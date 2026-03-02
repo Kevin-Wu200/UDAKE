@@ -1,30 +1,36 @@
 import { MapAdapter } from './MapAdapter.js';
+import { TiandituEngine } from '../map/core/TiandituEngine.js';
 import { TileCalculator } from '../map/core/TileCalculator.js';
 import { Projection } from '../map/core/Projection.js';
 import { Viewport } from '../map/core/Viewport.js';
 
 /**
- * 天地图适配器 - 原生 DOM 实现
- * 使用天地图 WMTS 服务直接加载瓦片
+ * 天地图适配器 - 使用 TiandituEngine
+ * 保持向后兼容的同时使用新的引擎架构
  */
 export class TiandituAdapter extends MapAdapter {
     constructor(options = {}) {
         super();
+
+        // 使用新的 TiandituEngine
+        this.engine = new TiandituEngine(options);
+
+        // 保持向后兼容的属性
         this.container = null;
         this.mapContainer = null;
         this.viewport = null;
 
-        // 地图状态
-        this.center = options.center || [116.39, 39.9]; // [lng, lat]
+        // 地图状态（代理到 engine）
+        this.center = options.center || [116.39, 39.9];
         this.zoom = options.zoom || 5;
         this.minZoom = options.minZoom || 1;
         this.maxZoom = options.maxZoom || 18;
-        this.type = options.type || 'img'; // 'img' 或 'vec'
+        this.type = options.type || 'img';
 
         // API Key
         this.apiKey = '66773e61397afa9c511d62fc259f3e70';
 
-        // 瓦片缓存
+        // 瓦片缓存（代理到 engine）
         this.tiles = new Map();
         this.tileServers = ['t0', 't1', 't2', 't3'];
         this.currentServerIndex = 0;
@@ -38,223 +44,81 @@ export class TiandituAdapter extends MapAdapter {
      * 初始化地图
      */
     async initMap(containerId) {
-        this.container = document.getElementById(containerId);
-        if (!this.container) {
-            throw new Error(`容器 #${containerId} 不存在`);
-        }
+        // 使用 engine 初始化
+        await this.engine.init(containerId, {
+            center: this.center,
+            zoom: this.zoom,
+            minZoom: this.minZoom,
+            maxZoom: this.maxZoom,
+            type: this.type
+        });
 
-        // 创建地图容器
-        this.mapContainer = document.createElement('div');
-        this.mapContainer.style.cssText = `
-            position: relative;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #f0f0f0;
-            cursor: grab;
-        `;
-        this.container.appendChild(this.mapContainer);
+        // 同步引用以保持向后兼容
+        this.container = this.engine.container;
+        this.mapContainer = this.engine.mapContainer;
+        this.viewport = this.engine.viewport;
+        this.tiles = this.engine.tiles;
 
-        // 初始化视口
-        this.viewport = new Viewport(this.container);
-
-        // 绑定事件
-        this.bindEvents();
-
-        // 渲染瓦片
-        this.renderTiles();
-
-        console.log('✅ 天地图初始化完成（原生 DOM 模式）');
+        console.log('✅ 天地图初始化完成（使用 TiandituEngine）');
         return this;
     }
 
     /**
-     * 绑定交互事件
+     * 绑定交互事件（已由 engine 处理）
      */
     bindEvents() {
-        // 鼠标滚轮缩放
-        this.container.addEventListener('wheel', (e) => {
-            e.preventDefault();
-            const delta = e.deltaY > 0 ? -1 : 1;
-            this.setZoom(this.zoom + delta);
-        });
-
-        // 鼠标拖拽
-        this.container.addEventListener('mousedown', (e) => {
-            this.viewport.startDrag(e.clientX, e.clientY);
-            this.container.style.cursor = 'grabbing';
-        });
-
-        this.container.addEventListener('mousemove', (e) => {
-            const delta = this.viewport.drag(e.clientX, e.clientY);
-            if (delta) {
-                // 根据拖拽距离更新中心点
-                const pixelPerDegree = this.getPixelPerDegree();
-                this.center[0] -= delta.deltaX / pixelPerDegree.lng;
-                this.center[1] += delta.deltaY / pixelPerDegree.lat;
-                this.renderTiles();
-            }
-        });
-
-        this.container.addEventListener('mouseup', () => {
-            this.viewport.endDrag();
-            this.container.style.cursor = 'grab';
-        });
-
-        this.container.addEventListener('mouseleave', () => {
-            this.viewport.endDrag();
-            this.container.style.cursor = 'grab';
-        });
-
-        // 窗口大小变化
-        window.addEventListener('resize', () => {
-            this.viewport.updateSize();
-            this.renderTiles();
-        });
+        // Engine 已经处理了事件绑定
     }
 
     /**
-     * 计算每度对应的像素数
+     * 计算每度对应的像素数（代理到 engine）
      */
     getPixelPerDegree() {
-        const n = Math.pow(2, this.zoom);
-        const lng = n * 256 / 360;
-        const lat = n * 256 / 360; // 简化计算
-        return { lng, lat };
+        return this.engine.getPixelPerDegree();
     }
 
     /**
-     * 渲染瓦片
+     * 渲染瓦片（代理到 engine）
      */
     renderTiles() {
-        // 清空现有瓦片
-        this.mapContainer.innerHTML = '';
-
-        const { width, height } = this.viewport.getSize();
-        const tiles = TileCalculator.calculateVisibleTiles(
-            this.center[0],
-            this.center[1],
-            this.zoom,
-            width,
-            height
-        );
-
-        tiles.forEach(tile => {
-            this.loadTile(tile);
-        });
+        this.engine.renderTiles();
     }
 
     /**
-     * 加载单个瓦片
+     * 加载单个瓦片（代理到 engine）
      */
     loadTile(tile) {
-        const { x, y, z } = tile;
-        const tileKey = `${z}-${x}-${y}`;
-
-        // 检查缓存
-        if (this.tiles.has(tileKey)) {
-            const cachedImg = this.tiles.get(tileKey);
-            this.mapContainer.appendChild(cachedImg.cloneNode());
-            return;
-        }
-
-        // 创建瓦片图片
-        const img = document.createElement('img');
-        img.style.cssText = `
-            position: absolute;
-            width: 256px;
-            height: 256px;
-        `;
-
-        // 计算瓦片位置
-        const { width, height } = this.viewport.getSize();
-        const position = TileCalculator.calculateTilePosition(
-            x, y,
-            this.center[0],
-            this.center[1],
-            z,
-            width,
-            height
-        );
-
-        img.style.left = `${position.left}px`;
-        img.style.top = `${position.top}px`;
-
-        // 设置瓦片 URL
-        img.src = this.getTileUrl(x, y, z);
-
-        // 超时处理
-        const timeout = setTimeout(() => {
-            if (!img.complete) {
-                console.warn(`瓦片 ${z}/${x}/${y} 加载超时`);
-                this.handleTileError(img, x, y, z);
-            }
-        }, 10000); // 10秒超时
-
-        // 加载成功
-        img.onload = () => {
-            clearTimeout(timeout);
-        };
-
-        // 错误处理
-        img.onerror = () => {
-            clearTimeout(timeout);
-            this.handleTileError(img, x, y, z);
-        };
-
-        this.mapContainer.appendChild(img);
-        this.tiles.set(tileKey, img);
+        this.engine.loadTile(tile);
     }
 
     /**
-     * 获取瓦片 URL
+     * 获取瓦片 URL（代理到 engine）
      */
     getTileUrl(x, y, z, serverIndex = 0) {
-        const server = this.tileServers[serverIndex];
-
-        if (this.type === 'img') {
-            // 影像图层
-            return `http://${server}.tianditu.gov.cn/img_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=img&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&tk=${this.apiKey}`;
-        } else {
-            // 矢量图层
-            return `http://${server}.tianditu.gov.cn/vec_w/wmts?SERVICE=WMTS&REQUEST=GetTile&VERSION=1.0.0&LAYER=vec&STYLE=default&TILEMATRIXSET=w&FORMAT=tiles&TILEMATRIX=${z}&TILEROW=${y}&TILECOL=${x}&tk=${this.apiKey}`;
-        }
+        return this.engine.getTileUrl(x, y, z, serverIndex);
     }
 
     /**
-     * 处理瓦片加载错误
+     * 处理瓦片加载错误（代理到 engine）
      */
     handleTileError(img, x, y, z, retryCount = 0) {
-        if (retryCount < this.tileServers.length) {
-            // 尝试下一个服务器
-            const nextServerIndex = (this.currentServerIndex + retryCount + 1) % this.tileServers.length;
-            console.warn(`瓦片加载失败，尝试备用服务器 ${this.tileServers[nextServerIndex]}`);
-            img.src = this.getTileUrl(x, y, z, nextServerIndex);
-            img.onerror = () => this.handleTileError(img, x, y, z, retryCount + 1);
-        } else {
-            console.error(`瓦片 ${z}/${x}/${y} 加载失败`);
-            img.style.display = 'none';
-        }
+        this.engine.handleTileError(img, x, y, z, retryCount);
     }
 
     /**
-     * 设置缩放级别
+     * 设置缩放级别（代理到 engine）
      */
     setZoom(zoom) {
-        zoom = Math.max(this.minZoom, Math.min(this.maxZoom, zoom));
-        if (zoom !== this.zoom) {
-            this.zoom = zoom;
-            this.renderTiles();
-            console.log(`缩放级别: ${this.zoom}`);
-        }
+        this.engine.setZoom(zoom);
+        this.zoom = this.engine.getZoom();
     }
 
     /**
-     * 设置中心点
+     * 设置中心点（代理到 engine）
      */
     setCenter(lng, lat) {
-        this.center = [lng, lat];
-        this.renderTiles();
+        this.engine.setCenter([lng, lat]);
+        this.center = this.engine.getCenter();
     }
 
     /**
@@ -263,7 +127,8 @@ export class TiandituAdapter extends MapAdapter {
     switchLayer(type) {
         if (type !== this.type) {
             this.type = type;
-            this.tiles.clear(); // 清空缓存
+            this.engine.type = type;
+            this.tiles.clear();
             this.renderTiles();
             console.log(`切换到${type === 'img' ? '影像' : '矢量'}图层`);
         }
@@ -273,7 +138,14 @@ export class TiandituAdapter extends MapAdapter {
      * 获取地图视图（兼容接口）
      */
     getView() {
-        return this;
+        return this.engine || this;
+    }
+
+    /**
+     * 获取引擎实例
+     */
+    getEngine() {
+        return this.engine;
     }
 
     /**

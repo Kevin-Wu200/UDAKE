@@ -1,13 +1,18 @@
 import { MapAdapter } from './MapAdapter.js';
 import { ArcGISConfig } from '../config/arcgis.config.js';
+import { ArcGISEngine } from '../map/core/ArcGISEngine.js';
 
 /**
  * ArcGIS 地图适配器
- * 封装 ArcGIS API for JavaScript 的地图操作
+ * 使用 ArcGISEngine，封装 ArcGIS API for JavaScript 的地图操作
  */
 export class ArcGISAdapter extends MapAdapter {
     constructor() {
         super();
+
+        // 使用新的 ArcGISEngine
+        this.engine = null;
+
         this.view = null;
         this.map = null;
         this.layers = {};
@@ -33,50 +38,25 @@ export class ArcGISAdapter extends MapAdapter {
             }
         }
 
-        // 动态加载 ArcGIS 模块
-        const [Map, MapView] = await Promise.all([
-            import('https://js.arcgis.com/4.28/@arcgis/core/Map.js'),
-            import('https://js.arcgis.com/4.28/@arcgis/core/views/MapView.js')
-        ].map(p => p.then(m => m.default)));
-
-        // 检测深色模式
-        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-
-        // 选择底图
-        const basemap = isDark
-            ? ArcGISConfig.ARCGIS_DARK_BASEMAP
-            : ArcGISConfig.ARCGIS_LIGHT_BASEMAP;
-
-        // 创建地图
-        this.map = new Map({
-            basemap: basemap
-        });
-
-        this.view = new MapView({
-            container: containerId,
-            map: this.map,
+        // 创建 ArcGISEngine
+        this.engine = new ArcGISEngine({
             center: ArcGISConfig.ARCGIS_DEFAULT_CENTER,
             zoom: ArcGISConfig.ARCGIS_DEFAULT_ZOOM,
-            constraints: ArcGISConfig.VIEW_OPTIONS.constraints,
-            ui: {
-                components: ['attribution']
-            }
+            minZoom: ArcGISConfig.VIEW_OPTIONS.constraints.minZoom,
+            maxZoom: ArcGISConfig.VIEW_OPTIONS.constraints.maxZoom
         });
 
-        // 监听系统深色模式变化
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        mediaQuery.addEventListener('change', (e) => {
-            this.map.basemap = e.matches
-                ? ArcGISConfig.ARCGIS_DARK_BASEMAP
-                : ArcGISConfig.ARCGIS_LIGHT_BASEMAP;
-        });
+        // 初始化引擎
+        await this.engine.init(containerId);
 
-        await this.view.when();
+        // 获取 view 和 map 引用
+        this.view = this.engine.getView();
+        this.map = this.engine.map;
 
         // 初始化 Graphics 图层
         await this.initGraphicsLayer();
 
-        console.log('✅ ArcGIS 地图初始化完成', config.isMock ? '(Mock模式)' : '');
+        console.log('✅ ArcGIS 地图初始化完成（使用 ArcGISEngine）', config.isMock ? '(Mock模式)' : '');
 
         return this.view;
     }
@@ -94,6 +74,13 @@ export class ArcGISAdapter extends MapAdapter {
 
     getView() {
         return this.view;
+    }
+
+    /**
+     * 获取引擎实例
+     */
+    getEngine() {
+        return this.engine;
     }
 
     /**
