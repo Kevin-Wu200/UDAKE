@@ -107,9 +107,37 @@ export class AMapAdapter extends MapAdapter {
      * 添加多边形
      */
     async addPolygon(coordinates, options = {}) {
-        // 高德地图的 polygon 已在 engine 中实现
-        // 这里可以扩展更多选项
-        console.log('添加多边形:', coordinates);
+        // 转换坐标格式
+        let path;
+        if (Array.isArray(coordinates[0][0])) {
+            // coordinates 是 rings 格式 [[[lng, lat], ...]]
+            path = coordinates[0].map(coord => [coord[0], coord[1]]);
+        } else {
+            // coordinates 已经是 path 格式 [[lng, lat], ...]
+            path = coordinates;
+        }
+
+        const polygon = new AMap.Polygon({
+            path: path,
+            strokeColor: options.strokeColor || '#007AFF',
+            strokeWeight: options.strokeWidth || 2,
+            strokeOpacity: options.strokeOpacity || 1,
+            fillColor: options.fillColor || [0, 122, 255, 0.1],
+            fillOpacity: options.fillOpacity || 0.1
+        });
+
+        this.map.add(polygon);
+
+        // 保存到图层
+        if (!this.layers['polygons']) {
+            this.layers['polygons'] = [];
+        }
+        this.layers['polygons'].push(polygon);
+
+        // 自动缩放到多边形
+        this.map.setFitView([polygon]);
+
+        return polygon;
     }
 
     /**

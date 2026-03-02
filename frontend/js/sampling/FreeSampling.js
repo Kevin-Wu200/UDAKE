@@ -7,7 +7,7 @@ import { ErrorHandler } from '../utils/ErrorHandler.js';
 
 export class FreeSampling {
     /**
-     * @param {Object} view - ArcGIS MapView
+     * @param {Object} view - MapView（支持 ArcGIS 和高德地图）
      * @param {Function} onPointAdded - 点添加回调
      */
     constructor(view, onPointAdded) {

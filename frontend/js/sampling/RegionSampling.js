@@ -1,23 +1,36 @@
 /**
  * 区域采样组件
  * 支持上传 GeoJSON 边界，仅允许在边界内添加采样点
+ * 支持多种地图引擎（ArcGIS、高德地图）
  */
 import { CoordinateInput } from './CoordinateInput.js';
 import { ErrorHandler } from '../utils/ErrorHandler.js';
 import { GeoJSONParser } from '../utils/geojsonParser.js';
+import { MapConfig } from '../config/map.config.js';
 
 export class RegionSampling {
     /**
-     * @param {Object} view - ArcGIS MapView
+     * @param {Object} viewOrAdapter - MapView 或 MapAdapter
      * @param {Function} onPointAdded - 点添加回调
      */
-    constructor(view, onPointAdded) {
-        this.view = view;
+    constructor(viewOrAdapter, onPointAdded) {
+        // 兼容旧代码：如果传入的是 view，尝试获取适配器
+        if (viewOrAdapter && typeof viewOrAdapter.getEngine === 'function') {
+            // 这是一个适配器
+            this.adapter = viewOrAdapter;
+            this.view = viewOrAdapter.getView();
+        } else {
+            // 这是一个 view，需要找到对应的适配器
+            this.view = viewOrAdapter;
+            this.adapter = null; // 将在需要时从全局获取
+        }
+
         this.onPointAdded = onPointAdded;
         this.coordinateInput = null;
         this.coordinateMode = 'manual';
         this.boundaryPolygon = null;
         this.boundaryLayer = null;
+        this.mapProvider = MapConfig.getProvider();
     }
 
     /**
@@ -165,9 +178,50 @@ export class RegionSampling {
     async displayBoundary(polygon) {
         // 移除旧的边界图层
         if (this.boundaryLayer) {
-            this.view.map.remove(this.boundaryLayer);
+            if (this.mapProvider === 'amap') {
+                this.view.remove(this.boundaryLayer);
+            } else {
+                this.view.map.remove(this.boundaryLayer);
+            }
         }
 
+        if (this.mapProvider === 'amap') {
+            // 高德地图实现
+            await this.displayBoundaryAMap(polygon);
+        } else {
+            // ArcGIS 实现
+            await this.displayBoundaryArcGIS(polygon);
+        }
+    }
+
+    /**
+     * 高德地图显示边界
+     */
+    async displayBoundaryAMap(polygon) {
+        const rings = this.getPolygonRings(polygon.geometry);
+
+        // 转换坐标格式：从 [[[lng, lat], ...]] 到 [[lng, lat], ...]
+        const path = rings[0].map(coord => [coord[0], coord[1]]);
+
+        this.boundaryLayer = new AMap.Polygon({
+            path: path,
+            strokeColor: '#007AFF',
+            strokeWeight: 2,
+            strokeOpacity: 0.8,
+            fillColor: '#007AFF',
+            fillOpacity: 0.1
+        });
+
+        this.view.add(this.boundaryLayer);
+
+        // 缩放到边界
+        this.view.setFitView([this.boundaryLayer], false, [20, 20, 20, 20]);
+    }
+
+    /**
+     * ArcGIS 显示边界
+     */
+    async displayBoundaryArcGIS(polygon) {
         // 使用 ArcGIS API 创建图层
         const [Graphic, GraphicsLayer] = await Promise.all([
             window.esri.require('esri/Graphic'),
@@ -380,7 +434,11 @@ export class RegionSampling {
         }
 
         if (this.boundaryLayer) {
-            this.view.map.remove(this.boundaryLayer);
+            if (this.mapProvider === 'amap') {
+                this.view.remove(this.boundaryLayer);
+            } else {
+                this.view.map.remove(this.boundaryLayer);
+            }
         }
     }
 }
