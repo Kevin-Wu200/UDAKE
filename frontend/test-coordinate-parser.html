@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>坐标解析器测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 800px;
+            margin: 40px auto;
+            padding: 20px;
+            background: #f5f5f7;
+        }
+        .test-section {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #1d1d1f;
+            margin-bottom: 32px;
+        }
+        h2 {
+            color: #1d1d1f;
+            font-size: 20px;
+            margin-bottom: 16px;
+        }
+        .test-case {
+            padding: 12px;
+            margin: 8px 0;
+            border-radius: 8px;
+            background: #f5f5f7;
+        }
+        .test-case.pass {
+            background: #d1f4e0;
+            border-left: 4px solid #34c759;
+        }
+        .test-case.fail {
+            background: #ffe5e5;
+            border-left: 4px solid #ff3b30;
+        }
+        .input-test {
+            margin: 16px 0;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #d2d2d7;
+            border-radius: 8px;
+            font-size: 14px;
+            margin: 8px 0;
+        }
+        input.invalid {
+            border: 1px solid #ff4d4f;
+            box-shadow: 0 0 4px rgba(255,0,0,0.3);
+        }
+        .error-message {
+            color: #ff3b30;
+            font-size: 12px;
+            margin-top: 4px;
+            display: none;
+        }
+        .result {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 12px;
+            color: #6e6e73;
+            margin-top: 8px;
+        }
+    </style>
+</head>
+<body>
+    <h1>坐标解析器测试</h1>
+
+    <div class="test-section">
+        <h2>自动化测试用例</h2>
+        <div id="test-results"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>交互式测试</h2>
+        <div class="input-test">
+            <label>经度测试：</label>
+            <input type="text" id="test-longitude" class="coordinate-input" placeholder="输入经度">
+            <div class="error-message" id="longitude-error"></div>
+            <div class="result" id="longitude-result"></div>
+        </div>
+        <div class="input-test">
+            <label>纬度测试：</label>
+            <input type="text" id="test-latitude" class="coordinate-input" placeholder="输入纬度">
+            <div class="error-message" id="latitude-error"></div>
+            <div class="result" id="latitude-result"></div>
+        </div>
+        <div class="input-test">
+            <label>采样值测试：</label>
+            <input type="text" id="test-value" class="coordinate-input" placeholder="输入采样值">
+            <div class="error-message" id="value-error"></div>
+            <div class="result" id="value-result"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { CoordinateParser } from './js/utils/CoordinateParser.js';
+
+        // 测试用例
+        const testCases = [
+            // 经度 - DD 格式
+            { input: '116.4074', type: 'longitude', expected: 116.4074, format: 'DD', shouldPass: true },
+            { input: '-73.9857', type: 'longitude', expected: -73.9857, format: 'DD', shouldPass: true },
+
+            // 经度 - DDM 格式
+            { input: '116°24.444\'', type: 'longitude', expected: 116.4074, format: 'DDM', shouldPass: true },
+            { input: '116 24.444', type: 'longitude', expected: 116.4074, format: 'DDM', shouldPass: true },
+            { input: '116°24.444', type: 'longitude', expected: 116.4074, format: 'DDM', shouldPass: true },
+
+            // 经度 - DMS 格式
+            { input: '116°24\'26"', type: 'longitude', expected: 116.4072, format: 'DMS', shouldPass: true },
+            { input: '116 24 26', type: 'longitude', expected: 116.4072, format: 'DMS', shouldPass: true },
+
+            // 经度 - 非法
+            { input: '200', type: 'longitude', shouldPass: false },
+            { input: '-200', type: 'longitude', shouldPass: false },
+
+            // 纬度 - DD 格式
+            { input: '39.9042', type: 'latitude', expected: 39.9042, format: 'DD', shouldPass: true },
+            { input: '-33.8688', type: 'latitude', expected: -33.8688, format: 'DD', shouldPass: true },
+
+            // 纬度 - DMS 格式
+            { input: '39°54\'15"', type: 'latitude', expected: 39.9042, format: 'DMS', shouldPass: true },
+
+            // 纬度 - 非法
+            { input: '100', type: 'latitude', shouldPass: false },
+            { input: '-100', type: 'latitude', shouldPass: false },
+        ];
+
+        // 运行测试
+        function runTests() {
+            const resultsDiv = document.getElementById('test-results');
+            let passCount = 0;
+            let failCount = 0;
+
+            testCases.forEach((testCase, index) => {
+                const result = CoordinateParser.parseCoordinate(testCase.input, testCase.type);
+                const passed = testCase.shouldPass ? result.valid : !result.valid;
+
+                if (passed && testCase.expected !== undefined) {
+                    // 检查数值是否接近（允许小误差）
+                    const numericMatch = Math.abs(result.value - testCase.expected) < 0.0001;
+                    if (!numericMatch) {
+                        console.error(`Test ${index + 1} failed: expected ${testCase.expected}, got ${result.value}`);
+                    }
+                }
+
+                const testDiv = document.createElement('div');
+                testDiv.className = `test-case ${passed ? 'pass' : 'fail'}`;
+                testDiv.innerHTML = `
+                    <strong>测试 ${index + 1}:</strong> "${testCase.input}" (${testCase.type})<br>
+                    <span class="result">
+                        结果: ${result.valid ? '✓ 有效' : '✗ 无效'} |
+                        值: ${result.value !== null ? result.value.toFixed(6) : 'null'} |
+                        格式: ${result.format || 'null'} |
+                        错误: ${result.error || 'none'}
+                    </span>
+                `;
+                resultsDiv.appendChild(testDiv);
+
+                if (passed) passCount++;
+                else failCount++;
+            });
+
+            const summary = document.createElement('div');
+            summary.style.marginTop = '16px';
+            summary.style.fontWeight = 'bold';
+            summary.innerHTML = `测试完成: ${passCount} 通过, ${failCount} 失败`;
+            resultsDiv.appendChild(summary);
+        }
+
+        // 交互式测试
+        function setupInteractiveTests() {
+            const longitudeInput = document.getElementById('test-longitude');
+            const latitudeInput = document.getElementById('test-latitude');
+            const valueInput = document.getElementById('test-value');
+
+            // 禁止滚轮和方向键
+            [longitudeInput, latitudeInput, valueInput].forEach(input => {
+                input.addEventListener('wheel', e => e.preventDefault());
+                input.addEventListener('keydown', e => {
+                    if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].includes(e.key)) {
+                        e.preventDefault();
+                    }
+                });
+            });
+
+            longitudeInput.addEventListener('input', (e) => {
+                const result = CoordinateParser.parseCoordinate(e.target.value, 'longitude');
+                updateUI('longitude', result, e.target);
+            });
+
+            latitudeInput.addEventListener('input', (e) => {
+                const result = CoordinateParser.parseCoordinate(e.target.value, 'latitude');
+                updateUI('latitude', result, e.target);
+            });
+
+            valueInput.addEventListener('input', (e) => {
+                const result = CoordinateParser.parseSampleValue(e.target.value);
+                updateUI('value', result, e.target);
+            });
+        }
+
+        function updateUI(type, result, input) {
+            const errorDiv = document.getElementById(`${type}-error`);
+            const resultDiv = document.getElementById(`${type}-result`);
+
+            if (!result.valid) {
+                input.classList.add('invalid');
+                errorDiv.textContent = result.error;
+                errorDiv.style.display = 'block';
+                resultDiv.textContent = '';
+            } else {
+                input.classList.remove('invalid');
+                errorDiv.style.display = 'none';
+                resultDiv.textContent = `✓ 有效 | 值: ${result.value.toFixed(6)}${result.format ? ' | 格式: ' + result.format : ''}`;
+            }
+        }
+
+        // 初始化
+        runTests();
+        setupInteractiveTests();
+    </script>
+</body>
+</html>

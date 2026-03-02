@@ -80,6 +80,23 @@
     border-color: var(--error-color);
 }
 
+/* 坐标输入框无效状态 */
+.coordinate-input.invalid {
+    border: 1px solid #ff4d4f;
+    box-shadow: 0 0 4px rgba(255, 0, 0, 0.3);
+}
+
+/* 移除 number input 的 spinner */
+.coordinate-input::-webkit-outer-spin-button,
+.coordinate-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.coordinate-input[type="number"] {
+    -moz-appearance: textfield;
+}
+
 .file-input {
     display: none;
 }

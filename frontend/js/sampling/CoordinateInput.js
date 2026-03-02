@@ -3,6 +3,7 @@
  * 支持手动输入和自动获取设备坐标
  */
 import { ErrorHandler } from '../utils/ErrorHandler.js';
+import { CoordinateParser } from '../utils/CoordinateParser.js';
 
 export class CoordinateInput {
     /**
@@ -14,6 +15,16 @@ export class CoordinateInput {
         this.onCoordinateChange = onCoordinateChange;
         this.currentPosition = null;
         this.watchId = null;
+
+        // 状态管理：保存原始输入和解析后的值
+        this.state = {
+            longitude_raw: '',
+            longitude: null,
+            latitude_raw: '',
+            latitude: null,
+            sampleValue_raw: '',
+            sampleValue: null
+        };
     }
 
     /**
@@ -44,33 +55,32 @@ export class CoordinateInput {
         panel.innerHTML = `
             <div class="form-group">
                 <label>经度 (Longitude)</label>
-                <input type="number"
+                <input type="text"
                        id="input-longitude"
-                       class="input"
-                       placeholder="例如: 116.4074"
-                       step="0.000001"
-                       min="-180"
-                       max="180">
+                       class="input coordinate-input"
+                       placeholder="例如: 116.4074 或 116°24.444' 或 116°24'26&quot;"
+                       autocomplete="off"
+                       spellcheck="false">
                 <div class="error-message" id="longitude-error"></div>
             </div>
             <div class="form-group">
                 <label>纬度 (Latitude)</label>
-                <input type="number"
+                <input type="text"
                        id="input-latitude"
-                       class="input"
-                       placeholder="例如: 39.9042"
-                       step="0.000001"
-                       min="-90"
-                       max="90">
+                       class="input coordinate-input"
+                       placeholder="例如: 39.9042 或 39°54'15&quot;"
+                       autocomplete="off"
+                       spellcheck="false">
                 <div class="error-message" id="latitude-error"></div>
             </div>
             <div class="form-group">
                 <label>采样值</label>
-                <input type="number"
+                <input type="text"
                        id="input-value"
-                       class="input"
+                       class="input coordinate-input"
                        placeholder="输入采样值"
-                       step="0.01">
+                       autocomplete="off"
+                       spellcheck="false">
                 <div class="error-message" id="value-error"></div>
             </div>
         `;
@@ -78,13 +88,32 @@ export class CoordinateInput {
         // 绑定实时验证
         const longitudeInput = panel.querySelector('#input-longitude');
         const latitudeInput = panel.querySelector('#input-latitude');
+        const valueInput = panel.querySelector('#input-value');
 
-        longitudeInput.addEventListener('input', () => {
-            this.validateLongitude(longitudeInput.value);
+        // 禁止滚轮改变值
+        [longitudeInput, latitudeInput, valueInput].forEach(input => {
+            input.addEventListener('wheel', e => e.preventDefault());
         });
 
-        latitudeInput.addEventListener('input', () => {
-            this.validateLatitude(latitudeInput.value);
+        // 禁止方向键改变值
+        [longitudeInput, latitudeInput, valueInput].forEach(input => {
+            input.addEventListener('keydown', e => {
+                if (['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown'].includes(e.key)) {
+                    e.preventDefault();
+                }
+            });
+        });
+
+        longitudeInput.addEventListener('input', (e) => {
+            this.validateCoordinate(e.target.value, 'longitude');
+        });
+
+        latitudeInput.addEventListener('input', (e) => {
+            this.validateCoordinate(e.target.value, 'latitude');
+        });
+
+        valueInput.addEventListener('input', (e) => {
+            this.validateSampleValue(e.target.value);
         });
 
         return panel;
@@ -210,45 +239,94 @@ export class CoordinateInput {
     }
 
     /**
-     * 验证经度
+     * 验证坐标（使用 CoordinateParser）
      * @param {string} value
+     * @param {string} type - 'longitude' | 'latitude'
      * @returns {boolean}
      */
-    validateLongitude(value) {
-        const longitude = parseFloat(value);
-        const errorDiv = document.getElementById('longitude-error');
+    validateCoordinate(value, type) {
+        const result = CoordinateParser.parseCoordinate(value, type);
+        const errorDiv = document.getElementById(`${type === 'longitude' ? 'longitude' : 'latitude'}-error`);
+        const input = document.getElementById(`input-${type === 'longitude' ? 'longitude' : 'latitude'}`);
 
-        const validation = ErrorHandler.validateCoordinates(longitude, 0);
-
-        if (!validation.valid) {
-            errorDiv.textContent = validation.error;
+        if (!result.valid) {
+            input.classList.add('invalid');
+            errorDiv.textContent = result.error;
             errorDiv.style.display = 'block';
+
+            // 更新状态
+            if (type === 'longitude') {
+                this.state.longitude_raw = value;
+                this.state.longitude = null;
+            } else {
+                this.state.latitude_raw = value;
+                this.state.latitude = null;
+            }
+
             return false;
         }
 
+        input.classList.remove('invalid');
         errorDiv.style.display = 'none';
+
+        // 更新状态：保存解析后的十进制度数
+        if (type === 'longitude') {
+            this.state.longitude_raw = value;
+            this.state.longitude = result.value;
+        } else {
+            this.state.latitude_raw = value;
+            this.state.latitude = result.value;
+        }
+
         return true;
     }
 
     /**
-     * 验证纬度
+     * 验证采样值
+     * @param {string} value
+     * @returns {boolean}
+     */
+    validateSampleValue(value) {
+        const result = CoordinateParser.parseSampleValue(value);
+        const errorDiv = document.getElementById('value-error');
+        const input = document.getElementById('input-value');
+
+        if (!result.valid) {
+            input.classList.add('invalid');
+            errorDiv.textContent = result.error;
+            errorDiv.style.display = 'block';
+
+            this.state.sampleValue_raw = value;
+            this.state.sampleValue = null;
+
+            return false;
+        }
+
+        input.classList.remove('invalid');
+        errorDiv.style.display = 'none';
+
+        this.state.sampleValue_raw = value;
+        this.state.sampleValue = result.value;
+
+        return true;
+    }
+
+    /**
+     * 验证经度（已废弃，使用 validateCoordinate）
+     * @param {string} value
+     * @returns {boolean}
+     */
+    validateLongitude(value) {
+        return this.validateCoordinate(value, 'longitude');
+    }
+
+    /**
+     * 验证纬度（已废弃，使用 validateCoordinate）
      * @param {string} value
      * @returns {boolean}
      */
     validateLatitude(value) {
-        const latitude = parseFloat(value);
-        const errorDiv = document.getElementById('latitude-error');
-
-        const validation = ErrorHandler.validateCoordinates(0, latitude);
-
-        if (!validation.valid) {
-            errorDiv.textContent = validation.error;
-            errorDiv.style.display = 'block';
-            return false;
-        }
-
-        errorDiv.style.display = 'none';
-        return true;
+        return this.validateCoordinate(value, 'latitude');
     }
 
     /**
@@ -257,22 +335,30 @@ export class CoordinateInput {
      */
     getValue() {
         if (this.mode === 'manual') {
-            const longitude = parseFloat(document.getElementById('input-longitude').value);
-            const latitude = parseFloat(document.getElementById('input-latitude').value);
-            const value = parseFloat(document.getElementById('input-value').value);
+            // 验证所有字段
+            const longitudeInput = document.getElementById('input-longitude');
+            const latitudeInput = document.getElementById('input-latitude');
+            const valueInput = document.getElementById('input-value');
 
-            const validation = ErrorHandler.validateCoordinates(longitude, latitude);
-            if (!validation.valid) {
-                ErrorHandler.showError(ErrorHandler.ErrorTypes.COORDINATE_FORMAT, validation.error);
+            const longitudeValid = this.validateCoordinate(longitudeInput.value, 'longitude');
+            const latitudeValid = this.validateCoordinate(latitudeInput.value, 'latitude');
+            const valueValid = this.validateSampleValue(valueInput.value);
+
+            // 如果任一字段无效，阻止提交
+            if (!longitudeValid || !latitudeValid || !valueValid) {
+                ErrorHandler.showError(
+                    ErrorHandler.ErrorTypes.VALIDATION_ERROR,
+                    '请输入合法的经纬度和采样值'
+                );
                 return null;
             }
 
-            if (isNaN(value)) {
-                ErrorHandler.showError(ErrorHandler.ErrorTypes.VALIDATION_ERROR, '请输入有效的采样值');
-                return null;
-            }
-
-            return { longitude, latitude, value };
+            // 使用状态中保存的十进制度数
+            return {
+                longitude: this.state.longitude,
+                latitude: this.state.latitude,
+                value: this.state.sampleValue
+            };
 
         } else if (this.mode === 'device') {
             if (!this.currentPosition) {
@@ -304,6 +390,33 @@ export class CoordinateInput {
             document.getElementById('input-longitude').value = '';
             document.getElementById('input-latitude').value = '';
             document.getElementById('input-value').value = '';
+
+            // 清空状态
+            this.state = {
+                longitude_raw: '',
+                longitude: null,
+                latitude_raw: '',
+                latitude: null,
+                sampleValue_raw: '',
+                sampleValue: null
+            };
+
+            // 清除错误样式
+            ['input-longitude', 'input-latitude', 'input-value'].forEach(id => {
+                const input = document.getElementById(id);
+                if (input) {
+                    input.classList.remove('invalid');
+                }
+            });
+
+            // 清除错误消息
+            ['longitude-error', 'latitude-error', 'value-error'].forEach(id => {
+                const errorDiv = document.getElementById(id);
+                if (errorDiv) {
+                    errorDiv.style.display = 'none';
+                }
+            });
+
         } else if (this.mode === 'device') {
             document.getElementById('device-input-value').value = '';
             this.currentPosition = null;
