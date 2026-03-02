@@ -70,11 +70,11 @@ fi
 
 # 检查图标文件
 echo -n "检查图标文件... "
-if [ -f ".claude/logo.png" ]; then
+if [ -f "dist/logo.png" ]; then
     echo "✓ 存在"
 else
     echo "✗ 不存在"
-    echo "请确保 .claude/logo.png 文件存在"
+    echo "请确保 dist/logo.png 文件存在"
     exit 1
 fi
 

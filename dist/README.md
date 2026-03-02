@@ -66,5 +66,5 @@ bash dist/scripts/dev.sh
 
 1. 所有打包相关文件必须在 `dist/` 目录内
 2. 不要在项目根目录创建其他打包目录
-3. 图标源文件：`.claude/logo.png`
+3. 图标源文件：`dist/logo.png`
 4. 构建产物会被 git 忽略（已配置 .gitignore）

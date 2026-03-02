@@ -68,7 +68,7 @@ fi
 # 生成应用图标
 echo -e "\n${YELLOW}[4/6] 生成应用图标...${NC}"
 
-LOGO_PATH="$PROJECT_ROOT/.claude/logo.png"
+LOGO_PATH="$DIST_DIR/logo.png"
 ICONSET_DIR="$DIST_DIR/tmp/UDAKE.iconset"
 ICNS_PATH="$DIST_DIR/UDAKE.icns"
 

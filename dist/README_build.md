@@ -42,7 +42,7 @@ dist/release/UDAKE.app
 1. **清理旧构建** - 删除之前的构建产物
 2. **构建前端** - 复制前端文件到 `dist/build/frontend`
 3. **构建后端** - 复制后端代码到 `dist/build/backend`
-4. **生成图标** - 从 `.claude/logo.png` 生成 `dist/UDAKE.icns`
+4. **生成图标** - 从 `dist/logo.png` 生成 `dist/UDAKE.icns`
 5. **安装依赖** - 安装 Electron 和相关依赖
 6. **打包应用** - 使用 electron-builder 生成 macOS 应用
 
@@ -314,7 +314,7 @@ dist/
 
 ### 图标未显示
 
-1. 确认 `.claude/logo.png` 存在
+1. 确认 `dist/logo.png` 存在
 2. 重新生成图标：
    ```bash
    rm dist/UDAKE.icns
@@ -340,8 +340,8 @@ dist/
 ## 📝 开发注意事项
 
 1. **不要在根目录创建新文件夹** - 所有打包相关文件必须在 `dist/` 内
-2. **图标源文件** - 只能使用 `.claude/logo.png`
-3. **日志位置** - 运行时日志在用户目录，构建日志在 `dist/logs/`
+2. **图标源文件** - 只能使用 `dist/logo.png`
+3. **日志位置** - 运行时日志在用户目录,构建日志在 `dist/logs/`
 4. **单实例运行** - 应用会阻止多实例启动
 5. **自动端口分配** - 后端会自动查找可用端口
 
