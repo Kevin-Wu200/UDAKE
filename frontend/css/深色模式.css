@@ -1,0 +1,36 @@
+@media (prefers-color-scheme: dark) {
+    :root {
+        --bg-primary: #0B0B0C;
+        --bg-secondary: #1c1c1e;
+        --bg-tertiary: #2c2c2e;
+
+        --text-primary: #FFFFFF;
+        --text-secondary: #B0B0B5;
+        --text-tertiary: #636366;
+
+        --border-color: #38383a;
+        --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+        --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.5);
+    }
+
+    .btn-icon {
+        background-color: var(--bg-tertiary);
+    }
+
+    .btn-icon:hover {
+        background-color: #48484a;
+    }
+
+    .modal-content {
+        background-color: rgba(30, 30, 30, 0.85);
+    }
+
+    .btn-secondary {
+        background-color: var(--bg-tertiary);
+    }
+
+    .btn-secondary:hover {
+        background-color: #48484a;
+    }
+}

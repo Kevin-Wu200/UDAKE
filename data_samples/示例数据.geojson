@@ -1,0 +1,66 @@
+{
+  "type": "FeatureCollection",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "EPSG:4326"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [116.4074, 39.9042]
+      },
+      "properties": {
+        "value": 25.5,
+        "name": "采样点1"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [116.4174, 39.9142]
+      },
+      "properties": {
+        "value": 28.3,
+        "name": "采样点2"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [116.3974, 39.8942]
+      },
+      "properties": {
+        "value": 22.1,
+        "name": "采样点3"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [116.4274, 39.9242]
+      },
+      "properties": {
+        "value": 30.2,
+        "name": "采样点4"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [116.3874, 39.8842]
+      },
+      "properties": {
+        "value": 20.5,
+        "name": "采样点5"
+      }
+    }
+  ]
+}

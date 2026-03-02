@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>智能不确定性驱动空间决策平台</title>
+
+    <!-- ArcGIS API for JavaScript -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.28/"></script>
+
+    <!-- Leaflet (用于天地图) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="css/主题变量.css">
+    <link rel="stylesheet" href="css/布局样式.css">
+    <link rel="stylesheet" href="css/组件样式.css">
+    <link rel="stylesheet" href="css/动画规范.css">
+    <link rel="stylesheet" href="css/深色模式.css">
+</head>
+<body>
+    <div id="app">
+        <!-- 顶部导航栏 -->
+        <header class="header">
+            <div class="header-content">
+                <div class="header-left"></div>
+                <h1 class="title">
+                    <span class="title-zh">智能不确定性驱动空间决策平台</span>
+                    <span class="title-en">UDAKE</span>
+                </h1>
+                <div class="header-right">
+                    <button id="new-project-btn" class="btn btn-primary">新建项目</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 左侧控制面板 -->
+            <aside class="sidebar">
+                <!-- 项目面板 -->
+                <div class="panel" id="project-panel" style="display: none;">
+                    <h2 class="panel-title">当前项目</h2>
+                    <div class="panel-content" id="project-content">
+                        <!-- 采样组件将动态插入这里 -->
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2 class="panel-title">数据上传</h2>
+                    <div class="panel-content">
+                        <div id="file-picker" class="file-picker">
+                            <span id="file-name">点击选择 GeoJSON 文件</span>
+                            <input type="file"
+                                   id="file-input"
+                                   accept=".geojson,.json"
+                                   class="file-input">
+                        </div>
+                        <button id="upload-btn" class="btn btn-primary">上传数据</button>
+                        <div id="upload-status" class="status-message"></div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2 class="panel-title">插值参数</h2>
+                    <div class="panel-content">
+                        <div class="form-group">
+                            <label>克里金方法</label>
+                            <select id="kriging-method" class="select">
+                                <option value="ordinary">普通克里金</option>
+                                <option value="universal">泛克里金</option>
+                                <option value="block">分块克里金</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>变异函数模型</label>
+                            <select id="variogram-model" class="select">
+                                <option value="spherical">球状模型</option>
+                                <option value="exponential">指数模型</option>
+                                <option value="gaussian">高斯模型</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>网格分辨率</label>
+                            <input type="text" id="grid-resolution" class="input" value="100" placeholder="请输入大于0的整数">
+                            <span class="error-message" id="grid-resolution-error">网格分辨率必须为大于0的整数</span>
+                        </div>
+
+                        <button id="start-kriging-btn" class="btn btn-primary" disabled>开始插值</button>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2 class="panel-title">任务状态</h2>
+                    <div class="panel-content">
+                        <div id="task-status" class="task-status">
+                            <p>暂无任务</p>
+                        </div>
+                        <div id="progress-bar" class="progress-bar" style="display: none;">
+                            <div class="progress-fill"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel">
+                    <h2 class="panel-title">图层控制</h2>
+                    <div class="panel-content">
+                        <div class="layer-control">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="layer-points" checked>
+                                <span>采样点</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="layer-prediction">
+                                <span>预测栅格</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="layer-variance">
+                                <span>方差栅格</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- 地图容器 -->
+            <div class="map-container">
+                <div id="viewDiv" class="map-view"></div>
+                <div id="info-panel" class="info-panel" style="display: none;">
+                    <h3>点击信息</h3>
+                    <div id="info-content"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript模块 -->
+    <script type="module" src="js/主程序.js"></script>
+</body>
+</html>
