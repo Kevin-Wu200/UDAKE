@@ -1,4 +1,4 @@
-import { TiandituEngine } from '../map/core/TiandituEngine.js';
+import { AMapEngine } from '../map/core/AMapEngine.js';
 import { ArcGISEngine } from '../map/core/ArcGISEngine.js';
 import { GeoUtils } from '../utils/GeoUtils.js';
 
@@ -18,14 +18,14 @@ export class MapManager {
 
     /**
      * 初始化地图
-     * @param {string} provider - 'tianditu' 或 'arcgis'
+     * @param {string} provider - 'amap' 或 'arcgis'
      * @param {string} containerId - 容器 ID
      * @param {Object} options - 初始化选项
      */
     async init(provider, containerId, options = {}) {
         // 创建地图引擎
-        if (provider === 'tianditu') {
-            this.mapEngine = new TiandituEngine(options);
+        if (provider === 'amap') {
+            this.mapEngine = new AMapEngine(options);
         } else if (provider === 'arcgis') {
             this.mapEngine = new ArcGISEngine(options);
         } else {

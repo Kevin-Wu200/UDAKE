@@ -60,7 +60,7 @@ export class LayerManager {
 
         let content = `<p><strong>坐标:</strong> ${mapPoint.longitude.toFixed(6)}, ${mapPoint.latitude.toFixed(6)}</p>`;
 
-        if (graphic.attributes) {
+        if (graphic && graphic.attributes) {
             for (const [key, value] of Object.entries(graphic.attributes)) {
                 if (key !== 'OBJECTID' && key !== 'FID') {
                     content += `<p><strong>${key}:</strong> ${value}</p>`;
