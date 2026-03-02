@@ -208,10 +208,6 @@
         }
     </style>
 
-    <!-- Leaflet -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
     <!-- ArcGIS API -->
     <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
     <script src="https://js.arcgis.com/4.28/"></script>
@@ -229,10 +225,6 @@
                 <div class="info-item">
                     <div class="info-label">当前地图引擎</div>
                     <div class="info-value" id="current-engine">加载中...</div>
-                </div>
-                <div class="info-item">
-                    <div class="info-label">Leaflet 版本</div>
-                    <div class="info-value" id="leaflet-version">-</div>
                 </div>
                 <div class="info-item">
                     <div class="info-label">浏览器</div>
@@ -318,7 +310,6 @@
                 // 显示系统信息
                 const engine = MapConfig.getProvider();
                 document.getElementById('current-engine').textContent = engine === 'arcgis' ? 'ArcGIS' : '天地图';
-                document.getElementById('leaflet-version').textContent = typeof L !== 'undefined' ? L.version : '未加载';
                 document.getElementById('browser-info').textContent = navigator.userAgent.split(' ').pop();
 
                 // 初始化地图

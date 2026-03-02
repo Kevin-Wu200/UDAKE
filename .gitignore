@@ -19,6 +19,9 @@ wheels/
 .installed.cfg
 *.egg
 
+# 前端库文件例外（不忽略）
+!frontend/lib/
+
 # 虚拟环境
 venv/
 ENV/
