@@ -22,6 +22,61 @@ export class AMapEngine extends BaseMapEngine {
     }
 
     /**
+     * 等待高德地图 API 加载完成
+     */
+    async waitForAMapAPI() {
+        // 如果已经加载，直接返回
+        if (typeof AMap !== 'undefined') {
+            console.log('✅ 高德地图 API 已加载');
+            return;
+        }
+
+        console.log('⏳ 等待高德地图 API 加载...');
+
+        // 等待 API 加载，最多等待 15 秒
+        const maxWaitTime = 15000;
+        const checkInterval = 100;
+        let waitedTime = 0;
+
+        return new Promise((resolve, reject) => {
+            const checkAPI = () => {
+                if (typeof AMap !== 'undefined') {
+                    console.log(`✅ 高德地图 API 加载完成 (耗时: ${waitedTime}ms)`);
+                    console.log(`   版本: ${AMap.version || '未知'}`);
+                    resolve();
+                } else if (waitedTime >= maxWaitTime) {
+                    console.error('❌ 高德地图 API 加载超时');
+                    console.error('可能原因:');
+                    console.error('1. 网络连接问题');
+                    console.error('2. Key 或安全密钥配置错误');
+                    console.error('3. 域名未在高德开放平台配置白名单');
+                    console.error('4. Electron webSecurity 阻止了外部请求');
+                    console.error('5. 脚本加载被 CSP 策略阻止');
+
+                    // 检查安全配置
+                    if (window._AMapSecurityConfig) {
+                        console.log('✅ 安全密钥已配置:', window._AMapSecurityConfig.securityJsCode ? '存在' : '缺失');
+                    } else {
+                        console.error('❌ 安全密钥未配置');
+                    }
+
+                    reject(new Error('高德地图 API 加载超时 (15秒)'));
+                } else {
+                    waitedTime += checkInterval;
+
+                    // 每秒输出一次进度
+                    if (waitedTime % 1000 === 0) {
+                        console.log(`   等待中... ${waitedTime / 1000}s`);
+                    }
+
+                    setTimeout(checkAPI, checkInterval);
+                }
+            };
+            checkAPI();
+        });
+    }
+
+    /**
      * 初始化地图
      */
     async init(container, options = {}) {
@@ -38,9 +93,7 @@ export class AMapEngine extends BaseMapEngine {
         }
 
         // 等待高德 API 加载
-        if (typeof AMap === 'undefined') {
-            throw new Error('高德地图 API 未加载');
-        }
+        await this.waitForAMapAPI();
 
         // 创建地图实例
         this.map = new AMap.Map(containerElement, {

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高德地图加载测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        #map {
+            width: 100%;
+            height: 400px;
+            margin: 20px 0;
+            border: 2px solid #ccc;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        pre {
+            background: #fff;
+            padding: 10px;
+            border: 1px solid #ddd;
+            overflow-x: auto;
+        }
+    </style>
+
+    <!-- 高德地图安全密钥配置 -->
+    <script>
+        window._AMapSecurityConfig = {
+            securityJsCode: "10b5ef21f6b36d09e24d7b076d35dccc"
+        };
+    </script>
+
+    <!-- 高德地图 JS API -->
+    <script src="https://webapi.amap.com/maps?v=2.0&key=2f3f114aa5671425aa3c52f707d741c5"></script>
+</head>
+<body>
+    <h1>高德地图加载诊断测试</h1>
+
+    <div id="status-container"></div>
+
+    <div id="map"></div>
+
+    <h2>诊断报告</h2>
+    <pre id="report"></pre>
+
+    <script>
+        const statusContainer = document.getElementById('status-container');
+        const reportElement = document.getElementById('report');
+        const report = [];
+
+        function addStatus(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status ${type}`;
+            div.textContent = message;
+            statusContainer.appendChild(div);
+            report.push(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function updateReport() {
+            reportElement.textContent = report.join('\n');
+        }
+
+        // 测试开始
+        addStatus('开始诊断...', 'info');
+        updateReport();
+
+        // 1. 检查安全密钥配置
+        if (window._AMapSecurityConfig && window._AMapSecurityConfig.securityJsCode) {
+            addStatus('✅ 安全密钥配置正确', 'success');
+        } else {
+            addStatus('❌ 安全密钥配置缺失', 'error');
+        }
+        updateReport();
+
+        // 2. 等待 AMap API 加载
+        let checkCount = 0;
+        const maxChecks = 100; // 10秒
+
+        const checkInterval = setInterval(() => {
+            checkCount++;
+
+            if (typeof AMap !== 'undefined') {
+                clearInterval(checkInterval);
+                addStatus(`✅ 高德地图 API 加载成功 (耗时: ${checkCount * 100}ms)`, 'success');
+                addStatus(`AMap 版本: ${AMap.version || '未知'}`, 'info');
+                updateReport();
+
+                // 3. 尝试创建地图实例
+                try {
+                    const map = new AMap.Map('map', {
+                        zoom: 10,
+                        center: [116.39, 39.9],
+                        viewMode: '2D'
+                    });
+
+                    addStatus('✅ 地图实例创建成功', 'success');
+                    addStatus(`地图中心: ${map.getCenter()}`, 'info');
+                    addStatus(`地图缩放: ${map.getZoom()}`, 'info');
+                    updateReport();
+
+                    // 4. 测试添加标记
+                    const marker = new AMap.Marker({
+                        position: [116.39, 39.9],
+                        title: '测试标记'
+                    });
+                    map.add(marker);
+                    addStatus('✅ 标记添加成功', 'success');
+                    updateReport();
+
+                    // 最终报告
+                    addStatus('🎉 所有测试通过！高德地图工作正常', 'success');
+                    updateReport();
+
+                } catch (error) {
+                    addStatus(`❌ 创建地图失败: ${error.message}`, 'error');
+                    updateReport();
+                }
+
+            } else if (checkCount >= maxChecks) {
+                clearInterval(checkInterval);
+                addStatus('❌ 高德地图 API 加载超时 (10秒)', 'error');
+                addStatus('可能原因:', 'error');
+                addStatus('1. 网络连接问题', 'error');
+                addStatus('2. Key 或安全密钥错误', 'error');
+                addStatus('3. 域名未在高德开放平台配置白名单', 'error');
+                addStatus('4. Electron webSecurity 阻止了外部请求', 'error');
+                updateReport();
+            }
+        }, 100);
+
+        // 5. 监听网络请求
+        window.addEventListener('error', (e) => {
+            if (e.target.tagName === 'SCRIPT') {
+                addStatus(`❌ 脚本加载失败: ${e.target.src}`, 'error');
+                updateReport();
+            }
+        }, true);
+
+        // 6. 检查环境信息
+        addStatus(`User Agent: ${navigator.userAgent}`, 'info');
+        addStatus(`当前域名: ${window.location.href}`, 'info');
+        addStatus(`协议: ${window.location.protocol}`, 'info');
+        updateReport();
+    </script>
+</body>
+</html>

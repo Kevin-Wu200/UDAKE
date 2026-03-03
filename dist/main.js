@@ -164,8 +164,8 @@ function createWindow() {
     trafficLightPosition: { x: 16, y: 16 },
     webPreferences: {
       nodeIntegration: false,
-      // contextIsolation: true,
       contextIsolation: false,
+      webSecurity: false, // 允许加载外部资源（高德地图 API）
       // preload: path.join(__dirname, 'preload.js')
     },
     show: false
