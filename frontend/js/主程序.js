@@ -10,6 +10,8 @@ import { NewProjectModal } from './components/NewProjectModal.js';
 import { FreeSampling } from './sampling/FreeSampling.js';
 import { RegionSampling } from './sampling/RegionSampling.js';
 import { Project } from './models/Project.js';
+import { LocationPermissionManager } from './utils/locationPermissionManager.js';
+import { SamplingRecommendationPanel } from './components/SamplingRecommendationPanel.js';
 
 console.log("主程序已执行");
 
@@ -24,6 +26,7 @@ class App {
         this.view = null;
         this.currentProject = null;
         this.samplingComponent = null;
+        this.recommendationPanel = null;
 
         this.init();
     }
@@ -87,6 +90,12 @@ class App {
     this.initializeComponents(this.view);
     console.log("组件初始化完成");
 
+    // 初始化定位权限（不阻塞后续流程）
+    console.log("准备检测定位权限");
+    LocationPermissionManager.requestPermission().then(status => {
+        console.log("定位权限状态:", status);
+    });
+
     console.log("准备绑定事件");
     this.bindEvents();
     console.log("bindEvents 调用完成");
@@ -110,12 +119,32 @@ class App {
         });
         const samplingPanel = singlePointSampling.createPanel();
 
+        // 创建采样建议面板
+        this.recommendationPanel = new SamplingRecommendationPanel(
+            view,
+            this.layerManager,
+            (recommendation) => this.handleRecommendationSelect(recommendation)
+        );
+        const recommendationPanel = this.recommendationPanel.createPanel();
+
         // 插入到侧边栏
         const firstPanel = sidebar.querySelector('.panel');
         sidebar.insertBefore(coordPanel, firstPanel);
 
         const interpolationPanel = sidebar.querySelectorAll('.panel')[2];
         interpolationPanel.parentNode.insertBefore(samplingPanel, interpolationPanel.nextSibling);
+
+        // 将采样建议面板添加到右侧侧边栏
+        const rightSidebarContent = document.querySelector('.right-sidebar-content');
+        if (rightSidebarContent) {
+            rightSidebarContent.appendChild(recommendationPanel);
+        }
+
+        // 绑定侧边栏切换按钮
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', () => this.toggleRightSidebar());
+        }
     }
 
     bindEvents() {
@@ -169,6 +198,26 @@ class App {
         });
         document.getElementById('layer-variance').addEventListener('change', (e) => {
             this.layerManager.toggleLayer('variance', e.target.checked);
+        });
+
+        // 导出按钮
+        document.getElementById('export-prediction-geojson').addEventListener('click', () => {
+            this.handleExport('prediction', 'geojson');
+        });
+        document.getElementById('export-prediction-shp').addEventListener('click', () => {
+            this.handleExport('prediction', 'shp');
+        });
+        document.getElementById('export-prediction-tif').addEventListener('click', () => {
+            this.handleExport('prediction', 'tif');
+        });
+        document.getElementById('export-variance-geojson').addEventListener('click', () => {
+            this.handleExport('variance', 'geojson');
+        });
+        document.getElementById('export-variance-shp').addEventListener('click', () => {
+            this.handleExport('variance', 'shp');
+        });
+        document.getElementById('export-variance-tif').addEventListener('click', () => {
+            this.handleExport('variance', 'tif');
         });
     }
 
@@ -454,15 +503,94 @@ class App {
             this.layerManager.addRasterLayer('prediction', predictionResult.geotiff_url);
             this.layerManager.addRasterLayer('variance', varianceResult.geotiff_url);
 
+            // 显示导出面板
+            document.getElementById('export-panel').style.display = 'block';
+
+            // 设置采样建议面板的任务ID，自动生成建议
+            if (this.recommendationPanel) {
+                this.recommendationPanel.setTaskId(this.currentTaskId);
+            }
+
         } catch (error) {
             console.error('加载结果失败:', error);
         }
+    }
+
+    /**
+     * 处理导出
+     */
+    async handleExport(dataType, format) {
+        if (!this.currentTaskId) {
+            this.showExportStatus('没有可导出的结果', 'error');
+            return;
+        }
+
+        const filename = `${this.currentTaskId}_${dataType}.${format}`;
+        this.showExportStatus(`正在下载 ${filename}...`, 'success');
+
+        try {
+            await this.apiService.downloadExportFile(this.currentTaskId, filename);
+            this.showExportStatus(`${filename} 下载完成`, 'success');
+        } catch (error) {
+            console.error('导出失败:', error);
+            this.showExportStatus(`导出失败: ${error.message}`, 'error');
+        }
+    }
+
+    showExportStatus(message, type) {
+        const statusDiv = document.getElementById('export-status');
+        statusDiv.textContent = message;
+        statusDiv.className = `status-message ${type}`;
     }
 
     showStatus(message, type) {
         const statusDiv = document.getElementById('upload-status');
         statusDiv.textContent = message;
         statusDiv.className = `status-message ${type}`;
+    }
+
+    /**
+     * 切换右侧侧边栏
+     */
+    toggleRightSidebar() {
+        const rightSidebar = document.getElementById('right-sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+
+        if (rightSidebar.classList.contains('hidden')) {
+            rightSidebar.classList.remove('hidden');
+            sidebarToggle.classList.remove('open');
+        } else {
+            rightSidebar.classList.add('hidden');
+            sidebarToggle.classList.add('open');
+        }
+    }
+
+    /**
+     * 处理建议点选中
+     * @param {Object} recommendation - 建议点数据
+     */
+    handleRecommendationSelect(recommendation) {
+        console.log('选中建议点:', recommendation);
+
+        // 如果有采样组件，自动填充坐标
+        if (this.samplingComponent && this.samplingComponent.coordinateInput) {
+            // 填充坐标
+            this.samplingComponent.coordinateInput.setValue({
+                longitude: recommendation.x,
+                latitude: recommendation.y
+            });
+
+            // 显示提示信息
+            this.showStatus(
+                `已选择建议点 #${recommendation.id}，坐标已自动填充`,
+                'success'
+            );
+        } else {
+            this.showStatus(
+                `建议点 #${recommendation.id} 坐标: ${recommendation.x.toFixed(6)}, ${recommendation.y.toFixed(6)}`,
+                'success'
+            );
+        }
     }
 }
 

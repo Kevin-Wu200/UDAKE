@@ -80,6 +80,8 @@ class TaskManager:
             return PredictionResult(
                 task_id=task_id,
                 geotiff_url=f"/results/{task_id}_prediction.tif",
+                geojson_url=f"/results/{task_id}_prediction.geojson",
+                shapefile_url=f"/results/{task_id}_prediction.shp",
                 statistics=result.get("prediction_stats", {})
             )
 
@@ -93,6 +95,8 @@ class TaskManager:
             return VarianceResult(
                 task_id=task_id,
                 geotiff_url=f"/results/{task_id}_variance.tif",
+                geojson_url=f"/results/{task_id}_variance.geojson",
+                shapefile_url=f"/results/{task_id}_variance.shp",
                 statistics=result.get("variance_stats", {})
             )
 

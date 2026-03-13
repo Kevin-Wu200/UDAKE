@@ -4,6 +4,7 @@
  */
 import { ErrorHandler } from '../utils/ErrorHandler.js';
 import { CoordinateParser } from '../utils/CoordinateParser.js';
+import { LocationPermissionManager } from '../utils/locationPermissionManager.js';
 
 export class CoordinateInput {
     /**
@@ -162,10 +163,13 @@ export class CoordinateInput {
      * 获取当前位置
      */
     getCurrentPosition() {
-        if (!navigator.geolocation) {
+        // 检查权限状态
+        const permissionStatus = LocationPermissionManager.getPermissionStatus();
+
+        if (permissionStatus === LocationPermissionManager.PermissionStatus.DENIED) {
             ErrorHandler.showError(
-                ErrorHandler.ErrorTypes.GEOLOCATION_FAILED,
-                '您的浏览器不支持地理定位'
+                ErrorHandler.ErrorTypes.PERMISSION_DENIED,
+                '定位权限未授权，无法使用当前位置采样功能，请在系统设置中开启定位权限。'
             );
             return;
         }
@@ -176,34 +180,73 @@ export class CoordinateInput {
         statusText.textContent = '正在获取位置...';
         statusIcon.innerHTML = '<span>⏳</span>';
 
-        navigator.geolocation.getCurrentPosition(
-            (position) => this.handlePositionSuccess(position),
-            (error) => this.handlePositionError(error),
-            {
-                enableHighAccuracy: true,
-                timeout: 10000,
-                maximumAge: 0
-            }
-        );
+        // 若权限为 unknown，再次尝试请求权限后获取位置
+        if (permissionStatus === LocationPermissionManager.PermissionStatus.UNKNOWN) {
+            LocationPermissionManager.requestPermission().then(status => {
+                if (status === LocationPermissionManager.PermissionStatus.DENIED) {
+                    statusText.textContent = '位置获取失败';
+                    statusIcon.innerHTML = '<span>❌</span>';
+                    ErrorHandler.showError(
+                        ErrorHandler.ErrorTypes.PERMISSION_DENIED,
+                        '定位权限未授权，无法使用当前位置采样功能，请在系统设置中开启定位权限。'
+                    );
+                    return;
+                }
+                this._doGetPosition();
+            });
+            return;
+        }
+
+        this._doGetPosition();
+    }
+
+    /**
+     * 执行定位获取（内部方法）
+     */
+    _doGetPosition() {
+        LocationPermissionManager.getCurrentPosition()
+            .then(position => this.handlePositionSuccess(position))
+            .catch(error => this._handlePermissionError(error));
+    }
+
+    /**
+     * 处理权限管理模块返回的错误
+     */
+    _handlePermissionError(error) {
+        const statusText = document.getElementById('location-text');
+        const statusIcon = document.getElementById('location-status');
+
+        statusText.textContent = '位置获取失败';
+        statusIcon.innerHTML = '<span>❌</span>';
+
+        if (error.type === 'denied') {
+            ErrorHandler.showError(ErrorHandler.ErrorTypes.PERMISSION_DENIED, error.message);
+        } else if (error.type === 'timeout') {
+            ErrorHandler.showError(ErrorHandler.ErrorTypes.GEOLOCATION_FAILED, error.message);
+        } else if (error.type === 'unsupported') {
+            ErrorHandler.showError(ErrorHandler.ErrorTypes.GEOLOCATION_FAILED, error.message);
+        } else {
+            ErrorHandler.showError(ErrorHandler.ErrorTypes.GEOLOCATION_FAILED, error.message);
+        }
     }
 
     /**
      * 处理定位成功
-     * @param {GeolocationPosition} position
+     * @param {{longitude: number, latitude: number, accuracy: number, timestamp: string}} position
      */
     handlePositionSuccess(position) {
-        const { longitude, latitude } = position.coords;
+        const { longitude, latitude, accuracy } = position;
 
-        // 强制校验坐标系为 WGS-84
-        if (position.coords.accuracy > 100) {
+        // 精度校验
+        if (accuracy > 100) {
             ErrorHandler.showWarning('定位精度较低，建议重新获取');
         }
 
         this.currentPosition = {
             longitude,
             latitude,
-            accuracy: position.coords.accuracy,
-            timestamp: new Date(position.timestamp).toISOString()
+            accuracy,
+            timestamp: position.timestamp
         };
 
         // 更新界面
@@ -222,20 +265,6 @@ export class CoordinateInput {
         }
 
         ErrorHandler.showSuccess('位置获取成功');
-    }
-
-    /**
-     * 处理定位失败
-     * @param {GeolocationPositionError} error
-     */
-    handlePositionError(error) {
-        const statusText = document.getElementById('location-text');
-        const statusIcon = document.getElementById('location-status');
-
-        statusText.textContent = '位置获取失败';
-        statusIcon.innerHTML = '<span>❌</span>';
-
-        ErrorHandler.handleGeolocationError(error);
     }
 
     /**
@@ -432,11 +461,75 @@ export class CoordinateInput {
     }
 
     /**
+     * 设置坐标值
+     * @param {Object} position - {longitude: number, latitude: number}
+     */
+    setValue(position) {
+        if (!position || typeof position.longitude !== 'number' || typeof position.latitude !== 'number') {
+            console.error('Invalid position:', position);
+            return;
+        }
+
+        if (this.mode === 'manual') {
+            const longitudeInput = document.getElementById('input-longitude');
+            const latitudeInput = document.getElementById('input-latitude');
+
+            if (longitudeInput && latitudeInput) {
+                // 设置输入值（使用十进制度数）
+                longitudeInput.value = position.longitude.toFixed(6);
+                latitudeInput.value = position.latitude.toFixed(6);
+
+                // 更新状态
+                this.state.longitude = position.longitude;
+                this.state.latitude = position.latitude;
+                this.state.longitude_raw = position.longitude.toFixed(6);
+                this.state.latitude_raw = position.latitude.toFixed(6);
+
+                // 清除错误样式
+                longitudeInput.classList.remove('invalid');
+                latitudeInput.classList.remove('invalid');
+
+                // 清除错误消息
+                const longitudeError = document.getElementById('longitude-error');
+                const latitudeError = document.getElementById('latitude-error');
+                if (longitudeError) longitudeError.style.display = 'none';
+                if (latitudeError) latitudeError.style.display = 'none';
+
+                // 触发回调
+                if (this.onCoordinateChange) {
+                    this.onCoordinateChange({
+                        longitude: position.longitude,
+                        latitude: position.latitude
+                    });
+                }
+            }
+        } else if (this.mode === 'device') {
+            // 设备模式下，更新当前位置
+            this.currentPosition = {
+                longitude: position.longitude,
+                latitude: position.latitude,
+                accuracy: 0,
+                timestamp: Date.now()
+            };
+
+            const coordinateDisplay = document.getElementById('coordinate-display');
+            if (coordinateDisplay) {
+                coordinateDisplay.textContent = `经度: ${position.longitude.toFixed(6)}, 纬度: ${position.latitude.toFixed(6)}`;
+                coordinateDisplay.style.display = 'block';
+            }
+
+            const statusText = document.getElementById('location-text');
+            const statusIcon = document.getElementById('location-status');
+            if (statusText) statusText.textContent = '位置已设置';
+            if (statusIcon) statusIcon.innerHTML = '<span>✅</span>';
+        }
+    }
+
+    /**
      * 销毁组件
      */
     destroy() {
-        if (this.watchId !== null) {
-            navigator.geolocation.clearWatch(this.watchId);
-        }
+        // watchId 已不再使用，保留接口兼容
+        this.watchId = null;
     }
 }

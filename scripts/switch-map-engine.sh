@@ -44,13 +44,13 @@ switch_to_arcgis() {
 }
 
 # 切换到天地图
-switch_to_tianditu() {
-    echo -e "${YELLOW}🔄 正在切换到天地图模式...${NC}"
+switch_to_amap() {
+    echo -e "${YELLOW}🔄 正在切换到AMap模式...${NC}"
 
-    sed -i.bak "s/MAP_PROVIDER: '[^']*'/MAP_PROVIDER: 'tianditu'/" "$CONFIG_FILE"
+    sed -i.bak "s/MAP_PROVIDER: '[^']*'/MAP_PROVIDER: 'amap'/" "$CONFIG_FILE"
 
     if [ $? -eq 0 ]; then
-        echo -e "${GREEN}✅ 已切换到天地图模式${NC}"
+        echo -e "${GREEN}✅ 已切换到AMap模式${NC}"
         echo -e "${YELLOW}⚠️  请重启应用以使更改生效${NC}"
     else
         echo -e "${RED}❌ 切换失败${NC}"
@@ -68,13 +68,13 @@ show_help() {
     echo ""
     echo "选项:"
     echo "  arcgis      切换到 ArcGIS 模式"
-    echo "  tianditu    切换到天地图模式"
+    echo "  amap    切换到天地图模式"
     echo "  status      显示当前配置"
     echo "  help        显示此帮助信息"
     echo ""
     echo "示例:"
     echo "  $0 arcgis       # 切换到 ArcGIS"
-    echo "  $0 tianditu     # 切换到天地图"
+    echo "  $0 amap     # 切换到天地图"
     echo "  $0 status       # 查看当前配置"
     echo ""
 }
@@ -85,9 +85,9 @@ case "$1" in
         show_current
         switch_to_arcgis
         ;;
-    tianditu)
+    amap)
         show_current
-        switch_to_tianditu
+        switch_to_amap
         ;;
     status)
         show_current

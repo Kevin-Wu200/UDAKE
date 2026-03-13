@@ -105,6 +105,25 @@ export class APIService {
     }
 
     /**
+     * 下载导出文件
+     */
+    async downloadExportFile(taskId, filename) {
+        const url = `${this.baseURL}/result/download/${taskId}/${filename}`;
+        const response = await fetch(url, { mode: 'cors', credentials: 'omit' });
+        if (!response.ok) {
+            throw new Error(`下载失败: HTTP ${response.status}`);
+        }
+        const blob = await response.blob();
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(link.href);
+    }
+
+    /**
      * 取消所有待处理请求
      */
     cancelAllRequests() {

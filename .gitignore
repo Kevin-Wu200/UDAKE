@@ -76,3 +76,8 @@ dist/logs/
 dist/tmp/
 dist/UDAKE.icns
 dist/package-lock.json
+
+#Android APK
+*.jks
+*.keystore
+密钥*.txt

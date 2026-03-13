@@ -5,6 +5,9 @@ from pykrige.ok import OrdinaryKriging
 from ..schemas.数据模型 import SpatialData
 from ..schemas.插值参数模型 import KrigingParameters
 from ..utils.栅格工具 import RasterUtils
+from ..utils.GeoJSON工具 import GeoJSONUtils
+from ..utils.Shapefile工具 import ShapefileUtils
+from ..config import settings
 import numpy as np
 from typing import Dict, Any
 import logging
@@ -51,6 +54,30 @@ class BlockKrigingEngine:
             task_id, ss, grid_x, grid_y, "variance"
         )
 
+        # 导出 GeoJSON
+        prediction_geojson = GeoJSONUtils.raster_to_points(z, grid_x, grid_y, "prediction")
+        prediction_geojson_path = settings.RESULTS_DIR / f"{task_id}_prediction.geojson"
+        GeoJSONUtils.save_geojson(prediction_geojson, prediction_geojson_path)
+
+        variance_geojson = GeoJSONUtils.raster_to_points(ss, grid_x, grid_y, "variance")
+        variance_geojson_path = settings.RESULTS_DIR / f"{task_id}_variance.geojson"
+        GeoJSONUtils.save_geojson(variance_geojson, variance_geojson_path)
+
+        logger.info(f"GeoJSON 已导出: {prediction_geojson_path}, {variance_geojson_path}")
+
+        # 导出 Shapefile
+        prediction_shp_path = ShapefileUtils.raster_to_shapefile(
+            z, grid_x, grid_y,
+            settings.RESULTS_DIR / f"{task_id}_prediction.shp",
+            "prediction"
+        )
+        variance_shp_path = ShapefileUtils.raster_to_shapefile(
+            ss, grid_x, grid_y,
+            settings.RESULTS_DIR / f"{task_id}_variance.shp",
+            "variance"
+        )
+        logger.info(f"Shapefile 已导出: {prediction_shp_path}, {variance_shp_path}")
+
         prediction_stats = {
             "mean": float(np.mean(z)),
             "std": float(np.std(z)),
@@ -68,6 +95,10 @@ class BlockKrigingEngine:
         return {
             "prediction_path": prediction_path,
             "variance_path": variance_path,
+            "prediction_geojson_path": str(prediction_geojson_path),
+            "variance_geojson_path": str(variance_geojson_path),
+            "prediction_shp_path": prediction_shp_path,
+            "variance_shp_path": variance_shp_path,
             "prediction_stats": prediction_stats,
             "variance_stats": variance_stats,
             "grid_shape": z.shape

@@ -498,3 +498,310 @@
     margin: 24px 0;
 }
 
+/* 导出面板样式 */
+.export-section {
+    margin-bottom: 16px;
+}
+
+.export-subtitle {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.export-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-export {
+    height: 32px;
+    padding: 0 14px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: transform var(--transition-fast),
+                background-color var(--transition-fast);
+    will-change: transform;
+}
+
+.btn-export:hover {
+    background-color: var(--bg-secondary);
+    transform: scale(1.02);
+}
+
+.btn-export:active {
+    transform: scale(0.98);
+}
+
+.btn-export:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 采样建议面板样式 */
+.sampling-recommendation-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.controls-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.recommendations-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.recommendations-count {
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.recommendations-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: 500px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.recommendations-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.recommendations-list::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+    border-radius: 3px;
+}
+
+.recommendations-list::-webkit-scrollbar-thumb {
+    background: var(--bg-tertiary);
+    border-radius: 3px;
+}
+
+.recommendations-list::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+}
+
+/* 建议点卡片 */
+.recommendation-card {
+    padding: 16px;
+    border-radius: 12px;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    will-change: transform, box-shadow;
+}
+
+.recommendation-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+    border-color: var(--primary-color);
+}
+
+.recommendation-card.selected {
+    border-color: var(--primary-color);
+    background-color: rgba(0, 122, 255, 0.05);
+    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.card-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.card-number {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.card-priority {
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: white;
+}
+
+.card-uncertainty {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.card-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.info-label {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.info-value {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    font-family: 'SF Mono', 'Monaco', monospace;
+}
+
+.card-reason {
+    padding: 8px 12px;
+    background-color: var(--bg-secondary);
+    border-radius: 8px;
+}
+
+.reason-label {
+    display: block;
+    font-size: var(--font-size-sm);
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 4px;
+}
+
+.reason-text {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    line-height: 1.4;
+}
+
+.card-footer {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-card {
+    flex: 1;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-locate {
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+}
+
+.btn-locate:hover {
+    background-color: var(--bg-tertiary);
+    transform: scale(1.02);
+}
+
+.btn-select {
+    background: linear-gradient(135deg, #007aff 0%, #0051d5 100%);
+    color: white;
+}
+
+.btn-select:hover {
+    opacity: 0.95;
+    transform: scale(1.02);
+}
+
+/* 地图标记样式 */
+.recommendation-marker {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    transition: all var(--transition-fast);
+    will-change: transform, z-index;
+}
+
+/* 右侧面板容器样式 */
+.right-sidebar {
+    width: 380px;
+    background-color: var(--bg-panel);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    transition: transform var(--transition-normal);
+    will-change: transform;
+}
+
+.right-sidebar.hidden {
+    transform: translateX(100%);
+}
+
+.right-sidebar-content {
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* 侧边栏切换按钮 */
+.sidebar-toggle {
+    position: fixed;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 80px;
+    background-color: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    transition: all var(--transition-fast);
+}
+
+.sidebar-toggle:hover {
+    background-color: var(--bg-secondary);
+}
+
+.sidebar-toggle::before {
+    content: '◀';
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.sidebar-toggle.open::before {
+    content: '▶';
+}
+

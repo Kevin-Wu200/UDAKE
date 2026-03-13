@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .config import settings
-from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口
+from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口
 import logging
 
 # 配置日志
@@ -39,6 +39,7 @@ app.include_router(结果查询接口.router, prefix="/api", tags=["结果查询
 app.include_router(任务状态接口.router, prefix="/api", tags=["任务状态"])
 app.include_router(报告生成接口.router, prefix="/api", tags=["报告生成"])
 app.include_router(模型推荐接口.router, prefix="/api", tags=["模型推荐"])
+app.include_router(采样建议接口.router, prefix="/api", tags=["采样建议"])
 
 @app.get("/")
 async def root():
