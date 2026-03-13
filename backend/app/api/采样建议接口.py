@@ -60,35 +60,55 @@ async def generate_recommendations(
     """
     try:
         # 验证任务
-        await verify_task_id(task_id)
+        verify_task_id(task_id)
 
-        # 获取任务结果
-        prediction_result = task_manager.get_prediction_result(task_id)
-        variance_result = task_manager.get_variance_result(task_id)
-
-        if not prediction_result or not variance_result:
-            raise HTTPException(status_code=404, detail="任务结果不存在，请先完成插值计算")
-
-        # 获取栅格数据
+        # 直接从文件路径读取结果
         from ..utils.栅格工具 import RasterUtils
+        from ..config import settings
+
         raster_utils = RasterUtils()
 
+        # 构建文件路径
+        variance_path = settings.RESULTS_DIR / f"{task_id}_variance.tif"
+        prediction_path = settings.RESULTS_DIR / f"{task_id}_prediction.tif"
+
+        if not variance_path.exists():
+            raise HTTPException(status_code=404, detail="方差栅格不存在，请先完成插值计算")
+
         # 读取方差栅格
-        variance_path = variance_result.geotiff_url
-        if not variance_path:
-            raise HTTPException(status_code=404, detail="方差栅格不存在")
+        from osgeo import gdal
+        dataset = gdal.Open(str(variance_path))
+        if dataset is None:
+            raise HTTPException(status_code=404, detail="无法打开方差栅格文件")
 
-        variance, x_coords, y_coords = raster_utils.read_geotiff(variance_path)
+        # 读取数据
+        band = dataset.GetRasterBand(1)
+        variance = band.ReadAsArray()
 
-        # 获取原始数据点
-        task_info = task_manager.get_task_info(task_id)
-        if not task_info:
-            raise HTTPException(status_code=404, detail="任务信息不存在")
+        # 获取地理变换参数
+        transform = dataset.GetGeoTransform()
 
-        # 提取现有采样点坐标
-        from ..schemas.数据模型 import SpatialData
-        spatial_data = task_manager.get_spatial_data(task_info.data_id)
-        existing_points = np.array([[p.x, p.y] for p in spatial_data.points]) if spatial_data else None
+        # 生成坐标网格
+        cols = dataset.RasterXSize
+        rows = dataset.RasterYSize
+
+        x_coords = np.array([transform[0] + transform[1] * x for x in range(cols)])
+        y_coords = np.array([transform[3] + transform[5] * y for y in range(rows)])
+
+        dataset = None
+
+        # 尝试从任务管理器获取原始数据点，如果失败则跳过
+        existing_points = None
+        try:
+            task_info = task_manager.get_task_info(task_id)
+            if task_info and task_info.data_id:
+                from ..schemas.数据模型 import SpatialData
+                spatial_data = task_manager.get_spatial_data(task_info.data_id)
+                if spatial_data:
+                    existing_points = np.array([[p.x, p.y] for p in spatial_data.points])
+        except Exception as e:
+            logger.warning(f"获取原始采样点失败: {str(e)}，将不使用现有采样点信息")
+            existing_points = None
 
         # 生成基础推荐
         base_recommendations = sampling_recommender.generate_recommendations(
@@ -120,7 +140,8 @@ async def generate_recommendations(
                 distances = np.sqrt(np.sum((existing_points - np.array([rec["x"], rec["y"]])) ** 2, axis=1))
                 distance_to_nearest = float(np.min(distances))
             else:
-                distance_to_nearest = float('inf')
+                # 使用一个很大的值表示无限远，避免JSON序列化错误
+                distance_to_nearest = 999999.0
 
             # 查找所属区域
             region_id = None

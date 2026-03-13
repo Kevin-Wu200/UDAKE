@@ -80,16 +80,26 @@ class SamplingRecommender:
         x_samples = np.linspace(x_coords.min(), x_coords.max(), int(np.sqrt(n)))
         y_samples = np.linspace(y_coords.min(), y_coords.max(), int(np.sqrt(n)))
 
+        # 创建网格以查找方差值
+        xx, yy = np.meshgrid(x_coords, y_coords)
+
         recommendations = []
         idx = 1
         for x in x_samples:
             for y in y_samples:
                 if idx > n:
                     break
+
+                # 查找最近的网格点获取方差值
+                x_idx = np.argmin(np.abs(x_coords - x))
+                y_idx = np.argmin(np.abs(y_coords - y))
+                variance_value = float(variance[y_idx, x_idx])
+
                 recommendations.append({
                     "id": idx,
                     "x": float(x),
                     "y": float(y),
+                    "variance": variance_value,
                     "priority": "medium"
                 })
                 idx += 1
