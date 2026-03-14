@@ -90,6 +90,10 @@ export interface KrigingParams {
     method: KrigingMethod;
     variogram_model: VariogramModel;
     grid_resolution: number;
+    nlags?: number;
+    nugget?: number;
+    sill?: number;
+    range?: number;
     enable_cross_validation: boolean;
 }
 

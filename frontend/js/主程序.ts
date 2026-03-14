@@ -39,6 +39,11 @@ import { MapTooltip, TooltipData, UncertaintyLevel } from './components/MapToolt
 import { MapLegend, ColorScheme, LegendPosition } from './components/MapLegend.js';
 import { LayerComparisonPanel, LayerComparisonConfig } from './components/LayerComparisonPanel.js';
 import { MeasureTool, MeasureType, MeasureResult } from './components/MeasureTool.js';
+import { ParameterAdjustmentPanel } from './components/ParameterAdjustmentPanel.js';
+import { ParameterHistoryManager } from './components/ParameterHistoryManager.js';
+import { ParameterComparisonPanel } from './components/ParameterComparisonPanel.js';
+import { ParameterInfoPanel } from './components/ParameterInfoPanel.js';
+import { ParameterTabPanel } from './components/ParameterTabPanel.js';
 
 // 导入类型
 import {
@@ -302,6 +307,14 @@ class App {
 
         // 初始化地图交互组件
         this.initializeMapInteractionComponents();
+
+        // 初始化参数调整面板
+        console.log('🎛️ 初始化参数调整面板...');
+        const parameterAdjustmentPanel = ParameterAdjustmentPanel.getInstance();
+
+        // 初始化参数标签页面板
+        console.log('📑 初始化参数标签页面板...');
+        const parameterTabPanel = ParameterTabPanel.getInstance();
     }
 
     /**
@@ -1205,15 +1218,30 @@ class App {
 
         const krigingMethodSelect = document.getElementById('kriging-method') as HTMLSelectElement;
         const variogramModelSelect = document.getElementById('variogram-model') as HTMLSelectElement;
-        const gridResolutionInput = document.getElementById('grid-resolution') as HTMLInputElement;
+        const parameterAdjustmentPanel = ParameterAdjustmentPanel.getInstance();
+        const adjustmentParams = parameterAdjustmentPanel.getParameters();
+
+        // 验证参数
+        const validation = parameterAdjustmentPanel.validateAll();
+        if (!validation.valid) {
+            this.showStatus(`参数验证失败: ${validation.errors.join(', ')}`, 'error');
+            return;
+        }
 
         const params: KrigingParams = {
             points: samplingPoints,
             method: (krigingMethodSelect?.value || 'ordinary') as 'ordinary' | 'universal' | 'block',
             variogram_model: (variogramModelSelect?.value || 'spherical') as 'spherical' | 'exponential' | 'gaussian',
-            grid_resolution: parseInt(gridResolutionInput?.value || '10', 10),
+            grid_resolution: adjustmentParams['grid-resolution'] || 100,
+            nlags: adjustmentParams['nlags'],
+            nugget: adjustmentParams['nugget'],
+            sill: adjustmentParams['sill'],
+            range: adjustmentParams['range'],
             enable_cross_validation: true
         };
+
+        // 保存为最后使用的参数
+        parameterAdjustmentPanel.saveAsLastUsed();
 
         try {
             LoadingManager.show('正在提交插值任务...');

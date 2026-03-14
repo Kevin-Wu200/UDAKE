@@ -86,10 +86,39 @@
                             </select>
                         </div>
 
-                        <div class="form-group">
-                            <label>网格分辨率</label>
-                            <input type="text" id="grid-resolution" class="input" value="100" placeholder="请输入大于0的整数">
-                            <span class="error-message" id="grid-resolution-error">网格分辨率必须为大于0的整数</span>
+                        <div class="form-group slider-group">
+                            <label>网格分辨率 <span class="param-value" id="grid-resolution-value">100</span></label>
+                            <input type="range" id="grid-resolution-slider" class="slider" min="50" max="500" value="100" step="10">
+                            <input type="number" id="grid-resolution" class="input" value="100" min="50" max="500" step="10">
+                            <span class="param-description">影响输出栅格的精细度，值越大越精细但计算越慢</span>
+                        </div>
+
+                        <div class="form-group slider-group">
+                            <label>滞后数 <span class="param-value" id="nlags-value">12</span></label>
+                            <input type="range" id="nlags-slider" class="slider" min="6" max="24" value="12" step="1">
+                            <input type="number" id="nlags" class="input" value="12" min="6" max="24" step="1">
+                            <span class="param-description">变异函数计算时的距离分组数量</span>
+                        </div>
+
+                        <div class="form-group slider-group">
+                            <label>变差值 <span class="param-value" id="nugget-value">0.0</span></label>
+                            <input type="range" id="nugget-slider" class="slider" min="0" max="1" value="0" step="0.05">
+                            <input type="number" id="nugget" class="input" value="0" min="0" max="1" step="0.05">
+                            <span class="param-description">表示测量误差或微观变异，值越小拟合越好</span>
+                        </div>
+
+                        <div class="form-group slider-group">
+                            <label>基台值 <span class="param-value" id="sill-value">1.0</span></label>
+                            <input type="range" id="sill-slider" class="slider" min="0" max="10" value="1" step="0.1">
+                            <input type="number" id="sill" class="input" value="1" min="0" max="10" step="0.1">
+                            <span class="param-description">变异函数的渐近值，表示总方差</span>
+                        </div>
+
+                        <div class="form-group slider-group">
+                            <label>范围值 <span class="param-value" id="range-value">10.0</span></label>
+                            <input type="range" id="range-slider" class="slider" min="0" max="100" value="10" step="1">
+                            <input type="number" id="range" class="input" value="10" min="0" max="100" step="1">
+                            <span class="param-description">变异函数达到基台值时的距离，表示空间相关范围</span>
                         </div>
 
                         <button id="start-kriging-btn" class="btn btn-primary" disabled>开始插值</button>
