@@ -2,8 +2,8 @@
 配置文件
 """
 from pydantic_settings import BaseSettings
-from pydantic import validator, Field
-from typing import List, Optional
+from pydantic import field_validator, Field
+from typing import List, Optional, Union
 from pathlib import Path
 import json
 
@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # CORS配置
-    BACKEND_CORS_ORIGINS: str = '["http://localhost:5173","http://localhost:3000","http://127.0.0.1:5173"]'
+    BACKEND_CORS_ORIGINS: Union[str, List[str]] = '["http://localhost:5173","http://localhost:3000","http://127.0.0.1:5173"]'
 
     # 文件上传配置
     MAX_FILE_SIZE_MB: int = 100
@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     ARCGIS_PORTAL_URL: str = "https://www.arcgis.com"
     ARCGIS_ENV: str = "development"
     ARCGIS_DEFAULT_BASEMAP: str = "streets-vector"
-    ARCGIS_DEFAULT_CENTER: str = "[139.767125,35.681236]"
+    ARCGIS_DEFAULT_CENTER: Union[str, List[float]] = "[139.767125,35.681236]"
     ARCGIS_DEFAULT_ZOOM: int = 10
 
     # 高德地图配置
@@ -57,7 +57,8 @@ class Settings(BaseSettings):
     AI_CACHE_ENABLED: bool = True
     AI_MAX_BATCH_SIZE: int = 100
 
-    @validator('BACKEND_CORS_ORIGINS', pre=True)
+    @field_validator('BACKEND_CORS_ORIGINS', mode='before')
+    @classmethod
     def parse_cors_origins(cls, v):
         if isinstance(v, str):
             try:
@@ -66,7 +67,8 @@ class Settings(BaseSettings):
                 return ["http://localhost:5173"]
         return v
 
-    @validator('ARCGIS_DEFAULT_CENTER', pre=True)
+    @field_validator('ARCGIS_DEFAULT_CENTER', mode='before')
+    @classmethod
     def parse_center(cls, v):
         if isinstance(v, str):
             try:
@@ -75,7 +77,8 @@ class Settings(BaseSettings):
                 return [139.767125, 35.681236]
         return v
 
-    @validator('MAX_CONCURRENT_TASKS', 'TASK_TIMEOUT', 'GRID_RESOLUTION', 'MAX_FILE_SIZE_MB', 'AI_MAX_BATCH_SIZE')
+    @field_validator('MAX_CONCURRENT_TASKS', 'TASK_TIMEOUT', 'GRID_RESOLUTION', 'MAX_FILE_SIZE_MB', 'AI_MAX_BATCH_SIZE')
+    @classmethod
     def validate_positive_int(cls, v):
         if v <= 0:
             raise ValueError(f'{v} must be positive')
