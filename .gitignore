@@ -27,6 +27,12 @@ venv/
 ENV/
 env/
 
+# Node.js 依赖
+node_modules/
+
+# 前端构建产物
+frontend/dist/
+
 # IDE
 .vscode/
 .idea/
@@ -43,8 +49,7 @@ Thumbs.db
 logs/
 
 # 数据文件
-backend/app/结果文件/*.tif
-backend/app/结果文件/*.json
+backend/app/结果文件/
 data_samples/*.json
 !data_samples/示例数据.geojson
 

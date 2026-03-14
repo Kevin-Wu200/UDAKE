@@ -75,15 +75,46 @@ async def generate_recommendations(
         if not variance_path.exists():
             raise HTTPException(status_code=404, detail="方差栅格不存在，请先完成插值计算")
 
+        # 验证文件大小
+        file_size = variance_path.stat().st_size
+        if file_size == 0:
+            raise HTTPException(status_code=400, detail="方差栅格文件为空，请重新生成")
+        if file_size > 500 * 1024 * 1024:  # 500MB 限制
+            raise HTTPException(status_code=400, detail="方差栅格文件过大，超过500MB限制")
+
         # 读取方差栅格
         from osgeo import gdal
-        dataset = gdal.Open(str(variance_path))
+        try:
+            dataset = gdal.Open(str(variance_path))
+        except Exception as e:
+            logger.error(f"GDAL打开文件失败: {str(e)}")
+            raise HTTPException(status_code=500, detail="无法读取栅格文件，请检查文件格式")
+
         if dataset is None:
-            raise HTTPException(status_code=404, detail="无法打开方差栅格文件")
+            raise HTTPException(status_code=404, detail="无法打开方差栅格文件，文件可能已损坏")
+
+        # 验证栅格格式
+        if dataset.RasterCount < 1:
+            dataset = None
+            raise HTTPException(status_code=400, detail="栅格文件不包含任何波段")
 
         # 读取数据
         band = dataset.GetRasterBand(1)
+        if band is None:
+            dataset = None
+            raise HTTPException(status_code=400, detail="无法获取栅格波段")
+
         variance = band.ReadAsArray()
+
+        # 验证数据完整性
+        if variance is None or variance.size == 0:
+            dataset = None
+            raise HTTPException(status_code=400, detail="栅格数据为空，请重新生成")
+
+        # 检查数据是否包含有效值
+        if np.all(np.isnan(variance)):
+            dataset = None
+            raise HTTPException(status_code=400, detail="栅格数据全部为无效值，请重新生成")
 
         # 获取地理变换参数
         transform = dataset.GetGeoTransform()

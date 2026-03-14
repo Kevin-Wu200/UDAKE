@@ -3,153 +3,200 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>高德地图加载测试</title>
+    <title>测试高德地图加载</title>
     <style>
         body {
             font-family: Arial, sans-serif;
+            margin: 20px;
             padding: 20px;
-            background: #f5f5f5;
         }
+        #log {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-left: 3px solid #ccc;
+        }
+        .log-info { border-left-color: #2196F3; }
+        .log-success { border-left-color: #4CAF50; }
+        .log-error { border-left-color: #f44336; }
         #map {
             width: 100%;
             height: 400px;
-            margin: 20px 0;
             border: 2px solid #ccc;
+            margin: 20px 0;
         }
-        .status {
-            padding: 10px;
+        .button-group {
             margin: 10px 0;
-            border-radius: 4px;
         }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .info { background: #d1ecf1; color: #0c5460; }
-        pre {
-            background: #fff;
-            padding: 10px;
-            border: 1px solid #ddd;
-            overflow-x: auto;
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            font-size: 14px;
         }
     </style>
+</head>
+<body>
+    <h1>高德地图加载测试</h1>
+    <p>测试不同的高德地图加载方式</p>
 
-    <!-- 高德地图安全密钥配置 -->
+    <div class="button-group">
+        <button onclick="testMethod1()">方法 1: 轮询检查</button>
+        <button onclick="testMethod2()">方法 2: 回调函数</button>
+        <button onclick="testMethod3()">方法 3: 原生方式</button>
+        <button onclick="clearLog()">清空日志</button>
+    </div>
+
+    <div id="map"></div>
+    <div id="log"></div>
+
     <script>
+        function addLog(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // 设置安全密钥
         window._AMapSecurityConfig = {
             securityJsCode: "10b5ef21f6b36d09e24d7b076d35dccc"
         };
-    </script>
 
-    <!-- 高德地图 JS API -->
-    <script src="https://webapi.amap.com/maps?v=2.0&key=2f3f114aa5671425aa3c52f707d741c5"></script>
-</head>
-<body>
-    <h1>高德地图加载诊断测试</h1>
+        // 方法 1: 轮询检查
+        async function testMethod1() {
+            addLog('=== 开始测试方法 1: 轮询检查 ===', 'info');
 
-    <div id="status-container"></div>
+            try {
+                const script = document.createElement('script');
+                script.src = 'https://webapi.amap.com/maps?v=2.0&key=2f3f114aa5671425aa3c52f707d741c5';
+                script.async = true;
 
-    <div id="map"></div>
+                script.onload = () => {
+                    addLog('脚本加载完成，开始轮询检查 AMap...', 'info');
 
-    <h2>诊断报告</h2>
-    <pre id="report"></pre>
+                    let checkCount = 0;
+                    const checkInterval = setInterval(() => {
+                        checkCount++;
+                        addLog(`检查状态 ${checkCount}: window.AMap = ${!!window.AMap}, window.AMap.Map = ${window.AMap ? !!window.AMap.Map : false}`, 'info');
 
-    <script>
-        const statusContainer = document.getElementById('status-container');
-        const reportElement = document.getElementById('report');
-        const report = [];
+                        if (window.AMap && window.AMap.Map) {
+                            clearInterval(checkInterval);
+                            addLog('✅ 方法 1 成功: AMap 已加载', 'success');
+                            initMap();
+                        } else if (checkCount >= 300) {
+                            clearInterval(checkInterval);
+                            addLog('❌ 方法 1 失败: 超时', 'error');
+                        }
+                    }, 50);
+                };
 
-        function addStatus(message, type = 'info') {
-            const div = document.createElement('div');
-            div.className = `status ${type}`;
-            div.textContent = message;
-            statusContainer.appendChild(div);
-            report.push(`[${type.toUpperCase()}] ${message}`);
-        }
+                script.onerror = () => {
+                    addLog('❌ 方法 1 失败: 脚本加载失败', 'error');
+                };
 
-        function updateReport() {
-            reportElement.textContent = report.join('\n');
-        }
-
-        // 测试开始
-        addStatus('开始诊断...', 'info');
-        updateReport();
-
-        // 1. 检查安全密钥配置
-        if (window._AMapSecurityConfig && window._AMapSecurityConfig.securityJsCode) {
-            addStatus('✅ 安全密钥配置正确', 'success');
-        } else {
-            addStatus('❌ 安全密钥配置缺失', 'error');
-        }
-        updateReport();
-
-        // 2. 等待 AMap API 加载
-        let checkCount = 0;
-        const maxChecks = 100; // 10秒
-
-        const checkInterval = setInterval(() => {
-            checkCount++;
-
-            if (typeof AMap !== 'undefined') {
-                clearInterval(checkInterval);
-                addStatus(`✅ 高德地图 API 加载成功 (耗时: ${checkCount * 100}ms)`, 'success');
-                addStatus(`AMap 版本: ${AMap.version || '未知'}`, 'info');
-                updateReport();
-
-                // 3. 尝试创建地图实例
-                try {
-                    const map = new AMap.Map('map', {
-                        zoom: 10,
-                        center: [116.39, 39.9],
-                        viewMode: '2D'
-                    });
-
-                    addStatus('✅ 地图实例创建成功', 'success');
-                    addStatus(`地图中心: ${map.getCenter()}`, 'info');
-                    addStatus(`地图缩放: ${map.getZoom()}`, 'info');
-                    updateReport();
-
-                    // 4. 测试添加标记
-                    const marker = new AMap.Marker({
-                        position: [116.39, 39.9],
-                        title: '测试标记'
-                    });
-                    map.add(marker);
-                    addStatus('✅ 标记添加成功', 'success');
-                    updateReport();
-
-                    // 最终报告
-                    addStatus('🎉 所有测试通过！高德地图工作正常', 'success');
-                    updateReport();
-
-                } catch (error) {
-                    addStatus(`❌ 创建地图失败: ${error.message}`, 'error');
-                    updateReport();
-                }
-
-            } else if (checkCount >= maxChecks) {
-                clearInterval(checkInterval);
-                addStatus('❌ 高德地图 API 加载超时 (10秒)', 'error');
-                addStatus('可能原因:', 'error');
-                addStatus('1. 网络连接问题', 'error');
-                addStatus('2. Key 或安全密钥错误', 'error');
-                addStatus('3. 域名未在高德开放平台配置白名单', 'error');
-                addStatus('4. Electron webSecurity 阻止了外部请求', 'error');
-                updateReport();
+                document.head.appendChild(script);
+            } catch (error) {
+                addLog(`❌ 方法 1 错误: ${error.message}`, 'error');
             }
-        }, 100);
+        }
 
-        // 5. 监听网络请求
-        window.addEventListener('error', (e) => {
-            if (e.target.tagName === 'SCRIPT') {
-                addStatus(`❌ 脚本加载失败: ${e.target.src}`, 'error');
-                updateReport();
+        // 方法 2: 回调函数
+        async function testMethod2() {
+            addLog('=== 开始测试方法 2: 回调函数 ===', 'info');
+
+            try {
+                window.testAMapCallback = () => {
+                    addLog('回调函数被触发', 'info');
+
+                    if (window.AMap && window.AMap.Map) {
+                        addLog('✅ 方法 2 成功: AMap 已加载', 'success');
+                        initMap();
+                    } else {
+                        addLog('❌ 方法 2 失败: AMap 不完整', 'error');
+                    }
+                };
+
+                const script = document.createElement('script');
+                script.src = 'https://webapi.amap.com/maps?v=2.0&key=2f3f114aa5671425aa3c52f707d741c5&callback=testAMapCallback';
+                script.async = true;
+
+                script.onerror = () => {
+                    addLog('❌ 方法 2 失败: 脚本加载失败', 'error');
+                };
+
+                document.head.appendChild(script);
+            } catch (error) {
+                addLog(`❌ 方法 2 错误: ${error.message}`, 'error');
             }
-        }, true);
+        }
 
-        // 6. 检查环境信息
-        addStatus(`User Agent: ${navigator.userAgent}`, 'info');
-        addStatus(`当前域名: ${window.location.href}`, 'info');
-        addStatus(`协议: ${window.location.protocol}`, 'info');
-        updateReport();
+        // 方法 3: 原生方式（简单）
+        async function testMethod3() {
+            addLog('=== 开始测试方法 3: 原生方式 ===', 'info');
+
+            try {
+                const script = document.createElement('script');
+                script.src = 'https://webapi.amap.com/maps?v=2.0&key=2f3f114aa5671425aa3c52f707d741c5';
+                script.async = true;
+
+                script.onload = () => {
+                    addLog('脚本加载完成，等待 2 秒后检查...', 'info');
+
+                    setTimeout(() => {
+                        if (window.AMap && window.AMap.Map) {
+                            addLog('✅ 方法 3 成功: AMap 已加载', 'success');
+                            initMap();
+                        } else {
+                            addLog('❌ 方法 3 失败: AMap 未加载', 'error');
+                            addLog(`AMap 状态: ${JSON.stringify({
+                                hasAMap: !!window.AMap,
+                                keys: window.AMap ? Object.keys(window.AMap).slice(0, 20) : []
+                            })}`, 'info');
+                        }
+                    }, 2000);
+                };
+
+                script.onerror = () => {
+                    addLog('❌ 方法 3 失败: 脚本加载失败', 'error');
+                };
+
+                document.head.appendChild(script);
+            } catch (error) {
+                addLog(`❌ 方法 3 错误: ${error.message}`, 'error');
+            }
+        }
+
+        function initMap() {
+            try {
+                const map = new AMap.Map('map', {
+                    center: [116.397428, 39.90923],
+                    zoom: 13
+                });
+                addLog('✅ 地图初始化成功', 'success');
+            } catch (error) {
+                addLog(`❌ 地图初始化失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 页面加载时自动测试
+        addLog('页面已加载，点击按钮开始测试', 'info');
     </script>
 </body>
 </html>

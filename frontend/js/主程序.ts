@@ -1,0 +1,1596 @@
+/**
+ * UDAKE 主程序
+ * 应用程序入口和核心逻辑
+ */
+
+import { initializeMap, getMapProvider, reinitializeMap } from './地图初始化.js';
+import { LayerManager } from './图层管理.js';
+import { TaskPoller } from './任务轮询.js';
+import { APIService } from './services/API封装.js';
+import { CoordinateSystemInfo } from './坐标系统信息.js';
+import { SinglePointSampling } from './单点采样输入.js';
+import { GeoJSONParser } from './utils/geojsonParser.js';
+import { DataImportModal } from './components/DataImportModal.js';
+import { NewProjectModal } from './components/NewProjectModal.js';
+import { FreeSampling } from './sampling/FreeSampling.js';
+import { RegionSampling } from './sampling/RegionSampling.js';
+import { Project } from './models/Project.js';
+import { LocationPermissionManager } from './utils/locationPermissionManager.js';
+import { SamplingRecommendationPanel } from './components/SamplingRecommendationPanel.js';
+import { OnboardingGuide } from './components/OnboardingGuide.js';
+import { FormValidator } from './utils/FormValidator.js';
+import { LoadingManager } from './utils/LoadingManager.js';
+import { KeyboardManager } from './utils/KeyboardManager.js';
+import { ConfirmDialog } from './components/ConfirmDialog.js';
+import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
+import { ThemeManager } from './utils/ThemeManager.js';
+import { OfflineManager } from './utils/OfflineManager.js';
+import { PreferencesPanel } from './components/PreferencesPanel.js';
+import { TemplateDownloader } from './components/TemplateDownloader.js';
+import { HistoryManager } from './utils/HistoryManager.js';
+import { FeedbackCollector } from './components/FeedbackCollector.js';
+import { ExportEnhancer } from './utils/ExportEnhancer.js';
+import { I18n } from './utils/I18n.js';
+import { MapEngineSwitcher } from './components/MapEngineSwitcher';
+import { IndustrySelector } from './components/IndustrySelector.js';
+import { SettingsPanel } from './components/SettingsPanel.js';
+import { LocationCenterButton } from './components/LocationCenterButton.js';
+
+// 导入类型
+import {
+    IAPIService,
+    IMapAdapterExtended,
+    MapView,
+    IProject,
+    ISamplingComponent,
+    ISamplingRecommendationPanel,
+    IOnboardingGuide,
+    IPreferencesPanel,
+    IFeedbackCollector,
+    IConfirmDialog,
+    SamplingRecommendation,
+    TransformedData,
+    DataImportCallback,
+    ProjectConfig,
+    ProjectCreateCallback,
+    TaskStatusCallback,
+    HistoryEntry,
+    FormValidationRules,
+    SamplingPoint,
+    KrigingParams,
+    ExtendedSamplingPoint
+} from '../types/app';
+import { TaskStatus } from '../types/core';
+
+// 简化类型定义
+type OfflineQueueHandler = (payload: any) => Promise<void>;
+
+type Preferences = {
+    theme: 'light' | 'dark';
+    animationsEnabled: boolean;
+    gridResolution: number;
+    language?: string;
+};
+
+console.log('主程序已执行');
+ThemeManager.init();
+PerformanceMonitor.init();
+HistoryManager.init();
+I18n.init();
+PerformanceMonitor.mark('appStart');
+
+class App {
+    public apiService: IAPIService | null = null;
+    public layerManager: LayerManager | null = null;
+    public taskPoller: TaskPoller | null = null;
+    public currentDataId: string | null = null;
+    public currentTaskId: string | null = null;
+    public view: MapView | null = null;
+    public currentProject: IProject | null = null;
+    public samplingComponent: ISamplingComponent | null = null;
+    public recommendationPanel: ISamplingRecommendationPanel | null = null;
+    public onboardingGuide: IOnboardingGuide | null = null;
+    public formValidator: FormValidator | null = null;
+    public preferencesPanel: IPreferencesPanel | null = null;
+    public feedbackCollector: IFeedbackCollector | null = null;
+    public exportEnhancer: any = null;
+    public mapEngineSwitcher: MapEngineSwitcher | null = null;
+    public industrySelector: IndustrySelector | null = null;
+    public settingsPanel: SettingsPanel | null = null;
+    public locationCenterButton: LocationCenterButton | null = null;
+
+    constructor() {
+        console.log('App 构造函数执行');
+        this.init();
+    }
+
+    /**
+     * 初始化应用
+     */
+    async init(): Promise<void> {
+        console.log('init 被执行');
+
+        LoadingManager.show('正在初始化应用...');
+
+        let backendPort = 8000;
+
+        if (window.electronAPI) {
+            try {
+                backendPort = await window.electronAPI.getBackendPort();
+                console.log('获取端口完成，端口:', backendPort);
+            } catch (error) {
+                console.warn('获取端口失败', error);
+            }
+        }
+
+        console.log('准备初始化 API');
+        const apiURL = `http://localhost:${backendPort}/api`;
+        console.log('API URL:', apiURL);
+        this.apiService = new APIService(apiURL);
+        console.log('API 初始化完成');
+
+        console.log('准备初始化地图');
+        LoadingManager.updateText('正在加载地图...');
+        const mapAdapter = await initializeMap('viewDiv');
+        this.view = mapAdapter.getView();
+        this.layerManager = new LayerManager(mapAdapter);
+        console.log('地图初始化完成');
+
+        console.log('准备初始化组件');
+        LoadingManager.updateText('正在初始化组件...');
+        this.initializeComponents(this.view);
+        console.log('组件初始化完成');
+
+        // 初始化定位权限（不阻塞后续流程）
+        console.log('准备检测定位权限');
+        LocationPermissionManager.requestPermission().then(status => {
+            console.log('定位权限状态:', status);
+        });
+
+        console.log('准备绑定事件');
+        this.bindEvents();
+        this.bindMobileEvents();
+        console.log('bindEvents 调用完成');
+
+        // 初始化新手引导
+        this.onboardingGuide = new OnboardingGuide();
+        this.onboardingGuide.autoStart();
+
+        LoadingManager.hide();
+        PerformanceMonitor.mark('appReady');
+        PerformanceMonitor.measure('appInitTime', 'appStart', 'appReady');
+
+        // 初始化离线管理器
+        await OfflineManager.init();
+
+        const uploadHandler: OfflineQueueHandler = async (payload: any) => {
+            const formData = new FormData();
+            formData.append('file', payload.file);
+            if (this.apiService) {
+                await this.apiService.request(`${this.apiService.baseURL}/upload-data`, {
+                    method: 'POST',
+                    body: formData
+                });
+            }
+        };
+
+        const krigingHandler: OfflineQueueHandler = async (payload: any) => {
+            if (this.apiService) {
+                await this.apiService.startKriging(payload);
+            }
+        };
+
+        OfflineManager.registerHandler('upload', uploadHandler);
+        OfflineManager.registerHandler('kriging', krigingHandler);
+
+        console.log('应用初始化完成');
+        
+        // 初始化界面文本
+        this.updateUIText();
+    }
+
+    /**
+     * 初始化新组件
+     */
+    private initializeComponents(view: MapView | null): void {
+        if (!view) return;
+
+        const sidebar = document.querySelector('.sidebar');
+        if (!sidebar) return;
+
+        // 创建坐标系统信息组件
+        const coordSystemInfo = new CoordinateSystemInfo(view);
+        const coordPanel = coordSystemInfo.createPanel();
+
+        // 创建单点采样输入组件
+        const singlePointSampling = new SinglePointSampling(view, async (pointData) => {
+            if (this.layerManager) {
+                await this.layerManager.addSamplingPoint(pointData);
+            }
+        });
+        const samplingPanel = singlePointSampling.createPanel();
+
+        // 创建采样建议面板
+        this.recommendationPanel = new SamplingRecommendationPanel(
+            view,
+            this.layerManager!,
+            (recommendation) => this.handleRecommendationSelect(recommendation)
+        );
+        const recommendationPanel = this.recommendationPanel.createPanel();
+
+        // 插入到侧边栏
+        const firstPanel = sidebar.querySelector('.panel');
+        if (firstPanel) {
+            sidebar.insertBefore(coordPanel, firstPanel);
+        }
+
+        const interpolationPanel = sidebar.querySelectorAll('.panel')[2];
+        if (interpolationPanel && interpolationPanel.parentNode) {
+            interpolationPanel.parentNode.insertBefore(samplingPanel, interpolationPanel.nextSibling);
+        }
+
+        // 添加模板下载面板到数据上传面板之后
+        const uploadPanel = sidebar.querySelectorAll('.panel')[1];
+        if (uploadPanel && uploadPanel.parentNode) {
+            const templatePanel = document.createElement('div');
+            templatePanel.className = 'panel';
+            templatePanel.appendChild(TemplateDownloader.createPanel());
+            uploadPanel.parentNode.insertBefore(templatePanel, uploadPanel.nextSibling);
+        }
+
+        // 添加行业选择器面板到模板下载面板之后
+        if (uploadPanel && uploadPanel.parentNode) {
+            const industryPanel = document.createElement('div');
+            industryPanel.className = 'panel';
+            industryPanel.innerHTML = `
+                <div class="panel-header">
+                    <h3>行业配置</h3>
+                </div>
+                <div id="industry-selector-container"></div>
+            `;
+            uploadPanel.parentNode.insertBefore(industryPanel, uploadPanel.nextSibling);
+
+            // 初始化行业选择器
+            this.industrySelector = new IndustrySelector('#industry-selector-container', this.apiService?.baseURL || '/api');
+
+            // 初始化设置面板
+            this.settingsPanel = new SettingsPanel('body', {
+                onLanguageChange: (language) => {
+                    console.log('语言已切换到:', language);
+                    this.updateUIText();
+                }
+            });
+
+            // 设置行业选择回调
+            this.industrySelector.setIndustrySelectCallback((industry) => {
+                console.log('选择了行业:', industry);
+                // 可以在这里根据选择的行业更新插值参数
+            });
+
+            // 设置模板下载回调
+            this.industrySelector.setTemplateDownloadCallback((template) => {
+                console.log('下载模板:', template);
+            });
+        }
+
+        // 添加操作历史面板到侧边栏底部
+        const historyPanel = HistoryManager.createPanel();
+        sidebar.appendChild(historyPanel);
+
+        // 将采样建议面板添加到右侧侧边栏
+        const rightSidebarContent = document.querySelector('.right-sidebar-content');
+        if (rightSidebarContent) {
+            rightSidebarContent.appendChild(recommendationPanel);
+        }
+
+        // 绑定侧边栏切换按钮
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', () => this.toggleRightSidebar());
+        }
+
+        // 初始化地图引擎切换器
+        this.initializeMapEngineSwitcher();
+    }
+
+    /**
+     * 初始化地图引擎切换器
+     */
+    private initializeMapEngineSwitcher(): void {
+        console.log('🗺️ 开始初始化地图引擎切换器...');
+        // 获取当前地图引擎
+        getMapProvider().then((provider) => {
+            console.log(`🗺️ 当前地图引擎: ${provider}`);
+            // 创建切换器
+            this.mapEngineSwitcher = new MapEngineSwitcher(
+                provider as 'arcgis' | 'amap',
+                async (newProvider) => await this.handleMapEngineSwitch(newProvider)
+            );
+
+            // 添加到地图容器（外层容器，避免在高德地图模式下按钮被隐藏）
+            const mapContainer = document.querySelector('.map-container') as HTMLElement;
+            if (mapContainer) {
+                console.log('🗺️ 地图容器已找到，准备添加切换按钮');
+                this.mapEngineSwitcher.addToContainer(mapContainer);
+                
+                // 初始化回到中心按钮
+                console.log('🗺️ 开始初始化回到中心按钮...');
+                this.locationCenterButton = new LocationCenterButton(() => this.handleLocationCenter());
+                this.locationCenterButton.addToContainer(mapContainer);
+                console.log('✅ 回到中心按钮已添加到容器');
+            } else {
+                console.error('❌ 找不到地图容器 .map-container');
+            }
+        }).catch((error) => {
+            console.error('❌ 初始化地图引擎切换器失败:', error);
+        });
+    }
+
+    /**
+     * 绑定事件
+     */
+    private bindEvents(): void {
+        console.log('bindEvents 执行');
+
+        // 偏好设置按钮
+        const preferencesBtn = document.getElementById('preferences-btn');
+        if (preferencesBtn) {
+            preferencesBtn.addEventListener('click', () => this.showPreferences());
+        }
+
+        // 反馈按钮
+        const feedbackBtn = document.getElementById('feedback-btn');
+        if (feedbackBtn) {
+            feedbackBtn.addEventListener('click', () => {
+                if (!this.feedbackCollector) {
+                    this.feedbackCollector = new FeedbackCollector();
+                }
+                this.feedbackCollector.show();
+            });
+        }
+
+        // 主题切换按钮
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        if (themeToggleBtn) {
+            themeToggleBtn.addEventListener('click', () => ThemeManager.toggle());
+        }
+
+        // 新建项目按钮
+        const newProjectBtn = document.getElementById('new-project-btn');
+        if (newProjectBtn) {
+            newProjectBtn.addEventListener('click', () => this.handleNewProject());
+        }
+
+        // 设置按钮
+        const settingsBtn = document.getElementById('settings-btn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => {
+                if (this.settingsPanel) {
+                    this.settingsPanel.toggle();
+                }
+            });
+        }
+
+        // 再次查看引导按钮
+        const showGuideBtn = document.getElementById('show-guide-btn');
+        if (showGuideBtn) {
+            showGuideBtn.addEventListener('click', () => {
+                if (this.onboardingGuide) {
+                    this.onboardingGuide.reset();
+                    this.onboardingGuide.start();
+                }
+            });
+        }
+
+        // 文件选择器交互
+        const picker = document.getElementById('file-picker');
+        const fileInput = document.getElementById('file-input') as HTMLInputElement;
+        const fileName = document.getElementById('file-name');
+
+        console.log('picker:', picker);
+        console.log('fileInput:', fileInput);
+
+        if (picker && fileInput) {
+            picker.addEventListener('click', () => {
+                console.log('file-picker 被点击');
+                try {
+                    fileInput.click();
+                    console.log('fileInput.click() 已执行');
+                } catch (e) {
+                    console.error('click 被阻止:', e);
+                }
+            });
+
+            fileInput.addEventListener('change', () => {
+                if (fileName) {
+                    if (fileInput.files && fileInput.files.length > 0) {
+                        fileName.textContent = fileInput.files[0].name;
+                    } else {
+                        fileName.textContent = '点击选择 GeoJSON 文件';
+                    }
+                }
+            });
+        }
+
+        // 文件上传
+        const uploadBtn = document.getElementById('upload-btn');
+        if (uploadBtn) {
+            uploadBtn.addEventListener('click', () => this.handleUpload());
+        }
+
+        // 网格分辨率实时校验
+        const gridResolutionInput = document.getElementById('grid-resolution');
+        if (gridResolutionInput) {
+            gridResolutionInput.addEventListener('input', () => this.validateGridResolution());
+        }
+
+        // 初始化表单验证器
+        this._initFormValidator();
+
+        // 开始插值
+        const startKrigingBtn = document.getElementById('start-kriging-btn');
+        if (startKrigingBtn) {
+            startKrigingBtn.addEventListener('click', () => this.handleStartKriging());
+        }
+
+        // 图层控制
+        const layerPoints = document.getElementById('layer-points');
+        if (layerPoints) {
+            layerPoints.addEventListener('change', (e) => {
+                const target = e.target as HTMLInputElement;
+                if (this.layerManager) {
+                    this.layerManager.toggleLayer('points', target.checked);
+                }
+            });
+        }
+
+        const layerPrediction = document.getElementById('layer-prediction');
+        if (layerPrediction) {
+            layerPrediction.addEventListener('change', (e) => {
+                const target = e.target as HTMLInputElement;
+                if (this.layerManager) {
+                    this.layerManager.toggleLayer('prediction', target.checked);
+                }
+            });
+        }
+
+        const layerVariance = document.getElementById('layer-variance');
+        if (layerVariance) {
+            layerVariance.addEventListener('change', (e) => {
+                const target = e.target as HTMLInputElement;
+                if (this.layerManager) {
+                    this.layerManager.toggleLayer('variance', target.checked);
+                }
+            });
+        }
+
+        // 导出按钮
+        this._bindExportButtons();
+    }
+
+    /**
+     * 更新界面文本（用于语言切换）
+     */
+    private updateUIText(): void {
+        // 更新标题
+        const titleZh = document.querySelector('.title-zh');
+        const titleEn = document.querySelector('.title-en');
+        if (titleZh && titleEn) {
+            if (I18n.locale === 'zh-CN') {
+                titleZh.style.display = 'inline';
+                titleEn.style.display = 'none';
+            } else {
+                titleZh.style.display = 'none';
+                titleEn.style.display = 'inline';
+            }
+        }
+
+        // 更新导航按钮
+        const newProjectBtn = document.getElementById('new-project-btn') as HTMLButtonElement;
+        if (newProjectBtn) {
+            newProjectBtn.textContent = I18n.t('nav.newProject');
+        }
+
+        // 更新面板标题
+        const panelTitles = document.querySelectorAll('.panel-title');
+        const panelIndex = {
+            0: 'panel.project',
+            1: 'upload.title',
+            2: 'kriging.title',
+            3: 'task.title',
+            4: 'export.title',
+            5: 'layer.title'
+        };
+        
+        panelTitles.forEach((title, index) => {
+            if (title && panelIndex[index]) {
+                title.textContent = I18n.t(panelIndex[index]);
+            }
+        });
+
+        // 更新数据上传相关
+        const fileName = document.getElementById('file-name');
+        if (fileName && fileName.textContent === '点击选择 GeoJSON 文件' || fileName.textContent === 'Click to select GeoJSON file') {
+            fileName.textContent = I18n.t('upload.selectFile');
+        }
+        
+        const uploadBtn = document.getElementById('upload-btn') as HTMLButtonElement;
+        if (uploadBtn) {
+            uploadBtn.textContent = I18n.t('upload.button');
+        }
+
+        // 更新插值参数相关
+        const krigingLabel = document.querySelectorAll('.form-group label');
+        if (krigingLabel.length >= 3) {
+            krigingLabel[0].textContent = I18n.t('kriging.method');
+            krigingLabel[1].textContent = I18n.t('kriging.variogram');
+            krigingLabel[2].textContent = I18n.t('kriging.resolution');
+        }
+
+        const krigingOptions = document.querySelectorAll('#kriging-method option');
+        if (krigingOptions.length >= 3) {
+            krigingOptions[0].textContent = I18n.t('kriging.ordinary');
+            krigingOptions[1].textContent = I18n.t('kriging.universal');
+            krigingOptions[2].textContent = I18n.t('kriging.block');
+        }
+
+        const variogramOptions = document.querySelectorAll('#variogram-model option');
+        if (variogramOptions.length >= 3) {
+            variogramOptions[0].textContent = I18n.t('kriging.spherical');
+            variogramOptions[1].textContent = I18n.t('kriging.exponential');
+            variogramOptions[2].textContent = I18n.t('kriging.gaussian');
+        }
+
+        const startKrigingBtn = document.getElementById('start-kriging-btn') as HTMLButtonElement;
+        if (startKrigingBtn) {
+            startKrigingBtn.textContent = I18n.t('kriging.start');
+        }
+
+        const gridResolutionError = document.getElementById('grid-resolution-error');
+        if (gridResolutionError) {
+            gridResolutionError.textContent = I18n.t('kriging.resolutionError');
+        }
+
+        // 更新任务状态
+        const taskStatus = document.getElementById('task-status');
+        if (taskStatus) {
+            const p = taskStatus.querySelector('p');
+            if (p && (p.textContent === '暂无任务' || p.textContent === 'No tasks')) {
+                p.textContent = I18n.t('task.noTask');
+            }
+        }
+
+        // 更新导出相关
+        const exportSubtitles = document.querySelectorAll('.export-subtitle');
+        if (exportSubtitles.length >= 2) {
+            exportSubtitles[0].textContent = I18n.t('export.prediction');
+            exportSubtitles[1].textContent = I18n.t('export.variance');
+        }
+
+        const exportButtons = document.querySelectorAll('.btn-export');
+        exportButtons.forEach(btn => {
+            const text = btn.textContent;
+            if (text.includes('导出 GeoJSON') || text.includes('Export GeoJSON')) {
+                btn.textContent = I18n.t('export.prediction'); // 使用简化的翻译
+            }
+        });
+
+        // 更新图层控制
+        const layerLabels = document.querySelectorAll('.layer-control .checkbox-label span');
+        if (layerLabels.length >= 3) {
+            layerLabels[0].textContent = I18n.t('layer.points');
+            layerLabels[1].textContent = I18n.t('layer.prediction');
+            layerLabels[2].textContent = I18n.t('layer.variance');
+        }
+
+        // 更新行业选择器
+        if (this.industrySelector) {
+            const industryTitle = document.querySelector('#industry-selector-container .industry-header h3');
+            if (industryTitle) {
+                industryTitle.textContent = I18n.t('industry.title');
+            }
+            const industryDesc = document.querySelector('#industry-selector-container .industry-description');
+            if (industryDesc) {
+                industryDesc.textContent = I18n.t('industry.description');
+            }
+            const dataIdLabel = document.querySelector('#industry-selector-container label[for="data-id"]');
+            if (dataIdLabel) {
+                dataIdLabel.textContent = I18n.t('industry.dataId');
+            }
+            const dataIdHint = document.querySelector('#industry-selector-container .input-hint');
+            if (dataIdHint) {
+                dataIdHint.textContent = I18n.t('industry.dataIdHint');
+            }
+            const industrySelectLabel = document.querySelector('#industry-selector-container label[for="industry-select"]');
+            if (industrySelectLabel) {
+                industrySelectLabel.textContent = I18n.t('industry.select');
+            }
+            const recommendBtn = document.querySelector('#industry-selector-container #recommend-btn');
+            if (recommendBtn) {
+                recommendBtn.textContent = I18n.t('industry.getRecommendation');
+            }
+            const downloadTemplateBtn = document.querySelector('#industry-selector-container #download-template-btn');
+            if (downloadTemplateBtn) {
+                downloadTemplateBtn.textContent = I18n.t('industry.downloadTemplate');
+            }
+            const recommendationTitle = document.querySelector('#industry-selector-container #recommendation-panel h4');
+            if (recommendationTitle) {
+                recommendationTitle.textContent = I18n.t('industry.recommendationTitle');
+            }
+            // 调用 IndustrySelector 的 updateUIText 方法
+            if (this.industrySelector) {
+                this.industrySelector.updateUIText();
+            }
+        }
+
+        // 更新采样建议面板
+        if (this.recommendationPanel) {
+            const recommendationTitle = document.querySelector('#sampling-recommendation-panel .section-title');
+            if (recommendationTitle) {
+                recommendationTitle.textContent = I18n.t('recommendation.title');
+            }
+            const recommendationDesc = document.querySelector('#sampling-recommendation-panel .section-description');
+            if (recommendationDesc) {
+                recommendationDesc.textContent = I18n.t('recommendation.description');
+            }
+            const strategyLabel = document.querySelector('#sampling-recommendation-panel label[for="recommendation-strategy"]');
+            if (strategyLabel) {
+                strategyLabel.textContent = I18n.t('recommendation.strategy');
+            }
+            const generateBtn = document.querySelector('#sampling-recommendation-panel #generate-recommendations-btn');
+            if (generateBtn) {
+                generateBtn.textContent = I18n.t('recommendation.generate');
+            }
+            // 调用 RecommendationPanel 的 updateUIText 方法
+            this.recommendationPanel.updateUIText();
+        }
+
+        // 更新操作历史面板
+        const historyTitle = document.querySelector('.panel-title');
+        const historyPanels = document.querySelectorAll('.panel');
+        historyPanels.forEach(panel => {
+            const title = panel.querySelector('.panel-title');
+            if (title && (title.textContent === '操作历史' || title.textContent === 'Operation History')) {
+                title.textContent = I18n.t('history.title');
+            }
+        });
+
+        // 调用 HistoryManager 的 updateUIText 方法
+        HistoryManager.updateUIText();
+    }
+
+    /**
+     * 绑定导出按钮
+     */
+    private _bindExportButtons(): void {
+        const bindButton = (id: string, dataType: string, format: string) => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.addEventListener('click', () => this.handleExport(dataType, format));
+            }
+        };
+
+        bindButton('export-prediction-geojson', 'prediction', 'geojson');
+        bindButton('export-prediction-shp', 'prediction', 'shp');
+        bindButton('export-prediction-tif', 'prediction', 'tif');
+        bindButton('export-variance-geojson', 'variance', 'geojson');
+        bindButton('export-variance-shp', 'variance', 'shp');
+        bindButton('export-variance-tif', 'variance', 'tif');
+
+        // 增强导出
+        const exportCsv = document.getElementById('export-csv');
+        if (exportCsv) {
+            exportCsv.addEventListener('click', () => {
+                const points = this.currentProject?.points || this.layerManager?.getSamplingPoints() || [];
+                if (points.length === 0) {
+                    this.showExportStatus('没有可导出的采样点', 'error');
+                    return;
+                }
+                ExportEnhancer.exportPointsCSV(points);
+                HistoryManager.record({
+                    action: '导出CSV',
+                    type: 'export',
+                    detail: `导出了 ${points.length} 个采样点`,
+                    undoable: false
+                });
+            });
+        }
+
+        const exportReport = document.getElementById('export-report');
+        if (exportReport) {
+            exportReport.addEventListener('click', () => {
+                if (!this.currentTaskId) {
+                    this.showExportStatus('没有可生成报告的任务', 'error');
+                    return;
+                }
+                const krigingMethodSelect = document.getElementById('kriging-method') as HTMLSelectElement;
+                const gridResolutionInput = document.getElementById('grid-resolution') as HTMLInputElement;
+                ExportEnhancer.generateHTMLReport({
+                    taskId: this.currentTaskId,
+                    method: krigingMethodSelect?.value || '',
+                    pointCount: (this.currentProject?.points || this.layerManager?.getSamplingPoints() || []).length,
+                    gridResolution: parseInt(gridResolutionInput?.value || '10', 10)
+                });
+                HistoryManager.record({
+                    action: '生成报告',
+                    type: 'export',
+                    detail: `生成了任务 ${this.currentTaskId} 的分析报告`,
+                    undoable: false
+                });
+            });
+        }
+    }
+
+    /**
+     * 初始化表单验证器
+     */
+    private _initFormValidator(): void {
+        this.formValidator = new FormValidator();
+
+        // 注册网格分辨率字段
+        const rules: FormValidationRules = {
+            required: '请输入网格分辨率',
+            pattern: /^[1-9]\d*$/,
+            patternMsg: '必须为大于0的正整数',
+            custom: (value) => {
+                const num = parseInt(value, 10);
+                if (num > 10000) {
+                    return { valid: false, message: '不能超过10000', level: 'error' };
+                }
+                if (num > 5000) {
+                    return { valid: true, message: '高分辨率可能导致计算较慢', level: 'warning' };
+                }
+                return { valid: true };
+            }
+        };
+
+        this.formValidator.register('grid-resolution', rules);
+
+        // 验证状态变化时更新按钮
+        this.formValidator.onValidationChange = (allValid) => {
+            const startBtn = document.getElementById('start-kriging-btn') as HTMLButtonElement;
+            const hasEnoughPoints = (this.currentProject && this.currentProject.getPointCount() >= 3) ||
+                                    (this.layerManager && this.layerManager.getSamplingPoints().length >= 3);
+            startBtn.disabled = !(allValid && hasEnoughPoints);
+        };
+    }
+
+    /**
+     * 处理新建项目
+     */
+    public handleNewProject(): void {
+        const modal = new NewProjectModal(
+            (project, config) => this.onProjectCreated(project, config),
+            this.view!
+        );
+        modal.show();
+    }
+
+    /**
+     * 项目创建完成回调
+     */
+    private onProjectCreated(project: IProject, config: ProjectConfig): void {
+        console.log('项目创建完成:', project);
+        HistoryManager.record({
+            action: '新建项目',
+            type: 'project',
+            detail: `创建了${config.sampling_mode === 'free' ? '自由采样' : '区域采样'}项目`,
+            undoable: false
+        });
+
+        // 保存当前项目
+        this.currentProject = project;
+
+        // 清理旧的采样组件
+        if (this.samplingComponent) {
+            this.samplingComponent.destroy();
+        }
+
+        // 创建采样组件
+        const projectPanel = document.getElementById('project-panel');
+        const projectContent = document.getElementById('project-content');
+
+        if (projectContent) {
+            // 清空内容
+            projectContent.innerHTML = '';
+
+            // 根据采样模式创建对应组件
+            if (config.sampling_mode === 'free') {
+                this.samplingComponent = new FreeSampling(
+                    this.view!,
+                    (pointData: any) => this.handlePointAdded(pointData)
+                );
+                const panel = this.samplingComponent.createPanel(config.coordinate_mode);
+                projectContent.appendChild(panel);
+            } else if (config.sampling_mode === 'region') {
+                this.samplingComponent = new RegionSampling(
+                    this.view!,
+                    (pointData: any) => this.handlePointAdded(pointData)
+                );
+                const panel = this.samplingComponent.createPanel(config.coordinate_mode);
+                projectContent.appendChild(panel);
+            }
+        }
+
+        // 显示项目面板
+        if (projectPanel) {
+            projectPanel.style.display = 'block';
+        }
+    }
+
+    /**
+     * 处理采样点添加
+     */
+    private async handlePointAdded(pointData: ExtendedSamplingPoint): Promise<void> {
+        console.log('添加采样点:', pointData);
+
+        if (!this.currentProject) {
+            throw new Error('没有当前项目');
+        }
+
+        // 添加到项目
+        const success = this.currentProject.addPoint(pointData);
+
+        if (!success) {
+            throw new Error('采样点超出区域边界');
+        }
+
+        // 在地图上显示
+        if (this.layerManager) {
+            await this.layerManager.addSamplingPoint(pointData);
+        }
+
+        // 校验网格分辨率后再决定是否启用按钮
+        this.validateGridResolution();
+    }
+
+    /**
+     * 校验网格分辨率输入
+     */
+    private validateGridResolution(): boolean {
+        const input = document.getElementById('grid-resolution') as HTMLInputElement;
+        const errorMsg = document.getElementById('grid-resolution-error') as HTMLElement;
+        const startBtn = document.getElementById('start-kriging-btn') as HTMLButtonElement;
+
+        if (!input || !errorMsg || !startBtn) return false;
+
+        const value = input.value.trim();
+        const validPattern = /^[1-9]\d*$/;
+
+        // 检查是否为空
+        if (value === '') {
+            input.classList.add('error');
+            errorMsg.classList.add('show');
+            startBtn.disabled = true;
+            return false;
+        }
+
+        // 检查格式是否合法
+        if (!validPattern.test(value)) {
+            input.classList.add('error');
+            errorMsg.classList.add('show');
+            startBtn.disabled = true;
+            return false;
+        }
+
+        // 检查数值范围
+        const numValue = parseInt(value, 10);
+        if (numValue > 10000) {
+            input.classList.add('error');
+            errorMsg.classList.add('show');
+            startBtn.disabled = true;
+            return false;
+        }
+
+        // 合法输入，移除错误状态
+        input.classList.remove('error');
+        errorMsg.classList.remove('show');
+
+        // 根据是否有足够的采样点来决定是否启用按钮
+        const hasEnoughPoints = (this.currentProject && this.currentProject.getPointCount() >= 3) ||
+                                (this.layerManager && this.layerManager.getSamplingPoints().length >= 3);
+        startBtn.disabled = !hasEnoughPoints;
+
+        return true;
+    }
+
+    /**
+     * 处理文件上传
+     */
+    private async handleUpload(): Promise<void> {
+        const fileInput = document.getElementById('file-input') as HTMLInputElement;
+        const file = fileInput?.files && fileInput.files.length > 0 ? fileInput.files[0] : null;
+
+        if (!file) {
+            this.showStatus('请选择文件', 'error');
+            return;
+        }
+
+        // 验证文件类型
+        if (!GeoJSONParser.validateFileType(file)) {
+            this.showStatus('仅支持 .geojson 或 .json 文件', 'error');
+            return;
+        }
+
+        try {
+            console.log('开始解析 GeoJSON 文件');
+            LoadingManager.show('正在解析文件...');
+
+            // 解析 GeoJSON
+            const parseResult = await GeoJSONParser.parseFile(file) as any;
+            console.log('GeoJSON 解析成功:', parseResult);
+
+            LoadingManager.hide();
+
+            // 显示配置弹窗
+            console.log('准备显示弹窗');
+            const modal = new DataImportModal((transformedData) => {
+                this.handleDataImport(transformedData as TransformedData);
+            }, this.view!);
+
+            modal.show(parseResult);
+            console.log('弹窗显示完成');
+
+        } catch (error) {
+            console.error('上传失败:', error);
+            LoadingManager.hide();
+            const errorMessage = error instanceof Error ? error.message : '未知错误';
+            this.showStatus(errorMessage, 'error');
+        }
+    }
+
+    /**
+     * 处理数据导入
+     */
+    private async handleDataImport(transformedData: TransformedData): Promise<void> {
+        try {
+            // 在地图上绘制采样点
+            if (this.layerManager) {
+                await this.layerManager.addPointsLayer(transformedData.geojson);
+
+                // 将数据添加到采样点数组
+                for (const point of transformedData.data) {
+                    await this.layerManager.addSamplingPoint(point);
+                }
+            }
+
+            this.showStatus(`数据导入成功！点数: ${transformedData.data.length}`, 'success');
+            HistoryManager.record({
+                action: '导入数据',
+                type: 'upload',
+                detail: `导入了 ${transformedData.data.length} 个采样点`,
+                undoable: false
+            });
+
+            // 校验网格分辨率后再决定是否启用按钮
+            this.validateGridResolution();
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : '未知错误';
+            this.showStatus(`导入失败: ${errorMessage}`, 'error');
+        }
+    }
+
+    /**
+     * 处理开始插值
+     */
+    private async handleStartKriging(): Promise<void> {
+        // 再次校验网格分辨率
+        if (!this.validateGridResolution()) {
+            this.showStatus('网格分辨率输入不合法', 'error');
+            return;
+        }
+
+        // 优先使用当前项目的采样点
+        let samplingPoints: SamplingPoint[];
+
+        if (this.currentProject && this.currentProject.getPointCount() > 0) {
+            samplingPoints = this.currentProject.points;
+        } else {
+            samplingPoints = this.layerManager?.getSamplingPoints() || [];
+        }
+
+        if (!samplingPoints || samplingPoints.length === 0) {
+            this.showStatus('请先上传数据或添加采样点', 'error');
+            return;
+        }
+
+        if (samplingPoints.length < 3) {
+            this.showStatus('至少需要 3 个采样点才能进行插值', 'error');
+            return;
+        }
+
+        // 确认开始插值
+        const confirmed = await ConfirmDialog.confirm({
+            title: '开始插值计算',
+            message: `将使用 ${samplingPoints.length} 个采样点进行克里金插值，确认开始？`,
+            confirmText: '开始',
+            cancelText: '取消'
+        });
+
+        if (!confirmed) return;
+
+        const krigingMethodSelect = document.getElementById('kriging-method') as HTMLSelectElement;
+        const variogramModelSelect = document.getElementById('variogram-model') as HTMLSelectElement;
+        const gridResolutionInput = document.getElementById('grid-resolution') as HTMLInputElement;
+
+        const params: KrigingParams = {
+            points: samplingPoints,
+            method: (krigingMethodSelect?.value || 'ordinary') as 'ordinary' | 'universal' | 'block',
+            variogram_model: (variogramModelSelect?.value || 'spherical') as 'spherical' | 'exponential' | 'gaussian',
+            grid_resolution: parseInt(gridResolutionInput?.value || '10', 10),
+            enable_cross_validation: true
+        };
+
+        try {
+            LoadingManager.show('正在提交插值任务...');
+            const response = await this.apiService!.startKriging(params);
+            this.currentTaskId = response.task_id;
+            LoadingManager.hide();
+
+            this.showStatus('任务已启动', 'success');
+            HistoryManager.record({
+                action: '开始插值',
+                type: 'kriging',
+                detail: `使用 ${params.method} 方法，${samplingPoints.length} 个采样点`,
+                undoable: false
+            });
+            this.startTaskPolling();
+
+        } catch (error) {
+            LoadingManager.hide();
+            const errorMessage = error instanceof Error ? error.message : '未知错误';
+            this.showStatus(`启动失败: ${errorMessage}`, 'error');
+        }
+    }
+
+    /**
+     * 开始任务轮询
+     */
+    private startTaskPolling(): void {
+        if (this.taskPoller) {
+            this.taskPoller.stop();
+        }
+
+        const callback: TaskStatusCallback = (status) => this.handleTaskUpdate(status);
+        this.taskPoller = new TaskPoller(
+            this.apiService!,
+            this.currentTaskId!,
+            callback
+        );
+
+        this.taskPoller.start();
+    }
+
+    /**
+     * 处理任务状态更新
+     */
+    private async handleTaskUpdate(status: TaskStatus): Promise<void> {
+        const statusDiv = document.getElementById('task-status');
+        const progressBar = document.getElementById('progress-bar');
+        const progressFill = progressBar?.querySelector('.progress-fill');
+
+        if (statusDiv) {
+            statusDiv.innerHTML = `
+                <p>状态: ${status.status}</p>
+                <p>进度: ${status.progress.toFixed(1)}%</p>
+            `;
+        }
+
+        if (progressBar && progressFill) {
+            progressBar.style.display = 'block';
+            progressFill.style.width = `${status.progress}%`;
+            progressBar.setAttribute('aria-valuenow', String(Math.round(status.progress)));
+        }
+
+        if (status.status === 'completed') {
+            this.taskPoller?.stop();
+            this.showStatus('插值完成！', 'success');
+            LoadingManager.show('正在加载结果...');
+            await this.loadResults();
+            LoadingManager.hide();
+        } else if (status.status === 'failed') {
+            this.taskPoller?.stop();
+            this.showStatus(`任务失败: ${status.error}`, 'error');
+        }
+    }
+
+    /**
+     * 加载结果
+     */
+    private async loadResults(): Promise<void> {
+        try {
+            const predictionResult = await this.apiService!.getPredictionResult(this.currentTaskId!);
+            const varianceResult = await this.apiService!.getVarianceResult(this.currentTaskId!);
+
+            // 加载栅格图层
+            if (this.layerManager) {
+                this.layerManager.addRasterLayer('prediction', predictionResult.geotiff_url);
+                this.layerManager.addRasterLayer('variance', varianceResult.geotiff_url);
+            }
+
+            // 显示导出面板
+            const exportPanel = document.getElementById('export-panel');
+            if (exportPanel) {
+                exportPanel.style.display = 'block';
+            }
+
+            // 设置采样建议面板的任务ID，自动生成建议
+            if (this.recommendationPanel && this.currentTaskId) {
+                this.recommendationPanel.setTaskId(this.currentTaskId);
+            }
+
+        } catch (error) {
+            console.error('加载结果失败:', error);
+        }
+    }
+
+    /**
+     * 处理导出
+     */
+    private async handleExport(dataType: string, format: string): Promise<void> {
+        if (!this.currentTaskId) {
+            this.showExportStatus('没有可导出的结果', 'error');
+            return;
+        }
+
+        const filename = `${this.currentTaskId}_${dataType}.${format}`;
+        LoadingManager.show(`正在导出 ${filename}...`);
+        this.showExportStatus(`正在下载 ${filename}...`, 'success');
+
+        try {
+            await this.apiService!.downloadExportFile(this.currentTaskId, filename);
+            LoadingManager.hide();
+            this.showExportStatus(`${filename} 下载完成`, 'success');
+            HistoryManager.record({
+                action: '导出结果',
+                type: 'export',
+                detail: `导出了 ${filename}`,
+                undoable: false
+            });
+        } catch (error) {
+            console.error('导出失败:', error);
+            LoadingManager.hide();
+            const errorMessage = error instanceof Error ? error.message : '未知错误';
+            this.showExportStatus(`导出失败: ${errorMessage}`, 'error');
+        }
+    }
+
+    /**
+     * 显示导出状态
+     */
+    private showExportStatus(message: string, type: string): void {
+        const statusDiv = document.getElementById('export-status');
+        if (statusDiv) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status-message ${type}`;
+        }
+    }
+
+    /**
+     * 显示状态
+     */
+    private showStatus(message: string, type: string): void {
+        const statusDiv = document.getElementById('upload-status');
+        if (statusDiv) {
+            statusDiv.textContent = message;
+            statusDiv.className = `status-message ${type}`;
+        }
+    }
+
+    /**
+     * 绑定移动端事件
+     */
+    private bindMobileEvents(): void {
+        const mobileToggle = document.getElementById('sidebar-mobile-toggle');
+        const overlay = document.getElementById('sidebar-overlay');
+        const sidebar = document.querySelector('.sidebar');
+
+        if (mobileToggle && overlay && sidebar) {
+            mobileToggle.addEventListener('click', () => {
+                const isOpen = sidebar.classList.toggle('mobile-open');
+                overlay.classList.toggle('visible');
+                mobileToggle.textContent = isOpen ? '✕' : '☰';
+                mobileToggle.setAttribute('aria-expanded', String(isOpen));
+                overlay.setAttribute('aria-hidden', String(!isOpen));
+            });
+
+            overlay.addEventListener('click', () => {
+                sidebar.classList.remove('mobile-open');
+                overlay.classList.remove('visible');
+                mobileToggle.textContent = '☰';
+                mobileToggle.setAttribute('aria-expanded', 'false');
+                overlay.setAttribute('aria-hidden', 'true');
+            });
+        }
+    }
+
+    /**
+     * 切换右侧侧边栏
+     */
+    private toggleRightSidebar(): void {
+        const rightSidebar = document.getElementById('right-sidebar');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+
+        if (rightSidebar && sidebarToggle) {
+            if (rightSidebar.classList.contains('hidden')) {
+                rightSidebar.classList.remove('hidden');
+                sidebarToggle.classList.remove('open');
+                sidebarToggle.setAttribute('aria-expanded', 'true');
+            } else {
+                rightSidebar.classList.add('hidden');
+                sidebarToggle.classList.add('open');
+                sidebarToggle.setAttribute('aria-expanded', 'false');
+            }
+        }
+    }
+
+    /**
+     * 显示偏好设置面板
+     */
+    private showPreferences(): void {
+        if (!this.preferencesPanel) {
+            const callback = (prefs: { theme: 'light' | 'dark' | 'auto'; animationsEnabled: boolean; gridResolution: number }) => {
+                // 应用主题
+                if (prefs.theme === 'dark') {
+                    ThemeManager.set('dark');
+                } else if (prefs.theme === 'light') {
+                    ThemeManager.set('light');
+                } else if (prefs.theme === 'auto') {
+                    ThemeManager.set('auto');
+                }
+                // 应用动画设置
+                document.documentElement.style.setProperty(
+                    '--transition-fast',
+                    prefs.animationsEnabled ? '0.2s ease' : '0s'
+                );
+                // 更新默认网格分辨率
+                const gridInput = document.getElementById('grid-resolution') as HTMLInputElement;
+                if (gridInput && !gridInput.value) {
+                    gridInput.value = String(prefs.gridResolution);
+                }
+            };
+
+            this.preferencesPanel = new PreferencesPanel(callback);
+        }
+        this.preferencesPanel.show();
+    }
+
+    /**
+     * 处理建议点选中
+     */
+    private handleRecommendationSelect(recommendation: SamplingRecommendation): void {
+        console.log('选中建议点:', recommendation);
+
+        // 如果有采样组件，自动填充坐标
+        if (this.samplingComponent && (this.samplingComponent as any).coordinateInput) {
+            // 填充坐标
+            (this.samplingComponent as any).coordinateInput.setValue({
+                longitude: recommendation.x,
+                latitude: recommendation.y
+            });
+
+            // 显示提示信息
+            this.showStatus(
+                `已选择建议点 #${recommendation.id}，坐标已自动填充`,
+                'success'
+            );
+        } else {
+            this.showStatus(
+                `建议点 #${recommendation.id} 坐标: ${recommendation.x.toFixed(6)}, ${recommendation.y.toFixed(6)}`,
+                'success'
+            );
+        }
+    }
+
+    /**
+     * 处理地图引擎切换
+     * @param newProvider - 新的地图引擎提供商
+     */
+    private async handleMapEngineSwitch(newProvider: 'arcgis' | 'amap'): Promise<void> {
+        try {
+            LoadingManager.show('正在切换地图引擎...');
+
+            // 保存当前状态
+            const currentCenter = this.view ? (this.view as any).getCenter?.() : null;
+            const currentZoom = this.view ? (this.view as any).getZoom?.() : null;
+            const samplingPoints = this.layerManager?.getSamplingPoints() || [];
+            const projectPoints = this.currentProject?.points || [];
+
+            // 清除当前图层
+            if (this.layerManager) {
+                this.layerManager.clearAllLayers();
+            }
+
+            // 清除所有 iframe（高德地图使用 iframe）
+            const iframes = document.querySelectorAll('iframe[id^="amap-loader-iframe"]');
+            iframes.forEach(iframe => {
+                console.log('🗑️ 移除旧的 AMap iframe');
+                if (iframe.parentNode) {
+                    iframe.parentNode.removeChild(iframe);
+                }
+            });
+
+            // 恢复地图容器可见性
+            const mapContainer = document.getElementById('viewDiv');
+            if (mapContainer) {
+                mapContainer.style.visibility = 'visible';
+            }
+
+            // 重新初始化地图
+            const mapAdapter = await reinitializeMap('viewDiv', newProvider);
+            this.view = mapAdapter.getView();
+
+            // 重新创建 LayerManager
+            this.layerManager = new LayerManager(mapAdapter);
+
+            // 恢复地图视图
+            if (currentCenter && currentZoom) {
+                const center = Array.isArray(currentCenter)
+                    ? currentCenter
+                    : [currentCenter.lng, currentCenter.lat];
+                (this.view as any).setCenter?.(center);
+                (this.view as any).setZoom?.(currentZoom);
+            }
+
+            // 恢复采样点
+            const pointsToRestore = projectPoints.length > 0 ? projectPoints : samplingPoints;
+            for (const point of pointsToRestore) {
+                await this.layerManager.addSamplingPoint(point);
+            }
+
+            // 更新采样组件的视图引用
+            if (this.samplingComponent) {
+                (this.samplingComponent as any).view = this.view;
+            }
+
+            // 更新坐标系统信息组件
+            const coordSystemInfo = document.querySelector('.coordinate-system-info');
+            if (coordSystemInfo) {
+                coordSystemInfo.remove();
+                const newCoordSystemInfo = new CoordinateSystemInfo(this.view);
+                const newCoordPanel = newCoordSystemInfo.createPanel();
+                const sidebar = document.querySelector('.sidebar');
+                const firstPanel = sidebar?.querySelector('.panel');
+                if (sidebar && firstPanel) {
+                    sidebar.insertBefore(newCoordPanel, firstPanel);
+                }
+            }
+
+            LoadingManager.hide();
+            this.showStatus(`已切换到 ${newProvider === 'arcgis' ? 'ArcGIS' : '高德'} 地图引擎`, 'success');
+
+            // 如果切换到高德地图，启用定位功能
+            if (newProvider === 'amap') {
+                try {
+                    console.log('📍 正在启用高德地图定位功能...');
+                    const { AMapEngine } = await import('./map/core/AMapEngine.js');
+                    
+                    // 获取地图适配器的引擎实例
+                    const engine = mapAdapter.getEngine();
+                    if (engine instanceof AMapEngine) {
+                        // 启用定位功能并请求权限
+                        const locationEnabled = await engine.enableLocation(true);
+                        
+                        if (locationEnabled) {
+                            console.log('✅ 高德地图定位功能已启用');
+                            // 显示回到中心按钮
+                            if (this.locationCenterButton) {
+                                this.locationCenterButton.show();
+                            }
+                        } else {
+                            console.log('⚠️ 定位权限未授权，定位蓝点不会显示');
+                            // 隐藏回到中心按钮
+                            if (this.locationCenterButton) {
+                                this.locationCenterButton.hide();
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('❌ 启用定位功能失败:', error);
+                    // 定位功能失败不影响地图切换
+                }
+            } else {
+                // 切换到 ArcGIS，隐藏回到中心按钮
+                if (this.locationCenterButton) {
+                    this.locationCenterButton.hide();
+                }
+            }
+
+            // 记录历史
+            HistoryManager.record({
+                action: '切换地图引擎',
+                type: 'map',
+                detail: `切换到 ${newProvider === 'arcgis' ? 'ArcGIS' : '高德'} 地图引擎`,
+                undoable: false
+            });
+
+        } catch (error) {
+            LoadingManager.hide();
+            console.error('地图引擎切换失败:', error);
+            const errorMessage = error instanceof Error ? error.message : '未知错误';
+            this.showStatus(`切换失败: ${errorMessage}`, 'error');
+            throw error;
+        }
+    }
+
+    /**
+     * 处理回到中心按钮点击
+     */
+    private async handleLocationCenter(): Promise<void> {
+        if (!this.layerManager) {
+            console.warn('⚠️ LayerManager 不存在');
+            return;
+        }
+
+        try {
+            const mapAdapter = this.layerManager.adapter;
+            if (!mapAdapter) {
+                console.warn('⚠️ 地图适配器不存在');
+                return;
+            }
+
+            const engine = mapAdapter.getEngine();
+            if (!engine) {
+                console.warn('⚠️ 地图引擎不存在');
+                return;
+            }
+
+            // 检查是否是高德地图引擎
+            const { AMapEngine } = await import('./map/core/AMapEngine.js');
+            if (engine instanceof AMapEngine) {
+                const success = engine.panToLocation();
+                if (success) {
+                    this.showStatus('已回到当前位置', 'success');
+                } else {
+                    this.showStatus('定位蓝点不存在，无法回到中心', 'warning');
+                }
+            } else {
+                this.showStatus('当前地图引擎不支持回到中心功能', 'warning');
+            }
+        } catch (error) {
+            console.error('❌ 回到中心失败:', error);
+            this.showStatus('回到中心失败', 'error');
+        }
+    }
+}
+
+/**
+ * 按钮涟漪效果
+ */
+function initRippleEffect(): void {
+    document.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        const btn = target.closest('.btn');
+        if (!btn) return;
+
+        const ripple = document.createElement('span');
+        ripple.className = 'btn-ripple';
+        const rect = btn.getBoundingClientRect();
+        const size = Math.max(rect.width, rect.height);
+        ripple.style.width = ripple.style.height = `${size}px`;
+        ripple.style.left = `${e.clientX - rect.left - size / 2}px`;
+        ripple.style.top = `${e.clientY - rect.top - size / 2}px`;
+        btn.appendChild(ripple);
+        ripple.addEventListener('animationend', () => ripple.remove());
+    });
+}
+
+/**
+ * 键盘快捷键（使用 KeyboardManager）
+ */
+function initKeyboardShortcuts(app: App): void {
+    // 注册快捷键
+    KeyboardManager.register({
+        key: 'Escape',
+        description: '关闭弹窗/侧边栏',
+        handler: () => {
+            // 关闭移动端侧边栏
+            const sidebar = document.querySelector('.sidebar.mobile-open');
+            if (sidebar) {
+                sidebar.classList.remove('mobile-open');
+                const overlay = document.getElementById('sidebar-overlay');
+                if (overlay) {
+                    overlay.classList.remove('visible');
+                    overlay.setAttribute('aria-hidden', 'true');
+                }
+                const toggle = document.getElementById('sidebar-mobile-toggle');
+                if (toggle) {
+                    toggle.textContent = '☰';
+                    toggle.setAttribute('aria-expanded', 'false');
+                }
+                return;
+            }
+            // 关闭模态框
+            const modal = document.querySelector('.modal-overlay.modal-show');
+            if (modal) {
+                modal.classList.remove('modal-show');
+                setTimeout(() => modal.remove(), 300);
+            }
+        }
+    });
+
+    KeyboardManager.register({
+        key: 'n',
+        ctrl: true,
+        description: '新建项目',
+        handler: () => app.handleNewProject()
+    });
+
+    KeyboardManager.register({
+        key: 'u',
+        ctrl: true,
+        description: '上传数据',
+        handler: () => {
+            const fileInput = document.getElementById('file-input') as HTMLInputElement;
+            fileInput?.click();
+        }
+    });
+
+    KeyboardManager.register({
+        key: 'Enter',
+        ctrl: true,
+        description: '开始插值',
+        handler: () => {
+            const btn = document.getElementById('start-kriging-btn') as HTMLButtonElement;
+            if (btn && !btn.disabled) {
+                btn.click();
+            }
+        }
+    });
+
+    KeyboardManager.register({
+        key: 's',
+        ctrl: true,
+        description: '导出结果',
+        handler: () => {
+            const exportPanel = document.getElementById('export-panel');
+            if (exportPanel && exportPanel.style.display !== 'none') {
+                const exportBtn = document.getElementById('export-prediction-geojson');
+                exportBtn?.click();
+            }
+        }
+    });
+
+    KeyboardManager.register({
+        key: 'd',
+        ctrl: true,
+        shift: true,
+        description: '切换主题',
+        handler: () => ThemeManager.toggle()
+    });
+
+    KeyboardManager.register({
+        key: 'z',
+        ctrl: true,
+        description: '撤销',
+        handler: () => HistoryManager.undo()
+    });
+
+    KeyboardManager.register({
+        key: 'z',
+        ctrl: true,
+        shift: true,
+        description: '重做',
+        handler: () => HistoryManager.redo()
+    });
+
+    // 初始化全局监听
+    KeyboardManager.init();
+}
+
+// 初始化交互增强
+initRippleEffect();
+
+// 注册 Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {
+            // SW 注册失败（开发环境或不支持），静默忽略
+        });
+    });
+}
+
+// 启动应用
+const app = new App();
+initKeyboardShortcuts(app);

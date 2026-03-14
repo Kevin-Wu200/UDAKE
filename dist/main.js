@@ -4,6 +4,9 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const net = require('net');
 
+// 初始化 @electron/remote
+require('@electron/remote/main').initialize();
+
 let mainWindow;
 let backendProcess;
 let backendPort = 18081;
@@ -166,10 +169,15 @@ function createWindow() {
       nodeIntegration: false,
       contextIsolation: false,
       webSecurity: false, // 允许加载外部资源（高德地图 API）
-      // preload: path.join(__dirname, 'preload.js')
+      sandbox: false, // 禁用沙箱，允许高德地图 API 执行
+      allowRunningInsecureContent: true, // 允许加载不安全的内容
+      preload: path.join(__dirname, 'preload.js')
     },
     show: false
   });
+
+  // 启用远程模块
+  require('@electron/remote/main').enable(mainWindow.webContents);
 
   // 窗口准备好后显示
   mainWindow.once('ready-to-show', () => {
@@ -178,13 +186,26 @@ function createWindow() {
 
   // 加载前端
   const isDev = !app.isPackaged;
+  let indexPath;
   if (isDev) {
-    mainWindow.loadFile(path.join(__dirname, '..', 'frontend', 'index.html'));
+    indexPath = path.join(__dirname, '..', 'frontend', 'dist', 'index.html');
     // mainWindow.loadURL("http://localhost:5173");
   } else {
-    mainWindow.loadFile(path.join(process.resourcesPath, 'frontend', 'index.html'));
+    indexPath = path.join(process.resourcesPath, 'frontend', 'index.html');
     // mainWindow.loadURL("http://localhost:5173");
   }
+
+  // 加载页面并设置 CSP
+  mainWindow.loadFile(indexPath).then(() => {
+    // 设置宽松的 CSP 以允许高德地图和 ArcGIS API 执行
+    mainWindow.webContents.executeJavaScript(`
+      const meta = document.createElement('meta');
+      meta.httpEquiv = 'Content-Security-Policy';
+      meta.content = "default-src 'self' 'unsafe-inline' 'unsafe-eval' https://webapi.amap.com https://restapi.amap.com https://jsapi.amap.com https://o4.amap.com https://js.arcgis.com https://tiles.arcgis.com https://static.arcgis.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://webapi.amap.com https://restapi.amap.com https://jsapi.amap.com https://o4.amap.com https://js.arcgis.com https://static.arcgis.com; img-src 'self' data: https://webapi.amap.com https://o4.amap.com https://tiles.arcgis.com https://static.arcgis.com https:; style-src 'self' 'unsafe-inline' https://webapi.amap.com https://o4.amap.com https://js.arcgis.com https://static.arcgis.com; connect-src 'self' http://localhost:* https://webapi.amap.com https://restapi.amap.com https://jsapi.amap.com https://o4.amap.com https://js.arcgis.com https://tiles.arcgis.com https://static.arcgis.com https://services.arcgis.com; font-src 'self' data: https://static.arcgis.com; worker-src 'self' blob:;";
+      document.head.appendChild(meta);
+      console.log('✅ CSP 已设置');
+    `).catch(err => log('设置 CSP 失败: ' + err.message));
+  }).catch(err => log('加载页面失败: ' + err.message));
 
   // 开发工具
   if (isDev) {
@@ -245,4 +266,29 @@ app.on('before-quit', () => {
 // IPC 通信
 ipcMain.handle('get-backend-port', () => {
   return backendPort;
+});
+
+// 打开下载文件夹
+ipcMain.handle('open-download-folder', () => {
+  const { shell } = require('electron');
+  const downloadsPath = app.getPath('downloads');
+  shell.openPath(downloadsPath);
+  return downloadsPath;
+});
+
+// 选择文件保存位置并保存文件
+ipcMain.handle('save-file', async (event, options) => {
+  const { dialog } = require('electron');
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: options.title || '保存文件',
+    defaultPath: options.defaultPath,
+    filters: options.filters || []
+  });
+
+  if (!result.canceled && result.filePath) {
+    fs.writeFileSync(result.filePath, Buffer.from(options.data));
+    return { success: true, filePath: result.filePath };
+  }
+
+  return { success: false, filePath: null };
 });

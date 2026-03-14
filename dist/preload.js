@@ -1,5 +1,7 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { ipcRenderer } = require('electron');
 
-contextBridge.exposeInMainWorld('electronAPI', {
-  getBackendPort: () => ipcRenderer.invoke('get-backend-port')
-});
+window.electronAPI = {
+  getBackendPort: () => ipcRenderer.invoke('get-backend-port'),
+  openDownloadFolder: () => ipcRenderer.invoke('open-download-folder'),
+  saveFile: (options) => ipcRenderer.invoke('save-file', options)
+};

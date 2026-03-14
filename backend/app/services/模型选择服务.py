@@ -177,3 +177,85 @@ class ModelSelector:
             "model_scores": model_scores,
             "point_count": point_count
         }
+
+    def select_parameters_by_industry(
+        self,
+        industry_config: Dict[str, Any],
+        x: np.ndarray,
+        y: np.ndarray,
+        values: np.ndarray,
+        enable_cross_validation: bool = True
+    ) -> Dict[str, Any]:
+        """
+        基于行业配置选择参数
+        结合行业预设配置和数据特征，提供优化的参数推荐
+
+        Args:
+            industry_config: 行业配置字典
+            x: X坐标数组
+            y: Y坐标数组
+            values: 值数组
+            enable_cross_validation: 是否启用交叉验证优化
+
+        Returns:
+            推荐的参数字典
+        """
+        point_count = len(values)
+
+        logger.info(f"基于行业配置推荐参数: {industry_config['name']}")
+
+        # 使用行业预设的克里金方法
+        method = KrigingMethod(industry_config['default_method'])
+
+        # 使用行业预设的变异函数模型
+        variogram_model = VariogramModel(industry_config['default_variogram'])
+
+        # 如果启用交叉验证且数据量足够，尝试优化变异函数模型
+        model_scores = {}
+        if enable_cross_validation and point_count >= 30:
+            logger.info("启用交叉验证优化变异函数模型...")
+            best_model, model_scores = self.select_best_variogram_model(x, y, values)
+
+            # 如果交叉验证的结果明显优于行业预设，则使用交叉验证结果
+            if model_scores and variogram_model.value in model_scores:
+                preset_score = model_scores[variogram_model.value]
+                best_score = model_scores[best_model.value]
+
+                # 如果最佳模型比预设模型好超过10%，则使用最佳模型
+                if best_score < preset_score * 0.9:
+                    logger.info(f"交叉验证优化: {variogram_model.value} -> {best_model.value}")
+                    variogram_model = best_model
+                else:
+                    logger.info(f"保持行业预设模型: {variogram_model.value}")
+
+        # 检测趋势（如果行业配置启用趋势检测）
+        has_trend = False
+        if industry_config.get('enable_trend_detection', True):
+            has_trend = self.detect_trend(x, y, values)
+            if has_trend and method != KrigingMethod.UNIVERSAL:
+                logger.info("检测到趋势，建议使用泛克里金方法")
+                # 不强制修改方法，只记录建议
+
+        # 使用行业预设的网格分辨率和滞后数
+        grid_resolution = industry_config['default_grid_resolution']
+        nlags = industry_config['default_nlags']
+
+        # 根据数据量调整网格分辨率（避免过度计算）
+        if point_count < 50:
+            grid_resolution = min(grid_resolution, 80)
+            logger.info("数据量小，调整网格分辨率")
+
+        return {
+            "variogram_model": variogram_model,
+            "method": method,
+            "grid_resolution": grid_resolution,
+            "nlags": nlags,
+            "has_trend": has_trend,
+            "enable_anisotropy": industry_config.get('enable_anisotropy', False),
+            "max_range": industry_config.get('max_range'),
+            "nugget_ratio": industry_config.get('nugget_ratio'),
+            "custom_parameters": industry_config.get('custom_parameters', {}),
+            "model_scores": model_scores,
+            "point_count": point_count,
+            "industry_name": industry_config['name']
+        }

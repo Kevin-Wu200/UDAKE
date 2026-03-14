@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Electron 环境诊断 - 高德地图</title>
+    <style>
+        body {
+            font-family: 'SF Mono', 'Monaco', 'Consolas', monospace;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #1e1e1e;
+            color: #d4d4d4;
+        }
+        h1 { color: #61afef; }
+        h2 { color: #98c379; margin-top: 30px; }
+        .section {
+            background: #282c34;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+            border-left: 4px solid #61afef;
+        }
+        .success { color: #98c379; }
+        .error { color: #e06c75; }
+        .warning { color: #e5c07b; }
+        .info { color: #61afef; }
+        button {
+            background: #61afef;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        button:hover { background: #4d8fcc; }
+        button:disabled { background: #5c6370; cursor: not-allowed; }
+        #log {
+            background: #1a1a1a;
+            padding: 15px;
+            margin-top: 20px;
+            border-radius: 5px;
+            max-height: 600px;
+            overflow-y: auto;
+            font-size: 12px;
+            line-height: 1.6;
+        }
+        #map-container {
+            width: 100%;
+            height: 400px;
+            margin-top: 20px;
+            background: #1a1a1a;
+            border: 2px solid #61afef;
+            border-radius: 5px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 5px 0;
+            border-radius: 3px;
+        }
+        .test-result.pass { background: rgba(152, 195, 121, 0.2); }
+        .test-result.fail { background: rgba(224, 108, 117, 0.2); }
+    </style>
+</head>
+<body>
+    <h1>🔍 Electron 环境诊断 - 高德地图</h1>
+
+    <div class="section">
+        <h2>1. 环境信息</h2>
+        <div id="env-info">检查中...</div>
+    </div>
+
+    <div class="section">
+        <h2>2. 网络测试</h2>
+        <button onclick="testNetwork()">测试网络连接</button>
+        <div id="network-result"></div>
+    </div>
+
+    <div class="section">
+        <h2>3. 浏览器 API 检查</h2>
+        <div id="api-check">检查中...</div>
+    </div>
+
+    <div class="section">
+        <h2>4. 高德地图加载测试</h2>
+        <button onclick="loadAMapClassic()">方法1: 经典方式</button>
+        <button onclick="loadAMapWithCallback()">方法2: 回调方式</button>
+        <button onclick="loadAMapWithPolling()">方法3: 轮询方式</button>
+        <div id="amap-result"></div>
+    </div>
+
+    <div class="section">
+        <h2>5. 地图显示</h2>
+        <button onclick="createMap()" id="create-map-btn" disabled>创建地图</button>
+        <div id="map-container"></div>
+    </div>
+
+    <div class="section">
+        <h2>📋 诊断日志</h2>
+        <button onclick="clearLog()">清空日志</button>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        let AMap = null;
+        let map = null;
+
+        // 日志函数
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const time = new Date().toLocaleTimeString();
+            const color = type === 'error' ? '#e06c75' : type === 'success' ? '#98c379' : type === 'warning' ? '#e5c07b' : '#d4d4d4';
+            logDiv.innerHTML += `<div style="color: ${color}">[${time}] ${message}</div>`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        // 检查环境
+        function checkEnvironment() {
+            const info = `
+                <div class="test-result ${typeof window !== 'undefined' ? 'pass' : 'fail'}">
+                    window 对象: <span class="${typeof window !== 'undefined' ? 'success' : 'error'}">${typeof window !== 'undefined' ? '✅ 存在' : '❌ 不存在'}</span>
+                </div>
+                <div class="test-result ${typeof document !== 'undefined' ? 'pass' : 'fail'}">
+                    document 对象: <span class="${typeof document !== 'undefined' ? 'success' : 'error'}">${typeof document !== 'undefined' ? '✅ 存在' : '❌ 不存在'}</span>
+                </div>
+                <div class="test-result">
+                    User Agent: <span class="info">${navigator.userAgent}</span>
+                </div>
+                <div class="test-result">
+                    在线状态: <span class="${navigator.onLine ? 'success' : 'error'}">${navigator.onLine ? '✅ 在线' : '❌ 离线'}</span>
+                </div>
+                <div class="test-result">
+                    语言: <span class="info">${navigator.language}</span>
+                </div>
+                <div class="test-result">
+                    平台: <span class="info">${navigator.platform}</span>
+                </div>
+            `;
+            document.getElementById('env-info').innerHTML = info;
+            log('环境检查完成', 'success');
+        }
+
+        // 测试网络
+        async function testNetwork() {
+            const resultDiv = document.getElementById('network-result');
+            resultDiv.innerHTML = '测试中...';
+            log('开始网络测试...');
+
+            try {
+                const start = Date.now();
+                const response = await fetch('https://webapi.amap.com/maps', {
+                    method: 'HEAD',
+                    mode: 'no-cors',
+                    cache: 'no-cache'
+                });
+                const time = Date.now() - start;
+                
+                resultDiv.innerHTML = `
+                    <div class="test-result pass">
+                        ✅ 网络连接正常<br>
+                        响应时间: ${time}ms
+                    </div>
+                `;
+                log(`网络测试成功，响应时间: ${time}ms`, 'success');
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="test-result fail">
+                        ❌ 网络连接失败<br>
+                        错误: ${error.message}
+                    </div>
+                `;
+                log(`网络测试失败: ${error.message}`, 'error');
+            }
+        }
+
+        // 检查浏览器 API
+        function checkAPIs() {
+            const apis = {
+                'fetch': typeof fetch !== 'undefined',
+                'Promise': typeof Promise !== 'undefined',
+                'Object.defineProperty': typeof Object.defineProperty !== 'undefined',
+                'Function.prototype.bind': typeof Function.prototype.bind !== 'undefined',
+                'Array.prototype.forEach': typeof Array.prototype.forEach !== 'undefined',
+                'document.createElement': typeof document.createElement !== 'undefined',
+                'document.head': !!document.head,
+                'document.body': !!document.body
+            };
+
+            let html = '';
+            for (const [api, available] of Object.entries(apis)) {
+                html += `
+                    <div class="test-result ${available ? 'pass' : 'fail'}">
+                        ${api}: <span class="${available ? 'success' : 'error'}">${available ? '✅ 可用' : '❌ 不可用'}</span>
+                    </div>
+                `;
+            }
+            document.getElementById('api-check').innerHTML = html;
+            log('浏览器 API 检查完成', 'success');
+        }
+
+        // 方法1: 经典方式加载
+        function loadAMapClassic() {
+            log('开始加载高德地图（经典方式）...');
+            const resultDiv = document.getElementById('amap-result');
+            resultDiv.innerHTML = '加载中...';
+
+            // 设置安全密钥
+            window._AMapSecurityConfig = {
+                securityJsCode: "10b5ef21f6b36d09e24d7b076d35dccc"
+            };
+            log('安全密钥已设置', 'success');
+
+            // 创建脚本
+            const script = document.createElement('script');
+            script.src = 'https://webapi.amap.com/maps?v=2.0&key=2f3f114aa5671425aa3c52f707d741c5';
+            
+            script.onload = () => {
+                log('脚本 onload 事件触发', 'success');
+                setTimeout(() => {
+                    if (window.AMap) {
+                        AMap = window.AMap;
+                        resultDiv.innerHTML = `
+                            <div class="test-result pass">
+                                ✅ 加载成功<br>
+                                AMap 版本: ${AMap.version || '未知'}<br>
+                                可用方法: ${Object.keys(AMap).slice(0, 10).join(', ')}...
+                            </div>
+                        `;
+                        log('AMap 对象加载成功', 'success');
+                        document.getElementById('create-map-btn').disabled = false;
+                    } else {
+                        resultDiv.innerHTML = `
+                            <div class="test-result fail">
+                                ❌ 加载失败<br>
+                                脚本已加载但 window.AMap 不存在
+                            </div>
+                        `;
+                        log('脚本已加载但 window.AMap 不存在', 'error');
+                    }
+                }, 100);
+            };
+
+            script.onerror = (error) => {
+                resultDiv.innerHTML = `
+                    <div class="test-result fail">
+                        ❌ 脚本加载失败
+                    </div>
+                `;
+                log('脚本加载失败', 'error');
+            };
+
+            document.head.appendChild(script);
+        }
+
+        // 方法2: 回调方式加载
+        function loadAMapWithCallback() {
+            log('开始加载高德地图（回调方式）...');
+            const resultDiv = document.getElementById('amap-result');
+            resultDiv.innerHTML = '加载中...';
+
+            // 设置安全密钥
+            window._AMapSecurityConfig = {
+                securityJsCode: "10b5ef21f6b36d09e24d7b076d35dccc"
+            };
+
+            // 设置回调
+            window.amapCallback = () => {
+                log('回调函数被触发', 'success');
+                if (window.AMap) {
+                    AMap = window.AMap;
+                    resultDiv.innerHTML = `
+                        <div class="test-result pass">
+                            ✅ 加载成功（回调方式）<br>
+                            AMap 版本: ${AMap.version || '未知'}
+                        </div>
+                    `;
+                    log('AMap 对象加载成功（回调方式）', 'success');
+                    document.getElementById('create-map-btn').disabled = false;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="test-result fail">
+                            ❌ 回调触发但 AMap 不存在
+                        </div>
+                    `;
+                    log('回调触发但 AMap 不存在', 'error');
+                }
+            };
+
+            // 创建脚本
+            const script = document.createElement('script');
+            script.src = 'https://webapi.amap.com/maps?v=2.0&key=2f3f114aa5671425aa3c52f707d741c5&callback=amapCallback';
+            
+            script.onerror = (error) => {
+                resultDiv.innerHTML = `
+                    <div class="test-result fail">
+                        ❌ 脚本加载失败
+                    </div>
+                `;
+                log('脚本加载失败', 'error');
+            };
+
+            document.head.appendChild(script);
+        }
+
+        // 方法3: 轮询方式加载
+        function loadAMapWithPolling() {
+            log('开始加载高德地图（轮询方式）...');
+            const resultDiv = document.getElementById('amap-result');
+            resultDiv.innerHTML = '加载中...';
+
+            // 设置安全密钥
+            window._AMapSecurityConfig = {
+                securityJsCode: "10b5ef21f6b36d09e24d7b076d35dccc"
+            };
+
+            // 创建脚本
+            const script = document.createElement('script');
+            script.src = 'https://webapi.amap.com/maps?v=2.0&key=2f3f114aa5671425aa3c52f707d741c5';
+            
+            script.onload = () => {
+                log('脚本 onload 事件触发，开始轮询...', 'success');
+                let checkCount = 0;
+                const maxChecks = 300; // 15秒
+
+                const checkInterval = setInterval(() => {
+                    checkCount++;
+                    if (checkCount % 50 === 0) {
+                        log(`轮询检查 ${checkCount}/${maxChecks}...`);
+                    }
+
+                    if (window.AMap && window.AMap.Map) {
+                        clearInterval(checkInterval);
+                        AMap = window.AMap;
+                        resultDiv.innerHTML = `
+                            <div class="test-result pass">
+                                ✅ 加载成功（轮询方式）<br>
+                                检查次数: ${checkCount}<br>
+                                AMap 版本: ${AMap.version || '未知'}
+                            </div>
+                        `;
+                        log(`AMap 对象加载成功，检查次数: ${checkCount}`, 'success');
+                        document.getElementById('create-map-btn').disabled = false;
+                    } else if (checkCount >= maxChecks) {
+                        clearInterval(checkInterval);
+                        resultDiv.innerHTML = `
+                            <div class="test-result fail">
+                                ❌ 加载超时<br>
+                                检查次数: ${checkCount}<br>
+                                window.AMap: ${!!window.AMap}
+                            </div>
+                        `;
+                        log('加载超时', 'error');
+                    }
+                }, 50);
+            };
+
+            script.onerror = (error) => {
+                resultDiv.innerHTML = `
+                    <div class="test-result fail">
+                        ❌ 脚本加载失败
+                    </div>
+                `;
+                log('脚本加载失败', 'error');
+            };
+
+            document.head.appendChild(script);
+        }
+
+        // 创建地图
+        function createMap() {
+            if (!AMap || !AMap.Map) {
+                log('AMap 未加载，无法创建地图', 'error');
+                return;
+            }
+
+            log('开始创建地图...');
+            const container = document.getElementById('map-container');
+            container.innerHTML = '';
+
+            try {
+                map = new AMap.Map(container, {
+                    center: [116.397428, 39.90923],
+                    zoom: 13,
+                    layers: [new AMap.TileLayer()]
+                });
+
+                log('地图创建成功', 'success');
+            } catch (error) {
+                log(`地图创建失败: ${error.message}`, 'error');
+                console.error(error);
+            }
+        }
+
+        // 全局错误监听
+        window.addEventListener('error', (event) => {
+            log(`全局错误: ${event.message}`, 'error');
+            console.error('Error event:', event);
+        });
+
+        window.addEventListener('unhandledrejection', (event) => {
+            log(`未处理的 Promise 拒绝: ${event.reason}`, 'error');
+            console.error('Unhandled rejection:', event);
+        });
+
+        // 初始化
+        window.onload = () => {
+            log('页面加载完成', 'success');
+            checkEnvironment();
+            checkAPIs();
+            log('诊断工具就绪，请点击按钮开始测试', 'info');
+        };
+    </script>
+</body>
+</html>

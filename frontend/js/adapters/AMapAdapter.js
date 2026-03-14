@@ -1,3 +1,4 @@
+/* global AMap */
 import { MapAdapter } from './MapAdapter.js';
 import { AMapEngine } from '../map/core/AMapEngine.js';
 
@@ -86,7 +87,7 @@ export class AMapAdapter extends MapAdapter {
     /**
      * 添加栅格图层（高德地图暂不支持，预留接口）
      */
-    async addRasterLayer(type, url) {
+    async addRasterLayer(_type, _url) {
         console.warn('高德地图暂不支持栅格图层');
     }
 
@@ -94,7 +95,7 @@ export class AMapAdapter extends MapAdapter {
      * 添加单个采样点
      */
     async addMarker(pointData) {
-        const marker = this.engine.addMarker([pointData.x, pointData.y], {
+        this.engine.addMarker([pointData.x, pointData.y], {
             title: `值: ${pointData.value}`,
             data: pointData
         });
@@ -160,7 +161,7 @@ export class AMapAdapter extends MapAdapter {
     /**
      * 设置图层透明度
      */
-    setLayerOpacity(layerName, opacity) {
+    setLayerOpacity(_layerName, _opacity) {
         console.warn('高德地图 Marker 不支持透明度设置');
     }
 
@@ -181,7 +182,7 @@ export class AMapAdapter extends MapAdapter {
      * 清除所有图层
      */
     clearAllLayers() {
-        for (const [name, markers] of Object.entries(this.layers)) {
+        for (const markers of Object.values(this.layers)) {
             if (Array.isArray(markers)) {
                 markers.forEach(marker => this.map.remove(marker));
             }
