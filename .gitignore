@@ -55,6 +55,9 @@ data_samples/*.json
 
 # 环境变量
 .env.local
+.env.development
+.env.testing
+.env.production
 
 # 临时文件
 *.tmp
