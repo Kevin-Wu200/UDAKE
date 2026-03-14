@@ -17,6 +17,9 @@ import { RegionSampling } from './sampling/RegionSampling.js';
 import { Project } from './models/Project.js';
 import { LocationPermissionManager } from './utils/locationPermissionManager.js';
 import { SamplingRecommendationPanel } from './components/SamplingRecommendationPanel.js';
+import { EnhancedSamplingRecommendationPanel } from './components/EnhancedSamplingRecommendationPanel.js';
+import { InteractiveSamplingMarkers } from './components/InteractiveSamplingMarkers.js';
+import { SamplingStrategySelector } from './components/SamplingStrategySelector.js';
 import { OnboardingGuide } from './components/OnboardingGuide.js';
 import { FormValidator } from './utils/FormValidator.js';
 import { LoadingManager } from './utils/LoadingManager.js';
@@ -98,6 +101,9 @@ class App {
     public currentProject: IProject | null = null;
     public samplingComponent: ISamplingComponent | null = null;
     public recommendationPanel: ISamplingRecommendationPanel | null = null;
+    public enhancedRecommendationPanel: EnhancedSamplingRecommendationPanel | null = null;
+    public interactiveMarkers: InteractiveSamplingMarkers | null = null;
+    public strategySelector: SamplingStrategySelector | null = null;
     public onboardingGuide: IOnboardingGuide | null = null;
     public formValidator: FormValidator | null = null;
     public preferencesPanel: IPreferencesPanel | null = null;
@@ -230,6 +236,36 @@ class App {
             (recommendation) => this.handleRecommendationSelect(recommendation)
         );
         const recommendationPanel = this.recommendationPanel.createPanel();
+
+        // 初始化增强采样推荐组件（可选）
+        if (this.apiService && mapAdapter) {
+            this.enhancedRecommendationPanel = new EnhancedSamplingRecommendationPanel(mapAdapter);
+            this.interactiveMarkers = new InteractiveSamplingMarkers(mapAdapter);
+            this.strategySelector = new SamplingStrategySelector();
+
+            // 监听策略变化
+            this.strategySelector.setOnStrategyChange((strategy, config) => {
+                console.log('策略变化:', strategy, config);
+                if (this.enhancedRecommendationPanel) {
+                    // 更新增强面板的策略配置
+                }
+            });
+
+            // 监听标记点击
+            this.interactiveMarkers.setOnMarkerClick((rec) => {
+                console.log('标记点击:', rec);
+                if (this.enhancedRecommendationPanel) {
+                    // 预览该点的效果
+                    this.enhancedRecommendationPanel.previewPointEffect(rec);
+                }
+            });
+
+            // 监听标记拖拽
+            this.interactiveMarkers.setOnMarkerDrag((rec, newPosition) => {
+                console.log('标记拖拽:', rec, newPosition);
+                // 实时重新评估
+            });
+        }
 
         // 插入到侧边栏
         const firstPanel = sidebar.querySelector('.panel');
@@ -1521,6 +1557,31 @@ class App {
                 `建议点 #${recommendation.id} 坐标: ${recommendation.x.toFixed(6)}, ${recommendation.y.toFixed(6)}`,
                 'success'
             );
+        }
+    }
+
+    /**
+     * 打开增强推荐面板
+     */
+    public openEnhancedRecommendationPanel(): void {
+        if (!this.currentTaskId) {
+            this.showStatus('请先创建任务', 'warning');
+            return;
+        }
+
+        if (this.enhancedRecommendationPanel) {
+            this.enhancedRecommendationPanel.initialize(this.currentTaskId);
+        } else {
+            this.showStatus('增强推荐面板未初始化', 'error');
+        }
+    }
+
+    /**
+     * 关闭增强推荐面板
+     */
+    public closeEnhancedRecommendationPanel(): void {
+        if (this.enhancedRecommendationPanel) {
+            this.enhancedRecommendationPanel.destroy();
         }
     }
 

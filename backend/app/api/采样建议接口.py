@@ -42,7 +42,8 @@ async def generate_recommendations(
     task_id: str,
     strategy: str = "hybrid",
     n_recommendations: int = 20,
-    threshold_percentile: float = 75
+    threshold_percentile: float = 75,
+    evaluate_impact: bool = False
 ):
     """
     生成采样建议
@@ -55,13 +56,131 @@ async def generate_recommendations(
       - variance_based: 基于方差优先（推荐高不确定性区域）
       - spatial_coverage: 基于空间覆盖（填补空白区域）
       - hybrid: 混合策略（70%高方差 + 30%均匀分布）
+      - impact_optimized: 基于影响优化（仅当evaluate_impact=True时可用）
     - n_recommendations: 建议点数量（默认20）
     - threshold_percentile: 高不确定性阈值百分位（默认75）
+    - evaluate_impact: 是否使用影响优化算法（默认False，保持向后兼容）
     """
     try:
         # 验证任务
         verify_task_id(task_id)
 
+        # 如果启用影响优化，使用新算法
+        if evaluate_impact and strategy == "impact_optimized":
+            from ..core.改进的采样推荐器 import ImprovedSamplingRecommender
+            from ..core.采样点影响评估器 import SamplingPointImpactEvaluator
+
+            # 初始化新算法
+            impact_evaluator = SamplingPointImpactEvaluator(max_workers=4)
+            improved_recommender = ImprovedSamplingRecommender(
+                impact_evaluator=impact_evaluator,
+                max_workers=4
+            )
+
+            # 读取任务数据
+            from ..utils.栅格工具 import RasterUtils
+            raster_utils = RasterUtils()
+
+            variance_path = settings.RESULTS_DIR / f"{task_id}_variance.tif"
+            if not variance_path.exists():
+                raise HTTPException(status_code=404, detail="方差栅格不存在，请先完成插值计算")
+
+            from osgeo import gdal
+            dataset = gdal.Open(str(variance_path))
+            if dataset is None:
+                raise HTTPException(status_code=404, detail="无法打开方差栅格文件")
+
+            variance = dataset.GetRasterBand(1).ReadAsArray()
+            transform = dataset.GetGeoTransform()
+            cols = dataset.RasterXSize
+            rows = dataset.RasterYSize
+            x_coords = np.array([transform[0] + transform[1] * x for x in range(cols)])
+            y_coords = np.array([transform[3] + transform[5] * y for y in range(rows)])
+            dataset = None
+
+            # 获取原始采样点
+            existing_points = None
+            existing_values = None
+            try:
+                task_info = task_manager.get_task_info(task_id)
+                if task_info and task_info.data_id:
+                    from ..schemas.数据模型 import SpatialData
+                    spatial_data = task_manager.get_spatial_data(task_info.data_id)
+                    if spatial_data:
+                        existing_points = np.array([[p.x, p.y] for p in spatial_data.points])
+                        existing_values = np.array([p.value for p in spatial_data.points])
+            except Exception as e:
+                logger.warning(f"获取原始采样点失败: {str(e)}")
+
+            if existing_points is None:
+                raise HTTPException(status_code=404, detail="无法获取原始采样点数据")
+
+            # 使用新算法生成推荐
+            improved_results = improved_recommender.recommend_optimal_points(
+                existing_points=existing_points,
+                existing_values=existing_values,
+                variance_grid=variance,
+                x_coords=x_coords,
+                y_coords=y_coords,
+                n_recommendations=n_recommendations,
+                strategy="impact_optimized"
+            )
+
+            # 转换为推荐格式
+            recommendations = []
+            for idx, rec in enumerate(improved_results["recommendations"]):
+                # 计算不确定性等级
+                variance_percentile = (np.percentile(variance, rec["variance"] * 100 / np.max(variance)))
+                uncertainty_level = int(np.ceil(variance_percentile * 5 / 100))
+
+                # 计算距离最近采样点的距离
+                if len(existing_points) > 0:
+                    distances = np.sqrt(np.sum((existing_points - np.array([rec["x"], rec["y"]])) ** 2, axis=1))
+                    distance_to_nearest = float(np.min(distances))
+                else:
+                    distance_to_nearest = 999999.0
+
+                # 生成采样理由
+                if rec.get("comprehensive_score", 0) > 0.7:
+                    sampling_reason = f"该点综合评分较高（{rec.get('comprehensive_score', 0):.2f}），预计可显著降低整体误差"
+                else:
+                    sampling_reason = "该区域具有较高的不确定性，建议优先采样"
+
+                # 计算预期收益
+                expected_benefit = rec.get("variance_reduction", 0.0)
+
+                recommendations.append(SamplingRecommendation(
+                    id=rec["id"],
+                    x=rec["x"],
+                    y=rec["y"],
+                    variance=rec.get("variance", 0.0),
+                    priority="high" if rec.get("comprehensive_score", 0) > 0.7 else "medium",
+                    uncertainty_level=uncertainty_level,
+                    region_id=None,
+                    distance_to_nearest=distance_to_nearest,
+                    sampling_reason=sampling_reason,
+                    expected_benefit=expected_benefit
+                ))
+
+            # 统计信息
+            statistics = {
+                "total_variance": float(np.sum(variance)),
+                "mean_variance": float(np.mean(variance)),
+                "max_variance": float(np.max(variance)),
+                "existing_points": len(existing_points),
+                "algorithm": "impact_optimized"
+            }
+
+            return SamplingRecommendationsResponse(
+                task_id=task_id,
+                strategy=strategy,
+                n_recommendations=len(recommendations),
+                recommendations=recommendations,
+                statistics=statistics,
+                generated_at=datetime.now()
+            )
+
+        # 使用原有算法
         # 直接从文件路径读取结果
         from ..utils.栅格工具 import RasterUtils
         from ..config import settings

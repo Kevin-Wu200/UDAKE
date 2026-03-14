@@ -258,4 +258,68 @@ export class APIService implements IAPIService {
     public cancelAllRequests(): void {
         this.pendingRequests.clear();
     }
+
+    // ==================== 采样影响评估相关方法 ====================
+
+    /**
+     * 评估候选采样点的影响
+     */
+    public async evaluateSamplingCandidates(taskId: string, candidatePoints: any[], strategy: string = 'impact_optimized', gridResolution: number = 50): Promise<any> {
+        return this.request<any>(`${this.baseURL}/api/sampling-impact/evaluate-candidates`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task_id: taskId,
+                candidate_points: candidatePoints,
+                strategy: strategy,
+                grid_resolution: gridResolution
+            })
+        });
+    }
+
+    /**
+     * 预览添加新采样点后的效果
+     */
+    public async previewSamplingEffect(taskId: string, newPoint: { x: number; y: number; value: number }, gridResolution: number = 50): Promise<any> {
+        return this.request<any>(`${this.baseURL}/api/sampling-impact/preview-effect`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task_id: taskId,
+                new_point: newPoint,
+                grid_resolution: gridResolution
+            })
+        });
+    }
+
+    /**
+     * 推荐最优采样点
+     */
+    public async recommendOptimalPoints(taskId: string, nRecommendations: number = 20, strategy: string = 'impact_optimized', constraints: any = null): Promise<any> {
+        return this.request<any>(`${this.baseURL}/api/sampling-impact/recommend-optimal`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task_id: taskId,
+                n_recommendations: nRecommendations,
+                strategy: strategy,
+                constraints: constraints
+            })
+        });
+    }
+
+    /**
+     * 批量模拟多个采样方案的效果
+     */
+    public async batchSimulateSampling(taskId: string, samplingPlans: any[], gridResolution: number = 50): Promise<any> {
+        return this.request<any>(`${this.baseURL}/api/sampling-impact/batch-simulate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                task_id: taskId,
+                sampling_plans: samplingPlans,
+                grid_resolution: gridResolution
+            })
+        });
+    }
 }
