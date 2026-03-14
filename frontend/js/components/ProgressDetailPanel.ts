@@ -3,8 +3,6 @@
  * 显示任务的详细进度信息，包括阶段进度、分块处理进度和预计剩余时间
  */
 
-import { taskPollingService } from '../services/TaskPollingService';
-
 interface StageInfo {
     stage: string;
     stage_name: string;
