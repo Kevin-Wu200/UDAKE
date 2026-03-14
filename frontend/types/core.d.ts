@@ -229,6 +229,73 @@ export interface AppState {
     mapEngine: MapEngineType;
     darkMode: boolean;
     sidebarOpen: boolean;
+    layout: LayoutConfig;
+    units: UnitConfig;
+    defaultParams: DefaultParamsConfig;
+}
+
+// ========== 布局配置 ==========
+
+/** 面板位置 */
+export type PanelPosition = 'left' | 'right' | 'top' | 'bottom' | 'floating';
+
+/** 面板信息 */
+export interface PanelInfo {
+    id: string;
+    visible: boolean;
+    position: PanelPosition;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    collapsed?: boolean;
+}
+
+/** 布局配置 */
+export interface LayoutConfig {
+    panels: Record<string, PanelInfo>;
+    activeLayout: string;
+    savedLayouts: Record<string, Record<string, PanelInfo>>;
+}
+
+// ========== 单位配置 ==========
+
+/** 坐标系统 */
+export type CoordinateSystem = 'wgs84' | 'gcj02' | 'bd09';
+
+/** 长度单位 */
+export type LengthUnit = 'm' | 'km' | 'ft' | 'mi';
+
+/** 面积单位 */
+export type AreaUnit = 'm2' | 'km2' | 'ha' | 'ac';
+
+/** 单位配置 */
+export interface UnitConfig {
+    coordinateSystem: CoordinateSystem;
+    lengthUnit: LengthUnit;
+    areaUnit: AreaUnit;
+}
+
+// ========== 默认参数配置 ==========
+
+/** 参数预设类型 */
+export type ParamPresetType = 'environment' | 'agriculture' | 'geology' | 'custom';
+
+/** 参数配置 */
+export interface ParamConfig {
+    name: string;
+    description: string;
+    presetType: ParamPresetType;
+    krigingParams: KrigingParams;
+    createdAt: string;
+    updatedAt: string;
+}
+
+/** 默认参数配置 */
+export interface DefaultParamsConfig {
+    activeConfig: string | null;
+    configs: Record<string, ParamConfig>;
+    presets: Record<ParamPresetType, ParamConfig>;
 }
 
 /** 状态变化监听器 */

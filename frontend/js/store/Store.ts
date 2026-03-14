@@ -204,7 +204,100 @@ export const appStore = new Store<AppState>(
             typeof window !== 'undefined' && window.matchMedia
                 ? window.matchMedia('(prefers-color-scheme: dark)').matches
                 : false,
-        sidebarOpen: true
+        sidebarOpen: true,
+        layout: {
+            panels: {
+                'parameter': { id: 'parameter', visible: true, position: 'left', width: 300 },
+                'sampling': { id: 'sampling', visible: true, position: 'right', width: 350 },
+                'legend': { id: 'legend', visible: true, position: 'bottom', height: 200 },
+                'tools': { id: 'tools', visible: true, position: 'top', height: 60 }
+            },
+            activeLayout: 'default',
+            savedLayouts: {}
+        },
+        units: {
+            coordinateSystem: 'wgs84',
+            lengthUnit: 'm',
+            areaUnit: 'm2'
+        },
+        defaultParams: {
+            activeConfig: null,
+            configs: {},
+            presets: {
+                'environment': {
+                    name: '环境监测预设',
+                    description: '适用于环境监测的默认参数配置',
+                    presetType: 'environment',
+                    krigingParams: {
+                        points: [],
+                        method: 'ordinary',
+                        variogram_model: 'spherical',
+                        grid_resolution: 100,
+                        nlags: 12,
+                        nugget: 0,
+                        sill: 1,
+                        range: 1000,
+                        enable_cross_validation: true
+                    },
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                },
+                'agriculture': {
+                    name: '农业分析预设',
+                    description: '适用于农业分析的默认参数配置',
+                    presetType: 'agriculture',
+                    krigingParams: {
+                        points: [],
+                        method: 'ordinary',
+                        variogram_model: 'exponential',
+                        grid_resolution: 50,
+                        nlags: 15,
+                        nugget: 0.1,
+                        sill: 1,
+                        range: 500,
+                        enable_cross_validation: true
+                    },
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                },
+                'geology': {
+                    name: '地质勘探预设',
+                    description: '适用于地质勘探的默认参数配置',
+                    presetType: 'geology',
+                    krigingParams: {
+                        points: [],
+                        method: 'universal',
+                        variogram_model: 'gaussian',
+                        grid_resolution: 200,
+                        nlags: 20,
+                        nugget: 0,
+                        sill: 1,
+                        range: 2000,
+                        enable_cross_validation: true
+                    },
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                },
+                'custom': {
+                    name: '自定义预设',
+                    description: '用户自定义的参数配置',
+                    presetType: 'custom',
+                    krigingParams: {
+                        points: [],
+                        method: 'ordinary',
+                        variogram_model: 'spherical',
+                        grid_resolution: 100,
+                        nlags: 12,
+                        nugget: 0,
+                        sill: 1,
+                        range: 1000,
+                        enable_cross_validation: true
+                    },
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                }
+            }
+        }
     },
     {
         persistKey: 'udake_app_state',
