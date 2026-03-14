@@ -180,6 +180,13 @@ export class MapTooltip {
                     font-size: 12px;
                     color: var(--text-tertiary, #aeaeb2);
                 }
+
+                @media (prefers-color-scheme: dark) {
+                    .map-tooltip {
+                        background: rgba(28, 28, 30, 0.95) !important;
+                        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+                    }
+                }
             `;
             document.head.appendChild(style);
         }

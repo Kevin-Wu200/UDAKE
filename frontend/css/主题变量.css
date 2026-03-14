@@ -70,13 +70,13 @@
         --bg-tertiary: #3a3a3c;
         --bg-panel: rgba(44, 44, 46, 0.85);
 
-        /* 深色模式文字 */
+        /* 深色模式文字 - 优化对比度符合WCAG AA标准 */
         --text-primary: #ffffff;
-        --text-secondary: #d1d1d6;
-        --text-tertiary: #8e8e93;
+        --text-secondary: #e5e5ea;
+        --text-tertiary: #aeaeb2;
 
         /* 深色模式边框 */
-        --border-color: rgba(255, 255, 255, 0.06);
+        --border-color: rgba(255, 255, 255, 0.08);
         --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
         --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.4);
         --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.5);

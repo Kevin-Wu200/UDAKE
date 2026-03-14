@@ -119,6 +119,13 @@ export class MapLegend {
                 transition: all 0.3s ease;
             }
 
+            @media (prefers-color-scheme: dark) {
+                .map-legend {
+                    background: rgba(28, 28, 30, 0.95);
+                    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+                }
+            }
+
             .map-legend[data-position="top-left"] {
                 top: 60px;
                 left: 10px;
