@@ -277,6 +277,7 @@ export class MapLegend {
                 padding: 4px 8px;
                 border: 1px solid var(--border-color, #e5e5e5);
                 background: var(--bg-primary, #ffffff);
+                color: var(--text-primary, #1d1d1f);
                 border-radius: 4px;
                 font-size: 11px;
                 cursor: pointer;
