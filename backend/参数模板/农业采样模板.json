@@ -1,0 +1,16 @@
+{
+  "name": "农业采样模板",
+  "description": "适用于农业土壤采样数据的克里金插值参数",
+  "industry": "agriculture",
+  "parameters": {
+    "method": "ordinary",
+    "variogram_model": "exponential",
+    "grid_resolution": 150,
+    "nlags": 8,
+    "enable_cross_validation": true,
+    "n_folds": 5,
+    "enable_anisotropy": true,
+    "max_range": null,
+    "nugget_ratio": 0.1
+  }
+}

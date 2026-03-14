@@ -272,7 +272,7 @@ export class InterpolationAnimationPanel {
     public setSpeed(speed: AnimationSpeed): void {
         this.animationConfig.speed = speed;
         this.panel.querySelectorAll('.speed-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.speed === speed);
+            btn.classList.toggle('active', (btn as HTMLElement).dataset.speed === speed);
         });
     }
 
@@ -426,7 +426,7 @@ export class InterpolationAnimationPanel {
     private updateStageIndicators(): void {
         const stageElements = this.panel.querySelectorAll('.animation-stage');
         stageElements.forEach(el => {
-            const stage = el.dataset.stage as AnimationStage;
+            const stage = (el as HTMLElement).dataset.stage as AnimationStage;
             const stageIndex = this.stages.findIndex(s => s.stage === stage);
             const currentIndex = this.stages.findIndex(s => s.stage === this.animationConfig.currentStage);
 

@@ -1,0 +1,16 @@
+{
+  "name": "气象监测模板",
+  "description": "适用于气象监测数据的克里金插值参数",
+  "industry": "meteorology",
+  "parameters": {
+    "method": "universal",
+    "variogram_model": "spherical",
+    "grid_resolution": 200,
+    "nlags": 12,
+    "enable_cross_validation": true,
+    "n_folds": 5,
+    "enable_anisotropy": true,
+    "max_range": null,
+    "nugget_ratio": null
+  }
+}

@@ -172,9 +172,9 @@ export class TransitionAnimationManager {
     private playPreview(): void {
         if (!this.previewPanel) return;
 
-        const type = this.previewPanel.querySelector('.preview-btn.active')?.dataset.type as TransitionType || 'fade';
-        const duration = this.previewPanel.querySelector('.duration-btn.active')?.dataset.duration as TransitionDuration || 'normal';
-        const easing = this.previewPanel.querySelector('.easing-btn.active')?.dataset.easing as EasingFunction || 'ease';
+        const type = (this.previewPanel.querySelector('.preview-btn.active') as HTMLElement)?.dataset.type as TransitionType || 'fade';
+        const duration = (this.previewPanel.querySelector('.duration-btn.active') as HTMLElement)?.dataset.duration as TransitionDuration || 'normal';
+        const easing = (this.previewPanel.querySelector('.easing-btn.active') as HTMLElement)?.dataset.easing as EasingFunction || 'ease';
 
         const element = this.previewPanel.querySelector('#preview-element') as HTMLElement;
         this.animateElement(element, type, duration, easing);

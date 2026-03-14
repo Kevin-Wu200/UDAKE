@@ -1,0 +1,16 @@
+{
+  "name": "水文监测模板",
+  "description": "适用于水文监测数据的克里金插值参数",
+  "industry": "hydrology",
+  "parameters": {
+    "method": "ordinary",
+    "variogram_model": "spherical",
+    "grid_resolution": 120,
+    "nlags": 7,
+    "enable_cross_validation": true,
+    "n_folds": 5,
+    "enable_anisotropy": false,
+    "max_range": null,
+    "nugget_ratio": null
+  }
+}

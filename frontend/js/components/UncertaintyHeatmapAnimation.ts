@@ -15,6 +15,7 @@ interface SamplingPoint {
     value: number;
     strategy: string;
     order: number;
+    level: UncertaintyLevel;
 }
 
 // 不确定性网格单元
@@ -327,7 +328,7 @@ export class UncertaintyHeatmapAnimation {
     public selectStrategy(strategy: string): void {
         this.animationState.selectedStrategy = strategy;
         this.panel.querySelectorAll('.strategy-btn').forEach(btn => {
-            btn.classList.toggle('active', btn.dataset.strategy === strategy);
+            btn.classList.toggle('active', (btn as HTMLElement).dataset.strategy === strategy);
         });
         this.reset();
     }
@@ -404,6 +405,7 @@ export class UncertaintyHeatmapAnimation {
 
         const uncertainty = this.getCellUncertaintyAt(x, y);
         const value = Math.random() * 100;
+        const level = this.getUncertaintyLevel(uncertainty);
 
         return {
             id: `point-${this.animationState.currentPoint}`,
@@ -412,7 +414,8 @@ export class UncertaintyHeatmapAnimation {
             uncertainty,
             value,
             strategy: this.animationState.selectedStrategy,
-            order: this.animationState.currentPoint + 1
+            order: this.animationState.currentPoint + 1,
+            level
         };
     }
 

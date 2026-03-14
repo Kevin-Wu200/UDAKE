@@ -1,0 +1,16 @@
+{
+  "name": "地质勘探模板",
+  "description": "适用于地质勘探数据的克里金插值参数",
+  "industry": "geology",
+  "parameters": {
+    "method": "ordinary",
+    "variogram_model": "gaussian",
+    "grid_resolution": 80,
+    "nlags": 10,
+    "enable_cross_validation": true,
+    "n_folds": 5,
+    "enable_anisotropy": true,
+    "max_range": null,
+    "nugget_ratio": 0.2
+  }
+}
