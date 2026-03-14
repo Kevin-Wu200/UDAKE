@@ -406,7 +406,7 @@ class App {
             const comparisonPanel = this.layerComparisonPanel.createPanel();
             comparisonPanel.style.position = 'absolute';
             comparisonPanel.style.top = '70px';
-            comparisonPanel.style.right = '10px';
+            comparisonPanel.style.right = '412px'; // 380px(侧边栏宽度) + 32px(切换按钮宽度)
             comparisonPanel.style.zIndex = '999';
             mapContainer.appendChild(comparisonPanel);
 
