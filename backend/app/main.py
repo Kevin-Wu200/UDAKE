@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .config import settings
-from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 行业配置接口
+from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口
 import logging
 
 # 配置日志
@@ -43,6 +43,10 @@ app.mount("/results", StaticFiles(directory=str(settings.RESULTS_DIR)), name="re
 # 注册路由
 app.include_router(数据上传接口.router, prefix="/api", tags=["数据上传"])
 app.include_router(插值任务接口.router, prefix="/api", tags=["插值任务"])
+app.include_router(批量插值接口.router, tags=["批量插值"])
+app.include_router(参数批量应用接口.router, tags=["参数批量应用"])
+app.include_router(结果对比分析接口.router, tags=["结果对比分析"])
+app.include_router(批量报告生成接口.router, tags=["批量报告生成"])
 app.include_router(结果查询接口.router, prefix="/api", tags=["结果查询"])
 app.include_router(任务状态接口.router, prefix="/api", tags=["任务状态"])
 app.include_router(报告生成接口.router, prefix="/api", tags=["报告生成"])
