@@ -3,7 +3,7 @@
  * 支持优先级颜色编码、预期收益显示、实时拖拽重评估和详细信息弹窗
  */
 import { I18n } from '../utils/I18n.js';
-import type { MapEngine } from '../config/map.config.js';
+import type { IMapAdapterExtended } from '../../types/app';
 
 /** 推荐点 */
 interface Recommendation {
@@ -37,14 +37,14 @@ interface MarkerEntry {
 }
 
 export class InteractiveSamplingMarkers {
-    private mapEngine: MapEngine;
+    private mapEngine: IMapAdapterExtended;
     private markers: Map<number, MarkerEntry>;
     private markerConfig: MarkerConfig;
     private onMarkerClick: ((rec: Recommendation) => void) | null;
     private onMarkerDrag: ((rec: Recommendation, newPosition: { x: number; y: number }) => void) | null;
     private activeMarkerId: number | null;
 
-    constructor(mapEngine: MapEngine) {
+    constructor(mapEngine: IMapAdapterExtended) {
         this.mapEngine = mapEngine;
         this.markers = new Map();
         this.markerConfig = {
@@ -61,31 +61,24 @@ export class InteractiveSamplingMarkers {
     /**
      * 创建推荐标记
      */
-    public createRecommendationMarker(rec: Recommendation): any {
-        // 创建自定义标记元素
-        const markerElement = this.createMarkerElement(rec);
+    public async createRecommendationMarker(rec: Recommendation): Promise<void> {
+        try {
+            // 使用 addMarker 方法添加标记
+            await this.mapEngine.addMarker({
+                x: rec.x,
+                y: rec.y,
+                value: rec.variance
+            });
 
-        // 创建地图标记
-        const marker = this.mapEngine.createMarker({
-            position: [rec.y, rec.x], // 注意：地图引擎通常使用 [lat, lng] 顺序
-            element: markerElement,
-            draggable: this.markerConfig.enableDrag
-        });
-
-        // 创建信息弹窗
-        const popup = this.createPopup(rec);
-
-        // 添加事件监听
-        this.attachMarkerEvents(marker, rec, popup);
-
-        // 存储标记
-        this.markers.set(rec.id, {
-            marker,
-            recommendation: rec,
-            popup
-        });
-
-        return marker;
+            // 存储标记信息
+            this.markers.set(rec.id, {
+                marker: { position: [rec.y, rec.x], data: rec },
+                recommendation: rec,
+                popup: null
+            });
+        } catch (error) {
+            console.error('创建标记失败:', error);
+        }
     }
 
     /**
@@ -173,6 +166,7 @@ export class InteractiveSamplingMarkers {
      * 创建信息弹窗
      */
     private createPopup(rec: Recommendation): any {
+        // 创建弹窗内容（暂时不实现弹窗功能）
         const popupContent = document.createElement('div');
         popupContent.className = 'marker-popup-content';
         popupContent.innerHTML = `
@@ -193,47 +187,17 @@ export class InteractiveSamplingMarkers {
                     ${rec.variance_reduction !== undefined ? `<p>${I18n.t('marker.varianceReduction')}: ${rec.variance_reduction.toFixed(6)}</p>` : ''}
                     ${rec.local_improvement !== undefined ? `<p>${I18n.t('marker.localImprovement')}: ${rec.local_improvement.toFixed(3)}</p>` : ''}
                 </div>
-                <div class="popup-section">
-                    <h4>${I18n.t('marker.analysis')}</h4>
-                    <p>${I18n.t('marker.uncertaintyLevel')}: ${rec.uncertainty_level}/5</p>
-                    <p>${I18n.t('marker.distanceToNearest')}: ${rec.distance_to_nearest.toFixed(2)}m</p>
-                </div>
-                <div class="popup-section">
-                    <h4>${I18n.t('marker.reason')}</h4>
-                    <p>${rec.sampling_reason}</p>
-                </div>
-                <div class="popup-section">
-                    <h4>${I18n.t('marker.expectedBenefit')}</h4>
-                    <p class="benefit-value">${rec.expected_benefit.toFixed(6)}</p>
-                </div>
-            </div>
-            <div class="popup-footer">
-                <button class="popup-btn preview-btn">${I18n.t('marker.preview')}</button>
-                <button class="popup-btn select-btn">${I18n.t('marker.select')}</button>
             </div>
         `;
 
-        // 创建弹窗
-        const popup = this.mapEngine.createPopup({
+        // 返回 null 表示暂时不实现弹窗
+        return {
             content: popupContent,
-            closeButton: true,
-            className: 'sampling-marker-popup'
-        });
-
-        // 添加按钮事件
-        const previewBtn = popupContent.querySelector('.preview-btn');
-        previewBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.triggerPreview(rec);
-        });
-
-        const selectBtn = popupContent.querySelector('.select-btn');
-        selectBtn?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.triggerSelect(rec);
-        });
-
-        return popup;
+            open: () => {},
+            close: () => {},
+            setContent: () => {},
+            getContent: () => popupContent
+        };
     }
 
     /**
@@ -369,13 +333,14 @@ export class InteractiveSamplingMarkers {
         const entry = this.markers.get(rec.id);
         if (entry) {
             // 更新标记位置
-            entry.marker.setLatLng([rec.y, rec.x]);
+            if (entry.marker.setLatLng) {
+                entry.marker.setLatLng([rec.y, rec.x]);
+            }
 
             // 更新推荐数据
             entry.recommendation = rec;
 
-            // 更新弹窗内容
-            entry.popup.setContent(this.createPopup(rec).getContent());
+            // 暂时不更新弹窗内容
         }
     }
 

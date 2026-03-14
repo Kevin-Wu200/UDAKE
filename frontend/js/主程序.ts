@@ -238,9 +238,9 @@ class App {
         const recommendationPanel = this.recommendationPanel.createPanel();
 
         // 初始化增强采样推荐组件（可选）
-        if (this.apiService && mapAdapter) {
-            this.enhancedRecommendationPanel = new EnhancedSamplingRecommendationPanel(mapAdapter);
-            this.interactiveMarkers = new InteractiveSamplingMarkers(mapAdapter);
+        if (this.apiService && this.layerManager) {
+            this.enhancedRecommendationPanel = new EnhancedSamplingRecommendationPanel(this.layerManager.adapter);
+            this.interactiveMarkers = new InteractiveSamplingMarkers(this.layerManager.adapter);
             this.strategySelector = new SamplingStrategySelector();
 
             // 监听策略变化

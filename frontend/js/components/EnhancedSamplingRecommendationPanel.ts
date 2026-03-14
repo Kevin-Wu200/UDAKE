@@ -4,7 +4,7 @@
  */
 import { APIService } from '../services/API封装.js';
 import { I18n } from '../utils/I18n.js';
-import type { MapEngine } from '../config/map.config.js';
+import type { IMapAdapterExtended } from '../../types/app';
 
 /** 候选点 */
 interface CandidatePoint {
@@ -78,7 +78,7 @@ interface SimulationResult {
 }
 
 export class EnhancedSamplingRecommendationPanel {
-    private mapEngine: MapEngine;
+    private mapEngine: IMapAdapterExtended;
     private apiService: APIService;
     private currentTaskId: string | null;
     private currentRecommendations: Recommendation[];
@@ -86,7 +86,7 @@ export class EnhancedSamplingRecommendationPanel {
     private isGenerating: boolean;
     private element: HTMLElement | null;
 
-    constructor(mapEngine: MapEngine) {
+    constructor(mapEngine: IMapAdapterExtended) {
         this.mapEngine = mapEngine;
         this.apiService = new APIService();
         this.currentTaskId = null;
@@ -531,12 +531,14 @@ export class EnhancedSamplingRecommendationPanel {
      * 选择推荐点
      */
     private selectRecommendation(rec: Recommendation): void {
-        // 在地图上高亮显示该点
-        if (this.mapEngine && this.mapEngine.highlightPoint) {
-            this.mapEngine.highlightPoint({
+        // 在地图上高亮显示该点（使用 addMarker 添加特殊标记）
+        if (this.mapEngine) {
+            this.mapEngine.addMarker({
                 x: rec.x,
                 y: rec.y,
-                color: this.getPriorityColor(rec.priority)
+                value: rec.variance
+            }).catch(error => {
+                console.error('高亮标记失败:', error);
             });
         }
 
