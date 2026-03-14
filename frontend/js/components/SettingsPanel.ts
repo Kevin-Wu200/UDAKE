@@ -6,6 +6,7 @@
 import { I18n } from '../utils/I18n';
 import { appStore } from '../store/Store';
 import { unitManager } from '../services/UnitManager';
+import { CustomSelect } from './CustomSelect';
 
 interface SettingsOptions {
     onLanguageChange?: (language: string) => void;
@@ -16,6 +17,11 @@ export class SettingsPanel {
     private overlay: HTMLElement;
     private panel: HTMLElement;
     private onLanguageChange: ((language: string) => void) | null;
+    
+    // 自定义下拉组件实例
+    private coordinateSystemSelect: CustomSelect | null = null;
+    private lengthUnitSelect: CustomSelect | null = null;
+    private areaUnitSelect: CustomSelect | null = null;
 
     constructor(container: HTMLElement | string, options: SettingsOptions = {}) {
         this.container = typeof container === 'string'
@@ -27,6 +33,7 @@ export class SettingsPanel {
 
     private init(): void {
         this.createPanel();
+        this.initCustomSelects();
         this.bindEvents();
     }
 
@@ -71,31 +78,17 @@ export class SettingsPanel {
                         
                         <div class="settings-item">
                             <label class="settings-label">坐标系统</label>
-                            <select class="settings-select" name="coordinate-system">
-                                <option value="wgs84">WGS84 (经纬度)</option>
-                                <option value="gcj02">GCJ02 (火星坐标)</option>
-                                <option value="bd09">BD09 (百度坐标)</option>
-                            </select>
+                            <div id="coordinate-system-container" class="custom-select-container"></div>
                         </div>
 
                         <div class="settings-item">
                             <label class="settings-label">长度单位</label>
-                            <select class="settings-select" name="length-unit">
-                                <option value="m">米 (m)</option>
-                                <option value="km">千米 (km)</option>
-                                <option value="ft">英尺 (ft)</option>
-                                <option value="mi">英里 (mi)</option>
-                            </select>
+                            <div id="length-unit-container" class="custom-select-container"></div>
                         </div>
 
                         <div class="settings-item">
                             <label class="settings-label">面积单位</label>
-                            <select class="settings-select" name="area-unit">
-                                <option value="m2">平方米 (m²)</option>
-                                <option value="km2">平方千米 (km²)</option>
-                                <option value="ha">公顷 (ha)</option>
-                                <option value="ac">英亩 (ac)</option>
-                            </select>
+                            <div id="area-unit-container" class="custom-select-container"></div>
                         </div>
                     </div>
                 </div>
@@ -111,14 +104,66 @@ export class SettingsPanel {
         this.container.appendChild(this.overlay);
     }
 
+    private initCustomSelects(): void {
+        // 初始化坐标系统选择器
+        const coordinateSystemContainer = this.panel.querySelector('#coordinate-system-container');
+        if (coordinateSystemContainer) {
+            this.coordinateSystemSelect = new CustomSelect(coordinateSystemContainer as HTMLElement, {
+                name: 'coordinate-system',
+                options: [
+                    { value: 'wgs84', label: 'WGS84 (经纬度)' },
+                    { value: 'gcj02', label: 'GCJ02 (火星坐标)' },
+                    { value: 'bd09', label: 'BD09 (百度坐标)' }
+                ],
+                value: unitManager.getCoordinateSystem(),
+                onChange: (value) => {
+                    unitManager.setCoordinateSystem(value as any);
+                }
+            });
+        }
+
+        // 初始化长度单位选择器
+        const lengthUnitContainer = this.panel.querySelector('#length-unit-container');
+        if (lengthUnitContainer) {
+            this.lengthUnitSelect = new CustomSelect(lengthUnitContainer as HTMLElement, {
+                name: 'length-unit',
+                options: [
+                    { value: 'm', label: '米 (m)' },
+                    { value: 'km', label: '千米 (km)' },
+                    { value: 'ft', label: '英尺 (ft)' },
+                    { value: 'mi', label: '英里 (mi)' }
+                ],
+                value: unitManager.getLengthUnit(),
+                onChange: (value) => {
+                    unitManager.setLengthUnit(value as any);
+                }
+            });
+        }
+
+        // 初始化面积单位选择器
+        const areaUnitContainer = this.panel.querySelector('#area-unit-container');
+        if (areaUnitContainer) {
+            this.areaUnitSelect = new CustomSelect(areaUnitContainer as HTMLElement, {
+                name: 'area-unit',
+                options: [
+                    { value: 'm2', label: '平方米 (m²)' },
+                    { value: 'km2', label: '平方千米 (km²)' },
+                    { value: 'ha', label: '公顷 (ha)' },
+                    { value: 'ac', label: '英亩 (ac)' }
+                ],
+                value: unitManager.getAreaUnit(),
+                onChange: (value) => {
+                    unitManager.setAreaUnit(value as any);
+                }
+            });
+        }
+    }
+
     private bindEvents(): void {
         const closeBtn = this.panel.querySelector('.settings-close-btn') as HTMLButtonElement;
         const resetBtn = this.panel.querySelector('.settings-reset-btn') as HTMLButtonElement;
         const saveBtn = this.panel.querySelector('.settings-save-btn') as HTMLButtonElement;
         const languageInputs = this.panel.querySelectorAll('input[name="language"]') as NodeListOf<HTMLInputElement>;
-        const coordinateSystemSelect = this.panel.querySelector('select[name="coordinate-system"]') as HTMLSelectElement;
-        const lengthUnitSelect = this.panel.querySelector('select[name="length-unit"]') as HTMLSelectElement;
-        const areaUnitSelect = this.panel.querySelector('select[name="area-unit"]') as HTMLSelectElement;
 
         // 关闭按钮
         closeBtn.addEventListener('click', () => this.hide());
@@ -143,24 +188,6 @@ export class SettingsPanel {
                 const target = e.target as HTMLInputElement;
                 this.updateLanguage(target.value);
             });
-        });
-
-        // 坐标系统选择
-        coordinateSystemSelect.addEventListener('change', (e) => {
-            const target = e.target as HTMLSelectElement;
-            unitManager.setCoordinateSystem(target.value as any);
-        });
-
-        // 长度单位选择
-        lengthUnitSelect.addEventListener('change', (e) => {
-            const target = e.target as HTMLSelectElement;
-            unitManager.setLengthUnit(target.value as any);
-        });
-
-        // 面积单位选择
-        areaUnitSelect.addEventListener('change', (e) => {
-            const target = e.target as HTMLSelectElement;
-            unitManager.setAreaUnit(target.value as any);
         });
 
         // 重置按钮
@@ -216,14 +243,16 @@ export class SettingsPanel {
         // 重置单位配置为默认值
         unitManager.resetToDefaults();
 
-        // 更新单位选择器
-        const coordinateSystemSelect = this.panel.querySelector('select[name="coordinate-system"]') as HTMLSelectElement;
-        const lengthUnitSelect = this.panel.querySelector('select[name="length-unit"]') as HTMLSelectElement;
-        const areaUnitSelect = this.panel.querySelector('select[name="area-unit"]') as HTMLSelectElement;
-
-        coordinateSystemSelect.value = 'wgs84';
-        lengthUnitSelect.value = 'm';
-        areaUnitSelect.value = 'm2';
+        // 更新自定义选择器
+        if (this.coordinateSystemSelect) {
+            this.coordinateSystemSelect.setValue('wgs84');
+        }
+        if (this.lengthUnitSelect) {
+            this.lengthUnitSelect.setValue('m');
+        }
+        if (this.areaUnitSelect) {
+            this.areaUnitSelect.setValue('m2');
+        }
 
         this.updateUIText();
         if (this.onLanguageChange) {
@@ -259,14 +288,16 @@ export class SettingsPanel {
         const lengthUnit = unitManager.getLengthUnit();
         const areaUnit = unitManager.getAreaUnit();
 
-        // 更新选择器
-        const coordinateSystemSelect = this.panel.querySelector('select[name="coordinate-system"]') as HTMLSelectElement;
-        const lengthUnitSelect = this.panel.querySelector('select[name="length-unit"]') as HTMLSelectElement;
-        const areaUnitSelect = this.panel.querySelector('select[name="area-unit"]') as HTMLSelectElement;
-
-        if (coordinateSystemSelect) coordinateSystemSelect.value = coordinateSystem;
-        if (lengthUnitSelect) lengthUnitSelect.value = lengthUnit;
-        if (areaUnitSelect) areaUnitSelect.value = areaUnit;
+        // 更新自定义选择器
+        if (this.coordinateSystemSelect) {
+            this.coordinateSystemSelect.setValue(coordinateSystem);
+        }
+        if (this.lengthUnitSelect) {
+            this.lengthUnitSelect.setValue(lengthUnit);
+        }
+        if (this.areaUnitSelect) {
+            this.areaUnitSelect.setValue(areaUnit);
+        }
     }
 
     public hide(): void {
@@ -286,6 +317,17 @@ export class SettingsPanel {
     }
 
     public destroy(): void {
+        // 销毁自定义下拉组件
+        if (this.coordinateSystemSelect) {
+            this.coordinateSystemSelect.destroy();
+        }
+        if (this.lengthUnitSelect) {
+            this.lengthUnitSelect.destroy();
+        }
+        if (this.areaUnitSelect) {
+            this.areaUnitSelect.destroy();
+        }
+        
         this.overlay.remove();
     }
 }
