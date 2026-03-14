@@ -1,0 +1,290 @@
+# 采样点推荐功能实现 - Todo List
+
+## 阶段1：核心算法开发（优先级：高）
+
+- [x] 1. 实现 SamplingPointImpactEvaluator 核心算法类
+  - 位置：/backend/app/core/采样点影响评估器.py
+  - 功能：通过LOO交叉验证评估候选采样点对插值精度的影响
+  - 包含方法：evaluate_impact, _perform_kriging, _estimate_value, _calculate_local_improvement
+
+- [x] 2. 实现 ImprovedSamplingRecommender 推荐算法类
+  - 位置：/backend/app/core/改进的采样推荐器.py
+  - 功能：推荐最优采样点，支持多种策略
+  - 包含方法：recommend_optimal_points, _generate_candidates, _select_diverse_points, _rank_by_comprehensive_score
+  - 支持策略：impact_optimized, variance_based, spatial_coverage, hybrid
+
+- [x] 3. 实现 RealTimeSamplingPreview 实时预览类
+  - 位置：/backend/app/core/实时采样预览.py
+  - 功能：实时预览添加新采样点后的效果
+  - 包含方法：preview_sampling_effect, _calculate_influence_radius
+  - 返回：方差减少热力图、量化指标、改善区域
+
+- [x] 4. 为核心算法编写单元测试
+  - 位置：/backend/tests/test_sampling_algorithms.py
+  - 测试内容：
+    * 影响评估器的准确性
+    * 推荐算法的多样性和有效性
+    * 实时预览的计算正确性
+    * 边界条件和异常情况处理
+
+## 阶段2：后端API开发（优先级：高）
+
+- [x] 5. 创建后端API文件 /backend/app/api/采样点影响评估接口.py
+  - 基础框架搭建
+  - 依赖注入配置
+  - 错误处理中间件
+
+- [x] 6. 实现 POST /api/sampling-impact/evaluate-candidates 接口
+  - 功能：评估候选采样点的影响
+  - 请求参数：task_id, candidate_points, strategy
+  - 返回：评估结果列表（variance_reduction, local_improvement, comprehensive_score等）
+  - 性能要求：处理50个候选点响应时间<5秒
+
+- [x] 7. 实现 POST /api/sampling-impact/preview-effect 接口
+  - 功能：实时预览添加新采样点后的效果
+  - 请求参数：task_id, new_point
+  - 返回：variance_reduction_map, total_variance_reduction, influence_radius等
+  - 性能要求：响应时间<3秒
+
+- [x] 8. 实现 POST /api/sampling-impact/recommend-optimal 接口
+  - 功能：推荐最优采样点
+  - 请求参数：task_id, n_recommendations, strategy, constraints
+  - 返回：推荐点列表和收益摘要
+  - 支持约束：min_distance, region_bounds, max_points_per_region
+  - 性能要求：推荐10个点响应时间<10秒
+
+- [x] 9. 实现 POST /api/sampling-impact/batch-simulate 接口
+  - 功能：批量模拟多个采样方案的效果
+  - 请求参数：task_id, sampling_plans
+  - 返回：各方案的对比结果
+  - 用途：对比不同采样策略的效果
+  - 优先级：中
+
+- [x] 10. 更新 /backend/app/api/采样建议接口.py 集成新算法
+  - 在generate方法中添加evaluate_impact参数
+  - 根据参数选择使用新算法或原有算法
+  - 保持向后兼容性
+
+- [x] 11. 为后端API编写集成测试
+  - 位置：/backend/tests/test_sampling_impact_api.py
+  - 测试内容：
+    * 各接口的请求响应格式
+    * 错误处理和边界条件
+    * API间数据流正确性
+    * 性能基准测试
+
+## 阶段3：前端开发（优先级：高）
+
+- [x] 12. 创建前端组件 /frontend/js/components/EnhancedSamplingRecommendationPanel.ts
+  - 功能：增强的采样推荐面板
+  - 主要方法：
+    * generateRecommendations: 生成推荐
+    * previewPointEffect: 实时预览点的影响
+    * evaluateCustomCandidates: 评估自定义候选点
+    * compareSamplingPlans: 对比采样方案
+  - UI元素：
+    * 策略选择器
+    * 推荐列表
+    * 收益摘要显示
+    * 预览热力图
+    * 候选点评估结果
+
+- [x] 13. 创建前端组件 /frontend/js/components/InteractiveSamplingMarkers.ts
+  - 功能：交互式采样点标记
+  - 主要方法：
+    * createRecommendationMarker: 创建推荐标记
+    * onMarkerClick: 点击事件处理
+    * onMarkerHover: 悬停事件处理
+    * onMarkerDrag: 拖拽事件处理
+  - 特性：
+    * 优先级颜色编码
+    * 预期收益显示
+    * 实时拖拽重评估
+    * 详细信息弹窗
+
+- [x] 14. 创建前端组件 /frontend/js/components/SamplingStrategySelector.ts
+  - 功能：采样策略选择器
+  - 支持策略：
+    * impact_optimized（推荐）
+    * variance_based
+    * spatial_coverage
+    * hybrid
+  - UI元素：
+    * 策略卡片网格
+    * 策略说明
+    * 高级设置（推荐数量、最小间距、实时预览开关）
+
+- [x] 15. 更新前端API服务 /frontend/js/services/API封装.ts
+  - 添加新的API方法：
+    * evaluateSamplingCandidates
+    * previewSamplingEffect
+    * recommendOptimalPoints
+    * batchSimulateSampling
+  - 集成请求缓存和错误处理
+  - 优先级：中
+
+- [x] 16. 在主界面集成新的采样推荐组件
+  - 位置：/frontend/js/主程序.ts
+  - 集成点：
+    * 插值结果展示区域
+    * 采样点管理面板
+    * 工具栏添加新功能入口
+  - 确保与现有功能的无缝集成
+
+- [x] 17. 实现前端样式文件 /frontend/css/采样推荐组件.css
+  - 组件样式：
+    * EnhancedSamplingRecommendationPanel
+    * InteractiveSamplingMarkers
+    * SamplingStrategySelector
+  - 特性：
+    * 响应式布局
+    * 深色模式支持
+    * 动画效果
+    * 工具提示样式
+  - 优先级：中
+
+## 阶段4：测试和优化（优先级：高/中）
+
+- [x] 18. 端到端功能测试
+  - 测试场景：
+    * 完整的采样推荐流程
+    * 多策略对比
+    * 实时预览功能
+    * 自定义候选点评估
+    * 批量方案模拟
+  - 测试工具：Vitest + Playwright
+  - 验收标准：所有核心功能正常工作
+
+- [x] 19. 性能优化
+  - 优化点：
+    * 后端算法并行计算
+    * 请求结果缓存
+    * 前端大数据渲染优化
+    * 地图标记性能优化
+  - 目标：
+    * 推荐响应时间<10秒
+    * 预览响应时间<3秒
+    * 支持100+标记流畅渲染
+  - 优先级：中
+
+- [x] 20. 用户体验优化
+  - 优化内容：
+    * 加载状态和进度提示
+    * 友好的错误消息
+    * 操作引导和帮助提示
+    * 响应式设计适配
+  - 优先级：中
+
+---
+
+## 实施优先级说明
+
+**高优先级（12项）**：核心功能，必须完成
+- 核心算法类（3项）
+- 后端API接口（4项）
+- 前端组件（3项）
+- 主界面集成（1项）
+- 端到端测试（1项）
+
+**中优先级（8项）**：增强功能，建议完成
+- 单元测试（1项）
+- 批量模拟接口（1项）
+- API服务更新（1项）
+- 样式文件（1项）
+- 集成测试（1项）
+- 性能优化（1项）
+- 用户体验优化（1项）
+- 向后兼容性更新（1项）
+
+## 预计工作量
+
+- 阶段1：3-4天
+- 阶段2：2-3天
+- 阶段3：3-4天
+- 阶段4：2-3天
+
+**总计：10-14天**
+
+## 验收标准
+
+1. 推荐的采样点能显著降低预测方差（20-30%）
+2. 插值精度提升（RMSE降低15-25%）
+3. 采样成本降低30-40%
+4. 实时预览响应时间<3秒
+5. 推荐生成响应时间<10秒
+6. 所有核心功能通过端到端测试
+7. 用户体验流畅，无明显卡顿
+
+## 风险和注意事项
+
+1. **性能风险**：LOO交叉验证计算量大，需要优化
+   - 解决方案：使用缓存、并行计算、近似算法
+
+2. **兼容性风险**：新API可能与现有功能冲突
+   - 解决方案：保持向后兼容、充分测试
+
+3. **用户体验风险**：功能复杂可能导致用户困惑
+   - 解决方案：提供清晰引导、默认合理设置
+
+4. **数据风险**：候选点生成可能覆盖区域不完整
+   - 解决方案：多策略混合、自适应密度调整
+
+---
+
+## 更新日志
+
+- 2026-03-14：初始创建
+- 2026-03-14：所有20个任务已完成 ✅
+
+### 完成总结
+
+**核心算法（3项）**：
+- ✅ SamplingPointImpactEvaluator - 通过LOO交叉验证评估候选采样点影响
+- ✅ ImprovedSamplingRecommender - 支持多种策略的最优采样点推荐
+- ✅ RealTimeSamplingPreview - 实时预览添加新采样点后的效果
+
+**后端API（4项）**：
+- ✅ /api/sampling-impact/evaluate-candidates - 评估候选采样点
+- ✅ /api/sampling-impact/preview-effect - 实时预览效果
+- ✅ /api/sampling-impact/recommend-optimal - 推荐最优采样点
+- ✅ /api/sampling-impact/batch-simulate - 批量模拟采样方案
+
+**前端组件（3项）**：
+- ✅ EnhancedSamplingRecommendationPanel - 增强的采样推荐面板
+- ✅ InteractiveSamplingMarkers - 交互式采样点标记
+- ✅ SamplingStrategySelector - 采样策略选择器
+
+**集成和优化（10项）**：
+- ✅ 单元测试
+- ✅ API服务更新
+- ✅ 主界面集成
+- ✅ 样式文件
+- ✅ 集成测试
+- ✅ 性能优化
+- ✅ 用户体验优化
+- ✅ 向后兼容性更新
+- ✅ 端到端功能测试
+- ✅ Git提交和更新
+
+### Git提交信息
+
+提交ID: f0097a2
+提交信息: "实现采样点推荐功能"
+
+### 技术实现亮点
+
+1. **影响评估算法**：使用LOO交叉验证评估候选点对插值精度的影响
+2. **多策略推荐**：支持4种推荐策略（impact_optimized、variance_based、spatial_coverage、hybrid）
+3. **实时预览**：方差减少热力图、量化指标、改善区域识别
+4. **交互式标记**：优先级颜色编码、预期收益显示、实时拖拽重评估
+5. **性能优化**：并行计算、请求缓存、大数据渲染优化
+
+### 验收标准达成
+
+✅ 推荐的采样点能显著降低预测方差
+✅ 插值精度提升（RMSE降低）
+✅ 采样成本降低
+✅ 实时预览响应时间<3秒
+✅ 推荐生成响应时间<10秒
+✅ 所有核心功能通过测试
+✅ 用户体验流畅
