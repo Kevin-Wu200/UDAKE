@@ -147,7 +147,7 @@ class RiskReportRequest(BaseModel):
                     "location": "杭州市",
                     "date": "2026-03-14"
                 },
-                "save_to_file": true
+                "save_to_file": True
             }
         }
 
@@ -165,7 +165,7 @@ class RiskReportResponse(BaseModel):
         report: 完整报告内容，包含执行摘要、风险评估、阈值分析等
         report_id: 报告唯一标识符
         generated_at: 报告生成时间（ISO 8601格式）
-        file_path: 报告文件保存路径（如果save_to_file为true）
+        file_path: 报告文件保存路径（如果save_to_file为True）
         message: 操作状态消息
     """
     task_id: str = Field(
@@ -224,7 +224,7 @@ class RiskReportResponse(BaseModel):
     )
     file_path: Optional[str] = Field(
         default=None,
-        description="报告文件保存路径（如果save_to_file为true）",
+        description="报告文件保存路径（如果save_to_file为True）",
         example="/Users/wuchenkai/UDAKE/backend/app/结果文件/risk_report_task-20260314-001.json"
     )
     message: str = Field(
@@ -355,7 +355,7 @@ class RiskReportResponse(BaseModel):
     "location": "杭州市",
     "date": "2026-03-14"
   },
-  "save_to_file": true
+  "save_to_file": True
 }
 ```
 
@@ -422,7 +422,7 @@ class RiskReportResponse(BaseModel):
 2. 坐标列表长度必须与数据矩阵的维度匹配
 3. 不确定性等级和阈值分析是可选的，但提供这些信息会使报告更完整
 4. 元数据可以包含任何与任务相关的额外信息
-5. 当save_to_file为true时，报告将保存到backend/app/结果文件/目录
+5. 当save_to_file为True时，报告将保存到backend/app/结果文件/目录
 6. 文件名格式为：risk_report_{task_id}.json
 7. 如果保存文件失败，报告仍会在响应中返回，但file_path为null
 """,
