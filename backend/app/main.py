@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .config import settings
-from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 性能报告接口
+from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口
 import logging
 
 # 配置日志
@@ -57,6 +57,10 @@ app.include_router(进度详情接口.router, prefix="/api", tags=["进度详情
 app.include_router(资源监控接口.router, prefix="/api", tags=["资源监控"])
 app.include_router(任务队列接口.router, prefix="/api", tags=["任务队列"])
 app.include_router(性能报告接口.router, prefix="/api", tags=["性能报告"])
+app.include_router(不确定性分级接口.router, prefix="/api", tags=["不确定性分级"])
+app.include_router(风险指数接口.router, prefix="/api", tags=["风险指数"])
+app.include_router(决策阈值接口.router, prefix="/api", tags=["决策阈值"])
+app.include_router(风险报告接口.router, prefix="/api", tags=["风险报告"])
 
 @app.get("/")
 async def root():
