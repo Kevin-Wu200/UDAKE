@@ -1,0 +1,121 @@
+# TODOList_9:
+
+## 优先级
+中
+
+## 任务列表
+
+### 9.1 单位设置
+- [x] 设计单位配置系统
+  - [x] 定义支持的单位类型
+  - [x] 创建单位转换规则
+  - [x] 实现单位切换机制
+- [x] 实现坐标系统设置
+  - [x] WGS84（经纬度）
+  - [x] GCJ02（火星坐标）
+  - [x] BD09（百度坐标）
+  - [x] 支持自定义投影
+- [x] 实现长度单位设置
+  - [x] 米（m）
+  - [x] 千米（km）
+  - [x] 英尺（ft）
+  - [x] 英里（mi）
+- [x] 实现面积单位设置
+  - [x] 平方米（m²）
+  - [x] 平方千米（km²）
+  - [x] 公顷（ha）
+  - [x] 英亩（ac）
+- [x] 添加单位设置UI
+  - [x] 在设置面板中添加单位选择器
+  - [x] 在数据显示中自动应用单位转换
+  - [x] 在导出时使用指定单位
+- [x] 实现单位持久化
+  - [x] 保存用户单位偏好
+  - [x] 页面加载时应用用户单位
+
+### 9.2 默认参数配置
+- [x] 设计默认参数配置系统
+  - [x] 定义参数配置的数据结构
+  - [x] 创建参数配置模板
+  - [x] 实现参数配置的保存和加载
+- [x] 实现默认参数设置界面
+  - [x] 为每个参数添加默认值输入框
+  - [x] 添加参数分组（克里金参数、采样参数等）
+  - [x] 提供参数配置的预览功能
+- [x] 实现参数配置管理
+  - [x] 保存默认参数配置
+  - [x] 加载已保存的配置
+  - [x] 删除配置
+  - [x] 重置为系统默认值
+- [x] 添加参数配置预设
+  - [x] 环境监测预设
+  - [x] 农业分析预设
+  - [x] 地质勘探预设
+  - [x] 支持用户自定义预设
+- [x] 实现参数配置的导入/导出
+  - [x] 导出为JSON文件
+  - [x] 从JSON文件导入
+  - [x] 支持配置文件的分享
+
+## 相关文件
+- `/Users/wuchenkai/UDAKE/frontend/css/`
+- `/Users/wuchenkai/UDAKE/frontend/js/components/`
+- `/Users/wuchenkai/UDAKE/frontend/js/store/`
+- `/Users/wuchenkai/UDAKE/frontend/js/config/`
+
+## 完成状态
+✅ 所有任务已完成
+
+## 新增文件
+- `/Users/wuchenkai/UDAKE/frontend/js/components/DraggablePanel.ts` - 可拖拽面板组件
+- `/Users/wuchenkai/UDAKE/frontend/css/可拖拽面板样式.css` - 可拖拽面板样式
+- `/Users/wuchenkai/UDAKE/frontend/js/services/UnitManager.ts` - 单位管理器
+- `/Users/wuchenkai/UDAKE/frontend/js/components/SettingsPanel.ts` - 更新的设置面板（添加单位选择器）
+- `/Users/wuchenkai/UDAKE/frontend/js/services/ParameterConfigManager.ts` - 参数配置管理器
+- `/Users/wuchenkai/UDAKE/frontend/js/components/ParameterConfigPanel.ts` - 参数配置面板组件
+- `/Users/wuchenkai/UDAKE/frontend/css/参数配置面板样式.css` - 参数配置面板样式
+
+## 修改文件
+- `/Users/wuchenkai/UDAKE/frontend/types/core.d.ts` - 添加布局、单位和参数配置类型定义
+- `/Users/wuchenkai/UDAKE/frontend/js/store/Store.ts` - 添加布局、单位和参数配置状态管理
+
+## 注意事项
+- ✅ 确保主题切换的平滑过渡
+- ✅ 优化拖拽面板的性能
+- ✅ 确保单位转换的准确性
+- ✅ 提供清晰的参数配置说明
+- ✅ 已完成测试并提交git更新
+
+## Git提交记录
+
+**提交ID**: 7f6a88debfc98f878003221a2fa9c7298871e8c0
+**提交信息**: 实现界面布局自定义、单位设置和参数配置管理
+**提交日期**: 2026-03-14 22:20:39
+**作者**: wuchenkai <1447954419@qq.com>
+
+**功能包括**：
+1. 可拖拽面板系统 - 支持面板拖拽、位置调整、大小调整和显示/隐藏
+2. 布局保存和恢复 - 支持多个布局方案的保存、加载和重置
+3. 单位配置系统 - 支持坐标系统（WGS84/GCJ02/BD09）、长度单位和面积单位
+4. 单位转换 - 提供准确的单位转换功能和格式化显示
+5. 参数配置管理 - 支持参数配置的保存、加载、删除和复制
+6. 参数配置预设 - 提供环境监测、农业分析、地质勘探预设
+7. 参数配置导入/导出 - 支持JSON格式的配置导入和导出
+
+**代码统计**：
+- 新增文件：6个
+- 修改文件：3个
+- 新增代码：2930行
+
+## 重新确认
+
+**确认日期**: 2026-03-14
+**确认内容**：
+- ✅ 所有新增文件已验证存在
+- ✅ 所有类型定义已正确添加
+- ✅ Store状态管理已正确集成
+- ✅ 所有功能已在提交7f6a88d中完成
+- ✅ 无需额外提交，任务已完成
+
+**验证结果**：
+所有任务已成功完成并提交，代码质量良好，功能完整。
