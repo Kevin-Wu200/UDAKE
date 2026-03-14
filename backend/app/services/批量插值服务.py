@@ -1,6 +1,7 @@
 """
 批量插值服务
 """
+from typing import Optional, List
 from ..schemas.批量处理模型 import (
     BatchKrigingRequest, BatchTaskSummary, BatchTaskDetail,
     BatchTaskFullResponse, BatchTaskExecutionMode
