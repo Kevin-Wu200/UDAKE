@@ -137,8 +137,8 @@ class ModelEvaluationResponse(BaseModel):
                 "variance_coverage": 0.85
             },
             "diagnostics": {
-                "residuals_normality": true,
-                "homoscedasticity": true,
+                "residuals_normality": True,
+                "homoscedasticity": True,
                 "outliers": []
             }
         }
@@ -206,8 +206,8 @@ class ModelEvaluationResponse(BaseModel):
                         "variance_coverage": 0.85
                     },
                     "diagnostics": {
-                        "residuals_normality": true,
-                        "homoscedasticity": true,
+                        "residuals_normality": True,
+                        "homoscedasticity": True,
                         "outliers": []
                     }
                 },
@@ -314,8 +314,8 @@ class ModelEvaluationResponse(BaseModel):
       "variance_coverage": 0.85
     },
     "diagnostics": {
-      "residuals_normality": true,
-      "homoscedasticity": true,
+      "residuals_normality": True,
+      "homoscedasticity": True,
       "outliers": []
     }
   },
@@ -381,8 +381,8 @@ class ModelEvaluationResponse(BaseModel):
                                 "variance_coverage": 0.85
                             },
                             "diagnostics": {
-                                "residuals_normality": true,
-                                "homoscedasticity": true,
+                                "residuals_normality": True,
+                                "homoscedasticity": True,
                                 "outliers": []
                             }
                         },

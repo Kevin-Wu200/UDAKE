@@ -170,7 +170,7 @@ class AnomalyDetectResponse(BaseModel):
                         {"x": 120.4, "y": 30.4, "value": 11.0, "type": "elliptic_envelope"}
                     ]
                 },
-                "value_anomalies": null,
+                "value_anomalies": None,
                 "anomaly_scores": [0.1, 0.8, 0.2, 0.7, 0.15],
                 "statistics": {
                     "total_points": 5,
@@ -298,7 +298,7 @@ class AnomalyDetectResponse(BaseModel):
                                 {"x": 120.4, "y": 30.4, "value": 11.0, "type": "elliptic_envelope"}
                             ]
                         },
-                        "value_anomalies": null,
+                        "value_anomalies": None,
                         "anomaly_scores": [0.1, 0.8, 0.2, 0.7, 0.15],
                         "statistics": {
                             "total_points": 5,

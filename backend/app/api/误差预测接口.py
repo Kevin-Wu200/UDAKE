@@ -27,7 +27,7 @@ class ErrorPredictRequest(BaseModel):
         x_coords: X坐标列表
         y_coords: Y坐标列表
         predicted_values: 预测值列表，对应每个采样点的预测结果
-        actual_values: 实际值列表，用于训练模型（如果train_model为true）
+        actual_values: 实际值列表，用于训练模型（如果train_model为True）
         train_model: 是否训练模型，训练后可提高预测精度
     """
     task_id: str = Field(
@@ -53,7 +53,7 @@ class ErrorPredictRequest(BaseModel):
     )
     actual_values: Optional[List[float]] = Field(
         default=None,
-        description="实际值列表，用于训练模型（如果train_model为true）",
+        description="实际值列表，用于训练模型（如果train_model为True）",
         example=[10.3, 11.0, 10.9, 10.8, 10.6]
     )
     train_model: bool = Field(
@@ -70,7 +70,7 @@ class ErrorPredictRequest(BaseModel):
                 "y_coords": [30.1, 30.2, 30.3, 30.4, 30.5],
                 "predicted_values": [10.5, 11.2, 10.8, 11.0, 10.7],
                 "actual_values": [10.3, 11.0, 10.9, 10.8, 10.6],
-                "train_model": true
+                "train_model": True
             }
         }
 
@@ -215,7 +215,7 @@ class ErrorPredictResponse(BaseModel):
   "y_coords": [30.1, 30.2, 30.3, 30.4, 30.5],
   "predicted_values": [10.5, 11.2, 10.8, 11.0, 10.7],
   "actual_values": [10.3, 11.0, 10.9, 10.8, 10.6],
-  "train_model": true
+  "train_model": True
 }
 ```
 
