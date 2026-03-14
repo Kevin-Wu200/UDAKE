@@ -344,6 +344,13 @@ export class LayerManager implements ILayerManager {
     }
 
     /**
+     * 设置图层Z轴索引
+     */
+    setLayerZIndex(layerName: string, zIndex: number): void {
+        this.adapter.setLayerZIndex(layerName, zIndex);
+    }
+
+    /**
      * 设置点击查询处理器
      */
     setupClickHandler(

@@ -22,6 +22,7 @@ export interface IMapAdapter {
     addPolygon(coordinates: number[][][], options?: PolygonStyleOptions): Promise<any>;
     toggleLayer(layerName: string, visible: boolean): void;
     setLayerOpacity(layerName: string, opacity: number): void;
+    setLayerZIndex(layerName: string, zIndex: number): void;
     removeLayer(layerName: string): void;
     clearAllLayers(): void;
     zoomToLayer(layerName: string): void;

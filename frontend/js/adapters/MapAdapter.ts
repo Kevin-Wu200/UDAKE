@@ -74,6 +74,13 @@ export abstract class MapAdapter {
     abstract setLayerOpacity(layerName: string, opacity: number): void;
 
     /**
+     * 设置图层Z轴索引
+     * @param layerName - 图层名称
+     * @param zIndex - Z轴索引
+     */
+    abstract setLayerZIndex(layerName: string, zIndex: number): void;
+
+    /**
      * 移除图层
      * @param layerName - 图层名称
      */

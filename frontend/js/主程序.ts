@@ -35,6 +35,10 @@ import { MapEngineSwitcher } from './components/MapEngineSwitcher';
 import { IndustrySelector } from './components/IndustrySelector.js';
 import { SettingsPanel } from './components/SettingsPanel.js';
 import { LocationCenterButton } from './components/LocationCenterButton.js';
+import { MapTooltip, TooltipData, UncertaintyLevel } from './components/MapTooltip.js';
+import { MapLegend, ColorScheme, LegendPosition } from './components/MapLegend.js';
+import { LayerComparisonPanel, LayerComparisonConfig } from './components/LayerComparisonPanel.js';
+import { MeasureTool, MeasureType, MeasureResult } from './components/MeasureTool.js';
 
 // 导入类型
 import {
@@ -98,6 +102,10 @@ class App {
     public industrySelector: IndustrySelector | null = null;
     public settingsPanel: SettingsPanel | null = null;
     public locationCenterButton: LocationCenterButton | null = null;
+    public mapTooltip: MapTooltip | null = null;
+    public mapLegend: MapLegend | null = null;
+    public layerComparisonPanel: LayerComparisonPanel | null = null;
+    public measureTool: MeasureTool | null = null;
 
     constructor() {
         console.log('App 构造函数执行');
@@ -291,6 +299,9 @@ class App {
 
         // 初始化地图引擎切换器
         this.initializeMapEngineSwitcher();
+
+        // 初始化地图交互组件
+        this.initializeMapInteractionComponents();
     }
 
     /**
@@ -324,6 +335,176 @@ class App {
         }).catch((error) => {
             console.error('❌ 初始化地图引擎切换器失败:', error);
         });
+    }
+
+    /**
+     * 初始化地图交互组件
+     */
+    private initializeMapInteractionComponents(): void {
+        console.log('🎨 开始初始化地图交互组件...');
+
+        getMapProvider().then((provider) => {
+            const mapContainer = document.querySelector('.map-container') as HTMLElement;
+            if (!mapContainer) {
+                console.error('❌ 找不到地图容器 .map-container');
+                return;
+            }
+
+            // 初始化地图悬停提示组件
+            console.log('🎨 初始化地图悬停提示组件...');
+            this.mapTooltip = new MapTooltip({
+                offset: 15,
+                animationDuration: 200,
+                showDelay: 300,
+                hideDelay: 100,
+                smartPositioning: true
+            });
+            this.mapTooltip.init(mapContainer);
+
+            // 初始化地图图例组件
+            console.log('🎨 初始化地图图例组件...');
+            this.mapLegend = new MapLegend({
+                title: '预测值',
+                unit: '',
+                ranges: [
+                    { min: 0, max: 0.2, color: '#34c759', label: '极低' },
+                    { min: 0.2, max: 0.4, color: '#30d158', label: '低' },
+                    { min: 0.4, max: 0.6, color: '#0a84ff', label: '中等' },
+                    { min: 0.6, max: 0.8, color: '#ff9500', label: '高' },
+                    { min: 0.8, max: 1.0, color: '#ff3b30', label: '极高' }
+                ],
+                position: 'bottom-right',
+                collapsible: true,
+                collapsed: false,
+                showValues: true
+            });
+            const legendElement = this.mapLegend.createLegend();
+            mapContainer.appendChild(legendElement);
+            this.mapLegend.loadFromStorage();
+
+            // 初始化图层对比面板
+            console.log('🎨 初始化图层对比面板...');
+            this.layerComparisonPanel = new LayerComparisonPanel({
+                onVisibilityChange: (layerId, visible) => {
+                    if (this.layerManager) {
+                        this.layerManager.toggleLayer(layerId, visible);
+                    }
+                },
+                onOpacityChange: (layerId, opacity) => {
+                    if (this.layerManager) {
+                        this.layerManager.setLayerOpacity(layerId, opacity / 100);
+                    }
+                },
+                onLayerOrderChange: (layers) => {
+                    if (this.layerManager) {
+                        layers.forEach(layer => {
+                            this.layerManager!.setLayerZIndex(layer.layerId, layer.zIndex);
+                        });
+                    }
+                }
+            });
+            const comparisonPanel = this.layerComparisonPanel.createPanel();
+            comparisonPanel.style.position = 'absolute';
+            comparisonPanel.style.top = '70px';
+            comparisonPanel.style.right = '10px';
+            comparisonPanel.style.zIndex = '999';
+            mapContainer.appendChild(comparisonPanel);
+
+            // 初始化测量工具
+            console.log('🎨 初始化测量工具...');
+            this.measureTool = new MeasureTool(
+                {
+                    defaultUnit: 'm',
+                    showLabels: true,
+                    snapToFeatures: false
+                },
+                {
+                    onMeasureComplete: (result: MeasureResult) => {
+                        console.log('测量完成:', result);
+                    },
+                    onMeasureUpdate: (result: MeasureResult) => {
+                        console.log('测量更新:', result);
+                    },
+                    onMeasureClear: () => {
+                        console.log('测量已清除');
+                    }
+                }
+            );
+            this.measureTool.init(this.view, provider as 'arcgis' | 'amap');
+            const measurePanel = this.measureTool.createPanel();
+            measurePanel.style.display = 'none'; // 默认隐藏，通过按钮显示
+            mapContainer.appendChild(measurePanel);
+
+            // 添加测量工具按钮到工具栏
+            this.addMeasureToolButton();
+
+            // 添加图层对比按钮到工具栏
+            this.addLayerComparisonButton();
+
+            console.log('✅ 地图交互组件初始化完成');
+
+        }).catch((error) => {
+            console.error('❌ 初始化地图交互组件失败:', error);
+        });
+    }
+
+    /**
+     * 添加测量工具按钮到工具栏
+     */
+    private addMeasureToolButton(): void {
+        const toolbar = document.querySelector('.map-toolbar');
+        if (!toolbar) {
+            console.warn('⚠️ 找不到地图工具栏，跳过添加测量工具按钮');
+            return;
+        }
+
+        const measureBtn = document.createElement('button');
+        measureBtn.className = 'toolbar-btn';
+        measureBtn.title = '测量工具';
+        measureBtn.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M2 10h16M10 2v16" stroke="currentColor" stroke-width="2"/>
+            </svg>
+        `;
+        measureBtn.addEventListener('click', () => {
+            if (this.measureTool) {
+                const panel = document.querySelector('.measure-tool-panel') as HTMLElement;
+                if (panel) {
+                    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+                }
+            }
+        });
+        toolbar.appendChild(measureBtn);
+    }
+
+    /**
+     * 添加图层对比按钮到工具栏
+     */
+    private addLayerComparisonButton(): void {
+        const toolbar = document.querySelector('.map-toolbar');
+        if (!toolbar) {
+            console.warn('⚠️ 找不到地图工具栏，跳过添加图层对比按钮');
+            return;
+        }
+
+        const comparisonBtn = document.createElement('button');
+        comparisonBtn.className = 'toolbar-btn';
+        comparisonBtn.title = '图层对比';
+        comparisonBtn.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <rect x="2" y="2" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+                <line x1="2" y1="10" x2="18" y2="10" stroke="currentColor" stroke-width="2"/>
+            </svg>
+        `;
+        comparisonBtn.addEventListener('click', () => {
+            if (this.layerComparisonPanel) {
+                const panel = document.querySelector('.layer-comparison-panel') as HTMLElement;
+                if (panel) {
+                    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+                }
+            }
+        });
+        toolbar.appendChild(comparisonBtn);
     }
 
     /**
@@ -954,6 +1135,18 @@ class App {
                 }
             }
 
+            // 添加采样点图层到图层对比面板
+            if (this.layerComparisonPanel) {
+                this.layerComparisonPanel.addLayer({
+                    layerId: 'points',
+                    layerName: '采样点',
+                    layerType: 'POINTS' as any,
+                    visible: true,
+                    opacity: 100,
+                    zIndex: 3
+                });
+            }
+
             this.showStatus(`数据导入成功！点数: ${transformedData.data.length}`, 'success');
             HistoryManager.record({
                 action: '导入数据',
@@ -1107,6 +1300,26 @@ class App {
             if (this.layerManager) {
                 this.layerManager.addRasterLayer('prediction', predictionResult.geotiff_url);
                 this.layerManager.addRasterLayer('variance', varianceResult.geotiff_url);
+            }
+
+            // 添加栅格图层到图层对比面板
+            if (this.layerComparisonPanel) {
+                this.layerComparisonPanel.addLayer({
+                    layerId: 'prediction',
+                    layerName: '预测值',
+                    layerType: 'PREDICTION' as any,
+                    visible: true,
+                    opacity: 100,
+                    zIndex: 2
+                });
+                this.layerComparisonPanel.addLayer({
+                    layerId: 'variance',
+                    layerName: '方差',
+                    layerType: 'VARIANCE' as any,
+                    visible: true,
+                    opacity: 100,
+                    zIndex: 1
+                });
             }
 
             // 显示导出面板

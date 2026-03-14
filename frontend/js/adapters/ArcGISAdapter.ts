@@ -363,6 +363,17 @@ export class ArcGISAdapter extends MapAdapter {
         }
     }
 
+    setLayerZIndex(layerName: string, zIndex: number): void {
+        if (this.layers[layerName]) {
+            this.layers[layerName].listMode = 'show';
+            // ArcGIS 图层管理中，Z-index 可以通过图层顺序控制
+            // 这里我们重新添加图层来改变层级
+            const layer = this.layers[layerName];
+            this.map.remove(layer);
+            this.map.add(layer, zIndex);
+        }
+    }
+
     removeLayer(layerName: string): void {
         if (this.layers[layerName]) {
             this.map.remove(this.layers[layerName]);

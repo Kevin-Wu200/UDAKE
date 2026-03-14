@@ -52,6 +52,9 @@ export abstract class MapAdapter {
     /** 设置图层透明度 */
     abstract setLayerOpacity(layerName: string, opacity: number): void;
 
+    /** 设置图层Z轴索引 */
+    abstract setLayerZIndex(layerName: string, zIndex: number): void;
+
     /** 移除图层 */
     abstract removeLayer(layerName: string): void;
 
@@ -115,6 +118,7 @@ export class ArcGISAdapter extends MapAdapter {
     addPolygon(coordinates: number[][][], options?: PolygonStyleOptions): Promise<void>;
     toggleLayer(layerName: string, visible: boolean): void;
     setLayerOpacity(layerName: string, opacity: number): void;
+    setLayerZIndex(layerName: string, zIndex: number): void;
     removeLayer(layerName: string): void;
     clearAllLayers(): void;
     zoomToLayer(layerName: string): void;
