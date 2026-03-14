@@ -6,8 +6,66 @@
  * - 动态加载 JS API
  * - 获取用户设备位置
  * - 使用官方结构初始化地图
+ * - 支持从后端获取API密钥
  */
 import { LocationPermissionManager } from '../utils/locationPermissionManager.js';
+
+// 默认配置（当无法从后端获取时使用）
+const DEFAULT_AMAP_CONFIG = {
+    API_KEY: "YOUR_AMAP_API_KEY_HERE",
+    SECURITY_CODE: "10b5ef21f6b36d09e24d7b076d35dccc",
+    DEFAULT_CENTER: [119.72170376, 30.26262781], // 杭州
+    DEFAULT_ZOOM: 18
+};
+
+// 当前配置（从后端获取或使用默认值）
+let currentAmapConfig = { ...DEFAULT_AMAP_CONFIG };
+
+export const AmapConfig = {
+    /**
+     * 从后端更新配置
+     * @param {Object} config - 从后端获取的配置对象
+     */
+    updateConfig(config) {
+        if (config && config.amap) {
+            currentAmapConfig = {
+                API_KEY: config.amap.apiKey || DEFAULT_AMAP_CONFIG.API_KEY,
+                SECURITY_CODE: config.amap.securityCode || DEFAULT_AMAP_CONFIG.SECURITY_CODE,
+                DEFAULT_CENTER: config.amap.defaultCenter || DEFAULT_AMAP_CONFIG.DEFAULT_CENTER,
+                DEFAULT_ZOOM: config.amap.defaultZoom || DEFAULT_AMAP_CONFIG.DEFAULT_ZOOM
+            };
+            console.log('✅ 高德地图配置已从后端更新');
+        }
+    },
+
+    /**
+     * 获取API密钥
+     */
+    getApiKey() {
+        return currentAmapConfig.API_KEY;
+    },
+
+    /**
+     * 获取安全密钥
+     */
+    getSecurityCode() {
+        return currentAmapConfig.SECURITY_CODE;
+    },
+
+    /**
+     * 获取默认中心点
+     */
+    getDefaultCenter() {
+        return currentAmapConfig.DEFAULT_CENTER;
+    },
+
+    /**
+     * 获取默认缩放级别
+     */
+    getDefaultZoom() {
+        return currentAmapConfig.DEFAULT_ZOOM;
+    }
+};
 
 /**
  * 网络状态监听器
@@ -60,7 +118,7 @@ async function testNetworkConnection() {
  */
 export function setAMapSecurity() {
     window._AMapSecurityConfig = {
-        securityJsCode: "10b5ef21f6b36d09e24d7b076d35dccc"
+        securityJsCode: AmapConfig.getSecurityCode()
     };
 }
 
@@ -115,7 +173,7 @@ export function loadAMapScript(containerId) {
                 <script>
                     // 设置安全密钥
                     window._AMapSecurityConfig = {
-                        securityJsCode: "10b5ef21f6b36d09e24d7b076d35dccc"
+                        securityJsCode: "${AmapConfig.getSecurityCode()}"
                     };
                     
                     var mapInstance = null;
@@ -207,7 +265,7 @@ export function loadAMapScript(containerId) {
                     
                     // 加载高德地图 API
                     var script = document.createElement('script');
-                    script.src = 'https://webapi.amap.com/maps?v=2.0&key=2f3f114aa5671425aa3c52f707d741c5';
+                    script.src = 'https://webapi.amap.com/maps?v=2.0&key=${AmapConfig.getApiKey()}';
                     script.onload = function() {
                         console.log('✅ 高德地图 API 在 iframe 中加载完成');
                         
