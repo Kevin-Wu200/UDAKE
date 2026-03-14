@@ -41,7 +41,7 @@ export class MapEngineSwitcher {
         this.button.style.cssText = `
             position: absolute;
             top: 16px;
-            right: 48px;
+            right: 80px;
             padding: 8px 16px;
             border-radius: 20px;
             background: rgba(255, 255, 255, 0.95);
