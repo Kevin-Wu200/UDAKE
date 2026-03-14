@@ -126,7 +126,7 @@ export class MapLegend {
 
             .map-legend[data-position="top-right"] {
                 top: 60px;
-                right: 412px; /* 380px(侧边栏宽度) + 32px(切换按钮宽度) */
+                right: 80px; /* 380px(侧边栏宽度) + 32px(切换按钮宽度) */
             }
 
             .map-legend[data-position="bottom-left"] {
@@ -136,7 +136,7 @@ export class MapLegend {
 
             .map-legend[data-position="bottom-right"] {
                 bottom: 20px;
-                right: 412px; /* 380px(侧边栏宽度) + 32px(切换按钮宽度) */
+                right: 80px; /* 380px(侧边栏宽度) + 32px(切换按钮宽度) */
             }
 
             .map-legend.collapsed {

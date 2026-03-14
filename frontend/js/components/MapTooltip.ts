@@ -308,7 +308,7 @@ export class MapTooltip {
         }
 
         // 检查是否超出右边界（考虑右侧侧边栏宽度380px和切换按钮宽度32px）
-        const rightSidebarWidth = 380 + 32; // 侧边栏宽度 + 切换按钮宽度
+        const rightSidebarWidth = 80; // 侧边栏宽度 + 切换按钮宽度
         if (x + tooltipRect.width > containerRect.width - rightSidebarWidth) {
             x = screenX - tooltipRect.width - this.config.offset;
         }
