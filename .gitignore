@@ -59,6 +59,12 @@ data_samples/*.json
 .env.testing
 .env.production
 
+# 前端环境变量
+frontend/.env.local
+frontend/.env.development
+frontend/.env.testing
+frontend/.env.production
+
 # 临时文件
 *.tmp
 *.temp
