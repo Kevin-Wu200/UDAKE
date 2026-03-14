@@ -259,21 +259,33 @@ class NotificationManager {
      * 显示浏览器通知
      */
     private showBrowserNotification(notification: StoredNotification): void {
-        const browserNotification = new Notification(notification.title, {
+        const browserNotificationOptions: {
+            body?: string;
+            icon?: string;
+            tag?: string;
+            data?: any;
+            actions?: Array<{
+                action: string;
+                title: string;
+                icon?: string;
+            }>;
+        } = {
             body: notification.body,
             icon: notification.icon || '/icon-192.png',
             tag: notification.tag,
             data: notification.data,
-        });
+        };
 
         // 添加操作按钮
         if (notification.actions && notification.actions.length > 0) {
-            browserNotification.actions = notification.actions.map(action => ({
+            browserNotificationOptions.actions = notification.actions.map(action => ({
                 action: action.id,
                 title: action.label,
                 icon: action.icon,
             }));
         }
+
+        const browserNotification = new Notification(notification.title, browserNotificationOptions);
 
         // 点击事件
         browserNotification.onclick = () => {

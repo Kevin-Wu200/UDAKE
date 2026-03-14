@@ -11,11 +11,11 @@ interface PerformanceMetrics {
 }
 
 interface OptimizationOptions {
-    enableLazyLoad: boolean;
-    enableImageCompression: boolean;
-    enableAnimationReduction: boolean;
-    enableVirtualScrolling: boolean;
-    maxConcurrentRequests: number;
+    enableLazyLoad?: boolean;
+    enableImageCompression?: boolean;
+    enableAnimationReduction?: boolean;
+    enableVirtualScrolling?: boolean;
+    maxConcurrentRequests?: number;
 }
 
 class MobilePerformanceOptimizer {
@@ -296,7 +296,7 @@ class MobilePerformanceOptimizer {
         // 禁用自动播放
         const videos = document.querySelectorAll('video[autoplay]');
         videos.forEach(video => {
-            video.pause();
+            (video as HTMLVideoElement).pause();
             video.removeAttribute('autoplay');
         });
 

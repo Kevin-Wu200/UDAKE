@@ -268,7 +268,7 @@ class TouchGestureManager {
     /**
      * 处理触摸结束
      */
-    private handleTouchEnd = (e: TouchEvent): void {
+    private handleTouchEnd = (e: TouchEvent): void => {
         // 移除结束的触摸点
         for (let i = 0; i < e.changedTouches.length; i++) {
             const touch = e.changedTouches[i];
