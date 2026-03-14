@@ -225,6 +225,7 @@ export const appStore = new Store<AppState>(
             configs: {},
             presets: {
                 'environment': {
+                    id: 'preset_environment',
                     name: '环境监测预设',
                     description: '适用于环境监测的默认参数配置',
                     presetType: 'environment',
@@ -243,6 +244,7 @@ export const appStore = new Store<AppState>(
                     updatedAt: new Date().toISOString()
                 },
                 'agriculture': {
+                    id: 'preset_agriculture',
                     name: '农业分析预设',
                     description: '适用于农业分析的默认参数配置',
                     presetType: 'agriculture',
@@ -261,6 +263,7 @@ export const appStore = new Store<AppState>(
                     updatedAt: new Date().toISOString()
                 },
                 'geology': {
+                    id: 'preset_geology',
                     name: '地质勘探预设',
                     description: '适用于地质勘探的默认参数配置',
                     presetType: 'geology',
@@ -279,6 +282,7 @@ export const appStore = new Store<AppState>(
                     updatedAt: new Date().toISOString()
                 },
                 'custom': {
+                    id: 'preset_custom',
                     name: '自定义预设',
                     description: '用户自定义的参数配置',
                     presetType: 'custom',

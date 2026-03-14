@@ -283,6 +283,7 @@ export type ParamPresetType = 'environment' | 'agriculture' | 'geology' | 'custo
 
 /** 参数配置 */
 export interface ParamConfig {
+    id: string;
     name: string;
     description: string;
     presetType: ParamPresetType;

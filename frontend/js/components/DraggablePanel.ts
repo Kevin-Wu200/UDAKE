@@ -95,7 +95,7 @@ export class DraggablePanel {
         this.header.style.cursor = 'move';
 
         this.header.addEventListener('mousedown', (e) => {
-            if (e.target.closest('.panel-controls')) return;
+            if ((e.target as HTMLElement).closest('.panel-controls')) return;
             
             this.isDragging = true;
             const rect = this.element.getBoundingClientRect();

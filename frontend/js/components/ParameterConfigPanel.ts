@@ -117,8 +117,8 @@ export class ParameterConfigPanel {
 
         // 预设按钮
         presetBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const presetType = btn.dataset.preset as ParamPresetType;
+            (btn as HTMLElement).addEventListener('click', () => {
+                const presetType = (btn as HTMLElement).dataset.preset as ParamPresetType;
                 this.applyPreset(presetType);
             });
         });

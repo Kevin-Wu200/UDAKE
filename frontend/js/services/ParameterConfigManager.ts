@@ -39,7 +39,7 @@ export class ParameterConfigManager {
         }
 
         const configs = appStore.get('defaultParams.configs');
-        return configs[activeConfigId] || null;
+        return configs[activeConfigId as string] || null;
     }
 
     /**
