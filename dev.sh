@@ -33,6 +33,38 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# 检查端口是否被占用
+check_port() {
+    local port=$1
+    if lsof -Pi :$port -sTCP:LISTEN -t >/dev/null 2>&1 ; then
+        return 0  # 端口被占用
+    else
+        return 1  # 端口可用
+    fi
+}
+
+# 清理占用端口的进程
+cleanup_port() {
+    local port=$1
+    log_info "清理端口 $port 的占用进程..."
+    
+    local pids=$(lsof -ti :$port 2>/dev/null || true)
+    if [ ! -z "$pids" ]; then
+        log_warning "端口 $port 被以下进程占用: $pids"
+        echo "$pids" | xargs kill -9 2>/dev/null || true
+        sleep 1
+        
+        # 再次检查
+        if check_port $port; then
+            log_error "无法清理端口 $port，请手动处理"
+            return 1
+        else
+            log_success "端口 $port 已清理"
+        fi
+    fi
+    return 0
+}
+
 # 检查依赖
 check_dependencies() {
     log_info "检查依赖环境..."
@@ -53,6 +85,19 @@ check_dependencies() {
     if [ ! -d "node_modules" ]; then
         log_warning "未找到 node_modules，正在安装依赖..."
         npm install
+    fi
+    
+    # 检查后端端口
+    if check_port 8000; then
+        log_warning "后端端口 8000 已被占用"
+        read -p "是否自动清理端口占用？(y/n) " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            cleanup_port 8000
+        else
+            log_error "请手动清理端口 8000 后重试"
+            exit 1
+        fi
     fi
     
     log_success "依赖检查完成"
@@ -101,20 +146,47 @@ start_backend() {
     # 检查后端启动脚本
     if [ -f "backend/run.py" ]; then
         cd backend
+        
+        # 激活虚拟环境并启动后端
+        if [ -f "../venv/bin/activate" ]; then
+            source ../venv/bin/activate
+        fi
+        
         python3 run.py > /tmp/udake_backend.log 2>&1 &
         BACKEND_PID=$!
         cd ..
+        
         log_success "后端服务已启动 (PID: $BACKEND_PID)"
         
-        # 等待后端启动
-        sleep 2
+        # 等待后端启动并检查状态
+        log_info "等待后端服务就绪..."
+        local max_wait=15
+        local wait_count=0
         
-        # 检查后端是否正常运行
-        if ! ps -p $BACKEND_PID > /dev/null; then
-            log_error "后端服务启动失败，查看日志: /tmp/udake_backend.log"
-            cat /tmp/udake_backend.log
-            exit 1
-        fi
+        while [ $wait_count -lt $max_wait ]; do
+            if ! ps -p $BACKEND_PID > /dev/null; then
+                log_error "后端服务启动失败，查看日志: /tmp/udake_backend.log"
+                echo ""
+                echo "=== 错误日志 ==="
+                tail -20 /tmp/udake_backend.log
+                echo "================"
+                exit 1
+            fi
+            
+            # 检查端口是否开始监听
+            if check_port 8000; then
+                log_success "后端服务就绪"
+                return 0
+            fi
+            
+            sleep 1
+            wait_count=$((wait_count + 1))
+            echo -n "."
+        done
+        
+        echo ""
+        log_warning "后端服务启动时间较长，继续启动前端..."
+        
     else
         log_warning "未找到后端启动脚本，跳过后端启动"
     fi
@@ -129,15 +201,34 @@ start_frontend() {
     
     log_success "前端服务已启动 (PID: $FRONTEND_PID)"
     
-    # 等待前端服务启动
-    sleep 3
+    # 等待前端服务启动并检查状态
+    log_info "等待前端服务就绪..."
+    local max_wait=15
+    local wait_count=0
     
-    # 检查前端服务是否正常运行
-    if ! ps -p $FRONTEND_PID > /dev/null; then
-        log_error "前端服务启动失败，查看日志: /tmp/udake_frontend.log"
-        cat /tmp/udake_frontend.log
-        exit 1
-    fi
+    while [ $wait_count -lt $max_wait ]; do
+        if ! ps -p $FRONTEND_PID > /dev/null; then
+            log_error "前端服务启动失败，查看日志: /tmp/udake_frontend.log"
+            echo ""
+            echo "=== 错误日志 ==="
+            tail -20 /tmp/udake_frontend.log
+            echo "================"
+            exit 1
+        fi
+        
+        # 检查前端服务是否可以访问
+        if curl -s http://localhost:5173 > /dev/null 2>&1; then
+            log_success "前端服务就绪"
+            return 0
+        fi
+        
+        sleep 1
+        wait_count=$((wait_count + 1))
+        echo -n "."
+    done
+    
+    echo ""
+    log_warning "前端服务启动时间较长，继续启动 Electron..."
 }
 
 # 启动 Electron 开发模式
@@ -150,6 +241,12 @@ start_electron() {
         exit 1
     fi
     
+    # 检查前端构建产物
+    if [ ! -d "frontend/dist" ]; then
+        log_warning "未找到前端构建产物，构建中..."
+        npm run build:prod
+    fi
+    
     # 启动 Electron
     npx electron . > /tmp/udake_electron.log 2>&1 &
     ELECTRON_PID=$!
@@ -157,12 +254,15 @@ start_electron() {
     log_success "Electron 应用已启动 (PID: $ELECTRON_PID)"
     
     # 等待 Electron 启动
-    sleep 2
+    sleep 3
     
     # 检查 Electron 是否正常运行
     if ! ps -p $ELECTRON_PID > /dev/null; then
         log_error "Electron 启动失败，查看日志: /tmp/udake_electron.log"
-        cat /tmp/udake_electron.log
+        echo ""
+        echo "=== 错误日志 ==="
+        tail -20 /tmp/udake_electron.log
+        echo "================"
         exit 1
     fi
 }
@@ -189,6 +289,40 @@ show_info() {
     echo ""
 }
 
+# 健康检查
+health_check() {
+    local healthy=true
+    
+    if [ ! -z "$BACKEND_PID" ]; then
+        if ps -p $BACKEND_PID > /dev/null; then
+            echo -e "${GREEN}✓${NC} 后端服务 (PID: $BACKEND_PID)"
+        else
+            echo -e "${RED}✗${NC} 后端服务已停止"
+            healthy=false
+        fi
+    fi
+    
+    if [ ! -z "$FRONTEND_PID" ]; then
+        if ps -p $FRONTEND_PID > /dev/null; then
+            echo -e "${GREEN}✓${NC} 前端服务 (PID: $FRONTEND_PID)"
+        else
+            echo -e "${RED}✗${NC} 前端服务已停止"
+            healthy=false
+        fi
+    fi
+    
+    if [ ! -z "$ELECTRON_PID" ]; then
+        if ps -p $ELECTRON_PID > /dev/null; then
+            echo -e "${GREEN}✓${NC} Electron 应用 (PID: $ELECTRON_PID)"
+        else
+            echo -e "${RED}✗${NC} Electron 应用已停止"
+            healthy=false
+        fi
+    fi
+    
+    return $([ "$healthy" = true ] && echo 0 || echo 1)
+}
+
 # 主函数
 main() {
     echo ""
@@ -209,8 +343,15 @@ main() {
     log_success "所有服务已启动，开发模式运行中..."
     echo ""
     
-    # 保持脚本运行
-    wait
+    # 定期健康检查
+    log_info "启动健康检查监控..."
+    while true; do
+        sleep 30
+        echo ""
+        echo "=== 健康检查 $(date '+%H:%M:%S') ==="
+        health_check || log_warning "部分服务异常，请检查日志"
+        echo "=========================="
+    done
 }
 
 # 执行主函数
