@@ -1,8 +1,10 @@
 """
 任务队列管理器
+优化版本：使用分段锁和异步执行器提升并发性能
 """
 import threading
 import time
+import asyncio
 from datetime import datetime, timedelta
 from typing import Dict, Optional, List, Any
 from queue import PriorityQueue, Empty
@@ -14,6 +16,9 @@ from ..schemas.任务队列模型 import (
 from ..schemas.输出结果模型 import TaskStatus
 from ..tasks.任务管理器 import TaskManager
 from .websocket_service import websocket_service
+from ..core.lock_manager import LockManager
+from ..core.async_executor import AsyncTaskExecutor
+from ..core.task_storage import FileTaskStorage
 import uuid
 
 class TaskQueueManager:
@@ -25,6 +30,12 @@ class TaskQueueManager:
         self.task_queue: PriorityQueue = PriorityQueue()
         self.running_tasks: Dict[str, QueueTaskInfo] = {}
         self.lock = threading.Lock()
+        # 新增：使用分段锁管理器替代全局锁
+        self.lock_manager = LockManager()
+        # 新增：异步执行器用于并发执行任务
+        self.async_executor = AsyncTaskExecutor(max_concurrent=10)
+        # 新增：任务持久化存储
+        self.task_storage = FileTaskStorage(storage_dir="tasks")
         self.scheduler_thread: Optional[threading.Thread] = None
         self.is_running = False
         self.task_manager = TaskManager()
@@ -158,7 +169,7 @@ class TaskQueueManager:
         priority: QueueTaskPriority = QueueTaskPriority.MEDIUM,
         metadata: Optional[Dict[str, Any]] = None
     ) -> str:
-        """添加任务到队列"""
+        """添加任务到队列（优化版本：使用分段锁）"""
         task_id = str(uuid.uuid4())
 
         task = QueueTaskInfo(
@@ -170,9 +181,11 @@ class TaskQueueManager:
             metadata=metadata or {}
         )
 
-        with self.lock:
+        # 使用分段锁替代全局锁
+        with self.lock_manager.get_task_lock(task_id):
             # 检查队列大小限制
             if len(self.tasks) >= self.config.queue_size_limit:
+                self.lock_manager.release_task_lock(task_id)
                 raise Exception("队列已满，无法添加新任务")
 
             self.tasks[task_id] = task
@@ -181,7 +194,32 @@ class TaskQueueManager:
             priority_value = self._get_priority_value(priority)
             self.task_queue.put((priority_value, task_id))
 
+        # 异步保存任务到持久化存储
+        asyncio.create_task(self._save_task_async(task_id, task))
+
         return task_id
+
+    async def _save_task_async(self, task_id: str, task: QueueTaskInfo):
+        """异步保存任务到持久化存储"""
+        try:
+            task_data = {
+                'task_id': task.task_id,
+                'task_type': task.task_type,
+                'priority': task.priority.value,
+                'status': task.status.value,
+                'parameters': task.parameters,
+                'metadata': task.metadata,
+                'created_at': task.created_at.isoformat() if task.created_at else None,
+                'started_at': task.started_at.isoformat() if task.started_at else None,
+                'completed_at': task.completed_at.isoformat() if task.completed_at else None,
+                'progress': task.progress,
+                'error': task.error,
+                'retry_count': task.retry_count,
+                'actual_duration': task.actual_duration
+            }
+            await self.task_storage.save_task(task_id, task_data)
+        except Exception as e:
+            print(f"保存任务失败: {e}")
 
     def control_task(self, task_id: str, action: str) -> TaskControlResponse:
         """控制任务"""
@@ -364,9 +402,10 @@ class TaskQueueManager:
                 )
 
     def get_task(self, task_id: str) -> Optional[QueueTaskInfo]:
-        """获取任务信息"""
-        with self.lock:
-            return self.tasks.get(task_id)
+        """获取任务信息（优化版本：使用分段锁）"""
+        with self.lock_manager.get_task_lock(task_id):
+            task = self.tasks.get(task_id)
+            return task
 
     def get_all_tasks(self, status: Optional[QueueTaskStatus] = None) -> List[QueueTaskInfo]:
         """获取所有任务"""
@@ -377,7 +416,7 @@ class TaskQueueManager:
             return tasks
 
     def get_statistics(self) -> QueueStatistics:
-        """获取队列统计信息"""
+        """获取队列统计信息（优化版本：包含锁统计信息）"""
         with self.lock:
             tasks = list(self.tasks.values())
 
@@ -404,6 +443,9 @@ class TaskQueueManager:
             ])
             throughput = completed_in_last_hour
 
+            # 获取锁统计信息
+            lock_stats = self.lock_manager.get_lock_stats()
+
             return QueueStatistics(
                 total_tasks=total,
                 waiting_tasks=waiting,
@@ -416,6 +458,15 @@ class TaskQueueManager:
                 success_rate=success_rate,
                 throughput=throughput
             )
+
+    def get_lock_statistics(self) -> Dict[str, Any]:
+        """
+        获取锁统计信息
+
+        Returns:
+            锁统计信息
+        """
+        return self.lock_manager.get_lock_stats()
 
     def get_visualization(self) -> QueueVisualization:
         """获取队列可视化数据"""
