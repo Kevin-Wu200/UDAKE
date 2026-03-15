@@ -40,30 +40,102 @@ export default defineConfig(({ mode }) => {
       sourcemap: isDevelopment || isTesting,
       minify: isProduction ? 'esbuild' : false,
       target: 'es2020',
+      // CSS 代码分割
+      cssCodeSplit: true,
+      // 启用压缩
+      reportCompressedSize: true,
       // 代码分割配置
       rollupOptions: {
         output: {
           manualChunks: (id: string) => {
-            // 将地图引擎分离为独立 chunk
-            if (id.includes('/frontend/js/adapters/') || id.includes('/frontend/js/map/core/')) {
-              return 'map-engines';
+            // 启动相关的关键代码（优先级最高）
+            if (id.includes('SplashScreen') || id.includes('LaunchProgressManager') ||
+                id.includes('StartupManager') || id.includes('LoadingManager') ||
+                id.includes('ResourceOptimizationConfig')) {
+              return 'startup';
             }
+
+            // 管理器模块
+            if (id.includes('/managers/') || id.includes('ComponentInitializer') ||
+                id.includes('EventBinder') || id.includes('StateManager')) {
+              return 'managers';
+            }
+
+            // 将地图引擎分离为独立 chunk（按不同引擎）
+            if (id.includes('ArcGISEngine') || id.includes('arcgis')) {
+              return 'map-arcgis';
+            }
+            if (id.includes('AMapEngine') || id.includes('amap')) {
+              return 'map-amap';
+            }
+            if (id.includes('TiandituEngine') || id.includes('tianditu')) {
+              return 'map-tianditu';
+            }
+            if (id.includes('/frontend/js/adapters/') || id.includes('/frontend/js/map/core/')) {
+              return 'map-core';
+            }
+
             // 将图表组件分离为独立 chunk
             if (id.includes('VariogramChart') || id.includes('UncertaintyHistogram') ||
                 id.includes('CrossValidationScatterChart') || id.includes('SamplingEfficiencyChart')) {
               return 'charts';
             }
+
             // 将工具类分离为独立 chunk
             if (id.includes('/frontend/js/utils/')) {
               return 'utils';
             }
+
             // 将采样相关组件分离为独立 chunk
             if (id.includes('/frontend/js/sampling/')) {
               return 'sampling';
             }
-            // 将组件分离为独立 chunk
+
+            // 核心功能组件
+            if (id.includes('SettingsPanel') || id.includes('PreferencesPanel') ||
+                id.includes('NewProjectModal') || id.includes('DataImportModal') ||
+                id.includes('ConfirmDialog')) {
+              return 'core-components';
+            }
+
+            // 地图交互组件
+            if (id.includes('MapTooltip') || id.includes('MapLegend') ||
+                id.includes('LayerComparisonPanel') || id.includes('MeasureTool') ||
+                id.includes('MapEngineSwitcher') || id.includes('LocationCenterButton')) {
+              return 'map-interaction';
+            }
+
+            // 参数相关组件
+            if (id.includes('ParameterAdjustmentPanel') || id.includes('ParameterTabPanel') ||
+                id.includes('ParameterHistoryManager') || id.includes('ParameterComparisonPanel') ||
+                id.includes('ParameterInfoPanel')) {
+              return 'parameter-components';
+            }
+
+            // 采样建议相关组件
+            if (id.includes('SamplingRecommendationPanel') || id.includes('EnhancedSamplingRecommendationPanel') ||
+                id.includes('InteractiveSamplingMarkers') || id.includes('SamplingStrategySelector')) {
+              return 'sampling-recommendation';
+            }
+
+            // 离线相关组件
+            if (id.includes('OfflineModeBanner') || id.includes('CacheManagementPanel')) {
+              return 'offline-components';
+            }
+
+            // 其他组件
             if (id.includes('/frontend/js/components/')) {
               return 'components';
+            }
+
+            // API服务
+            if (id.includes('/frontend/js/services/')) {
+              return 'services';
+            }
+
+            // 模型层
+            if (id.includes('/frontend/js/models/')) {
+              return 'models';
             }
           },
           chunkFileNames: 'assets/[name]-[hash].js',
@@ -72,7 +144,7 @@ export default defineConfig(({ mode }) => {
         }
       },
       // 优化 chunk 大小警告阈值
-      chunkSizeWarningLimit: 1000,
+      chunkSizeWarningLimit: 800,
     },
 
     // 依赖预构建配置
