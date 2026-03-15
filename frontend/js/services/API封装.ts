@@ -15,7 +15,7 @@ import { OfflineManager } from '../utils/OfflineManager';
 
 export class APIService implements IAPIService {
     public baseURL: string;
-    private pendingRequests: Map<string, Promise<any>>;
+    private pendingRequests: Map<string, Promise<unknown>>;
     private cache: Map<string, CacheEntry>;
     private cacheMaxSize: number;
     private cacheTTL: number;
@@ -116,7 +116,7 @@ export class APIService implements IAPIService {
         return `请求失败 (${status}): ${statusText}，请稍后重试`;
     }
 
-    public async request<T = any>(url: string, options: RequestInit = {}): Promise<T> {
+    public async request<T = unknown>(url: string, options: RequestInit = {}): Promise<T> {
         const method = options.method || 'GET';
         const requestKey = `${method}_${url}`;
 
@@ -283,9 +283,82 @@ export class APIService implements IAPIService {
         return this.request<ResultResponse>(`${this.baseURL}/result/variance/${taskId}`);
     }
 
-    public async getReport(taskId: string): Promise<any> {
-        return this.request<any>(`${this.baseURL}/result/report/${taskId}`);
-    }
+    public async getReport(taskId: string): Promise<{
+    taskId: string;
+    title: string;
+    description?: string;
+    generatedAt: Date;
+    studyArea: {
+        type: string;
+        coordinates: unknown;
+    };
+    riskIndices: Array<{
+        value: number;
+        level: string;
+        factors: Array<{ name: string; weight: number; value: number; description: string }>;
+        timestamp: Date;
+    }>;
+    uncertaintyLevels: {
+        grid: string[][];
+        bounds: { minX: number; minY: number; maxX: number; maxY: number };
+        cellSize: number;
+        thresholds: { low: number; medium: number; high: number };
+    };
+    hotspots: Array<{
+        id: string;
+        location: { x: number; y: number };
+        radius: number;
+        riskLevel: number;
+        uncertaintyLevel: string;
+        priority: string;
+    }>;
+    recommendations: Array<{
+        recommendation: string;
+        confidence: number;
+        reasoning: string[];
+        alternatives: string[];
+        riskLevel: { value: number; level: string };
+        uncertainty: { value: number; level: string };
+    }>;
+    metadata: Record<string, unknown>;
+}> {
+    return this.request<{
+        taskId: string;
+        title: string;
+        description?: string;
+        generatedAt: Date;
+        studyArea: { type: string; coordinates: unknown };
+        riskIndices: Array<{
+            value: number;
+            level: string;
+            factors: Array<{ name: string; weight: number; value: number; description: string }>;
+            timestamp: Date;
+        }>;
+        uncertaintyLevels: {
+            grid: string[][];
+            bounds: { minX: number; minY: number; maxX: number; maxY: number };
+            cellSize: number;
+            thresholds: { low: number; medium: number; high: number };
+        };
+        hotspots: Array<{
+            id: string;
+            location: { x: number; y: number };
+            radius: number;
+            riskLevel: number;
+            uncertaintyLevel: string;
+            priority: string;
+        }>;
+        recommendations: Array<{
+            recommendation: string;
+            confidence: number;
+            reasoning: string[];
+            alternatives: string[];
+            riskLevel: { value: number; level: string };
+            uncertainty: { value: number; level: string };
+        }>;
+        metadata: Record<string, unknown>;
+    }>(`${this.baseURL}/result/report/${taskId}`);
+}
 
     public async downloadExportFile(taskId: string, filename: string): Promise<void> {
         const url = `${this.baseURL}/result/download/${taskId}/${filename}`;
@@ -303,11 +376,11 @@ export class APIService implements IAPIService {
         URL.revokeObjectURL(link.href);
     }
 
-    public async get<T = any>(url: string): Promise<T> {
+    public async get<T = unknown>(url: string): Promise<T> {
         return this.request<T>(`${this.baseURL}${url}`);
     }
 
-    public async post<T = any>(url: string, data: unknown): Promise<T> {
+    public async post<T = unknown>(url: string, data: unknown): Promise<T> {
         return this.request<T>(`${this.baseURL}${url}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -324,24 +397,69 @@ export class APIService implements IAPIService {
     /**
      * 评估候选采样点的影响
      */
-    public async evaluateSamplingCandidates(taskId: string, candidatePoints: any[], strategy: string = 'impact_optimized', gridResolution: number = 50): Promise<any> {
-        return this.request<any>(`${this.baseURL}/api/sampling-impact/evaluate-candidates`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                task_id: taskId,
-                candidate_points: candidatePoints,
-                strategy: strategy,
-                grid_resolution: gridResolution
-            })
-        });
+    public async evaluateSamplingCandidates(
+        taskId: string,
+        candidatePoints: Array<{ x: number; y: number }>,
+        strategy: string = 'impact_optimized',
+        gridResolution: number = 50
+    ): Promise<{
+        taskId: string;
+        candidates: Array<{
+            x: number;
+            y: number;
+            score: number;
+            uncertainty: number;
+            variance: number;
+            impact: number;
+            priority: number;
+        }>;
+        statistics: {
+            meanScore: number;
+            maxScore: number;
+            minScore: number;
+        };
+    }> {
+        return this.request<{ taskId: string; candidates: Array<{ x: number; y: number; score: number; uncertainty: number; variance: number; impact: number; priority: number }>; statistics: { meanScore: number; maxScore: number; minScore: number } }>(
+            `${this.baseURL}/api/sampling-impact/evaluate-candidates`,
+            {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    task_id: taskId,
+                    candidate_points: candidatePoints,
+                    strategy: strategy,
+                    grid_resolution: gridResolution
+                })
+            }
+        );
     }
 
     /**
      * 预览添加新采样点后的效果
      */
-    public async previewSamplingEffect(taskId: string, newPoint: { x: number; y: number; value: number }, gridResolution: number = 50): Promise<any> {
-        return this.request<any>(`${this.baseURL}/api/sampling-impact/preview-effect`, {
+    public async previewSamplingEffect(
+        taskId: string,
+        newPoint: { x: number; y: number; value: number },
+        gridResolution: number = 50
+    ): Promise<{
+        taskId: string;
+        newPoint: { x: number; y: number; value: number };
+        uncertaintyGrid: number[][];
+        varianceGrid: number[][];
+        statistics: {
+            meanUncertainty: number;
+            maxUncertainty: number;
+            minUncertainty: number;
+            reduction: number;
+        };
+    }> {
+        return this.request<{
+            taskId: string;
+            newPoint: { x: number; y: number; value: number };
+            uncertaintyGrid: number[][];
+            varianceGrid: number[][];
+            statistics: { meanUncertainty: number; maxUncertainty: number; minUncertainty: number; reduction: number };
+        }>(`${this.baseURL}/api/sampling-impact/preview-effect`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -355,8 +473,41 @@ export class APIService implements IAPIService {
     /**
      * 推荐最优采样点
      */
-    public async recommendOptimalPoints(taskId: string, nRecommendations: number = 20, strategy: string = 'impact_optimized', constraints: any = null): Promise<any> {
-        return this.request<any>(`${this.baseURL}/api/sampling-impact/recommend-optimal`, {
+    public async recommendOptimalPoints(
+        taskId: string,
+        nRecommendations: number = 20,
+        strategy: string = 'impact_optimized',
+        constraints: Record<string, unknown> | null = null
+    ): Promise<{
+        taskId: string;
+        recommendations: Array<{
+            x: number;
+            y: number;
+            expectedUncertainty: number;
+            uncertaintyReduction: number;
+            variance: number;
+            priority: number;
+            reason: string;
+        }>;
+        expectedImprovement: number;
+        uncertaintyReduction: number;
+        cost: number;
+    }> {
+        return this.request<{
+            taskId: string;
+            recommendations: Array<{
+                x: number;
+                y: number;
+                expectedUncertainty: number;
+                uncertaintyReduction: number;
+                variance: number;
+                priority: number;
+                reason: string;
+            }>;
+            expectedImprovement: number;
+            uncertaintyReduction: number;
+            cost: number;
+        }>(`${this.baseURL}/api/sampling-impact/recommend-optimal`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -371,8 +522,48 @@ export class APIService implements IAPIService {
     /**
      * 批量模拟多个采样方案的效果
      */
-    public async batchSimulateSampling(taskId: string, samplingPlans: any[], gridResolution: number = 50): Promise<any> {
-        return this.request<any>(`${this.baseURL}/api/sampling-impact/batch-simulate`, {
+    public async batchSimulateSampling(
+        taskId: string,
+        samplingPlans: Array<{
+            planId: string;
+            points: Array<{ x: number; y: number }>;
+            parameters: Record<string, unknown>;
+        }>,
+        gridResolution: number = 50
+    ): Promise<{
+        taskId: string;
+        results: Array<{
+            planId: string;
+            points: Array<{ x: number; y: number }>;
+            uncertainty: number[][];
+            statistics: {
+                meanUncertainty: number;
+                maxUncertainty: number;
+                minUncertainty: number;
+            };
+        }>;
+        comparison: {
+            bestPlanId: string;
+            rankings: Array<{
+                planId: string;
+                rank: number;
+                score: number;
+            }>;
+        };
+    }> {
+        return this.request<{
+            taskId: string;
+            results: Array<{
+                planId: string;
+                points: Array<{ x: number; y: number }>;
+                uncertainty: number[][];
+                statistics: { meanUncertainty: number; maxUncertainty: number; minUncertainty: number };
+            }>;
+            comparison: {
+                bestPlanId: string;
+                rankings: Array<{ planId: string; rank: number; score: number }>;
+            };
+        }>(`${this.baseURL}/api/sampling-impact/batch-simulate`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -381,5 +572,226 @@ export class APIService implements IAPIService {
                 grid_resolution: gridResolution
             })
         });
+    }
+
+    // TaskExecutors 需要的方法实现
+
+    /**
+     * 提交插值任务
+     */
+    public async submitInterpolation(data: {
+        points: Array<{ x: number; y: number; value: number }>;
+        parameters: Record<string, unknown>;
+    }): Promise<string> {
+        return this.request<string>(`${this.baseURL}/api/interpolation`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 获取插值结果
+     */
+    public async getInterpolationResult(interpolationId: string): Promise<{
+        id: string;
+        grid: number[][];
+        variance: number[][];
+        bounds: { minX: number; minY: number; maxX: number; maxY: number };
+        cellSize: number;
+        statistics: { mean: number; std: number; min: number; max: number };
+    }> {
+        return this.request<{
+            id: string;
+            grid: number[][];
+            variance: number[][];
+            bounds: { minX: number; minY: number; maxX: number; maxY: number };
+            cellSize: number;
+            statistics: { mean: number; std: number; min: number; max: number };
+        }>(`${this.baseURL}/api/interpolation/${interpolationId}`);
+    }
+
+    /**
+     * 生成采样点
+     */
+    public async generateSamplingPoints(data: {
+        bounds?: { minX: number; minY: number; maxX: number; maxY: number };
+        existingPoints?: Array<{ x: number; y: number; value: number }>;
+        parameters: Record<string, unknown>;
+    }): Promise<{
+        taskId: string;
+        points: Array<{ x: number; y: number; uncertainty?: number; priority?: number }>;
+        count: number;
+    }> {
+        return this.request<{
+            taskId: string;
+            points: Array<{ x: number; y: number; uncertainty?: number; priority?: number }>;
+            count: number;
+        }>(`${this.baseURL}/api/sampling`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 执行分析
+     */
+    public async performAnalysis(data: {
+        datasetId?: string;
+        grid?: number[][];
+        bounds?: { minX: number; minY: number; maxX: number; maxY: number };
+        variance?: number[][];
+        parameters: Record<string, unknown>;
+    }): Promise<{
+        taskId: string;
+        analysisType: string;
+        result: unknown;
+        generatedAt: Date;
+    }> {
+        return this.request<{
+            taskId: string;
+            analysisType: string;
+            result: unknown;
+            generatedAt: Date;
+        }>(`${this.baseURL}/api/analysis`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 生成报告
+     */
+    public async generateReport(analysisId: string): Promise<{
+        id: string;
+        title: string;
+        content: string;
+        format: string;
+        generatedAt: Date;
+    }> {
+        return this.request<{
+            id: string;
+            title: string;
+            content: string;
+            format: string;
+            generatedAt: Date;
+        }>(`${this.baseURL}/api/analysis/${analysisId}/report`);
+    }
+
+    /**
+     * 导出数据
+     */
+    public async exportData(data: {
+        taskId?: string;
+        datasetId?: string;
+        format: 'geojson' | 'csv' | 'json' | 'shapefile';
+        options?: {
+            includeMetadata?: boolean;
+            precision?: number;
+            filters?: Array<{ field: string; operator: string; value: unknown }>;
+        };
+    }): Promise<{
+        fileId: string;
+        fileName: string;
+        format: string;
+        size: number;
+        downloadUrl: string;
+        expiresAt: Date;
+        recordCount?: number;
+    }> {
+        return this.request<{
+            fileId: string;
+            fileName: string;
+            format: string;
+            size: number;
+            downloadUrl: string;
+            expiresAt: Date;
+            recordCount?: number;
+        }>(`${this.baseURL}/api/export`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 解析导入文件
+     */
+    public async parseImportFile(file: File): Promise<{
+        fileName: string;
+        format: string;
+        recordCount: number;
+        fields: Array<{
+            name: string;
+            type: string;
+            nullable: boolean;
+        }>;
+        sampleData: Array<Record<string, unknown>>;
+    }> {
+        return this.request<{
+            fileName: string;
+            format: string;
+            recordCount: number;
+            fields: Array<{ name: string; type: string; nullable: boolean }>;
+            sampleData: Array<Record<string, unknown>>;
+        }>(`${this.baseURL}/api/import/parse`, {
+            method: 'POST',
+            body: this._formDataFromFile(file)
+        });
+    }
+
+    /**
+     * 导入数据
+     */
+    public async importData(data: {
+        file?: File;
+        url?: string;
+        content?: string;
+        format: 'geojson' | 'csv' | 'shapefile' | 'json';
+        options?: {
+            encoding?: string;
+            skipInvalid?: boolean;
+            validate?: boolean;
+            transform?: { sourceCRS: string; targetCRS: string };
+        };
+    }): Promise<{
+        datasetId: string;
+        fileName: string;
+        recordCount: number;
+        bounds: { minX: number; minY: number; maxX: number; maxY: number };
+        statistics: { count: number; min: number; max: number; mean: number; std: number };
+        validation?: {
+            valid: boolean;
+            errors: Array<{ field: string; message: string; value: unknown }>;
+            warnings: Array<{ field: string; message: string; value: unknown; severity: string }>;
+        };
+    }> {
+        return this.request<{
+            datasetId: string;
+            fileName: string;
+            recordCount: number;
+            bounds: { minX: number; minY: number; maxX: number; maxY: number };
+            statistics: { count: number; min: number; max: number; mean: number; std: number };
+            validation?: {
+                valid: boolean;
+                errors: Array<{ field: string; message: string; value: unknown }>;
+                warnings: Array<{ field: string; message: string; value: unknown; severity: string }>;
+            };
+        }>(`${this.baseURL}/api/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 从文件创建 FormData
+     */
+    private _formDataFromFile(file: File): FormData {
+        const formData = new FormData();
+        formData.append('file', file);
+        return formData;
     }
 }
