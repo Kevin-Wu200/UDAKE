@@ -1,9 +1,0 @@
-app图标：/Users/wuchenkai/UDAKE/dist/build_Android/logo/logo.png
-
-打包结果apk文件：/Users/wuchenkai/UDAKE/dist/build_Android/apk/UDAKE.apk
-
-apk自动构建python脚本：/Users/wuchenkai/UDAKE/dist/build_Android/build_py/auto_build.apk.py
-
-打包说明文档：/Users/wuchenkai/UDAKE/dist/build_Android/docs/打包构建.md
-
-密钥说明：/Users/wuchenkai/UDAKE/dist/build_Android/docs/密钥说明.txt

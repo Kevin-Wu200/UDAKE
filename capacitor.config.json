@@ -1,1 +1,8 @@
-{"appId": "com.udake.app", "appName": "UDAKE", "webDir": "frontend/dist", "bundledWebRuntime": false, "server": {"androidScheme": "https"}, "plugins": {"SplashScreen": {"launchShowDuration": 0, "launchAutoHide": true, "backgroundColor": "#ffffffff", "androidSplashResourceName": "splash", "androidScaleType": "CENTER_CROP", "showSpinner": false, "androidSpinnerStyle": "large", "spinnerColor": "#999999", "splashFullScreen": true, "splashImmersive": true, "layoutName": "splash_screen", "useDialog": true}}, "android": {"buildOptions": {"keystorePath": "/Users/wuchenkai/.android_keystore/UDAKE.jks", "keystoreAlias": "udake", "keystoreAliasPassword": "", "keystorePassword": ""}}}
+{"appId": "com.udake.app", "appName": "UDAKE", "webDir": "frontend/dist", "bundledWebRuntime": false, "server": {"androidScheme": "https"}, "plugins": {"SplashScreen": {"launchShowDuration": 0, "launchAutoHide": true, "backgroundColor": "#ffffffff", "androidSplashResourceName": "splash", "androidScaleType": "CENTER_CROP", "showSpinner": false, "androidSpinnerStyle": "large", "spinnerColor": "#999999", "splashFullScreen": true, "splashImmersive": true, "layoutName": "splash_screen", "useDialog": true}}, "android": {
+    "buildOptions": {
+      "keystorePath": ".android_keystore/UDAKE.jks",
+      "keystoreAlias": "UDAKE",
+      "keystoreAliasPassword": "15024468581",
+      "keystorePassword": "15024468581"
+    }
+  }}

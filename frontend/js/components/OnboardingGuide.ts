@@ -43,7 +43,7 @@ export class OnboardingGuide {
                 position: 'bottom'
             },
             {
-                target: '.sidebar .panel:nth-child(3)',
+                target: '.sidebar .panel:nth-child(2)',
                 title: '数据上传',
                 content: '上传 GeoJSON 格式的采样数据文件，系统将自动解析坐标和属性字段。',
                 position: 'right'

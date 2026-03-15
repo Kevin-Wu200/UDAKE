@@ -47,7 +47,8 @@
   "include": [
     "frontend/js/**/*",
     "frontend/types/**/*",
-    "frontend/types/global.d.ts"
+    "frontend/types/global.d.ts",
+    "frontend/vite-env.d.ts"
   ],
   "exclude": [
     "node_modules",
