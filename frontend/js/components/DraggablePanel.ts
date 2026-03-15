@@ -4,7 +4,7 @@
  */
 
 import { appStore } from '../store/Store';
-import type { PanelInfo, PanelPosition } from '../../types/core';
+import type { PanelInfo } from '../../types/core';
 
 export class DraggablePanel {
     private panelId: string;
@@ -14,7 +14,6 @@ export class DraggablePanel {
     private isDragging: boolean = false;
     private isResizing: boolean = false;
     private dragOffset = { x: 0, y: 0 };
-    private resizeHandle: HTMLElement | null = null;
     private resizeDirection: string = '';
 
     constructor(panelId: string, element: HTMLElement) {
@@ -220,10 +219,9 @@ export class DraggablePanel {
 
     private startResize(e: MouseEvent, direction: string): void {
         e.stopPropagation();
-        
+
         this.isResizing = true;
         this.resizeDirection = direction;
-        this.resizeHandle = e.target as HTMLElement;
 
         const rect = this.element.getBoundingClientRect();
         this.dragOffset = {
@@ -426,9 +424,9 @@ export class LayoutManager {
     private initializePanels(): void {
         const panels = appStore.get('layout.panels') as Record<string, PanelInfo>;
 
-        for (const [panelId, panelInfo] of Object.entries(panels)) {
+        for (const [panelId, _panelInfo] of Object.entries(panels)) {
             const element = document.querySelector(`[data-panel-id="${panelId}"]`) as HTMLElement;
-            
+
             if (element) {
                 const draggablePanel = new DraggablePanel(panelId, element);
                 this.panels.set(panelId, draggablePanel);
@@ -546,7 +544,7 @@ export class LayoutManager {
 
         if (listElement) {
             const activeLayout = appStore.get('layout.activeLayout');
-            listElement.innerHTML = Object.entries(savedLayouts).map(([name, layout]) => `
+            listElement.innerHTML = Object.entries(savedLayouts).map(([name, _layout]) => `
                 <div class="layout-item ${name === activeLayout ? 'active' : ''}" data-layout="${name}">
                     <span class="layout-name">${name}</span>
                     <button class="layout-delete" title="删除">✕</button>

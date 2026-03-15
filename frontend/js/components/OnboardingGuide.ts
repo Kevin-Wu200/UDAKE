@@ -356,7 +356,8 @@ export class OnboardingGuide {
         // 检查下边界
         if (top + tooltipRect.height + margin > windowHeight) {
             // 尝试在上方显示
-            const targetElement = document.querySelector(this.steps[this.currentStep].target);
+            const targetSelector = this.steps[this.currentStep].target;
+            const targetElement = targetSelector ? document.querySelector(targetSelector) : null;
             if (targetElement) {
                 const targetRect = targetElement.getBoundingClientRect();
                 top = targetRect.top - tooltipRect.height - padding;

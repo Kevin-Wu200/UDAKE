@@ -2,7 +2,6 @@
  * 交互式采样点标记组件
  * 支持优先级颜色编码、预期收益显示、实时拖拽重评估和详细信息弹窗
  */
-import { I18n } from '../utils/I18n.js';
 import type { IMapAdapterExtended } from '../../types/app';
 
 /** 推荐点 */
@@ -40,9 +39,9 @@ export class InteractiveSamplingMarkers {
     private mapEngine: IMapAdapterExtended;
     private markers: Map<number, MarkerEntry>;
     private markerConfig: MarkerConfig;
-    private onMarkerClick: ((rec: Recommendation) => void) | null;
-    private onMarkerDrag: ((rec: Recommendation, newPosition: { x: number; y: number }) => void) | null;
-    private activeMarkerId: number | null;
+    private onMarkerClick: ((rec: Recommendation) => void) | null = null;
+    private onMarkerDrag: ((rec: Recommendation, newPosition: { x: number; y: number }) => void) | null = null;
+    private activeMarkerId: number | null = null;
 
     constructor(mapEngine: IMapAdapterExtended) {
         this.mapEngine = mapEngine;
@@ -53,7 +52,6 @@ export class InteractiveSamplingMarkers {
             showScore: true,
             enableDrag: true
         };
-        this.onMarkerClick = null;
         this.onMarkerDrag = null;
         this.activeMarkerId = null;
     }
@@ -78,170 +76,6 @@ export class InteractiveSamplingMarkers {
             });
         } catch (error) {
             console.error('创建标记失败:', error);
-        }
-    }
-
-    /**
-     * 创建标记元素
-     */
-    private createMarkerElement(rec: Recommendation): HTMLElement {
-        const element = document.createElement('div');
-        element.className = `sampling-marker priority-${rec.priority}`;
-        element.style.width = `${this.markerConfig.size}px`;
-        element.style.height = `${this.markerConfig.size}px`;
-        element.style.position = 'relative';
-
-        // 根据优先级设置颜色
-        const color = this.getPriorityColor(rec.priority);
-        element.style.backgroundColor = color;
-        element.style.borderRadius = '50%';
-        element.style.border = '2px solid white';
-        element.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-        element.style.cursor = 'pointer';
-        element.style.transition = 'transform 0.2s ease, box-shadow 0.2s ease';
-
-        // 添加内圈（表示不确定性等级）
-        const innerCircle = document.createElement('div');
-        innerCircle.className = 'marker-inner-circle';
-        const uncertaintySize = this.markerConfig.size * (1 - rec.uncertainty_level / 5);
-        innerCircle.style.width = `${uncertaintySize}px`;
-        innerCircle.style.height = `${uncertaintySize}px`;
-        innerCircle.style.backgroundColor = 'rgba(255,255,255,0.7)';
-        innerCircle.style.borderRadius = '50%';
-        innerCircle.style.position = 'absolute';
-        innerCircle.style.top = '50%';
-        innerCircle.style.left = '50%';
-        innerCircle.style.transform = 'translate(-50%, -50%)';
-        element.appendChild(innerCircle);
-
-        // 添加评分标签（如果启用）
-        if (this.markerConfig.showScore && rec.comprehensive_score !== undefined) {
-            const scoreLabel = document.createElement('div');
-            scoreLabel.className = 'marker-score';
-            scoreLabel.textContent = rec.comprehensive_score.toFixed(2);
-            scoreLabel.style.position = 'absolute';
-            scoreLabel.style.bottom = '-20px';
-            scoreLabel.style.left = '50%';
-            scoreLabel.style.transform = 'translateX(-50%)';
-            scoreLabel.style.fontSize = '10px';
-            scoreLabel.style.fontWeight = 'bold';
-            scoreLabel.style.color = color;
-            scoreLabel.style.whiteSpace = 'nowrap';
-            element.appendChild(scoreLabel);
-        }
-
-        // 添加ID标签（如果启用）
-        if (this.markerConfig.showLabel) {
-            const idLabel = document.createElement('div');
-            idLabel.className = 'marker-id';
-            idLabel.textContent = `#${rec.id}`;
-            idLabel.style.position = 'absolute';
-            idLabel.style.top = '-18px';
-            idLabel.style.left = '50%';
-            idLabel.style.transform = 'translateX(-50%)';
-            idLabel.style.fontSize = '11px';
-            idLabel.style.fontWeight = 'bold';
-            idLabel.style.color = '#333';
-            idLabel.style.whiteSpace = 'nowrap';
-            element.appendChild(idLabel);
-        }
-
-        // 添加动画
-        element.addEventListener('mouseenter', () => {
-            element.style.transform = 'scale(1.2)';
-            element.style.boxShadow = '0 4px 8px rgba(0,0,0,0.4)';
-        });
-
-        element.addEventListener('mouseleave', () => {
-            if (this.activeMarkerId !== rec.id) {
-                element.style.transform = 'scale(1)';
-                element.style.boxShadow = '0 2px 4px rgba(0,0,0,0.3)';
-            }
-        });
-
-        return element;
-    }
-
-    /**
-     * 创建信息弹窗
-     */
-    private createPopup(rec: Recommendation): any {
-        // 创建弹窗内容（暂时不实现弹窗功能）
-        const popupContent = document.createElement('div');
-        popupContent.className = 'marker-popup-content';
-        popupContent.innerHTML = `
-            <div class="popup-header">
-                <span class="popup-title">${I18n.t('marker.title')} #${rec.id}</span>
-                <span class="popup-priority priority-${rec.priority}">${rec.priority}</span>
-            </div>
-            <div class="popup-body">
-                <div class="popup-section">
-                    <h4>${I18n.t('marker.coordinates')}</h4>
-                    <p>X: ${rec.x.toFixed(6)}</p>
-                    <p>Y: ${rec.y.toFixed(6)}</p>
-                </div>
-                <div class="popup-section">
-                    <h4>${I18n.t('marker.metrics')}</h4>
-                    <p>${I18n.t('marker.variance')}: ${rec.variance.toFixed(6)}</p>
-                    <p>${I18n.t('marker.score')}: ${(rec.comprehensive_score || 0).toFixed(3)}</p>
-                    ${rec.variance_reduction !== undefined ? `<p>${I18n.t('marker.varianceReduction')}: ${rec.variance_reduction.toFixed(6)}</p>` : ''}
-                    ${rec.local_improvement !== undefined ? `<p>${I18n.t('marker.localImprovement')}: ${rec.local_improvement.toFixed(3)}</p>` : ''}
-                </div>
-            </div>
-        `;
-
-        // 返回 null 表示暂时不实现弹窗
-        return {
-            content: popupContent,
-            open: () => {},
-            close: () => {},
-            setContent: () => {},
-            getContent: () => popupContent
-        };
-    }
-
-    /**
-     * 附加标记事件
-     */
-    private attachMarkerEvents(marker: any, rec: Recommendation, popup: any): void {
-        // 点击事件
-        marker.on('click', (e: any) => {
-            this.onMarkerClick?.(rec);
-            this.highlightMarker(rec.id);
-            popup.open();
-        });
-
-        // 悬停事件
-        marker.on('mouseover', (e: any) => {
-            this.showTooltip(rec, e.originalEvent);
-        });
-
-        marker.on('mouseout', (e: any) => {
-            this.hideTooltip();
-        });
-
-        // 拖拽事件
-        if (this.markerConfig.enableDrag) {
-            marker.on('dragstart', (e: any) => {
-                this.activeMarkerId = rec.id;
-            });
-
-            marker.on('drag', (e: any) => {
-                const newPosition = {
-                    x: e.target.getLatLng().lng,
-                    y: e.target.getLatLng().lat
-                };
-                this.onMarkerDrag?.(rec, newPosition);
-            });
-
-            marker.on('dragend', (e: any) => {
-                const newPosition = {
-                    x: e.target.getLatLng().lng,
-                    y: e.target.getLatLng().lat
-                };
-                this.onMarkerDrag?.(rec, newPosition);
-                this.activeMarkerId = null;
-            });
         }
     }
 
@@ -276,41 +110,6 @@ export class InteractiveSamplingMarkers {
         });
 
         this.activeMarkerId = null;
-    }
-
-    /**
-     * 显示工具提示
-     */
-    private showTooltip(rec: Recommendation, event: MouseEvent): void {
-        // TODO: 实现工具提示
-        console.log('Show tooltip for marker', rec.id);
-    }
-
-    /**
-     * 隐藏工具提示
-     */
-    private hideTooltip(): void {
-        // TODO: 隐藏工具提示
-    }
-
-    /**
-     * 触发预览
-     */
-    private triggerPreview(rec: Recommendation): void {
-        const event = new CustomEvent('markerPreview', {
-            detail: rec
-        });
-        document.dispatchEvent(event);
-    }
-
-    /**
-     * 触发选择
-     */
-    private triggerSelect(rec: Recommendation): void {
-        const event = new CustomEvent('markerSelect', {
-            detail: rec
-        });
-        document.dispatchEvent(event);
     }
 
     /**
@@ -387,18 +186,6 @@ export class InteractiveSamplingMarkers {
      */
     public setOnMarkerDrag(callback: ((rec: Recommendation, newPosition: { x: number; y: number }) => void) | null): void {
         this.onMarkerDrag = callback;
-    }
-
-    /**
-     * 获取优先级颜色
-     */
-    private getPriorityColor(priority: string): string {
-        switch (priority) {
-            case 'high': return '#ff4444';
-            case 'medium': return '#ffbb33';
-            case 'low': return '#00C851';
-            default: return '#33b5e5';
-        }
     }
 
     /**

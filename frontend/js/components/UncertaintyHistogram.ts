@@ -378,7 +378,7 @@ export class UncertaintyHistogram {
         if (newBinCount >= 5 && newBinCount <= 100) {
           this.config.binCount = newBinCount;
           this.data = this.processData();
-          this.drawHTMLChart(canvas, ctx);
+          if (ctx) this.drawHTMLChart(canvas, ctx);
           this.addStatisticsPanel();
         }
       });

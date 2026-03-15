@@ -44,10 +44,10 @@ interface AnimationEvents {
 
 export class UncertaintyHeatmapAnimation {
     private container: HTMLElement;
-    private overlay: HTMLElement;
-    private panel: HTMLElement;
-    private heatmapCanvas: HTMLCanvasElement;
-    private ctx: CanvasRenderingContext2D;
+    private overlay: HTMLElement | null = null;
+    private panel: HTMLElement | null = null;
+    private heatmapCanvas: HTMLCanvasElement | null = null;
+    private ctx: CanvasRenderingContext2D | null = null;
     private animationId: number | null = null;
     private animationState: AnimationState;
     private samplingPoints: SamplingPoint[] = [];
@@ -212,6 +212,8 @@ export class UncertaintyHeatmapAnimation {
     }
 
     private bindEvents(): void {
+        if (!this.panel || !this.heatmapCanvas) return;
+
         const closeBtn = this.panel.querySelector('.heatmap-close-btn') as HTMLElement;
         closeBtn.addEventListener('click', () => this.hide());
 
@@ -238,7 +240,7 @@ export class UncertaintyHeatmapAnimation {
         this.heatmapCanvas.addEventListener('click', (e) => this.handleCanvasClick(e));
         this.heatmapCanvas.addEventListener('mousemove', (e) => this.handleCanvasHover(e));
 
-        this.overlay.addEventListener('click', (e) => {
+        this.overlay?.addEventListener('click', (e) => {
             if (e.target === this.overlay) {
                 this.hide();
             }
@@ -248,6 +250,8 @@ export class UncertaintyHeatmapAnimation {
     }
 
     private resizeCanvas(): void {
+        if (!this.panel || !this.heatmapCanvas) return;
+
         const container = this.panel.querySelector('.heatmap-canvas-container') as HTMLElement;
         const rect = container.getBoundingClientRect();
         this.heatmapCanvas.width = rect.width;
@@ -287,6 +291,7 @@ export class UncertaintyHeatmapAnimation {
     }
 
     public show(): void {
+        if (!this.overlay) return;
         this.overlay.style.display = 'flex';
         this.resizeCanvas();
         this.reset();
@@ -294,7 +299,9 @@ export class UncertaintyHeatmapAnimation {
 
     public hide(): void {
         this.pause();
-        this.overlay.style.display = 'none';
+        if (this.overlay) {
+            this.overlay.style.display = 'none';
+        }
     }
 
     public play(): void {
@@ -327,9 +334,11 @@ export class UncertaintyHeatmapAnimation {
 
     public selectStrategy(strategy: string): void {
         this.animationState.selectedStrategy = strategy;
-        this.panel.querySelectorAll('.strategy-btn').forEach(btn => {
-            btn.classList.toggle('active', (btn as HTMLElement).dataset.strategy === strategy);
-        });
+        if (this.panel) {
+            this.panel.querySelectorAll('.strategy-btn').forEach(btn => {
+                btn.classList.toggle('active', (btn as HTMLElement).dataset.strategy === strategy);
+            });
+        }
         this.reset();
     }
 
@@ -464,6 +473,8 @@ export class UncertaintyHeatmapAnimation {
     }
 
     private updateControlButtons(): void {
+        if (!this.panel) return;
+
         const playBtn = this.panel.querySelector('#heatmap-play-btn') as HTMLElement;
         const pauseBtn = this.panel.querySelector('#heatmap-pause-btn') as HTMLElement;
         playBtn.style.display = this.animationState.isPlaying ? 'none' : 'block';
@@ -471,6 +482,8 @@ export class UncertaintyHeatmapAnimation {
     }
 
     private updateUI(): void {
+        if (!this.panel) return;
+
         const progressValue = this.panel.querySelector('#sampling-progress-value') as HTMLElement;
         const progressFill = this.panel.querySelector('#sampling-progress-fill') as HTMLElement;
         const reductionValue = this.panel.querySelector('#uncertainty-reduction-value') as HTMLElement;
@@ -516,6 +529,8 @@ export class UncertaintyHeatmapAnimation {
     }
 
     private addPointsListItem(point: SamplingPoint): void {
+        if (!this.panel) return;
+
         const container = this.panel.querySelector('#points-list-container') as HTMLElement;
         const item = document.createElement('div');
         item.className = 'points-list-item';
@@ -529,11 +544,15 @@ export class UncertaintyHeatmapAnimation {
     }
 
     private clearPointsList(): void {
+        if (!this.panel) return;
+
         const container = this.panel.querySelector('#points-list-container') as HTMLElement;
         container.innerHTML = '';
     }
 
     private handleCanvasClick(e: MouseEvent): void {
+        if (!this.heatmapCanvas) return;
+
         const rect = this.heatmapCanvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
@@ -549,6 +568,8 @@ export class UncertaintyHeatmapAnimation {
     }
 
     private handleCanvasHover(e: MouseEvent): void {
+        if (!this.heatmapCanvas) return;
+
         const rect = this.heatmapCanvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
@@ -570,10 +591,14 @@ export class UncertaintyHeatmapAnimation {
     }
 
     private clearCanvas(): void {
+        if (!this.ctx || !this.heatmapCanvas) return;
+
         this.ctx.clearRect(0, 0, this.heatmapCanvas.width, this.heatmapCanvas.height);
     }
 
     private renderHeatmap(): void {
+        if (!this.ctx) return;
+
         for (let x = 0; x < this.gridSize; x++) {
             for (let y = 0; y < this.gridSize; y++) {
                 const cell = this.uncertaintyGrid[x][y];
@@ -602,39 +627,49 @@ export class UncertaintyHeatmapAnimation {
     }
 
     private renderSamplingPoints(): void {
+        if (!this.ctx || !this.heatmapCanvas) return;
+
+        const ctx = this.ctx;
+        const canvas = this.heatmapCanvas;
+
         this.samplingPoints.forEach(point => {
-            const x = (point.x / this.gridWidth) * this.heatmapCanvas.width;
-            const y = (point.y / this.gridHeight) * this.heatmapCanvas.height;
+            const x = (point.x / this.gridWidth) * canvas.width;
+            const y = (point.y / this.gridHeight) * canvas.height;
 
             // 绘制点
-            this.ctx.fillStyle = '#ffffff';
-            this.ctx.strokeStyle = '#000000';
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.arc(x, y, 6, 0, Math.PI * 2);
-            this.ctx.fill();
-            this.ctx.stroke();
+            ctx.fillStyle = '#ffffff';
+            ctx.strokeStyle = '#000000';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(x, y, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
 
             // 绘制序号
-            this.ctx.fillStyle = '#000000';
-            this.ctx.font = 'bold 10px sans-serif';
-            this.ctx.textAlign = 'center';
-            this.ctx.textBaseline = 'middle';
-            this.ctx.fillText(point.order.toString(), x, y);
+            ctx.fillStyle = '#000000';
+            ctx.font = 'bold 10px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(point.order.toString(), x, y);
         });
     }
 
     private renderPulseEffect(): void {
+        if (!this.ctx || !this.heatmapCanvas) return;
+
+        const ctx = this.ctx;
+        const canvas = this.heatmapCanvas;
+
         if (this.samplingPoints.length > 0 && this.pulseRadius > 0) {
             const lastPoint = this.samplingPoints[this.samplingPoints.length - 1];
-            const x = (lastPoint.x / this.gridWidth) * this.heatmapCanvas.width;
-            const y = (lastPoint.y / this.gridHeight) * this.heatmapCanvas.height;
+            const x = (lastPoint.x / this.gridWidth) * canvas.width;
+            const y = (lastPoint.y / this.gridHeight) * canvas.height;
 
-            this.ctx.strokeStyle = `rgba(255, 255, 255, ${this.pulseRadius / 30})`;
-            this.ctx.lineWidth = 2;
-            this.ctx.beginPath();
-            this.ctx.arc(x, y, 30 - this.pulseRadius, 0, Math.PI * 2);
-            this.ctx.stroke();
+            ctx.strokeStyle = `rgba(255, 255, 255, ${this.pulseRadius / 30})`;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(x, y, 30 - this.pulseRadius, 0, Math.PI * 2);
+            ctx.stroke();
 
             this.pulseRadius -= 0.5;
         }

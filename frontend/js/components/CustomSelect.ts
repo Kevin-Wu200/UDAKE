@@ -235,9 +235,9 @@ export class CustomSelect {
 
     private updateTheme(): void {
         // 主题变化时的更新逻辑（如果有需要）
-        const isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
-                       window.matchMedia('(prefers-color-scheme: dark)').matches;
-        
+        // const _isDark = document.documentElement.getAttribute('data-theme') === 'dark' ||
+        //                window.matchMedia('(prefers-color-scheme: dark)').matches;
+
         // 根据主题可以添加特定的样式或行为
     }
 

@@ -27,6 +27,8 @@ import { HistoryManager } from './utils/HistoryManager.js';
 import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
 import { SplashScreen } from './components/SplashScreen.js';
 import { LaunchProgressManager } from './utils/LaunchProgressManager.js';
+import { FeedbackCollector } from './components/FeedbackCollector.js';
+import { PreferencesPanel } from './components/PreferencesPanel.js';
 import { StartupManager } from './utils/StartupManager.js';
 import { ResourceOptimizationManager } from './config/ResourceOptimizationConfig.js';
 
@@ -123,46 +125,50 @@ class App {
         console.log('init 被执行');
 
         try {
-            // 阶段1：启动StartupManager
+            // 阶段0：初始化核心管理器
+            console.log('初始化启动管理器');
+            this.startupManager = StartupManager.getInstance({
+                enablePerformanceMonitoring: true,
+                enableResourcePreload: true,
+                minDisplayTime: 2500,
+                enableSkipButton: true,
+                maxRetries: 3
+            });
+            await this.startupManager.start();
+
+            // 初始化资源优化管理器
+            this.resourceOptimizationManager = ResourceOptimizationManager.getInstance();
+            await this.resourceOptimizationManager.init();
+
+            // 初始化启动进度管理器（必须在使用前初始化）
+            this.launchProgressManager = LaunchProgressManager.getInstance();
+            const defaultStages = LaunchProgressManager.createDefaultStages();
+            defaultStages.forEach(stage => {
+                this.launchProgressManager!.registerStage(stage);
+            });
+
+            // 显示启动画面
+            this.splashScreen = SplashScreen.getInstance({
+                showSkipButton: true,
+                showProgress: true,
+                minDisplayTime: 2500
+            });
+            this.splashScreen.show();
+
+            // 设置进度回调
+            this.launchProgressManager.setCallbacks({
+                onStageStart: (stage) => {
+                    this.splashScreen?.updateStatus(stage.description);
+                    this.splashScreen?.setStage('loading');
+                },
+                onTotalProgress: (total) => {
+                    this.splashScreen?.updateProgress(total);
+                }
+            });
+
+            // 阶段1：完成初始化准备
             await this.launchProgressManager.executeStage('initialize', async () => {
-                this.startupManager = StartupManager.getInstance({
-                    enablePerformanceMonitoring: true,
-                    enableResourcePreload: true,
-                    minDisplayTime: 2500,
-                    enableSkipButton: true,
-                    maxRetries: 3
-                });
-                await this.startupManager.start();
-
-                // 初始化资源优化管理器
-                this.resourceOptimizationManager = ResourceOptimizationManager.getInstance();
-                await this.resourceOptimizationManager.init();
-
-                // 初始化启动进度管理器
-                this.launchProgressManager = LaunchProgressManager.getInstance();
-                const defaultStages = LaunchProgressManager.createDefaultStages();
-                defaultStages.forEach(stage => {
-                    this.launchProgressManager!.registerStage(stage);
-                });
-
-                // 显示启动画面
-                this.splashScreen = SplashScreen.getInstance({
-                    showSkipButton: true,
-                    showProgress: true,
-                    minDisplayTime: 2500
-                });
-                this.splashScreen.show();
-
-                // 设置进度回调
-                this.launchProgressManager.setCallbacks({
-                    onStageStart: (stage) => {
-                        this.splashScreen?.updateStatus(stage.description);
-                        this.splashScreen?.setStage('loading');
-                    },
-                    onTotalProgress: (total) => {
-                        this.splashScreen?.updateProgress(total);
-                    }
-                });
+                console.log('初始化准备完成');
             });
 
             // 阶段2：连接后端
@@ -369,7 +375,6 @@ class App {
             const feedbackCollector = components.feedbackCollector;
             if (!feedbackCollector) {
                 // 延迟初始化
-                const { FeedbackCollector } = require('./components/FeedbackCollector.js');
                 const collector = new FeedbackCollector();
                 collector.show();
             } else {
@@ -551,7 +556,8 @@ class App {
 
         // 保存当前项目
         this.currentProject = project;
-        this.stateManager.setState('currentProjectId', project.id);
+        // 使用时间戳作为项目 ID
+        this.stateManager.setState('currentProjectId', Date.now().toString());
 
         // 清理旧的采样组件
         if (this.samplingComponent) {
@@ -1029,7 +1035,6 @@ class App {
                 }
             };
 
-            const { PreferencesPanel } = require('./components/PreferencesPanel.js');
             const panel = new PreferencesPanel(callback);
             panel.show();
         } else {

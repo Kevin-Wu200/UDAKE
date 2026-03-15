@@ -438,30 +438,6 @@ class MobilePerformanceOptimizer {
     }
 
     /**
-     * 限制并发请求数
-     */
-    private async limitConcurrentRequests<T>(requests: Array<() => Promise<T>>): Promise<T[]> {
-        const results: T[] = [];
-        const executing: Promise<void>[] = [];
-
-        for (const request of requests) {
-            const promise = request().then(result => {
-                results.push(result);
-            });
-
-            executing.push(promise);
-
-            if (executing.length >= this.options.maxConcurrentRequests) {
-                await Promise.race(executing);
-                executing.splice(executing.findIndex(p => p === promise), 1);
-            }
-        }
-
-        await Promise.all(executing);
-        return results;
-    }
-
-    /**
      * 获取性能指标
      */
     public getMetrics(): PerformanceMetrics {

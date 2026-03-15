@@ -24,8 +24,6 @@ class MobileNavigation {
     private enableHaptic: boolean;
     private isSidebarOpen: boolean = false;
     private currentNavIndex: number = 0;
-    private startX: number = 0;
-    private startY: number = 0;
     private swipeThreshold: number = 50;
 
     private elements: {

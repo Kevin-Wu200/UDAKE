@@ -3,6 +3,8 @@
  * 定义不确定性分析相关的类型和接口
  */
 
+import type { Geometry } from 'geojson';
+
 /**
  * 不确定性类型
  */
@@ -185,7 +187,7 @@ export interface SpatialRiskReport {
   title: string;
   description?: string;
   generatedAt: Date;
-  studyArea: GeoJSONGeometry;
+  studyArea: Geometry;
   riskIndices: RiskIndex[];
   uncertaintyLevels: UncertaintyClassification;
   hotspots: RiskHotspot[];

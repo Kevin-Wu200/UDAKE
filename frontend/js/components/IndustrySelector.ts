@@ -41,7 +41,6 @@ export class IndustrySelector {
   private container: HTMLElement;
   private industries: IndustryConfig[] = [];
   private selectedIndustry: IndustryConfig | null = null;
-  private onDataIdChange: ((dataId: string) => void) | null = null;
   private onIndustrySelect: ((industry: IndustryConfig) => void) | null = null;
   private onTemplateDownload: ((template: string) => void) | null = null;
   private currentDataId: string = '';
@@ -237,7 +236,6 @@ export class IndustrySelector {
     const industrySelect = this.container.querySelector('#industry-select') as HTMLSelectElement;
     const recommendBtn = this.container.querySelector('#recommend-btn') as HTMLButtonElement;
     const downloadTemplateBtn = this.container.querySelector('#download-template-btn') as HTMLButtonElement;
-    const templateDialog = this.container.querySelector('#template-dialog') as HTMLElement;
     const confirmBtn = this.container.querySelector('.confirm-btn') as HTMLButtonElement;
     const cancelBtn = this.container.querySelector('.cancel-btn') as HTMLButtonElement;
 
@@ -433,13 +431,6 @@ export class IndustrySelector {
       console.error('下载模板失败:', error);
       alert(I18n.t('template.downloadFailed'));
     }
-  }
-
-  /**
-   * 设置数据ID变更回调
-   */
-  public setDataIdChangeCallback(callback: (dataId: string) => void): void {
-    this.onDataIdChange = callback;
   }
 
   /**

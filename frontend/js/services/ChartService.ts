@@ -236,7 +236,7 @@ export class ChartService {
    */
   static fitNormalDistribution(data: number[]) {
     const n = data.length;
-    if (n === 0) return { mean: 0, stdDev: 0, goodnessOfFit: 0 };
+    if (n === 0) return { mean: 0, stdDev: 0, skewness: 0, kurtosis: 0, goodnessOfFit: 0 };
 
     const mean = data.reduce((sum, d) => sum + d, 0) / n;
     const variance = data.reduce((sum, d) => sum + Math.pow(d - mean, 2), 0) / (n - 1);

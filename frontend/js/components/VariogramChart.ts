@@ -40,7 +40,8 @@ export class VariogramChart {
     if (this.config.selectedModel) {
       this.selectedModel = this.config.selectedModel;
     } else if (this.data.models.size > 0) {
-      this.selectedModel = this.data.models.keys().next().value;
+      const firstModel = this.data.models.keys().next().value;
+      this.selectedModel = firstModel !== undefined ? firstModel : null;
     }
 
     // 初始化所有模型可见
@@ -328,7 +329,7 @@ export class VariogramChart {
         const checkbox = legendItem.querySelector(`#model-${name}`) as HTMLInputElement;
         checkbox.addEventListener('change', (e) => {
           this.toggleModel(name, (e.target as HTMLInputElement).checked);
-          this.drawHTMLChart(canvas, ctx);
+          if (ctx) this.drawHTMLChart(canvas, ctx);
         });
       });
     }
@@ -337,7 +338,7 @@ export class VariogramChart {
     const resetBtn = chartDiv.querySelector('#reset-zoom');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
-        this.drawHTMLChart(canvas, ctx);
+        if (ctx) this.drawHTMLChart(canvas, ctx);
       });
     }
 

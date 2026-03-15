@@ -103,11 +103,11 @@ export class TaskManagementPanel {
     private async loadTasks(): Promise<void> {
         if (this.currentTab === 'active') {
             const tasks = await this.taskManager.getAllTasks();
-            this.renderTaskList(tasks.filter(t =>
+            this.renderTaskList(tasks.filter((t: Task) =>
                 ['pending', 'running', 'paused'].includes(t.status)
             ));
             (this.container.querySelector('#active-task-count') as HTMLElement).textContent =
-                tasks.filter(t => ['pending', 'running', 'paused'].includes(t.status)).length.toString();
+                tasks.filter((t: Task) => ['pending', 'running', 'paused'].includes(t.status)).length.toString();
         } else {
             const history = await this.taskManager.getTaskHistory();
             this.renderTaskList(history);

@@ -70,7 +70,7 @@ class MobileMapControls {
                 }
             });
 
-            button.addEventListener('touchstart', (e) => {
+            button.addEventListener('touchstart', (_e) => {
                 if (control.enabled !== false) {
                     button.classList.add('active');
                 }

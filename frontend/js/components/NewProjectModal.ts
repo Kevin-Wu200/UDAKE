@@ -3,8 +3,6 @@
  * 引导用户选择采样模式和坐标获取方式
  */
 import { Project } from '../models/Project.js';
-import { FreeSampling } from '../sampling/FreeSampling.js';
-import { RegionSampling } from '../sampling/RegionSampling.js';
 import { ErrorHandler } from '../utils/ErrorHandler.js';
 import { KeyboardManager } from '../utils/KeyboardManager.js';
 import type { SamplingMode, CoordinateMode } from '../../types/core';

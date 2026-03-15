@@ -67,7 +67,7 @@ export class ArcGISAdapter extends MapAdapter {
      * 初始化地图
      * 根据 isMock 标志选择使用 ArcGISEngine 或 MockMapEngine
      */
-    async initMap(containerId: string, options?: AdapterOptions): Promise<any> {
+    async initMap(containerId: string, _options?: AdapterOptions): Promise<any> {
         // 初始化 ArcGIS 配置
         const config = ArcGISConfig.getConfig();
 
@@ -390,7 +390,7 @@ export class ArcGISAdapter extends MapAdapter {
             return;
         }
 
-        for (const [name, layer] of Object.entries(this.layers)) {
+        for (const [_name, layer] of Object.entries(this.layers)) {
             this.map.remove(layer);
         }
         this.layers = {};

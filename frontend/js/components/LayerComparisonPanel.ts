@@ -410,7 +410,7 @@ export class LayerComparisonPanel {
      * 显示所有图层
      */
     private showAllLayers(): void {
-        this.configs.forEach((config, layerId) => {
+        this.configs.forEach((_config, layerId) => {
             this.setLayerVisibility(layerId, true);
         });
     }
@@ -419,7 +419,7 @@ export class LayerComparisonPanel {
      * 隐藏所有图层
      */
     private hideAllLayers(): void {
-        this.configs.forEach((config, layerId) => {
+        this.configs.forEach((_config, layerId) => {
             this.setLayerVisibility(layerId, false);
         });
     }
@@ -428,7 +428,7 @@ export class LayerComparisonPanel {
      * 重置所有透明度
      */
     private resetAllOpacity(): void {
-        this.configs.forEach((config, layerId) => {
+        this.configs.forEach((_config, layerId) => {
             this.setLayerOpacity(layerId, 100);
         });
     }

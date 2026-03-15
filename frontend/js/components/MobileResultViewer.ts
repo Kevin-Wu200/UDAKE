@@ -27,8 +27,6 @@ class MobileResultViewer {
     private enablePinchZoom: boolean;
     private enableHaptic: boolean;
     private isOpen: boolean = false;
-    private startX: number = 0;
-    private startY: number = 0;
     private currentScale: number = 1;
     private initialDistance: number = 0;
 
@@ -177,7 +175,7 @@ class MobileResultViewer {
         `;
 
         // 创建每个结果页面
-        this.results.forEach((result, index) => {
+        this.results.forEach((result, _index) => {
             const page = this.createResultPage(result);
             page.style.cssText = `
                 min-width: 100%;

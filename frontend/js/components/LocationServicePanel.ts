@@ -6,7 +6,7 @@
 import { locationService } from '../services/LocationService';
 import { trackManager } from '../services/TrackManager';
 import { geofenceManager } from '../services/GeofenceManager';
-import type { LocationData, Track, Geofence } from '../types/sensor';
+import type { LocationData, Track } from '../types/sensor';
 
 /**
  * 位置服务面板类

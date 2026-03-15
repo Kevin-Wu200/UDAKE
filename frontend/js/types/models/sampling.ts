@@ -3,6 +3,8 @@
  * 定义采样相关的类型和接口
  */
 
+import type { Geometry } from 'geojson';
+
 /**
  * 采样方法枚举
  */
@@ -55,11 +57,11 @@ export interface SamplingConfig {
 export interface SamplingConstraints {
   minDistance?: number;
   maxDistance?: number;
-  boundary?: GeoJSONGeometry;
+  boundary?: Geometry;
   minPoints?: number;
   maxPoints?: number;
-  allowedAreas?: GeoJSONGeometry[];
-  forbiddenAreas?: GeoJSONGeometry[];
+  allowedAreas?: Geometry[];
+  forbiddenAreas?: Geometry[];
 }
 
 /**
@@ -86,7 +88,7 @@ export interface StratificationConfig {
 export interface StratificationLayer {
   id: string;
   name: string;
-  geometry: GeoJSONGeometry;
+  geometry: Geometry;
   weight: number;
   targetPoints?: number;
 }
@@ -147,7 +149,7 @@ export interface SamplingRecommendation {
   reason: string;
   expectedValue?: number;
   uncertainty?: number;
-  geometry?: GeoJSONGeometry;
+  geometry?: Geometry;
   point?: { x: number; y: number };
   metadata?: Record<string, unknown>;
 }
@@ -214,7 +216,7 @@ export interface SamplingCandidate {
 export interface SamplingRegion {
   id: string;
   name: string;
-  geometry: GeoJSONGeometry;
+  geometry: Geometry;
   parameters: RegionSamplingParameters;
   status: 'pending' | 'sampling' | 'completed';
   points: SamplingPoint[];

@@ -322,7 +322,7 @@ class MobileParameterDrawer {
             }
         }, { passive: true });
 
-        document.addEventListener('touchend', (e: TouchEvent) => {
+        document.addEventListener('touchend', (_e: TouchEvent) => {
             if (!isDragging) return;
             isDragging = false;
 

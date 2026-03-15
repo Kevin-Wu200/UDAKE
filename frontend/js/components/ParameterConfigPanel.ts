@@ -4,7 +4,7 @@
  */
 
 import { parameterConfigManager } from '../services/ParameterConfigManager';
-import type { ParamConfig, ParamPresetType } from '../../types/core';
+import type { ParamPresetType } from '../../types/core';
 
 export class ParameterConfigPanel {
     private container: HTMLElement;

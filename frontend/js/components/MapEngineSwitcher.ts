@@ -3,8 +3,6 @@
  * 允许用户在 ArcGIS 和高德地图之间切换
  */
 
-import type { MapProvider } from '../../types/sampling';
-
 /**
  * 地图引擎切换器组件
  */

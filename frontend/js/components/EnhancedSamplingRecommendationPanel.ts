@@ -28,7 +28,7 @@ interface EvaluationResult {
 
 /** 推荐点 */
 interface Recommendation {
-    id: number;
+    id: number | string;
     x: number;
     y: number;
     variance: number;
@@ -36,10 +36,10 @@ interface Recommendation {
     comprehensive_score?: number;
     variance_reduction?: number;
     local_improvement?: number;
-    uncertainty_level: number;
-    distance_to_nearest: number;
-    sampling_reason: string;
-    expected_benefit: number;
+    uncertainty_level?: number;
+    distance_to_nearest?: number;
+    sampling_reason?: string;
+    expected_benefit?: number;
 }
 
 /** 预览结果 */
@@ -554,18 +554,6 @@ export class EnhancedSamplingRecommendationPanel {
             detail: rec
         });
         document.dispatchEvent(event);
-    }
-
-    /**
-     * 获取优先级颜色
-     */
-    private getPriorityColor(priority: string): string {
-        switch (priority) {
-            case 'high': return '#ff4444';
-            case 'medium': return '#ffbb33';
-            case 'low': return '#00C851';
-            default: return '#33b5e5';
-        }
     }
 
     /**

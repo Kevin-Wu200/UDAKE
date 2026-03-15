@@ -54,7 +54,6 @@ export class InterpolationAnimationPanel {
     private interpolationResult: Array<{ x: number; y: number; value: number }> = [];
     private loadedPointsCount = 0;
     private currentFrame = 0;
-    private totalFrames = 0;
 
     constructor(container: HTMLElement | string, events?: AnimationEvents) {
         this.container = typeof container === 'string'
@@ -110,7 +109,7 @@ export class InterpolationAnimationPanel {
 
                     <!-- 阶段指示器 -->
                     <div class="animation-stages">
-                        ${this.stages.map((stage, index) => `
+                        ${this.stages.map((stage, _index) => `
                             <div class="animation-stage" data-stage="${stage.stage}">
                                 <div class="stage-icon">${stage.icon}</div>
                                 <div class="stage-name">${stage.name}</div>
@@ -332,7 +331,7 @@ export class InterpolationAnimationPanel {
         }
     }
 
-    private updateVariogramStage(speedMultiplier: number): void {
+    private updateVariogramStage(_speedMultiplier: number): void {
         // 生成变异函数点
         const totalVariogramPoints = 20;
         const currentProgress = (this.animationConfig.progress - 25) / 25; // 25-50%
@@ -362,7 +361,7 @@ export class InterpolationAnimationPanel {
         }
     }
 
-    private updateInterpolationStage(speedMultiplier: number): void {
+    private updateInterpolationStage(_speedMultiplier: number): void {
         const gridResolution = 20;
         const totalPoints = gridResolution * gridResolution;
         const currentProgress = (this.animationConfig.progress - 50) / 40; // 50-90%
