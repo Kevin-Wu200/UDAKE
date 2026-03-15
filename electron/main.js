@@ -44,7 +44,7 @@ function createWindow() {
       spellcheck: false, // 禁用拼写检查
       plugins: false, // 禁用插件
       webGL: true, // 启用 WebGL
-      sandbox: false, // 暂时禁用沙箱以支持某些功能
+      sandbox: true, // 启用沙箱以提高安全性
       preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, '../logo/UDAKE.icns'),
@@ -52,23 +52,26 @@ function createWindow() {
     titleBarStyle: 'hiddenInset', // macOS 风格标题栏
   })
 
-  // 设置内容安全策略
+  // 设置内容安全策略 - 移除 'unsafe-eval' 以提高安全性
   win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https: http:;",
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https: http:;",
-          "style-src 'self' 'unsafe-inline' data: blob: https: http:;",
-          "img-src 'self' data: blob: https: http:;",
-          "font-src 'self' data: blob: https: http:;",
-          "connect-src 'self' data: blob: https: http: ws: wss:;",
-          "media-src 'self' data: blob: https: http:;",
+          "default-src 'self';",
+          "script-src 'self' 'unsafe-inline' blob: https://js.arcgis.com;",
+          "style-src 'self' 'unsafe-inline' blob: https://js.arcgis.com;",
+          "img-src 'self' data: blob: https:;",
+          "font-src 'self' data: blob:;",
+          "connect-src 'self' http://localhost:8000 ws://localhost:8000 https: wss: blob:;",
+          "media-src 'self' data: blob:;",
           "object-src 'none';",
           "base-uri 'self';",
-          "form-action 'self';"
-        ].join('; ')
+          "form-action 'self';",
+          "worker-src 'self' blob:;",
+          "frame-ancestors 'self';",
+          "upgrade-insecure-requests;"
+        ].join(' ')
       }
     })
   })

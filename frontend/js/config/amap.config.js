@@ -11,9 +11,10 @@
 import { LocationPermissionManager } from '../utils/locationPermissionManager.js';
 
 // 默认配置（当无法从后端获取时使用）
+// 注意：API 密钥应该从环境变量或后端获取，不要硬编码
 const DEFAULT_AMAP_CONFIG = {
-    API_KEY: "2f3f114aa5671425aa3c52f707d741c5",
-    SECURITY_CODE: "10b5ef21f6b36d09e24d7b076d35dccc",
+    API_KEY: import.meta.env.AMAP_API_KEY || "",
+    SECURITY_CODE: import.meta.env.AMAP_SECURITY_CODE || "",
     DEFAULT_CENTER: [119.72170376, 30.26262781], // 杭州
     DEFAULT_ZOOM: 18
 };

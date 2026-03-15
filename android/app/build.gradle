@@ -26,9 +26,9 @@ android {
     signingConfigs {
         release {
             storeFile file('../../.android_keystore/UDAKE.jks')
-            storePassword '15024468581'
+            storePassword System.getenv('KEYSTORE_PASSWORD') ?: project.hasProperty('KEYSTORE_PASSWORD') ? project.KEYSTORE_PASSWORD : ''
             keyAlias 'UDAKE'
-            keyPassword '15024468581'
+            keyPassword System.getenv('KEYSTORE_ALIAS_PASSWORD') ?: project.hasProperty('KEYSTORE_ALIAS_PASSWORD') ? project.KEYSTORE_ALIAS_PASSWORD : ''
         }
     }
 

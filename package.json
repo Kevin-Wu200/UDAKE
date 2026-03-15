@@ -21,8 +21,9 @@
     "test": "vitest --run",
     "test:watch": "vitest",
     "test:coverage": "vitest --run --coverage",
+    "test:security": "vitest --run tests/security.test.ts",
     "build:electron": "npm run build:prod && electron-builder --mac",
-    "build:android": "npm run build:prod && npx cap sync android && cd android && ./gradlew assembleRelease && cd ..",
+    "build:android": "npm run build:prod && node scripts/update-capacitor-config.js && npx cap sync android && cd android && ./gradlew assembleRelease && cd ..",
     "build:all": "npm run build:prod && npm run build:android && npm run build:electron"
   },
   "keywords": [],

@@ -54,6 +54,7 @@ data_samples/*.json
 !data_samples/示例数据.geojson
 
 # 环境变量
+.env
 .env.local
 .env.development
 .env.testing
@@ -95,6 +96,8 @@ dist/package-lock.json
 *.jks
 *.keystore
 密钥*.txt
+Key*.txt
+.android_keystore/
 
 # TODOList
 TODOList/

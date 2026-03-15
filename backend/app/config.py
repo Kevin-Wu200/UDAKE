@@ -49,9 +49,9 @@ class Settings(BaseSettings):
     ARCGIS_DEFAULT_CENTER: Union[str, List[float]] = "[139.767125,35.681236]"
     ARCGIS_DEFAULT_ZOOM: int = 10
 
-    # 高德地图配置
-    AMAP_API_KEY: str = "2f3f114aa5671425aa3c52f707d741c5"
-    AMAP_SECURITY_CODE: str = "10b5ef21f6b36d09e24d7b076d35dccc"
+    # 高德地图配置（从环境变量读取）
+    AMAP_API_KEY: str = Field(default="", description="高德地图API密钥")
+    AMAP_SECURITY_CODE: str = Field(default="", description="高德地图安全密钥")
 
     # 天地图配置
     TIANDITU_API_KEY: str = "YOUR_TIANDITU_API_KEY_HERE"
