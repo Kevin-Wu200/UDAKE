@@ -8,7 +8,8 @@ export default defineConfig({
         include: ['tests/**/*.test.{js,ts}'],
         coverage: {
             provider: 'v8',
-            reporter: ['text', 'html', 'lcov'],
+            reporter: ['text', 'json', 'html', 'lcov'],
+            all: true,
             include: [
                 'frontend/js/**/*.{js,ts}',
                 'frontend/js/services/**/*.{js,ts}',
@@ -32,15 +33,27 @@ export default defineConfig({
                 // 构建产物
                 'frontend/dist/**',
 
+                // 测试文件
+                'tests/**',
+
+                // 配置文件
+                '**/*.config.*',
+
+                // Mock 数据
+                '**/mockData',
+
+                // 覆盖率报告目录
+                'coverage/**',
+
                 // 临时文件
                 '**/*.tmp',
                 '**/*.bak'
             ],
             thresholds: {
-                lines: 70,
-                functions: 70,
-                branches: 60,
-                statements: 70
+                lines: 80,
+                functions: 80,
+                branches: 80,
+                statements: 80
             }
         }
     }

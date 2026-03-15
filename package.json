@@ -22,6 +22,9 @@
     "test:watch": "vitest",
     "test:coverage": "vitest --run --coverage",
     "test:security": "vitest --run tests/security.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:performance": "vitest --run tests/performance-monitor.test.ts",
     "build:electron": "npm run build:prod && electron-builder --mac",
     "build:android": "npm run build:prod && node scripts/update-capacitor-config.js && npx cap sync android && cd android && ./gradlew assembleRelease && cd ..",
     "build:all": "npm run build:prod && npm run build:android && npm run build:electron"
@@ -31,6 +34,7 @@
   "license": "ISC",
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.58.2",
     "@vitest/coverage-v8": "^4.1.0",
     "electron": "^41.0.2",
     "electron-builder": "^26.8.1",
