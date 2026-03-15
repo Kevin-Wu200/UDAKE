@@ -268,6 +268,10 @@ class App {
             // 步骤6: 绑定离线横幅事件
             this.bindOfflineBannerEvents();
 
+            // 步骤7: 初始化缓存状态面板
+            this.initializeCacheStatusPanel();
+            console.log('[缓存状态面板] 初始化完成');
+
             console.log('非关键组件初始化完成');
         } catch (error) {
             console.error('非关键组件初始化失败:', error);
@@ -318,6 +322,119 @@ class App {
         if (this.cacheManagementPanel) {
             this.cacheManagementPanel.show();
         }
+    }
+
+    /**
+     * 初始化缓存状态面板
+     */
+    private initializeCacheStatusPanel(): void {
+        // 绑定管理缓存按钮点击事件
+        const manageBtn = document.getElementById('open-cache-management');
+        if (manageBtn) {
+            manageBtn.addEventListener('click', () => {
+                this.handleManageCache();
+            });
+        }
+
+        // 初始更新缓存状态
+        this.updateCacheStatusPanel();
+
+        // 监听网络状态变化
+        OfflineManager.onStatusChange((online) => {
+            this.updateCacheStatusPanel();
+        });
+
+        // 定期更新缓存状态（每30秒）
+        setInterval(() => {
+            this.updateCacheStatusPanel();
+        }, 30000);
+    }
+
+    /**
+     * 更新缓存状态面板
+     */
+    private async updateCacheStatusPanel(): Promise<void> {
+        // 更新网络状态
+        const networkIcon = document.getElementById('cache-network-icon');
+        const networkStatus = document.getElementById('cache-network-status');
+        if (networkIcon && networkStatus) {
+            const isOnline = OfflineManager.isOnline;
+            networkIcon.className = `cache-status-icon ${isOnline ? 'online' : 'offline'}`;
+            networkStatus.textContent = isOnline ? '在线' : '离线';
+        }
+
+        // 更新存储使用情况
+        const storageFill = document.getElementById('cache-storage-fill');
+        const storageText = document.getElementById('cache-storage-text');
+        if (storageFill && storageText) {
+            try {
+                const cacheInfo = await this.getCacheInfo();
+                const totalSize = cacheInfo.reduce((sum, info) => sum + info.size, 0);
+                const maxStorage = 50 * 1024 * 1024; // 50MB
+                const percentage = (totalSize / maxStorage) * 100;
+
+                storageFill.style.width = `${Math.min(percentage, 100)}%`;
+                storageFill.className = 'cache-storage-fill';
+                if (percentage > 80) {
+                    storageFill.classList.add('danger');
+                } else if (percentage > 60) {
+                    storageFill.classList.add('warning');
+                }
+
+                storageText.textContent = `${this.formatBytes(totalSize)} / 50 MB`;
+            } catch (error) {
+                console.error('更新存储状态失败:', error);
+            }
+        }
+
+        // 更新待同步操作数
+        const pendingCount = document.getElementById('cache-pending-count');
+        if (pendingCount) {
+            try {
+                const count = await OfflineManager.getPendingCount();
+                pendingCount.textContent = count.toString();
+            } catch (error) {
+                console.error('更新待同步数量失败:', error);
+            }
+        }
+    }
+
+    /**
+     * 获取缓存信息（简化版）
+     */
+    private async getCacheInfo(): Promise<{ name: string; size: number; count: number; description: string }[]> {
+        // 模拟缓存信息
+        return [
+            {
+                name: '项目数据',
+                size: 1024 * 1024, // 1MB
+                count: 3,
+                description: '本地保存的项目信息'
+            },
+            {
+                name: '采样点',
+                size: 5 * 1024 * 1024, // 5MB
+                count: 150,
+                description: '离线采样的点位数据'
+            },
+            {
+                name: '结果缓存',
+                size: 10 * 1024 * 1024, // 10MB
+                count: 8,
+                description: '插值和计算结果'
+            }
+        ];
+    }
+
+    /**
+     * 格式化字节数
+     */
+    private formatBytes(bytes: number): string {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
 
     /**

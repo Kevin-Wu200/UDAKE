@@ -487,3 +487,218 @@
         padding: 16px;
     }
 }
+
+/* ========== 侧边栏缓存状态面板 ========== */
+
+.cache-status-panel {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 12px;
+    margin-top: 8px;
+    overflow: hidden;
+}
+
+.cache-status-panel .panel-title {
+    color: white;
+    margin: 0;
+    padding: 12px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    background: rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cache-status-panel .panel-content {
+    padding: 12px 16px;
+}
+
+.cache-status-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.cache-status-item:last-child {
+    border-bottom: none;
+}
+
+.cache-status-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.cache-status-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.cache-status-icon.online {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #34c759;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(52, 199, 89, 0.3);
+}
+
+.cache-status-icon.offline {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #ff9500;
+    border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(255, 149, 0, 0.3);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.cache-status-text {
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.cache-status-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: white;
+    margin-top: 2px;
+}
+
+/* 存储使用进度条 */
+.cache-storage-bar {
+    height: 6px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    overflow: hidden;
+    margin: 4px 0;
+}
+
+.cache-storage-fill {
+    height: 100%;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 3px;
+    transition: width 0.5s ease;
+}
+
+.cache-storage-fill.warning {
+    background: #ff9500;
+}
+
+.cache-storage-fill.danger {
+    background: #ff3b30;
+}
+
+.cache-storage-text {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.8);
+    margin-top: 2px;
+}
+
+/* 管理缓存按钮 */
+.cache-status-panel .btn-sm {
+    width: 100%;
+    margin-top: 8px;
+    padding: 8px 12px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.cache-status-panel .btn-sm:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+}
+
+.cache-status-panel .btn-sm:active {
+    transform: translateY(0);
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .cache-status-panel {
+        background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+    }
+
+    .cache-status-panel .panel-title {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .cache-status-item {
+        border-bottom-color: rgba(255, 255, 255, 0.05);
+    }
+
+    .cache-status-label {
+        color: rgba(255, 255, 255, 0.85);
+    }
+
+    .cache-status-value {
+        color: white;
+    }
+
+    .cache-storage-bar {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .cache-storage-fill {
+        background: rgba(255, 255, 255, 0.6);
+    }
+
+    .cache-storage-text {
+        color: rgba(255, 255, 255, 0.7);
+    }
+
+    .cache-status-panel .btn-sm {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .cache-status-panel .btn-sm:hover {
+        background: rgba(255, 255, 255, 0.15);
+    }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .cache-status-panel .panel-title {
+        padding: 10px 12px;
+        font-size: 13px;
+    }
+
+    .cache-status-panel .panel-content {
+        padding: 10px 12px;
+    }
+
+    .cache-status-item {
+        padding: 6px 0;
+    }
+
+    .cache-status-label {
+        font-size: 11px;
+    }
+
+    .cache-status-value {
+        font-size: 13px;
+    }
+
+    .cache-status-panel .btn-sm {
+        font-size: 11px;
+        padding: 7px 10px;
+    }
+}

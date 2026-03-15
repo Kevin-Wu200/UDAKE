@@ -219,6 +219,39 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="panel cache-status-panel" id="cache-status-panel">
+                    <h2 class="panel-title">缓存状态</h2>
+                    <div class="panel-content">
+                        <div class="cache-status-item">
+                            <div class="cache-status-label">
+                                <span class="cache-status-icon" id="cache-network-icon"></span>
+                                <span class="cache-status-text">网络状态</span>
+                            </div>
+                            <span class="cache-status-value" id="cache-network-status">检测中...</span>
+                        </div>
+                        <div class="cache-status-item">
+                            <div class="cache-status-label">
+                                <span class="cache-status-icon storage-icon">💾</span>
+                                <span class="cache-status-text">存储使用</span>
+                            </div>
+                            <div class="cache-storage-bar">
+                                <div class="cache-storage-fill" id="cache-storage-fill"></div>
+                            </div>
+                            <span class="cache-storage-text" id="cache-storage-text">0 B / 50 MB</span>
+                        </div>
+                        <div class="cache-status-item">
+                            <div class="cache-status-label">
+                                <span class="cache-status-icon sync-icon">🔄</span>
+                                <span class="cache-status-text">待同步</span>
+                            </div>
+                            <span class="cache-status-value" id="cache-pending-count">0</span>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" id="open-cache-management">
+                            管理缓存
+                        </button>
+                    </div>
+                </div>
             </aside>
 
             <!-- 地图容器 -->
