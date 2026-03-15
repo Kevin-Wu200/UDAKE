@@ -16,6 +16,8 @@ export class OnboardingGuide {
     public tooltip: HTMLDivElement | null;
     public steps: GuideStep[];
     public readonly STORAGE_KEY: string;
+    private resizeHandler: (() => void) | null;
+    private scrollHandler: (() => void) | null;
 
     constructor() {
         this.currentStep = 0;
@@ -23,6 +25,8 @@ export class OnboardingGuide {
         this.tooltip = null;
         this.steps = this._defineSteps();
         this.STORAGE_KEY = 'udake_onboarding_completed';
+        this.resizeHandler = null;
+        this.scrollHandler = null;
     }
 
     /**
@@ -88,6 +92,30 @@ export class OnboardingGuide {
         this._createOverlay();
         this._createTooltip();
         this._showStep(0);
+
+        // 添加窗口大小改变监听器
+        this.resizeHandler = () => {
+            if (this.tooltip && this.overlay) {
+                const step = this.steps[this.currentStep];
+                this._updateHighlight(step);
+                this._positionTooltip(step);
+            }
+        };
+        window.addEventListener('resize', this.resizeHandler);
+
+        // 添加滚动事件监听器（防抖处理）
+        let scrollTimeout: number | null = null;
+        this.scrollHandler = () => {
+            if (scrollTimeout) clearTimeout(scrollTimeout);
+            scrollTimeout = window.setTimeout(() => {
+                if (this.tooltip && this.overlay) {
+                    const step = this.steps[this.currentStep];
+                    this._updateHighlight(step);
+                    this._positionTooltip(step);
+                }
+            }, 100);
+        };
+        window.addEventListener('scroll', this.scrollHandler);
     }
 
     /**
@@ -243,6 +271,7 @@ export class OnboardingGuide {
             tooltip.style.top = '50%';
             tooltip.style.left = '50%';
             tooltip.style.transform = 'translate(-50%, -50%)';
+            this._ensureTooltipInViewport();
             return;
         }
 
@@ -251,28 +280,108 @@ export class OnboardingGuide {
             tooltip.style.top = '50%';
             tooltip.style.left = '50%';
             tooltip.style.transform = 'translate(-50%, -50%)';
+            this._ensureTooltipInViewport();
             return;
         }
 
         const rect = el.getBoundingClientRect();
-        const tooltipRect = { width: 320, height: 200 };
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        const padding = 16;
+        const tooltipMinWidth = 280;
+        const tooltipMinHeight = 150;
 
+        // 首先定位到默认位置
         switch (step.position) {
             case 'bottom':
-                tooltip.style.top = `${rect.bottom + 16}px`;
-                tooltip.style.left = `${Math.max(16, rect.left + rect.width / 2 - tooltipRect.width / 2)}px`;
-                tooltip.style.transform = 'none';
+                tooltip.style.top = `${rect.bottom + padding}px`;
+                tooltip.style.left = `${rect.left + rect.width / 2}px`;
+                tooltip.style.transform = 'translate(-50%, 0)';
                 break;
             case 'right':
-                tooltip.style.top = `${rect.top}px`;
-                tooltip.style.left = `${rect.right + 16}px`;
-                tooltip.style.transform = 'none';
+                tooltip.style.top = `${rect.top + rect.height / 2}px`;
+                tooltip.style.left = `${rect.right + padding}px`;
+                tooltip.style.transform = 'translate(0, -50%)';
                 break;
             default:
-                tooltip.style.top = `${rect.bottom + 16}px`;
-                tooltip.style.left = `${rect.left}px`;
-                tooltip.style.transform = 'none';
+                tooltip.style.top = `${rect.bottom + padding}px`;
+                tooltip.style.left = `${rect.left + rect.width / 2}px`;
+                tooltip.style.transform = 'translate(-50%, 0)';
         }
+
+        // 确保提示框在视口内
+        this._ensureTooltipInViewport();
+    }
+
+    /**
+     * 确保提示框在视口内
+     */
+    private _ensureTooltipInViewport(): void {
+        if (!this.tooltip) return;
+
+        // 强制重排以获取实际尺寸
+        this.tooltip.style.visibility = 'hidden';
+        this.tooltip.style.display = 'block';
+        const tooltipRect = this.tooltip.getBoundingClientRect();
+        this.tooltip.style.visibility = 'visible';
+
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+        const padding = 16;
+        const margin = 8;
+
+        let top = parseFloat(this.tooltip.style.top);
+        let left = parseFloat(this.tooltip.style.left);
+        let transform = this.tooltip.style.transform;
+
+        // 检查右边界
+        if (left + tooltipRect.width + margin > windowWidth) {
+            const maxLeft = windowWidth - tooltipRect.width - margin;
+            left = Math.max(padding, maxLeft);
+            // 清除 transform 以使用绝对定位
+            if (transform.includes('translateX')) {
+                transform = transform.replace(/translateX\([^)]+\)/, 'translateX(0)');
+            }
+        }
+
+        // 检查左边界
+        if (left - margin < 0) {
+            left = margin;
+            // 清除 transform 以使用绝对定位
+            if (transform.includes('translateX')) {
+                transform = transform.replace(/translateX\([^)]+\)/, 'translateX(0)');
+            }
+        }
+
+        // 检查下边界
+        if (top + tooltipRect.height + margin > windowHeight) {
+            // 尝试在上方显示
+            const targetElement = document.querySelector(this.steps[this.currentStep].target);
+            if (targetElement) {
+                const targetRect = targetElement.getBoundingClientRect();
+                top = targetRect.top - tooltipRect.height - padding;
+            } else {
+                top = windowHeight - tooltipRect.height - margin;
+            }
+            // 调整 transform
+            if (transform.includes('translateY')) {
+                transform = transform.replace(/translateY\([^)]+\)/, 'translateY(0)');
+            }
+        }
+
+        // 检查上边界
+        if (top - margin < 0) {
+            top = margin;
+            // 调整 transform
+            if (transform.includes('translateY')) {
+                transform = transform.replace(/translateY\([^)]+\)/, 'translateY(0)');
+            }
+        }
+
+        // 应用修正后的位置
+        this.tooltip.style.top = `${top}px`;
+        this.tooltip.style.left = `${left}px`;
+        this.tooltip.style.transform = transform;
     }
 
     /**
@@ -280,6 +389,19 @@ export class OnboardingGuide {
      */
     public finish(): void {
         localStorage.setItem(this.STORAGE_KEY, 'true');
+
+        // 移除窗口大小改变监听器
+        if (this.resizeHandler) {
+            window.removeEventListener('resize', this.resizeHandler);
+            this.resizeHandler = null;
+        }
+
+        // 移除滚动监听器
+        if (this.scrollHandler) {
+            window.removeEventListener('scroll', this.scrollHandler);
+            this.scrollHandler = null;
+        }
+
         if (this.overlay) {
             this.overlay.style.opacity = '0';
             this.overlay.style.transition = 'opacity 240ms ease';
