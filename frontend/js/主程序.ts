@@ -76,6 +76,21 @@ import {
 } from '../types/app';
 import { TaskStatus } from '../types/core';
 
+// 离线组件接口定义
+interface ICacheManagementPanel {
+    init(): Promise<void>;
+    show(): Promise<void>;
+    hide(): void;
+    destroy(): void;
+}
+
+interface IOfflineModeBanner {
+    init(): Promise<void>;
+    show(): void;
+    hide(): void;
+    destroy(): void;
+}
+
 // 简化类型定义
 type OfflineQueueHandler = (payload: any) => Promise<void>;
 
@@ -119,8 +134,8 @@ class App {
     public mapLegend: MapLegend | null = null;
     public layerComparisonPanel: LayerComparisonPanel | null = null;
     public measureTool: MeasureTool | null = null;
-    public cacheManagementPanel: any | null = null;
-    public offlineModeBanner: any | null = null;
+    public cacheManagementPanel: ICacheManagementPanel | null = null;
+    public offlineModeBanner: IOfflineModeBanner | null = null;
 
     constructor() {
         console.log('App 构造函数执行');
@@ -211,9 +226,11 @@ class App {
         console.log('开始初始化非关键组件...');
 
         try {
-            // 初始化离线管理器
+            // 步骤1: 初始化离线管理器
             await OfflineManager.init();
+            console.log('[离线管理器] 初始化完成');
 
+            // 步骤2: 注册离线队列处理器
             const uploadHandler: OfflineQueueHandler = async (payload: any) => {
                 const formData = new FormData();
                 formData.append('file', payload.file);
@@ -233,19 +250,25 @@ class App {
 
             OfflineManager.registerHandler('upload', uploadHandler);
             OfflineManager.registerHandler('kriging', krigingHandler);
+            console.log('[离线管理器] 处理器注册完成');
 
-            // 初始化缓存管理面板
+            // 步骤3: 短暂延迟确保所有状态已就绪
+            await new Promise(resolve => setTimeout(resolve, 100));
+
+            // 步骤4: 初始化缓存管理面板
             this.cacheManagementPanel = CacheManagementPanel;
             await this.cacheManagementPanel.init();
+            console.log('[缓存管理面板] 初始化完成');
 
-            // 初始化离线模式横幅
+            // 步骤5: 初始化离线模式横幅
             this.offlineModeBanner = OfflineModeBanner;
             await this.offlineModeBanner.init();
+            console.log('[离线模式横幅] 初始化完成');
 
-            // 监听离线横幅事件
+            // 步骤6: 绑定离线横幅事件
             this.bindOfflineBannerEvents();
 
-            console.log('应用初始化完成');
+            console.log('非关键组件初始化完成');
         } catch (error) {
             console.error('非关键组件初始化失败:', error);
         }

@@ -39,18 +39,14 @@ export class OfflineManager {
     private static _online: boolean = navigator.onLine;
     private static _listeners: Set<(online: boolean) => void> = new Set();
     private static _syncInProgress = false;
-    private static _indicatorEl: HTMLElement | null = null;
 
     /** 初始化：打开 IndexedDB + 监听网络状态 */
     static async init(): Promise<void> {
         await this._openDB();
         this._bindNetworkEvents();
-        this._createIndicator();
-        this._updateIndicator();
 
         // 恢复在线时自动同步
         this.onStatusChange((online) => {
-            this._updateIndicator();
             if (online) this.sync();
         });
     }
@@ -76,42 +72,6 @@ export class OfflineManager {
         this._online = val;
         console.log(`[Offline] 网络状态: ${val ? '在线' : '离线'}`);
         this._listeners.forEach(cb => { try { cb(val); } catch (e) { console.error(e); } });
-    }
-
-    // ========== UI 指示器 ==========
-
-    private static _createIndicator(): void {
-        if (this._indicatorEl) return;
-        const el = document.createElement('div');
-        el.id = 'offline-indicator';
-        el.setAttribute('role', 'status');
-        el.setAttribute('aria-live', 'polite');
-        el.style.cssText = `
-            position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%);
-            padding: 8px 20px; border-radius: 20px; font-size: 13px; font-weight: 500;
-            z-index: 10000; pointer-events: none;
-            transition: opacity 0.3s, transform 0.3s;
-            backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-        `;
-        document.body.appendChild(el);
-        this._indicatorEl = el;
-    }
-
-    private static _updateIndicator(): void {
-        const el = this._indicatorEl;
-        if (!el) return;
-        if (this._online) {
-            el.textContent = '已恢复在线';
-            el.style.background = 'rgba(52,199,89,0.9)';
-            el.style.color = '#fff';
-            el.style.opacity = '1';
-            setTimeout(() => { el.style.opacity = '0'; }, 2000);
-        } else {
-            el.textContent = '当前处于离线模式';
-            el.style.background = 'rgba(255,149,0,0.9)';
-            el.style.color = '#fff';
-            el.style.opacity = '1';
-        }
     }
 
     // ========== IndexedDB ==========
