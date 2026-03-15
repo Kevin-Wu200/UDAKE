@@ -179,30 +179,61 @@ class App {
         PerformanceMonitor.mark('appReady');
         PerformanceMonitor.measure('appInitTime', 'appStart', 'appReady');
 
-        // 初始化离线管理器
-        await OfflineManager.init();
+        // 延迟初始化非关键组件
+        this.deferredInitialization();
+    }
 
-        const uploadHandler: OfflineQueueHandler = async (payload: any) => {
-            const formData = new FormData();
-            formData.append('file', payload.file);
-            if (this.apiService) {
-                await this.apiService.request(`${this.apiService.baseURL}/upload-data`, {
-                    method: 'POST',
-                    body: formData
-                });
-            }
-        };
+    /**
+     * 延迟初始化非关键组件
+     */
+    private deferredInitialization(): void {
+        // 使用 requestIdleCallback 在浏览器空闲时初始化非关键组件
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => {
+                this.initializeNonCriticalComponents();
+            }, { timeout: 2000 });
+        } else {
+            // 降级方案：使用 setTimeout
+            setTimeout(() => {
+                this.initializeNonCriticalComponents();
+            }, 100);
+        }
+    }
 
-        const krigingHandler: OfflineQueueHandler = async (payload: any) => {
-            if (this.apiService) {
-                await this.apiService.startKriging(payload);
-            }
-        };
+    /**
+     * 初始化非关键组件
+     */
+    private async initializeNonCriticalComponents(): Promise<void> {
+        console.log('开始初始化非关键组件...');
 
-        OfflineManager.registerHandler('upload', uploadHandler);
-        OfflineManager.registerHandler('kriging', krigingHandler);
+        try {
+            // 初始化离线管理器
+            await OfflineManager.init();
 
-        console.log('应用初始化完成');
+            const uploadHandler: OfflineQueueHandler = async (payload: any) => {
+                const formData = new FormData();
+                formData.append('file', payload.file);
+                if (this.apiService) {
+                    await this.apiService.request(`${this.apiService.baseURL}/upload-data`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                }
+            };
+
+            const krigingHandler: OfflineQueueHandler = async (payload: any) => {
+                if (this.apiService) {
+                    await this.apiService.startKriging(payload);
+                }
+            };
+
+            OfflineManager.registerHandler('upload', uploadHandler);
+            OfflineManager.registerHandler('kriging', krigingHandler);
+
+            console.log('应用初始化完成');
+        } catch (error) {
+            console.error('非关键组件初始化失败:', error);
+        }
         
         // 初始化界面文本
         this.updateUIText();

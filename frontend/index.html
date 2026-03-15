@@ -5,12 +5,46 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>智能不确定性驱动空间决策平台</title>
 
-    <!-- ArcGIS API for JavaScript -->
-    <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
-    <script src="https://js.arcgis.com/4.28/"></script>
-
     <!-- 自定义样式 -->
     <link rel="stylesheet" href="css/主题变量.css">
+
+    <!-- 预加载关键资源 -->
+    <link rel="preload" href="css/布局样式.css" as="style">
+    <link rel="preload" href="css/组件样式.css" as="style">
+    <link rel="preload" href="css/动画规范.css" as="style">
+
+    <!-- 动态加载 ArcGIS API -->
+    <script>
+        // 延迟加载 ArcGIS API
+        function loadArcGISAPI() {
+            return new Promise((resolve, reject) => {
+                // 检查是否已经加载
+                if (window.require) {
+                    resolve();
+                    return;
+                }
+
+                // 动态加载 ArcGIS API
+                const script = document.createElement('script');
+                script.src = 'https://js.arcgis.com/4.28/';
+                script.onload = () => {
+                    console.log('ArcGIS API 加载完成');
+                    resolve();
+                };
+                script.onerror = () => {
+                    console.error('ArcGIS API 加载失败');
+                    reject(new Error('ArcGIS API 加载失败'));
+                };
+                document.head.appendChild(script);
+
+                // 加载样式
+                const link = document.createElement('link');
+                link.rel = 'stylesheet';
+                link.href = 'https://js.arcgis.com/4.28/esri/themes/light/main.css';
+                document.head.appendChild(link);
+            });
+        }
+    </script>
     <link rel="stylesheet" href="css/布局样式.css">
     <link rel="stylesheet" href="css/组件样式.css">
     <link rel="stylesheet" href="css/动画规范.css">

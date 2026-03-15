@@ -40,11 +40,48 @@ export default defineConfig(({ mode }) => {
       sourcemap: isDevelopment || isTesting,
       minify: isProduction ? 'esbuild' : false,
       target: 'es2020',
+      // 代码分割配置
+      rollupOptions: {
+        output: {
+          manualChunks: (id: string) => {
+            // 将地图引擎分离为独立 chunk
+            if (id.includes('/frontend/js/adapters/') || id.includes('/frontend/js/map/core/')) {
+              return 'map-engines';
+            }
+            // 将图表组件分离为独立 chunk
+            if (id.includes('VariogramChart') || id.includes('UncertaintyHistogram') ||
+                id.includes('CrossValidationScatterChart') || id.includes('SamplingEfficiencyChart')) {
+              return 'charts';
+            }
+            // 将工具类分离为独立 chunk
+            if (id.includes('/frontend/js/utils/')) {
+              return 'utils';
+            }
+            // 将采样相关组件分离为独立 chunk
+            if (id.includes('/frontend/js/sampling/')) {
+              return 'sampling';
+            }
+            // 将组件分离为独立 chunk
+            if (id.includes('/frontend/js/components/')) {
+              return 'components';
+            }
+          },
+          chunkFileNames: 'assets/[name]-[hash].js',
+          entryFileNames: 'assets/[name]-[hash].js',
+          assetFileNames: 'assets/[name]-[hash].[ext]'
+        }
+      },
+      // 优化 chunk 大小警告阈值
+      chunkSizeWarningLimit: 1000,
     },
 
     // 依赖预构建配置
     optimizeDeps: {
       exclude: ['@arcgis/core'],
+      // 预构建大型依赖
+      include: [
+        'echarts',
+      ]
     },
 
     // CSS配置
