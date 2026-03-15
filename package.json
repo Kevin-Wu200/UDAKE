@@ -44,6 +44,8 @@
     "@capacitor/android": "^8.2.0",
     "@capacitor/cli": "^8.2.0",
     "@capacitor/core": "^8.2.0",
+    "@capacitor/device": "^8.0.1",
+    "@capacitor/geolocation": "^8.1.0",
     "@capacitor/local-notifications": "^8.0.2",
     "echarts": "^6.0.0"
   },

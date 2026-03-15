@@ -49,6 +49,7 @@ import { ParameterInfoPanel } from './components/ParameterInfoPanel.js';
 import { ParameterTabPanel } from './components/ParameterTabPanel.js';
 import CacheManagementPanel from './components/CacheManagementPanel.js';
 import OfflineModeBanner from './components/OfflineModeBanner.js';
+import { createLocationServiceIntegration } from './位置服务集成示例.js';
 
 // 导入类型
 import {
@@ -136,6 +137,7 @@ class App {
     public measureTool: MeasureTool | null = null;
     public cacheManagementPanel: ICacheManagementPanel | null = null;
     public offlineModeBanner: IOfflineModeBanner | null = null;
+    public locationServiceIntegration: any = null;
 
     constructor() {
         console.log('App 构造函数执行');
@@ -271,6 +273,10 @@ class App {
             // 步骤7: 初始化缓存状态面板
             this.initializeCacheStatusPanel();
             console.log('[缓存状态面板] 初始化完成');
+
+            // 步骤8: 初始化位置服务
+            await this.initializeLocationService();
+            console.log('[位置服务] 初始化完成');
 
             console.log('非关键组件初始化完成');
         } catch (error) {
@@ -435,6 +441,39 @@ class App {
         const sizes = ['B', 'KB', 'MB', 'GB'];
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    /**
+     * 初始化位置服务
+     */
+    private async initializeLocationService(): Promise<void> {
+        try {
+            console.log('开始初始化位置服务...');
+
+            // 检查地图是否已初始化
+            if (!this.view) {
+                console.warn('地图未初始化，跳过位置服务初始化');
+                return;
+            }
+
+            // 获取地图实例
+            const mapInstance = this.view.getMap();
+            if (!mapInstance) {
+                console.warn('无法获取地图实例，跳过位置服务初始化');
+                return;
+            }
+
+            // 创建位置服务集成
+            this.locationServiceIntegration = createLocationServiceIntegration(mapInstance);
+
+            // 初始化位置服务
+            await this.locationServiceIntegration.initialize();
+
+            console.log('位置服务初始化成功');
+        } catch (error) {
+            console.error('位置服务初始化失败:', error);
+            // 不阻塞应用运行，位置服务可选
+        }
     }
 
     /**
@@ -783,6 +822,37 @@ class App {
             }
         });
         toolbar.appendChild(comparisonBtn);
+
+        // 添加位置服务按钮到工具栏
+        this.addLocationServiceButton();
+    }
+
+    /**
+     * 添加位置服务按钮到工具栏
+     */
+    private addLocationServiceButton(): void {
+        const toolbar = document.querySelector('.map-toolbar');
+        if (!toolbar) {
+            console.warn('⚠️ 找不到地图工具栏，跳过添加位置服务按钮');
+            return;
+        }
+
+        const locationBtn = document.createElement('button');
+        locationBtn.className = 'toolbar-btn';
+        locationBtn.title = '位置服务';
+        locationBtn.innerHTML = `
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                <path d="M10 2C6.686 2 4 4.686 4 8c0 3.314 6 10 6 10s6-6.686 6-10c0-3.314-2.686-6-6-6zm0 8c-1.105 0-2-.895-2-2s.895-2 2-2 2 .895 2 2-.895 2-2 2z"/>
+            </svg>
+        `;
+        locationBtn.addEventListener('click', () => {
+            if (this.locationServiceIntegration) {
+                this.locationServiceIntegration.openLocationServicePanel();
+            } else {
+                alert('位置服务未初始化，请稍后重试');
+            }
+        });
+        toolbar.appendChild(locationBtn);
     }
 
     /**
@@ -1243,6 +1313,12 @@ class App {
         // 清理旧的采样组件
         if (this.samplingComponent) {
             this.samplingComponent.destroy();
+        }
+
+        // 清理位置服务
+        if (this.locationServiceIntegration) {
+            this.locationServiceIntegration.dispose();
+            this.locationServiceIntegration = null;
         }
 
         // 创建采样组件
