@@ -1,6 +1,105 @@
 {
-  "name":"udake_macos",
-  "type":"commonjs",
-  "version":"1.0.0",
-  "description":"智能不确定性驱动空间决策平台",
-  "main":"electron/main.js","scripts":{"dev":"vite","dev:test":"vite --mode testing","build":"tsc --noEmit && vite build","build:dev":"tsc --noEmit && vite build --mode development","build:test":"tsc --noEmit && vite build --mode testing","build:prod":"tsc --noEmit && vite build --mode production","preview":"vite preview","preview:test":"vite preview --mode testing","lint":"eslint frontend/js/","lint:fix":"eslint frontend/js/ --fix","format":"prettier --write 'frontend/js/**/*.{js,ts,css}'","format:check":"prettier --check 'frontend/js/**/*.{js,ts,css}'","typecheck":"tsc --noEmit","test":"vitest --run","test:watch":"vitest","test:coverage":"vitest --run --coverage","build:electron":"npm run build:prod && electron-builder --mac","build:android":"npm run build:prod && npx cap sync android && cd android && ./gradlew assembleRelease && cd ..","build:all":"npm run build:prod && npm run build:android && npm run build:electron"},"keywords":[],"author":"","license":"ISC","devDependencies":{"@eslint/js":"^10.0.1","@vitest/coverage-v8":"^4.1.0","electron":"^41.0.2","electron-builder":"^26.8.1","eslint":"^10.0.3","jsdom":"^28.1.0","prettier":"^3.8.1","typescript":"^5.9.3","vite":"^8.0.0","vitest":"^4.1.0"},"dependencies":{"@capacitor/android":"^8.2.0","@capacitor/cli":"^8.2.0","@capacitor/core":"^8.2.0","echarts":"^6.0.0"},"build":{"appId":"com.udake.app","productName":"UDAKE","directories":{"output":"release","buildResources":"logo"},"files":["electron/**/*","frontend/dist/**/*","package.json"],"mac":{"target":[{"target":"dmg","arch":["x64","arm64"]},{"target":"zip","arch":["x64","arm64"]}],"icon":"logo/UDAKE.icns","category":"public.app-category.science","hardenedRuntime":true,"gatekeeperAssess":false,"entitlements":"build/entitlements.mac.plist","entitlementsInherit":"build/entitlements.mac.plist"},"dmg":{"contents":[{"x":130,"y":220},{"x":410,"y":220,"type":"link","path":"/Applications"}],"window":{"width":540,"height":380}}}}
+  "name": "udake_macos",
+  "type": "commonjs",
+  "version": "1.0.0",
+  "description": "智能不确定性驱动空间决策平台",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "vite",
+    "dev:test": "vite --mode testing",
+    "build": "tsc --noEmit && vite build",
+    "build:dev": "tsc --noEmit && vite build --mode development",
+    "build:test": "tsc --noEmit && vite build --mode testing",
+    "build:prod": "tsc --noEmit && vite build --mode production",
+    "preview": "vite preview",
+    "preview:test": "vite preview --mode testing",
+    "lint": "eslint frontend/js/",
+    "lint:fix": "eslint frontend/js/ --fix",
+    "format": "prettier --write 'frontend/js/**/*.{js,ts,css}'",
+    "format:check": "prettier --check 'frontend/js/**/*.{js,ts,css}'",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest --run --coverage",
+    "build:electron": "npm run build:prod && electron-builder --mac",
+    "build:android": "npm run build:prod && npx cap sync android && cd android && ./gradlew assembleRelease && cd ..",
+    "build:all": "npm run build:prod && npm run build:android && npm run build:electron"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@vitest/coverage-v8": "^4.1.0",
+    "electron": "^41.0.2",
+    "electron-builder": "^26.8.1",
+    "eslint": "^10.0.3",
+    "jsdom": "^28.1.0",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "vite": "^8.0.0",
+    "vitest": "^4.1.0"
+  },
+  "dependencies": {
+    "@capacitor/android": "^8.2.0",
+    "@capacitor/cli": "^8.2.0",
+    "@capacitor/core": "^8.2.0",
+    "@capacitor/local-notifications": "^8.0.2",
+    "echarts": "^6.0.0"
+  },
+  "build": {
+    "appId": "com.udake.app",
+    "productName": "UDAKE",
+    "directories": {
+      "output": "release",
+      "buildResources": "logo"
+    },
+    "files": [
+      "electron/**/*",
+      "frontend/dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "logo/UDAKE.icns",
+      "category": "public.app-category.science",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist"
+    },
+    "dmg": {
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    }
+  }
+}
