@@ -12,13 +12,13 @@ import type {
 } from '../../types/core';
 
 import { OfflineManager } from '../utils/OfflineManager';
+import { TwoLevelCache } from '../utils/cache/TwoLevelCache';
 
 export class APIService implements IAPIService {
     public baseURL: string;
     private pendingRequests: Map<string, Promise<unknown>>;
-    private cache: Map<string, CacheEntry>;
-    private cacheMaxSize: number;
-    private cacheTTL: number;
+    private cache: TwoLevelCache<string, any>;
+    private cacheConfig: Map<string, number>; // 不同端点的TTL配置
 
     // 重试配置
     private readonly maxRetries: number = 3;
@@ -28,9 +28,32 @@ export class APIService implements IAPIService {
     constructor(baseURL: string = '') {
         this.baseURL = baseURL;
         this.pendingRequests = new Map();
-        this.cache = new Map();
-        this.cacheMaxSize = 50;
-        this.cacheTTL = 5 * 60 * 1000;
+        this.cache = new TwoLevelCache(
+            {
+                maxSize: 100,
+                ttl: 5 * 60 * 1000, // 5分钟
+                strategy: 'lru'
+            },
+            {
+                maxSize: 500,
+                ttl: 60 * 60 * 1000, // 1小时
+                strategy: 'lfu',
+                storageKey: 'api-cache'
+            },
+            {
+                enableAutoPromote: true,
+                promoteThreshold: 3
+            }
+        );
+
+        // 配置不同端点的缓存TTL
+        this.cacheConfig = new Map([
+            ['/api/data/list', 60 * 1000], // 1分钟
+            ['/api/config', 10 * 60 * 1000], // 10分钟
+            ['/api/tasks', 30 * 1000], // 30秒
+            ['/api/results', 5 * 60 * 1000], // 5分钟
+            ['/config', 10 * 60 * 1000] // 10分钟
+        ]);
     }
 
     /**
@@ -43,45 +66,74 @@ export class APIService implements IAPIService {
     private _getCacheKey(url: string, options: RequestInit = {}): string {
         const method = options.method || 'GET';
         const body = options.body || '';
-        return `${method}:${url}:${typeof body === 'string' ? body : ''}`;
-    }
-
-    private _getFromCache<T>(key: string): T | null {
-        if (!this.cache.has(key)) return null;
-        const entry = this.cache.get(key)!;
-        if (Date.now() - entry.timestamp > this.cacheTTL) {
-            this.cache.delete(key);
-            console.log(`[缓存] 已过期: ${key}`);
-            return null;
+        const data = JSON.stringify({
+            method,
+            url,
+            body: typeof body === 'string' ? body : JSON.stringify(body)
+        });
+        // 使用简单的哈希生成键
+        let hash = 0;
+        for (let i = 0; i < data.length; i++) {
+            const char = data.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
         }
-        this.cache.delete(key);
-        this.cache.set(key, entry);
-        console.log(`[缓存] 命中: ${key}`);
-        return entry.data as T;
+        return `${method}_${Math.abs(hash)}`;
     }
 
-    private _setCache(key: string, data: unknown): void {
-        if (this.cache.size >= this.cacheMaxSize) {
-            const oldestKey = this.cache.keys().next().value;
-            if (oldestKey !== undefined) {
-                this.cache.delete(oldestKey);
-                console.log(`[缓存] LRU淘汰: ${oldestKey}`);
-            }
+    private async _getFromCache<T>(key: string): Promise<T | null> {
+        const value = await this.cache.get(key);
+        if (value !== undefined) {
+            console.log(`[缓存] 命中: ${key}`);
+            return value as T;
         }
-        this.cache.set(key, { data, timestamp: Date.now() });
+        return null;
     }
 
-    public clearCache(): void {
-        this.cache.clear();
+    private async _setCache(key: string, data: unknown, customTTL?: number): Promise<void> {
+        await this.cache.set(key, data, customTTL);
+    }
+
+    public async clearCache(): Promise<void> {
+        await this.cache.clear();
         console.log('[缓存] 已清除所有缓存');
     }
 
-    public clearCacheFor(url: string): void {
-        for (const key of this.cache.keys()) {
-            if (key.includes(url)) {
-                this.cache.delete(key);
+    public async clearCacheFor(url: string): Promise<void> {
+        await this.cache.invalidatePattern(url);
+    }
+
+    public getCacheStats() {
+        return this.cache.getStats();
+    }
+
+    public resetCacheStats(): void {
+        this.cache.resetStats();
+    }
+
+    private _shouldUseCache(method: string, url: string): boolean {
+        // 只缓存GET请求
+        if (method !== 'GET') {
+            return false;
+        }
+
+        // 检查是否在缓存配置中
+        for (const [endpoint] of this.cacheConfig) {
+            if (url.includes(endpoint)) {
+                return true;
             }
         }
+
+        return false;
+    }
+
+    private _getCacheTTL(url: string): number {
+        for (const [endpoint, ttl] of this.cacheConfig) {
+            if (url.includes(endpoint)) {
+                return ttl;
+            }
+        }
+        return 5 * 60 * 1000; // 默认5分钟
     }
 
     /**
@@ -161,10 +213,10 @@ export class APIService implements IAPIService {
             }
         }
 
-        // 在线模式：检查内存缓存
-        if (method === 'GET') {
+        // 在线模式：检查缓存
+        if (method === 'GET' && this._shouldUseCache(method, url)) {
             const cacheKey = this._getCacheKey(url, options);
-            const cached = this._getFromCache<T>(cacheKey);
+            const cached = await this._getFromCache<T>(cacheKey);
             if (cached !== null) {
                 return cached;
             }
@@ -209,9 +261,10 @@ export class APIService implements IAPIService {
                     const data: T = await response.json();
 
                     // 缓存 GET 请求结果
-                    if (method === 'GET') {
+                    if (method === 'GET' && this._shouldUseCache(method, url)) {
                         const cacheKey = this._getCacheKey(url, options);
-                        this._setCache(cacheKey, data);
+                        const ttl = this._getCacheTTL(url);
+                        await this._setCache(cacheKey, data, ttl);
                     }
 
                     // 缓存任务状态和结果到 IndexedDB
