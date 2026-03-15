@@ -11,6 +11,8 @@ import type {
     KrigingParams
 } from '../../types/core';
 
+import { OfflineManager } from '../utils/OfflineManager';
+
 export class APIService implements IAPIService {
     public baseURL: string;
     private pendingRequests: Map<string, Promise<any>>;
@@ -117,6 +119,49 @@ export class APIService implements IAPIService {
     public async request<T = any>(url: string, options: RequestInit = {}): Promise<T> {
         const method = options.method || 'GET';
         const requestKey = `${method}_${url}`;
+
+        // 检查网络状态
+        const isOnline = OfflineManager.isOnline;
+
+        // 离线模式处理
+        if (!isOnline) {
+            if (method === 'GET') {
+                // GET 请求：尝试从缓存返回
+                const cacheKey = this._getCacheKey(url, options);
+                const cached = this._getFromCache<T>(cacheKey);
+                if (cached !== null) {
+                    console.log(`[离线模式] 从缓存返回数据: ${url}`);
+                    return cached;
+                }
+
+                // 尝试从 IndexedDB 获取缓存
+                const taskIdMatch = url.match(/task-status\/([^\/]+)/);
+                if (taskIdMatch) {
+                    const taskId = taskIdMatch[1];
+                    const cachedResult = await OfflineManager.getCachedResult(taskId);
+                    if (cachedResult) {
+                        console.log(`[离线模式] 从 IndexedDB 返回结果: ${taskId}`);
+                        return cachedResult as T;
+                    }
+                }
+
+                throw new Error('离线模式：无缓存数据可用');
+            } else {
+                // POST/PUT/DELETE 请求：加入离线队列
+                console.log(`[离线模式] 请求已加入队列: ${method} ${url}`);
+
+                // 根据URL判断操作类型
+                if (url.includes('upload-data')) {
+                    await OfflineManager.enqueue({ type: 'upload', payload: options.body });
+                } else if (url.includes('start-kriging')) {
+                    await OfflineManager.enqueue({ type: 'kriging', payload: JSON.parse(options.body as string) });
+                }
+
+                throw new Error('离线模式：操作已加入队列，将在恢复在线后自动执行');
+            }
+        }
+
+        // 在线模式：检查内存缓存
         if (method === 'GET') {
             const cacheKey = this._getCacheKey(url, options);
             const cached = this._getFromCache<T>(cacheKey);
@@ -124,10 +169,12 @@ export class APIService implements IAPIService {
                 return cached;
             }
         }
+
         if (this.pendingRequests.has(requestKey)) {
             console.warn(`请求已在进行中: ${requestKey}`);
             return this.pendingRequests.get(requestKey) as Promise<T>;
         }
+
         const requestPromise = (async (): Promise<T> => {
             let lastError: Error | null = null;
 
@@ -160,10 +207,22 @@ export class APIService implements IAPIService {
                     }
 
                     const data: T = await response.json();
+
+                    // 缓存 GET 请求结果
                     if (method === 'GET') {
                         const cacheKey = this._getCacheKey(url, options);
                         this._setCache(cacheKey, data);
                     }
+
+                    // 缓存任务状态和结果到 IndexedDB
+                    if (url.includes('task-status') || url.includes('result')) {
+                        const taskIdMatch = url.match(/task-status\/([^\/]+)|result\/prediction\/([^\/]+)/);
+                        if (taskIdMatch) {
+                            const taskId = taskIdMatch[1] || taskIdMatch[2];
+                            await OfflineManager.cacheResult(taskId, data);
+                        }
+                    }
+
                     return data;
 
                 } catch (error: unknown) {
@@ -187,6 +246,7 @@ export class APIService implements IAPIService {
             // 所有重试都失败
             throw lastError || new Error('请求失败，已达到最大重试次数');
         })();
+
         this.pendingRequests.set(requestKey, requestPromise);
         requestPromise.finally(() => {
             this.pendingRequests.delete(requestKey);

@@ -1,0 +1,489 @@
+/**
+ * 缓存管理面板样式
+ */
+
+/* 动画定义 */
+@keyframes slideUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(-50%) translateY(20px);
+    }
+}
+
+@keyframes spin {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+/* 面板容器 */
+.cache-management-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    width: 90%;
+    max-width: 480px;
+    max-height: 85vh;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    z-index: 9999;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+.cache-management-panel.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(-50%, -50%) scale(1);
+}
+
+/* 背景遮罩 */
+.cache-panel-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 9998;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+.cache-panel-backdrop.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* 面板头部 */
+.cache-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.cache-panel-title {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -0.5px;
+}
+
+.cache-panel-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border: none;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: white;
+}
+
+.cache-panel-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+/* 面板内容 */
+.cache-panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    -webkit-overflow-scrolling: touch;
+}
+
+/* 滚动条样式 */
+.cache-panel-content::-webkit-scrollbar {
+    width: 6px;
+}
+
+.cache-panel-content::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.cache-panel-content::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.cache-panel-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.3);
+}
+
+/* 分区标题 */
+.cache-section-title {
+    margin: 0 0 12px 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+    letter-spacing: -0.3px;
+}
+
+/* 网络状态指示器 */
+.cache-status-section {
+    margin-bottom: 24px;
+}
+
+.cache-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    transition: all 0.3s ease;
+}
+
+.cache-status-icon {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    transition: all 0.3s ease;
+}
+
+.cache-status-icon.online {
+    background: #34c759;
+    box-shadow: 0 0 0 3px rgba(52, 199, 89, 0.2);
+}
+
+.cache-status-icon.offline {
+    background: #ff9500;
+    box-shadow: 0 0 0 3px rgba(255, 149, 0, 0.2);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+.cache-status-text {
+    font-size: 14px;
+    font-weight: 500;
+    color: #1a1a1a;
+}
+
+/* 存储使用情况 */
+.cache-usage-section {
+    margin-bottom: 24px;
+}
+
+.cache-usage-bar {
+    height: 8px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.cache-usage-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.cache-usage-fill.warning {
+    background: linear-gradient(90deg, #ff9500 0%, #ff3b30 100%);
+}
+
+.cache-usage-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: #666;
+}
+
+.cache-usage-used {
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.cache-usage-total {
+    color: #666;
+}
+
+/* 缓存列表 */
+.cache-list-section {
+    margin-bottom: 24px;
+}
+
+.cache-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.cache-item {
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 8px;
+    transition: all 0.2s ease;
+}
+
+.cache-item:hover {
+    background: rgba(0, 0, 0, 0.05);
+    transform: translateX(4px);
+}
+
+.cache-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.cache-item-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #1a1a1a;
+}
+
+.cache-item-size {
+    font-size: 13px;
+    font-weight: 500;
+    color: #667eea;
+}
+
+.cache-item-details {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: #666;
+}
+
+.cache-item-count {
+    color: #667eea;
+    font-weight: 500;
+}
+
+/* 操作按钮区 */
+.cache-actions-section {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.cache-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.cache-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.cache-btn:not(:disabled):hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.cache-btn:not(:disabled):active {
+    transform: translateY(0);
+}
+
+.cache-btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.cache-btn-danger {
+    background: linear-gradient(135deg, #ff3b30 0%, #ff9500 100%);
+    color: white;
+}
+
+.cache-btn-secondary {
+    background: rgba(102, 126, 234, 0.1);
+    color: #667eea;
+}
+
+.cache-btn-secondary:hover {
+    background: rgba(102, 126, 234, 0.2);
+}
+
+/* 加载动画 */
+.cache-btn-loading {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+}
+
+.cache-btn-secondary .cache-btn-loading {
+    border-color: rgba(102, 126, 234, 0.3);
+    border-top-color: #667eea;
+}
+
+/* 待同步操作区 */
+.cache-pending-section {
+    padding: 16px;
+    background: rgba(102, 126, 234, 0.05);
+    border-radius: 8px;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+.cache-pending-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.cache-pending-count {
+    font-size: 24px;
+    font-weight: 700;
+    color: #667eea;
+}
+
+.cache-pending-text {
+    font-size: 14px;
+    color: #666;
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+    .cache-management-panel {
+        background: rgba(30, 30, 30, 0.95);
+        color: #f5f5f5;
+    }
+
+    .cache-panel-title {
+        color: white;
+    }
+
+    .cache-section-title {
+        color: #f5f5f5;
+    }
+
+    .cache-status-indicator {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .cache-status-text {
+        color: #f5f5f5;
+    }
+
+    .cache-usage-bar {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .cache-usage-info {
+        color: #aaa;
+    }
+
+    .cache-usage-used {
+        color: #f5f5f5;
+    }
+
+    .cache-item {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .cache-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .cache-item-name {
+        color: #f5f5f5;
+    }
+
+    .cache-item-details {
+        color: #aaa;
+    }
+
+    .cache-btn-secondary {
+        background: rgba(102, 126, 234, 0.2);
+        color: #8b9cf5;
+    }
+
+    .cache-btn-secondary:hover {
+        background: rgba(102, 126, 234, 0.3);
+    }
+
+    .cache-pending-section {
+        background: rgba(102, 126, 234, 0.1);
+        border-color: rgba(102, 126, 234, 0.3);
+    }
+
+    .cache-pending-text {
+        color: #aaa;
+    }
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+    .cache-management-panel {
+        width: 100%;
+        height: 100%;
+        max-height: 100%;
+        border-radius: 0;
+        transform: translateY(100%);
+    }
+
+    .cache-management-panel.show {
+        transform: translateY(0);
+    }
+
+    .cache-panel-content {
+        padding: 16px;
+    }
+}

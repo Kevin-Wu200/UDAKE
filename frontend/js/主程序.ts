@@ -47,6 +47,8 @@ import { ParameterHistoryManager } from './components/ParameterHistoryManager.js
 import { ParameterComparisonPanel } from './components/ParameterComparisonPanel.js';
 import { ParameterInfoPanel } from './components/ParameterInfoPanel.js';
 import { ParameterTabPanel } from './components/ParameterTabPanel.js';
+import CacheManagementPanel from './components/CacheManagementPanel.js';
+import OfflineModeBanner from './components/OfflineModeBanner.js';
 
 // 导入类型
 import {
@@ -117,6 +119,8 @@ class App {
     public mapLegend: MapLegend | null = null;
     public layerComparisonPanel: LayerComparisonPanel | null = null;
     public measureTool: MeasureTool | null = null;
+    public cacheManagementPanel: any | null = null;
+    public offlineModeBanner: any | null = null;
 
     constructor() {
         console.log('App 构造函数执行');
@@ -230,13 +234,67 @@ class App {
             OfflineManager.registerHandler('upload', uploadHandler);
             OfflineManager.registerHandler('kriging', krigingHandler);
 
+            // 初始化缓存管理面板
+            this.cacheManagementPanel = CacheManagementPanel;
+            await this.cacheManagementPanel.init();
+
+            // 初始化离线模式横幅
+            this.offlineModeBanner = OfflineModeBanner;
+            await this.offlineModeBanner.init();
+
+            // 监听离线横幅事件
+            this.bindOfflineBannerEvents();
+
             console.log('应用初始化完成');
         } catch (error) {
             console.error('非关键组件初始化失败:', error);
         }
-        
+
         // 初始化界面文本
         this.updateUIText();
+    }
+
+    /**
+     * 绑定离线横幅事件
+     */
+    private bindOfflineBannerEvents(): void {
+        // 监听查看缓存数据事件
+        document.addEventListener('offline-view-cache', (event) => {
+            console.log('查看缓存数据事件触发', event);
+            this.handleViewCacheData();
+        });
+
+        // 监听管理缓存事件
+        document.addEventListener('offline-manage-cache', (event) => {
+            console.log('管理缓存事件触发', event);
+            this.handleManageCache();
+        });
+    }
+
+    /**
+     * 处理查看缓存数据
+     */
+    private handleViewCacheData(): void {
+        // 这里可以实现显示本地缓存的项目列表
+        // 可以使用现有的 DataImportModal 或创建新的缓存数据浏览界面
+        console.log('显示本地缓存数据');
+
+        // 示例：显示所有本地项目
+        OfflineManager.getAllProjects().then(projects => {
+            console.log('本地项目列表:', projects);
+            // 可以在这里打开一个模态框显示项目列表
+        }).catch(error => {
+            console.error('获取本地项目失败:', error);
+        });
+    }
+
+    /**
+     * 处理管理缓存
+     */
+    private handleManageCache(): void {
+        if (this.cacheManagementPanel) {
+            this.cacheManagementPanel.show();
+        }
     }
 
     /**
