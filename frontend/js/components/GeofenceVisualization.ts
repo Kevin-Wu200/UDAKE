@@ -353,7 +353,9 @@ export class GeofenceVisualization {
     menu.querySelectorAll('.menu-item').forEach((item) => {
       item.addEventListener('click', (e) => {
         const action = (e.target as HTMLElement).getAttribute('data-action');
-        this.handleContextMenuAction(geofence.id, action);
+        if (action) {
+          this.handleContextMenuAction(geofence.id, action);
+        }
         menu.remove();
       });
     });

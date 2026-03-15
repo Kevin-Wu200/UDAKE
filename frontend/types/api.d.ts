@@ -30,4 +30,13 @@ export interface IAPIService {
     clearCache(): void;
     clearCacheFor(url: string): void;
     cancelAllRequests(): void;
+    // TaskExecutors 需要的方法
+    submitInterpolation(data: any): Promise<string>;
+    getInterpolationResult(interpolationId: string): Promise<any>;
+    generateSamplingPoints(data: any): Promise<any>;
+    performAnalysis(data: any): Promise<any>;
+    generateReport(analysisId: string): Promise<any>;
+    exportData(data: any): Promise<any>;
+    parseImportFile(file: File): Promise<any>;
+    importData(data: any): Promise<any>;
 }

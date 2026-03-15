@@ -252,7 +252,11 @@ export class EnhancedSamplingRecommendationPanel {
                 task_id: this.currentTaskId,
                 n_recommendations: nRecommendations,
                 strategy: this.currentStrategy
-            });
+            }) as {
+                recommendations: Array<{ id: string; x: number; y: number; variance: number; priority: string }>;
+                expectedImprovement: number;
+                uncertaintyReduction: number;
+            };
 
             this.currentRecommendations = response.recommendations || [];
             this.renderRecommendations();
@@ -453,7 +457,10 @@ export class EnhancedSamplingRecommendationPanel {
         if (heatmapContainer) {
             const tempDiv = document.createElement('div');
             tempDiv.innerHTML = summaryHtml;
-            heatmapContainer.appendChild(tempDiv.firstElementChild);
+            const firstChild = tempDiv.firstElementChild;
+            if (firstChild) {
+                heatmapContainer.appendChild(firstChild);
+            }
         }
     }
 
@@ -497,7 +504,7 @@ export class EnhancedSamplingRecommendationPanel {
                 task_id: this.currentTaskId,
                 candidate_points: candidates,
                 strategy: this.currentStrategy
-            });
+            }) as { results: EvaluationResult[] };
 
             return response.results || [];
 
@@ -517,7 +524,7 @@ export class EnhancedSamplingRecommendationPanel {
             const response = await this.apiService.post(`/api/sampling-impact/batch-simulate`, {
                 task_id: this.currentTaskId,
                 sampling_plans: plans
-            });
+            }) as { results: SimulationResult[] };
 
             return response.results || [];
 

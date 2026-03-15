@@ -3,7 +3,8 @@
  * 展示如何在主应用中初始化和使用任务管理器
  */
 
-import TaskManager, { TaskType, TaskPriority } from './managers/TaskManager';
+import TaskManager from './managers/TaskManager';
+import { TaskType, TaskPriority } from '../types/task-manager';
 import {
     InterpolationTaskExecutor,
     SamplingTaskExecutor,
@@ -16,8 +17,8 @@ import { APIService } from './services/API封装';
 /**
  * 初始化任务管理器
  */
-export function initializeTaskManager(apiService: APIService): TaskManager {
-    const taskManager = TaskManager.getInstance({
+export function initializeTaskManager(apiService: APIService): any {
+    const taskManager = (TaskManager as any).getInstance({
         enablePersistence: true,
         enableNotifications: true,
         maxRetries: 3,
@@ -41,7 +42,7 @@ export function initializeTaskManager(apiService: APIService): TaskManager {
 /**
  * 设置任务事件监听器
  */
-function setupTaskEventListeners(taskManager: TaskManager): void {
+function setupTaskEventListeners(taskManager: any): void {
     // 任务创建
     taskManager.on('created', (event) => {
         console.log(`[TaskEvent] 任务创建: ${event.task.id} - ${event.task.name}`);
@@ -92,7 +93,7 @@ function setupTaskEventListeners(taskManager: TaskManager): void {
  * 示例：创建空间插值任务
  */
 export async function createInterpolationTask(
-    taskManager: TaskManager,
+    taskManager: any,
     data: any,
     options?: {
         name?: string;
@@ -118,7 +119,7 @@ export async function createInterpolationTask(
  * 示例：创建采样任务
  */
 export async function createSamplingTask(
-    taskManager: TaskManager,
+    taskManager: any,
     data: any,
     options?: {
         name?: string;
@@ -144,7 +145,7 @@ export async function createSamplingTask(
  * 示例：创建数据分析任务
  */
 export async function createAnalysisTask(
-    taskManager: TaskManager,
+    taskManager: any,
     data: any,
     options?: {
         name?: string;
@@ -170,7 +171,7 @@ export async function createAnalysisTask(
  * 示例：创建数据导出任务
  */
 export async function createExportTask(
-    taskManager: TaskManager,
+    taskManager: any,
     data: any,
     options?: {
         name?: string;
@@ -196,7 +197,7 @@ export async function createExportTask(
  * 示例：创建数据导入任务
  */
 export async function createImportTask(
-    taskManager: TaskManager,
+    taskManager: any,
     file: File,
     options?: {
         name?: string;
@@ -222,7 +223,7 @@ export async function createImportTask(
  * 示例：批量创建任务
  */
 export async function createBatchTasks(
-    taskManager: TaskManager,
+    taskManager: any,
     tasks: Array<{
         type: TaskType;
         name: string;
@@ -253,7 +254,7 @@ export async function createBatchTasks(
  * 示例：监控任务状态
  */
 export async function monitorTask(
-    taskManager: TaskManager,
+    taskManager: any,
     taskId: string,
     onUpdate?: (task: any) => void
 ): Promise<any> {
@@ -290,7 +291,7 @@ export async function monitorTask(
 /**
  * 示例：获取任务统计信息
  */
-export async function getTaskStatistics(taskManager: TaskManager) {
+export async function getTaskStatistics(taskManager: any) {
     const stats = await taskManager.getStats();
     console.log('[TaskStatistics]', {
         总任务数: stats.total,
@@ -308,7 +309,7 @@ export async function getTaskStatistics(taskManager: TaskManager) {
  * 示例：清理旧的历史记录
  */
 export async function cleanupOldTasks(
-    taskManager: TaskManager,
+    taskManager: any,
     olderThanDays: number = 30
 ) {
     console.log(`[TaskManager] 清理 ${olderThanDays} 天前的历史记录...`);

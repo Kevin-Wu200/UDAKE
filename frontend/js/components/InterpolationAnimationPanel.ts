@@ -40,10 +40,10 @@ interface AnimationEvents {
 
 export class InterpolationAnimationPanel {
     private container: HTMLElement;
-    private overlay: HTMLElement;
-    private panel: HTMLElement;
-    private animationCanvas: HTMLCanvasElement;
-    private ctx: CanvasRenderingContext2D;
+    private overlay!: HTMLElement;
+    private panel!: HTMLElement;
+    private animationCanvas!: HTMLCanvasElement;
+    private ctx!: CanvasRenderingContext2D;
     private animationId: number | null = null;
     private animationConfig: AnimationConfig;
     private stages: StageConfig[];

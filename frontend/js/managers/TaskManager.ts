@@ -3,7 +3,7 @@
  * 统一管理所有后台任务的创建、执行、监控和管理
  */
 
-import { Task, TaskType, TaskPriority, TaskStatus, TaskManagerOptions, TaskEvent, TaskExecutor, TaskStats } from '../types/task-manager';
+import { Task, TaskType, TaskPriority, TaskStatus, TaskManagerOptions, TaskEvent, TaskExecutor, TaskStats } from '../../types/task-manager';
 import { TaskQueue } from './TaskQueue';
 import { TaskStorage } from './TaskStorage';
 import { LocalNotifications } from '@capacitor/local-notifications';
@@ -529,6 +529,7 @@ export class TaskManager {
     private dispatchEvent(event: string, task: Task, data?: any): void {
         const taskEvent: TaskEvent = {
             type: event as any,
+            taskId: task.id,
             task,
             timestamp: Date.now(),
             data

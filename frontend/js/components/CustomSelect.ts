@@ -18,9 +18,9 @@ interface CustomSelectOptions {
 
 export class CustomSelect {
     private container: HTMLElement;
-    private select: HTMLElement;
-    private dropdown: HTMLElement;
-    private selectedText: HTMLElement;
+    private select!: HTMLElement;
+    private dropdown!: HTMLElement;
+    private selectedText!: HTMLElement;
     private options: SelectOption[];
     private currentValue: string;
     private isOpen: boolean;

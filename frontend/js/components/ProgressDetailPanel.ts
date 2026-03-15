@@ -36,8 +36,8 @@ interface ProgressDetail {
 
 export class ProgressDetailPanel {
     private container: HTMLElement;
-    private overlay: HTMLElement;
-    private panel: HTMLElement;
+    private overlay!: HTMLElement;
+    private panel!: HTMLElement;
     private taskId: string | null = null;
     private pollingInterval: number | null = null;
 

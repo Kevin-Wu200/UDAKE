@@ -328,7 +328,7 @@ export class MapLegend {
             </div>
             <div class="legend-content">
                 ${this.renderColorScale()}
-                ${this.renderLegendItems(ranges, showValues, unit)}
+                ${this.renderLegendItems(ranges, showValues ?? false, unit)}
                 ${this.renderSchemeSelector()}
             </div>
         `;
@@ -369,7 +369,7 @@ export class MapLegend {
                 ${ranges.map((range, index) => `
                     <div class="legend-item">
                         <div class="legend-color" style="background-color: ${range.color};"></div>
-                        <span class="legend-item-label">${labels[index] || `区间 ${index + 1}`}</span>
+                        <span class="legend-item-label">${(labels && labels[index]) || `区间 ${index + 1}`}</span>
                         ${showValues ? `
                             <span class="legend-item-value">
                                 ${range.min.toFixed(2)} - ${range.max.toFixed(2)}

@@ -186,8 +186,8 @@ export class FeedbackCollector {
         // 类型选择
         overlay.querySelectorAll('.feedback-type-btn').forEach(btn => {
             btn.addEventListener('click', () => this._selectType(overlay, btn as HTMLElement));
-            btn.addEventListener('keydown', (e: KeyboardEvent) => {
-                if (e.key === 'Enter' || e.key === ' ') {
+            btn.addEventListener('keydown', (e: Event) => {
+                if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') {
                     e.preventDefault();
                     this._selectType(overlay, btn as HTMLElement);
                 }
@@ -197,8 +197,8 @@ export class FeedbackCollector {
         // 优先级选择
         overlay.querySelectorAll('.feedback-priority-btn').forEach(btn => {
             btn.addEventListener('click', () => this._selectPriority(overlay, btn as HTMLElement));
-            btn.addEventListener('keydown', (e: KeyboardEvent) => {
-                if (e.key === 'Enter' || e.key === ' ') {
+            btn.addEventListener('keydown', (e: Event) => {
+                if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') {
                     e.preventDefault();
                     this._selectPriority(overlay, btn as HTMLElement);
                 }
@@ -226,8 +226,8 @@ export class FeedbackCollector {
         const fileList = overlay.querySelector('#feedback-file-list')! as HTMLElement;
 
         fileDrop.addEventListener('click', () => fileInput.click());
-        fileDrop.addEventListener('keydown', (e: KeyboardEvent) => {
-            if (e.key === 'Enter' || e.key === ' ') {
+        fileDrop.addEventListener('keydown', (e: Event) => {
+            if ((e as KeyboardEvent).key === 'Enter' || (e as KeyboardEvent).key === ' ') {
                 e.preventDefault();
                 fileInput.click();
             }
@@ -242,10 +242,10 @@ export class FeedbackCollector {
             fileDrop.classList.remove('drag-over');
         });
 
-        fileDrop.addEventListener('drop', (e: DragEvent) => {
+        fileDrop.addEventListener('drop', (e: Event) => {
             e.preventDefault();
             fileDrop.classList.remove('drag-over');
-            const files = e.dataTransfer?.files;
+            const files = (e as DragEvent).dataTransfer?.files;
             if (files) {
                 this._handleFiles(files, fileList);
             }

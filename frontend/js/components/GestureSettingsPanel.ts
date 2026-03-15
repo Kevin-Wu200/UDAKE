@@ -297,7 +297,7 @@ class GestureSettingsPanel {
         // 绑定手势项事件
         const gestureItems = panel.querySelectorAll('.gesture-setting-item');
         gestureItems.forEach(item => {
-            const gestureType = item.dataset.gesture as GestureType;
+            const gestureType = (item as HTMLElement).dataset.gesture as GestureType;
 
             const enableToggle = item.querySelector('.gesture-enable-toggle') as HTMLInputElement;
             const hapticToggle = item.querySelector('.gesture-haptic-toggle') as HTMLInputElement;

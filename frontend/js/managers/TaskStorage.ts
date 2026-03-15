@@ -3,7 +3,7 @@
  * 使用 IndexedDB 存储任务数据
  */
 
-import { Task, TaskStatus } from '../types/task-manager';
+import { Task, TaskStatus } from '../../types/task-manager';
 
 const DB_NAME = 'UDAKE_TaskStorage';
 const DB_VERSION = 1;

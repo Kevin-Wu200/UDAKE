@@ -3,8 +3,8 @@
  * 演示如何为不同类型的任务创建执行器
  */
 
-import { Task, TaskExecutor } from '../types/task-manager';
-import { IAPIService } from '../types/api';
+import { Task, TaskExecutor } from '../../types/task-manager';
+import { IAPIService } from '../../types/api';
 
 /**
  * 空间插值任务执行器
@@ -49,6 +49,12 @@ export class InterpolationTaskExecutor implements TaskExecutor {
 
     private delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async cancel(taskId: string): Promise<boolean> {
+        console.log(`[InterpolationTaskExecutor] 取消插值任务: ${taskId}`);
+        // 这里可以实现取消逻辑
+        return true;
     }
 }
 
@@ -98,6 +104,12 @@ export class SamplingTaskExecutor implements TaskExecutor {
     private delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
+
+    async cancel(taskId: string): Promise<boolean> {
+        console.log(`[SamplingTaskExecutor] 取消采样任务: ${taskId}`);
+        // 这里可以实现取消逻辑
+        return true;
+    }
 }
 
 /**
@@ -135,6 +147,12 @@ export class AnalysisTaskExecutor implements TaskExecutor {
 
     private delay(ms: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    async cancel(taskId: string): Promise<boolean> {
+        console.log(`[AnalysisTaskExecutor] 取消分析任务: ${taskId}`);
+        // 这里可以实现取消逻辑
+        return true;
     }
 }
 
@@ -179,9 +197,10 @@ export class ExportTaskExecutor implements TaskExecutor {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    async cancel(taskId: string): Promise<void> {
+    async cancel(taskId: string): Promise<boolean> {
         console.log(`[ExportTaskExecutor] 取消导出任务: ${taskId}`);
         // 实现取消逻辑
+        return true;
     }
 }
 
@@ -226,9 +245,10 @@ export class ImportTaskExecutor implements TaskExecutor {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    async cancel(taskId: string): Promise<void> {
+    async cancel(taskId: string): Promise<boolean> {
         console.log(`[ImportTaskExecutor] 取消导入任务: ${taskId}`);
         // 实现取消逻辑
+        return true;
     }
 }
 

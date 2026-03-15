@@ -3,7 +3,7 @@
  * 实现任务的优先级队列管理
  */
 
-import { Task, TaskPriority, TaskQueueOptions } from '../types/task-manager';
+import { Task, TaskPriority, TaskQueueOptions } from '../../types/task-manager';
 
 const DEFAULT_QUEUE_OPTIONS: TaskQueueOptions = {
     maxConcurrentTasks: 2,

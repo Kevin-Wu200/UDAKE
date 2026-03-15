@@ -8,8 +8,8 @@ import type { ParamConfig, ParamPresetType } from '../../types/core';
 
 export class ParameterConfigPanel {
     private container: HTMLElement;
-    private overlay: HTMLElement;
-    private panel: HTMLElement;
+    private overlay!: HTMLElement;
+    private panel!: HTMLElement;
 
     constructor(container: HTMLElement | string) {
         this.container = typeof container === 'string'

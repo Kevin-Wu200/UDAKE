@@ -3,18 +3,18 @@
  * 显示任务列表、详情和操作按钮
  */
 
-import { Task, TaskStatus, TaskPriority } from '../types/task-manager';
+import { Task, TaskStatus, TaskPriority } from '../../types/task-manager';
 import TaskManager from '../managers/TaskManager';
 
 export class TaskManagementPanel {
     private container: HTMLElement;
-    private taskManager: TaskManager;
+    private taskManager: any;
     private currentTab: 'active' | 'history' = 'active';
     private selectedTask: Task | null = null;
 
     constructor(container: HTMLElement) {
         this.container = container;
-        this.taskManager = TaskManager.getInstance();
+        this.taskManager = (TaskManager as any).getInstance();
         this.render();
         this.setupEventListeners();
     }

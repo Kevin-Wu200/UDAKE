@@ -1,93 +1,1099 @@
-# 优化9：快捷操作与手势捷径
+# TODOList 9: 测试覆盖提升和性能监控
 
-## 待办事项清单
+## 任务目标
+提升测试覆盖率到80%以上，实现全面的性能监控，确保代码质量和系统性能。
 
-### 步骤1：需求确认
-- [ ] 确认需要快捷操作的功能（常用功能、高频操作）
-- [ ] 确定手势捷径的应用场景
-- [ ] 定义上下文菜单的使用范围
-- [ ] 确认最近使用记录的需求
-- [ ] 收集用户对快捷操作的期望
+---
 
-### 步骤2：技术调研
-- [ ] 研究浮动按钮的设计模式
-- [ ] 调研上下文菜单的最佳实践
-- [ ] 研究手势捷径的实现方案
-- [ ] 调研最近使用记录的存储方案
-- [ ] 研究快捷操作的性能优化
+## 任务 1: 评估当前测试覆盖
 
-### 步骤3：原型开发
-- [ ] 创建 QuickActions 类结构
-- [ ] 实现浮动按钮原型
-- [ ] 实现上下文菜单原型
-- [ ] 实现手势捷径原型
-- [ ] 创建最近使用记录原型
+### 实施步骤
+1.1. 安装测试覆盖率工具
+- 安装依赖：
+  ```bash
+  npm install --save-dev @vitest/coverage-v8
+  ```
 
-### 步骤4：功能实现
-- [ ] 实现浮动快捷按钮
-  - [ ] 主浮动按钮（FAB）
-  - [ ] 子菜单按钮
-  - [ ] 按钮动画和过渡
-  - [ ] 按钮位置配置
-  - [ ] 按钮显示/隐藏逻辑
-- [ ] 实现手势捷径
-  - [ ] 双击画布快速标记
-  - [ ] 三指快速截图
-  - [ ] 滑动边缘快速导航
-  - [ ] 长按快捷菜单
-  - [ ] 手势捷径配置
-- [ ] 实现上下文菜单
-  - [ ] 右键菜单（桌面）
-  - [ ] 长按菜单（移动端）
-  - [ ] 上下文相关菜单项
-  - [ ] 菜单动画
-- [ ] 实现常用功能面板
-  - [ ] 快速工具栏
-  - [ ] 快速参数调整
-  - [ ] 快速视图切换
-  - [ ] 面板拖拽和定位
-- [ ] 实现最近使用记录
-  - [ ] 记录最近操作
-  - [ ] 记录最近文件
-  - [ ] 记录最近项目
-  - [ ] 快速访问功能
-- [ ] 实现快捷操作配置
-  - [ ] 自定义快捷按钮
-  - [ ] 自定义手势捷径
-  - [ ] 快捷键配置
-  - [ ] 配置导入导出
+1.2. 配置测试覆盖率
+- 更新文件：`/Users/wuchenkai/UDAKE/vitest.config.js`
+  ```javascript
+  import { defineConfig } from 'vitest/config';
 
-### 步骤5：测试验证
-- [ ] 在真实Android设备上测试所有快捷操作
-- [ ] 验证浮动按钮的响应和动画
-- [ ] 测试手势捷径的识别准确性
-- [ ] 测试上下文菜单的相关性和准确性
-- [ ] 验证最近使用记录的准确性
-- [ ] 测试快捷操作配置的有效性
-- [ ] 测试快捷操作的性能
+  export default defineConfig({
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      coverage: {
+        provider: 'v8',
+        reporter: ['text', 'json', 'html', 'lcov'],
+        exclude: [
+          'node_modules/',
+          'tests/',
+          'dist/',
+          '**/*.d.ts',
+          '**/*.config.*',
+          '**/mockData',
+          '**/coverage/**'
+        ],
+        all: true,
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80
+      }
+    }
+  });
+  ```
 
-### 步骤6：性能优化
-- [ ] 优化浮动按钮的渲染性能
-- [ ] 优化手势捷径的识别性能
-- [ ] 优化上下文菜单的加载速度
-- [ ] 优化最近使用记录的查询性能
-- [ ] 实现快捷操作的性能监控
+1.3. 运行测试覆盖率分析
+- 运行命令：
+  ```bash
+  npm run test:coverage
+  ```
 
-### 步骤7：文档更新
-- [ ] 编写快捷操作使用指南
-- [ ] 更新开发者文档（快捷操作API、手势API）
-- [ ] 添加快捷操作配置说明
-- [ ] 创建快捷操作设计指南
-- [ ] 更新README和CHANGELOG
+1.4. 创建测试覆盖报告
+- 创建文件：`/Users/wuchenkai/UDAKE/docs/test-coverage-report.md`
+- 记录当前覆盖率：
+  ```markdown
+  # 测试覆盖率报告
 
-### 步骤8：功能集成
-- [ ] 将快捷操作系统集成到全局应用
-- [ ] 在主界面集成浮动按钮
-- [ ] 在地图组件中集成手势捷径
-- [ ] 在数据列表中集成上下文菜单
-- [ ] 在设置页面集成快捷操作配置
-- [ ] 在主菜单集成最近使用记录
-- [ ] 集成快捷键到桌面版本
-- [ ] 添加快捷操作使用引导
-- [ ] 实现快捷操作统计和分析
-- [ ] 进行端到端集成测试
+  ## 整体覆盖率
+
+  - 语句覆盖率: XX%
+  - 分支覆盖率: XX%
+  - 函数覆盖率: XX%
+  - 行覆盖率: XX%
+
+  ## 模块覆盖率
+
+  ### 核心模块
+  - 主程序.ts: XX%
+  - API封装.ts: XX%
+  - 任务管理器.ts: XX%
+
+  ### 组件
+  - 地图组件: XX%
+  - 采样组件: XX%
+  - 图表组件: XX%
+
+  ### 工具类
+  - 缓存工具: XX%
+  - 错误处理: XX%
+  - 国际化: XX%
+
+  ## 未覆盖的关键区域
+
+  1. 克里金插值算法
+  2. 地图引擎适配器
+  3. 离线同步逻辑
+  4. 插件系统
+  ```
+
+### 验证方法
+- 检查覆盖率报告
+- 识别未覆盖的代码
+- 分析测试缺失原因
+
+### 注意事项
+- 重点关注核心业务逻辑
+- 优先测试关键路径
+- 考虑测试成本和收益
+
+---
+
+## 任务 2: 为核心算法编写测试
+
+### 实施步骤
+2.1. 创建克里金插值测试
+- 创建文件：`/Users/wuchenkai/UDAKE/tests/kriging/interpolation.test.ts`
+  ```typescript
+  import { describe, it, expect, beforeEach } from 'vitest';
+  import { KrigingService } from '../services/KrigingService';
+
+  describe('克里金插值服务', () => {
+    let service: KrigingService;
+
+    beforeEach(() => {
+      service = new KrigingService();
+    });
+
+    describe('普通克里金', () => {
+      it('应该成功执行普通克里金插值', async () => {
+        const points = generateTestPoints(50);
+        const parameters = {
+          method: 'ordinary',
+          variogramModel: 'spherical',
+          nugget: 0.1,
+          sill: 1.0,
+          range: 10.0
+        };
+
+        const result = await service.interpolate(points, parameters);
+
+        expect(result).toBeDefined();
+        expect(result.grid).toBeDefined();
+        expect(result.grid.length).toBeGreaterThan(0);
+        expect(result.variance).toBeDefined();
+      });
+
+      it('应该正确处理边界情况', async () => {
+        const points = generateTestPoints(2); // 最小点数
+        const parameters = {
+          method: 'ordinary',
+          variogramModel: 'spherical',
+          nugget: 0.1,
+          sill: 1.0,
+          range: 10.0
+        };
+
+        const result = await service.interpolate(points, parameters);
+
+        expect(result).toBeDefined();
+      });
+
+      it('应该验证输入数据', async () => {
+        const invalidPoints = [{ x: 1, y: 1 }]; // 缺少 value
+        const parameters = {
+          method: 'ordinary',
+          variogramModel: 'spherical',
+          nugget: 0.1,
+          sill: 1.0,
+          range: 10.0
+        };
+
+        await expect(service.interpolate(invalidPoints, parameters))
+          .rejects.toThrow('无效的采样点数据');
+      });
+    });
+
+    describe('泛克里金', () => {
+      it('应该成功执行泛克里金插值', async () => {
+        const points = generateTrendPoints(50);
+        const parameters = {
+          method: 'universal',
+          variogramModel: 'exponential',
+          nugget: 0.1,
+          sill: 1.0,
+          range: 10.0,
+          trendOrder: 1
+        };
+
+        const result = await service.interpolate(points, parameters);
+
+        expect(result).toBeDefined();
+        expect(result.grid).toBeDefined();
+      });
+    });
+
+    describe('交叉验证', () => {
+      it('应该执行交叉验证', async () => {
+        const points = generateTestPoints(100);
+        const parameters = {
+          method: 'ordinary',
+          variogramModel: 'spherical',
+          nugget: 0.1,
+          sill: 1.0,
+          range: 10.0
+        };
+
+        const cvResult = await service.crossValidation(points, parameters);
+
+        expect(cvResult).toBeDefined();
+        expect(cvResult.rmse).toBeLessThan(0.5);
+        expect(cvResult.mae).toBeLessThan(0.3);
+      });
+    });
+  });
+
+  function generateTestPoints(count: number): Array<{x: number, y: number, value: number}> {
+    const points = [];
+    for (let i = 0; i < count; i++) {
+      points.push({
+        x: Math.random() * 100,
+        y: Math.random() * 100,
+        value: Math.random() * 10
+      });
+    }
+    return points;
+  }
+
+  function generateTrendPoints(count: number): Array<{x: number, y: number, value: number}> {
+    const points = [];
+    for (let i = 0; i < count; i++) {
+      const x = Math.random() * 100;
+      const y = Math.random() * 100;
+      // 添加趋势
+      const value = 0.5 * x + 0.3 * y + Math.random() * 2;
+      points.push({ x, y, value });
+    }
+    return points;
+  }
+  ```
+
+2.2. 创建变异函数测试
+- 创建文件：`/Users/wuchenkai/UDAKE/tests/kriging/variogram.test.ts`
+
+2.3. 创建采样系统测试
+- 创建文件：`/Users/wuchenkai/UDAKE/tests/sampling/sampling.test.ts`
+
+### 验证方法
+- 运行算法测试
+- 检查测试覆盖率
+- 验证结果准确性
+
+### 注意事项
+- 使用随机种子确保可重复性
+- 测试边界情况和异常情况
+- 使用合理的测试数据
+
+---
+
+## 任务 3: 为地图引擎编写测试
+
+### 实施步骤
+3.1. 创建地图引擎基类测试
+- 创建文件：`/Users/wuchenkai/UDAKE/tests/map/base-engine.test.ts`
+  ```typescript
+  import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+  import { BaseMapEngine } from '../frontend/js/map/core/BaseMapEngine';
+
+  describe('BaseMapEngine', () => {
+    let engine: BaseMapEngine;
+    let container: HTMLElement;
+
+    beforeEach(() => {
+      container = document.createElement('div');
+      document.body.appendChild(container);
+      engine = new BaseMapEngine(container);
+    });
+
+    afterEach(() => {
+      engine.destroy();
+      document.body.removeChild(container);
+    });
+
+    it('应该成功初始化', async () => {
+      await engine.initialize();
+      expect(container.querySelector('.map-container')).toBeTruthy();
+    });
+
+    it('应该支持缩放', async () => {
+      await engine.initialize();
+      await engine.zoomIn();
+      await engine.zoomOut();
+      
+      // 验证缩放级别
+      expect(engine.getZoom()).toBeGreaterThan(0);
+    });
+
+    it('应该支持平移', async () => {
+      await engine.initialize();
+      await engine.pan(10, 10);
+      
+      // 验证中心点
+      const center = engine.getCenter();
+      expect(center.x).toBeCloseTo(5, 1);
+      expect(center.y).toBeCloseTo(5, 1);
+    });
+
+    it('应该支持添加标记', async () => {
+      await engine.initialize();
+      const marker = await engine.addMarker({
+        position: [50, 50],
+        popup: 'Test Marker'
+      });
+      
+      expect(marker).toBeDefined();
+      expect(marker.getPosition()).toEqual([50, 50]);
+    });
+
+    it('应该支持删除标记', async () => {
+      await engine.initialize();
+      const marker = await engine.addMarker({
+        position: [50, 50]
+      });
+      
+      await marker.remove();
+      expect(engine.getMarkers().length).toBe(0);
+    });
+
+    it('应该支持添加图层', async () => {
+      await engine.initialize();
+      const layer = await engine.addLayer({
+        type: 'tile',
+        url: 'https://tile.example.com/{z}/{x}/{y}.png'
+      });
+      
+      expect(layer).toBeDefined();
+    });
+
+    it('应该处理错误', async () => {
+      await expect(engine.addLayer({
+        type: 'tile',
+        url: 'invalid-url'
+      })).rejects.toThrow();
+    });
+  });
+  ```
+
+3.2. 创建地图适配器测试
+- 创建文件：`/Users/wuchenkai/UDAKE/tests/map/adapters.test.ts`
+
+3.3. 创建地图交互测试
+- 创建文件：`/Users/wuchenkai/UDAKE/tests/map/interaction.test.ts`
+
+### 验证方法
+- 测试所有地图功能
+- 检查事件处理
+- 验证错误处理
+
+### 注意事项
+- 使用模拟DOM
+- 测试异步操作
+- 清理资源
+
+---
+
+## 任务 4: 为离线功能编写测试
+
+### 实施步骤
+4.1. 创建离线管理器测试
+- 创建文件：`/Users/wuchenkai/UDAKE/tests/offline/offline-manager.test.ts`
+  ```typescript
+  import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+  import { OfflineManager } from '../frontend/js/utils/OfflineManager';
+
+  describe('OfflineManager', () => {
+    let manager: OfflineManager;
+
+    beforeEach(() => {
+      manager = new OfflineManager();
+    });
+
+    afterEach(async () => {
+      await manager.clear();
+    });
+
+    it('应该检测在线状态', async () => {
+      const isOnline = await manager.isOnline();
+      expect(typeof isOnline).toBe('boolean');
+    });
+
+    it('应该存储数据到 IndexedDB', async () => {
+      const testData = { id: '1', value: 'test' };
+      await manager.store('test-key', testData);
+      
+      const retrieved = await manager.retrieve('test-key');
+      expect(retrieved).toEqual(testData);
+    });
+
+    it('应该支持批量存储', async () => {
+      const items = [
+        { id: '1', value: 'test1' },
+        { id: '2', value: 'test2' },
+        { id: '3', value: 'test3' }
+      ];
+      
+      await manager.storeBatch('items', items);
+      
+      const retrieved = await manager.retrieveBatch('items');
+      expect(retrieved).toHaveLength(3);
+    });
+
+    it('应该处理离线队列', async () => {
+      await manager.addToQueue({
+        type: 'API_REQUEST',
+        url: '/api/test',
+        method: 'POST',
+        data: { test: 'data' }
+      });
+
+      const queue = await manager.getQueue();
+      expect(queue).toHaveLength(1);
+    });
+
+    it('应该在上线时同步队列', async () => {
+      await manager.addToQueue({
+        type: 'API_REQUEST',
+        url: '/api/test',
+        method: 'POST',
+        data: { test: 'data' }
+      });
+
+      // 模拟上线
+      await manager.syncQueue();
+
+      const queue = await manager.getQueue();
+      expect(queue).toHaveLength(0);
+    });
+
+    it('应该处理同步冲突', async () => {
+      // 存储初始数据
+      await manager.store('conflict-key', { version: 1, value: 'initial' });
+
+      // 模拟离线修改
+      await manager.store('conflict-key', { version: 1, value: 'offline-modified' });
+
+      // 模拟服务器返回的新版本
+      const serverData = { version: 2, value: 'server-modified' };
+
+      // 处理冲突
+      const resolved = await manager.resolveConflict('conflict-key', serverData);
+      
+      expect(resolved).toBeDefined();
+      expect(resolved.version).toBeGreaterThan(1);
+    });
+
+    it('应该清除过期数据', async () => {
+      await manager.store('expiring-key', { value: 'test' }, { ttl: 1000 });
+
+      // 等待过期
+      await new Promise(resolve => setTimeout(resolve, 1100));
+
+      const retrieved = await manager.retrieve('expiring-key');
+      expect(retrieved).toBeNull();
+    });
+  });
+  ```
+
+4.2. 创建同步逻辑测试
+- 创建文件：`/Users/wuchenkai/UDAKE/tests/offline/sync.test.ts`
+
+### 验证方法
+- 测试离线功能
+- 测试同步逻辑
+- 验证冲突解决
+
+### 注意事项
+- 清理测试数据
+- 测试超时处理
+- 模拟网络状态
+
+---
+
+## 任务 5: 实现性能监控
+
+### 实施步骤
+5.1. 创建性能监控类
+- 创建文件：`/Users/wuchenkai/UDAKE/frontend/js/utils/PerformanceMonitor.ts`
+  ```typescript
+  export interface PerformanceMetric {
+    name: string;
+    duration: number;
+    timestamp: number;
+    metadata?: any;
+  }
+
+  export interface PerformanceStats {
+    count: number;
+    total: number;
+    average: number;
+    min: number;
+    max: number;
+    p50: number;
+    p95: number;
+    p99: number;
+  }
+
+  export class PerformanceMonitor {
+    private metrics: Map<string, PerformanceMetric[]> = new Map();
+    private observers: PerformanceObserver[] = [];
+
+    constructor() {
+      this.initializeObservers();
+    }
+
+    private initializeObservers(): void {
+      // 监控资源加载
+      const resourceObserver = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.entryType === 'resource') {
+            this.recordMetric('resource-load', entry.duration, {
+              name: entry.name,
+              type: entry.initiatorType
+            });
+          }
+        }
+      });
+      resourceObserver.observe({ entryTypes: ['resource'] });
+      this.observers.push(resourceObserver);
+
+      // 监控长任务
+      const longTaskObserver = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.entryType === 'longtask') {
+            this.recordMetric('long-task', entry.duration, {
+              name: entry.name
+            });
+          }
+        }
+      });
+      longTaskObserver.observe({ entryTypes: ['longtask'] });
+      this.observers.push(longTaskObserver);
+
+      // 监控测量
+      const measureObserver = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.entryType === 'measure') {
+            this.recordMetric(entry.name, entry.duration);
+          }
+        }
+      });
+      measureObserver.observe({ entryTypes: ['measure'] });
+      this.observers.push(measureObserver);
+    }
+
+    recordMetric(name: string, duration: number, metadata?: any): void {
+      const metric: PerformanceMetric = {
+        name,
+        duration,
+        timestamp: Date.now(),
+        metadata
+      };
+
+      if (!this.metrics.has(name)) {
+        this.metrics.set(name, []);
+      }
+
+      this.metrics.get(name)!.push(metric);
+
+      // 限制保留的指标数量
+      const metrics = this.metrics.get(name)!;
+      if (metrics.length > 1000) {
+        metrics.splice(0, metrics.length - 1000);
+      }
+    }
+
+    startMeasure(name: string): () => void {
+      const startTime = performance.now();
+      performance.mark(`${name}-start`);
+
+      return () => {
+        const endTime = performance.now();
+        performance.mark(`${name}-end`);
+        performance.measure(name, `${name}-start`, `${name}-end`);
+
+        this.recordMetric(name, endTime - startTime);
+
+        // 清理标记
+        performance.clearMarks(`${name}-start`);
+        performance.clearMarks(`${name}-end`);
+        performance.clearMeasures(name);
+      };
+    }
+
+    async measureAsync<T>(name: string, fn: () => Promise<T>): Promise<T> {
+      const stopMeasure = this.startMeasure(name);
+      
+      try {
+        return await fn();
+      } finally {
+        stopMeasure();
+      }
+    }
+
+    getStats(name: string): PerformanceStats | null {
+      const metrics = this.metrics.get(name);
+      if (!metrics || metrics.length === 0) {
+        return null;
+      }
+
+      const durations = metrics.map(m => m.duration).sort((a, b) => a - b);
+      const total = durations.reduce((sum, d) => sum + d, 0);
+
+      return {
+        count: durations.length,
+        total,
+        average: total / durations.length,
+        min: durations[0],
+        max: durations[durations.length - 1],
+        p50: durations[Math.floor(durations.length * 0.5)],
+        p95: durations[Math.floor(durations.length * 0.95)],
+        p99: durations[Math.floor(durations.length * 0.99)]
+      };
+    }
+
+    getAllStats(): Map<string, PerformanceStats> {
+      const stats = new Map<string, PerformanceStats>();
+      
+      for (const name of this.metrics.keys()) {
+        const stat = this.getStats(name);
+        if (stat) {
+          stats.set(name, stat);
+        }
+      }
+
+      return stats;
+    }
+
+    getWebVitals(): any {
+      // 获取 Core Web Vitals
+      const vitals: any = {};
+
+      // LCP (Largest Contentful Paint)
+      const lcpEntry = performance.getEntriesByName('largest-contentful-paint', 'paint')[0] as any;
+      if (lcpEntry) {
+        vitals.lcp = lcpEntry.startTime;
+      }
+
+      // FID (First Input Delay)
+      const fidEntry = performance.getEntriesByName('first-input', 'event')[0] as any;
+      if (fidEntry) {
+        vitals.fid = fidEntry.processingStart - fidEntry.startTime;
+      }
+
+      // CLS (Cumulative Layout Shift)
+      let clsValue = 0;
+      for (const entry of performance.getEntries() as any[]) {
+        if (entry.entryType === 'layout-shift' && !entry.hadRecentInput) {
+          clsValue += entry.value;
+        }
+      }
+      vitals.cls = clsValue;
+
+      // FCP (First Contentful Paint)
+      const fcpEntry = performance.getEntriesByName('first-contentful-paint', 'paint')[0] as any;
+      if (fcpEntry) {
+        vitals.fcp = fcpEntry.startTime;
+      }
+
+      // TTFB (Time to First Byte)
+      const navEntry = performance.getEntriesByType('navigation')[0] as any;
+      if (navEntry) {
+        vitals.ttfb = navEntry.responseStart - navEntry.requestStart;
+      }
+
+      return vitals;
+    }
+
+    getMemoryUsage(): any {
+      if ('memory' in performance) {
+        const memory = (performance as any).memory;
+        return {
+          usedJSHeapSize: memory.usedJSHeapSize,
+          totalJSHeapSize: memory.totalJSHeapSize,
+          jsHeapSizeLimit: memory.jsHeapSizeLimit,
+          usagePercent: (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100
+        };
+      }
+      return null;
+    }
+
+    clear(): void {
+      this.metrics.clear();
+    }
+
+    destroy(): void {
+      this.observers.forEach(observer => observer.disconnect());
+      this.observers = [];
+      this.clear();
+    }
+
+    generateReport(): string {
+      const stats = this.getAllStats();
+      const vitals = this.getWebVitals();
+      const memory = this.getMemoryUsage();
+
+      let report = '=== 性能监控报告 ===\n\n';
+
+      report += '## Core Web Vitals\n';
+      report += `- LCP: ${vitals.lcp ? vitals.lcp.toFixed(2) + 'ms' : 'N/A'}\n`;
+      report += `- FID: ${vitals.fid ? vitals.fid.toFixed(2) + 'ms' : 'N/A'}\n`;
+      report += `- CLS: ${vitals.cls ? vitals.cls.toFixed(4) : 'N/A'}\n`;
+      report += `- FCP: ${vitals.fcp ? vitals.fcp.toFixed(2) + 'ms' : 'N/A'}\n`;
+      report += `- TTFB: ${vitals.ttfb ? vitals.ttfb.toFixed(2) + 'ms' : 'N/A'}\n\n`;
+
+      if (memory) {
+        report += '## 内存使用\n';
+        report += `- 已使用: ${(memory.usedJSHeapSize / 1024 / 1024).toFixed(2)} MB\n`;
+        report += `- 总计: ${(memory.totalJSHeapSize / 1024 / 1024).toFixed(2)} MB\n`;
+        report += `- 使用率: ${memory.usagePercent.toFixed(2)}%\n\n`;
+      }
+
+      report += '## 性能指标统计\n';
+      for (const [name, stat] of stats.entries()) {
+        report += `\n### ${name}\n`;
+        report += `- 计数: ${stat.count}\n`;
+        report += `- 平均: ${stat.average.toFixed(2)}ms\n`;
+        report += `- 最小: ${stat.min.toFixed(2)}ms\n`;
+        report += `- 最大: ${stat.max.toFixed(2)}ms\n`;
+        report += `- P50: ${stat.p50.toFixed(2)}ms\n`;
+        report += `- P95: ${stat.p95.toFixed(2)}ms\n`;
+        report += `- P99: ${stat.p99.toFixed(2)}ms\n`;
+      }
+
+      return report;
+    }
+  }
+
+  // 导出单例
+  export const performanceMonitor = new PerformanceMonitor();
+  ```
+
+### 验证方法
+- 测试性能监控功能
+- 验证指标准确性
+- 检查报告生成
+
+### 注意事项
+- 避免影响应用性能
+- 限制存储的指标数量
+- 处理不支持的性能API
+
+---
+
+## 任务 6: 集成性能监控到应用
+
+### 实施步骤
+6.1. 更新主程序，集成性能监控
+- 在主程序中初始化性能监控：
+  ```typescript
+  import { performanceMonitor } from './utils/PerformanceMonitor';
+
+  export class App {
+    async initialize(): Promise<void> {
+      const stopMeasure = performanceMonitor.startMeasure('app-initialization');
+      
+      try {
+        // 初始化应用
+        await this.startupManager.initialize();
+        await this.componentInitializer.initialize(mapContainer);
+        this.bindEvents();
+        await this.restoreState();
+        
+      } finally {
+        stopMeasure();
+      }
+
+      // 定期生成报告
+      setInterval(() => {
+        console.log(performanceMonitor.generateReport());
+      }, 60000); // 每分钟
+    }
+  }
+  ```
+
+6.2. 创建性能监控仪表板
+- 创建文件：`/Users/wuchenkai/UDAKE/frontend/js/components/PerformanceDashboard.ts`
+
+### 验证方法
+- 测试性能监控集成
+- 检查指标收集
+- 验证报告生成
+
+### 注意事项
+- 不要在生产环境过度监控
+- 提供性能告警
+- 优化监控开销
+
+---
+
+## 任务 7: 创建集成测试
+
+### 实施步骤
+7.1. 创建端到端测试
+- 安装 Playwright：
+  ```bash
+  npm install --save-dev @playwright/test
+  ```
+
+- 创建测试文件：`/Users/wuchenkai/UDAKE/tests/e2e/workflow.test.ts`
+  ```typescript
+  import { test, expect } from '@playwright/test';
+
+  test.describe('完整工作流', () => {
+    test.beforeEach(async ({ page }) => {
+      await page.goto('http://localhost:5173');
+    });
+
+    test('应该能够完成数据导入到报告生成的完整流程', async ({ page }) => {
+      // 1. 导入数据
+      await page.click('[data-testid="import-button"]');
+      await page.setInputFiles('input[type="file"]', 'tests/fixtures/sample-data.geojson');
+      await page.click('[data-testid="confirm-import"]');
+      await expect(page.locator('[data-testid="data-table"]')).toBeVisible();
+
+      // 2. 配置插值参数
+      await page.click('[data-testid="configure-button"]');
+      await page.selectOption('[data-testid="method-select"]', 'ordinary');
+      await page.selectOption('[data-testid="variogram-select"]', 'spherical');
+      await page.fill('[data-testid="nugget-input"]', '0.1');
+      await page.fill('[data-testid="sill-input"]', '1.0');
+      await page.fill('[data-testid="range-input"]', '10.0');
+      await page.click('[data-testid="save-parameters"]');
+
+      // 3. 运行插值
+      await page.click('[data-testid="run-interpolation"]');
+      await expect(page.locator('[data-testid="progress-bar"]')).toBeVisible();
+      await expect(page.locator('[data-testid="progress-bar"]')).not.toBeVisible({ timeout: 60000 });
+
+      // 4. 查看结果
+      await expect(page.locator('[data-testid="result-map"]')).toBeVisible();
+      await expect(page.locator('[data-testid="result-chart"]')).toBeVisible();
+
+      // 5. 生成报告
+      await page.click('[data-testid="generate-report"]');
+      await expect(page.locator('[data-testid="report-preview"]')).toBeVisible();
+
+      // 6. 导出报告
+      await page.click('[data-testid="export-report"]');
+      // 验证下载
+      const [download] = await Promise.all([
+        page.waitForEvent('download'),
+        page.click('[data-testid="confirm-export"]')
+      ]);
+      expect(download.suggestedFilename()).toMatch(/\.pdf$/);
+    });
+
+    test('应该能够处理错误情况', async ({ page }) => {
+      // 测试无效数据导入
+      await page.click('[data-testid="import-button"]');
+      await page.setInputFiles('input[type="file"]', 'tests/fixtures/invalid-data.json');
+      await page.click('[data-testid="confirm-import"]');
+      await expect(page.locator('[data-testid="error-message"]')).toBeVisible();
+      await expect(page.locator('[data-testid="error-message"]')).toContainText('无效的数据格式');
+
+      // 测试网络错误
+      // Mock 网络请求失败
+      await page.route('**/api/**', route => route.abort());
+      await page.click('[data-testid="run-interpolation"]');
+      await expect(page.locator('[data-testid="error-message"]')).toBeVisible();
+      await expect(page.locator('[data-testid="error-message"]')).toContainText('网络连接失败');
+    });
+
+    test('应该支持离线模式', async ({ page }) => {
+      // 模拟离线
+      await page.setOffline(true);
+      await page.reload();
+
+      // 验证离线提示
+      await expect(page.locator('[data-testid="offline-indicator"]')).toBeVisible();
+
+      // 导入数据（应该缓存）
+      await page.click('[data-testid="import-button"]');
+      await page.setInputFiles('input[type="file"]', 'tests/fixtures/sample-data.geojson');
+      await page.click('[data-testid="confirm-import"]');
+
+      // 恢复在线
+      await page.setOffline(false);
+      await page.reload();
+
+      // 验证数据已同步
+      await expect(page.locator('[data-testid="data-table"]')).toBeVisible();
+    });
+  });
+  ```
+
+### 验证方法
+- 运行 E2E 测试
+- 检查测试覆盖率
+- 验证业务流程
+
+### 注意事项
+- 使用测试环境
+- 清理测试数据
+- 处理异步操作
+
+---
+
+## 任务 8: 创建性能基准测试
+
+### 实施步骤
+8.1. 创建基准测试
+- 创建文件：`/Users/wuchenkai/UDAKE/tests/benchmark/performance.test.ts`
+  ```typescript
+  import { describe, it, expect } from 'vitest';
+  import { performanceMonitor } from '../frontend/js/utils/PerformanceMonitor';
+
+  describe('性能基准测试', () => {
+    it('应该在合理时间内完成大数据量插值', async () => {
+      const points = generateTestPoints(1000);
+      const service = new KrigingService();
+
+      const duration = await performanceMonitor.measureAsync(
+        'large-dataset-interpolation',
+        () => service.interpolate(points, {
+          method: 'ordinary',
+          variogramModel: 'spherical',
+          nugget: 0.1,
+          sill: 1.0,
+          range: 10.0
+        })
+      );
+
+      expect(duration).toBeLessThan(5000); // 5秒内完成
+    });
+
+    it('应该能够在合理时间内渲染大量地图标记', async () => {
+      const engine = new BaseMapEngine(container);
+      await engine.initialize();
+
+      const duration = await performanceMonitor.measureAsync(
+        'render-many-markers',
+        async () => {
+          for (let i = 0; i < 1000; i++) {
+            await engine.addMarker({
+              position: [Math.random() * 100, Math.random() * 100]
+            });
+          }
+        }
+      );
+
+      expect(duration).toBeLessThan(2000); // 2秒内完成
+    });
+
+    it('应该能够在合理时间内处理大量缓存操作', async () => {
+      const cache = new SmartCache({ maxSize: 10000 });
+
+      const duration = await performanceMonitor.measureAsync(
+        'cache-operations',
+        async () => {
+          // 写入
+          for (let i = 0; i < 5000; i++) {
+            cache.set(`key-${i}`, { data: `value-${i}` });
+          }
+          // 读取
+          for (let i = 0; i < 5000; i++) {
+            cache.get(`key-${i}`);
+          }
+        }
+      );
+
+      expect(duration).toBeLessThan(1000); // 1秒内完成
+    });
+  });
+  ```
+
+### 验证方法
+- 运行基准测试
+- 对比性能指标
+- 识别性能瓶颈
+
+### 注意事项
+- 使用一致的测试环境
+- 多次运行取平均值
+- 记录基准数据
+
+---
+
+## 任务 9: 配置 CI/CD 测试
+
+### 实施步骤
+9.1. 创建 GitHub Actions 工作流
+- 创建文件：`/.github/workflows/test.yml`
+  ```yaml
+  name: 测试
+
+  on:
+    push:
+      branches: [ main, develop ]
+    pull_request:
+      branches: [ main, develop ]
+
+  jobs:
+    unit-tests:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+        - name: 设置 Node.js
+          uses: actions/setup-node@v3
+          with:
+            node-version: '18'
+        - name: 安装依赖
+          run: npm ci
+        - name: 运行单元测试
+          run: npm run test:unit
+        - name: 生成覆盖率报告
+          run: npm run test:coverage
+        - name: 上传覆盖率报告
+          uses: codecov/codecov-action@v3
+          with:
+            files: ./coverage/lcov.info
+
+    e2e-tests:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+        - name: 设置 Node.js
+          uses: actions/setup-node@v3
+          with:
+            node-version: '18'
+        - name: 安装依赖
+          run: npm ci
+        - name: 安装 Playwright
+          run: npx playwright install --with-deps
+        - name: 构建应用
+          run: npm run build
+        - name: 运行 E2E 测试
+          run: npm run test:e2e
+        - name: 上传测试报告
+          uses: actions/upload-artifact@v3
+          if: always()
+          with:
+            name: playwright-report
+            path: playwright-report/
+
+    performance-tests:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v3
+        - name: 设置 Node.js
+          uses: actions/setup-node@v3
+          with:
+            node-version: '18'
+        - name: 安装依赖
+          run: npm ci
+        - name: 运行性能测试
+          run: npm run test:performance
+        - name: 上传性能报告
+          uses: actions/upload-artifact@v3
+          with:
+            name: performance-report
+            path: performance-report/
+  ```
+
+### 验证方法
+- 触发 CI/CD 流程
+- 检查测试结果
+- 验证覆盖率报告
+
+### 注意事项
+- 配置测试超时
+- 处理测试失败
+- 优化测试执行时间
+
+---
+
+## 完成标准
+
+- [ ] 测试覆盖率达到80%以上
+- [ ] 核心算法测试完成
+- [ ] 地图引擎测试完成
+- [ ] 离线功能测试完成
+- [ ] 性能监控已实现
+- [ ] 集成测试已创建
+- [ ] 性能基准测试已创建
+- [ ] CI/CD 测试已配置
+- [ ] 所有测试通过
+- [ ] 文档已完善
+
+---
+
+## 预期成果
+
+- 测试覆盖率达到80%以上
+- 全面的性能监控
+- 完善的测试套件
+- 自动化 CI/CD 流程
+- 更好的代码质量
+- 及早发现问题和性能瓶颈
+
+---
+
+## 后续工作
+
+- 实现测试报告可视化
+- 添加性能告警
+- 实现自动化回归测试
+- 添加负载测试
+- 实现A/B测试支持

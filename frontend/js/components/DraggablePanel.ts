@@ -9,8 +9,8 @@ import type { PanelInfo, PanelPosition } from '../../types/core';
 export class DraggablePanel {
     private panelId: string;
     private element: HTMLElement;
-    private header: HTMLElement;
-    private content: HTMLElement;
+    private header!: HTMLElement;
+    private content!: HTMLElement;
     private isDragging: boolean = false;
     private isResizing: boolean = false;
     private dragOffset = { x: 0, y: 0 };
@@ -175,7 +175,7 @@ export class DraggablePanel {
     }
 
     private updatePanelPosition(): void {
-        const panels = appStore.get('layout.panels');
+        const panels = appStore.get('layout.panels') as Record<string, PanelInfo>;
         const panelInfo = panels[this.panelId];
         
         if (panelInfo) {
@@ -301,7 +301,7 @@ export class DraggablePanel {
     };
 
     private updatePanelSize(): void {
-        const panels = appStore.get('layout.panels');
+        const panels = appStore.get('layout.panels') as Record<string, PanelInfo>;
         const panelInfo = panels[this.panelId];
         
         if (panelInfo) {
@@ -337,7 +337,7 @@ export class DraggablePanel {
     }
 
     private toggleCollapse(): void {
-        const panels = appStore.get('layout.panels');
+        const panels = appStore.get('layout.panels') as Record<string, PanelInfo>;
         const panelInfo = panels[this.panelId];
         
         if (panelInfo) {
@@ -350,19 +350,19 @@ export class DraggablePanel {
     }
 
     private hidePanel(): void {
-        const panels = appStore.get('layout.panels');
+        const panels = appStore.get('layout.panels') as Record<string, PanelInfo>;
         const panelInfo = panels[this.panelId];
-        
+
         if (panelInfo) {
             panelInfo.visible = false;
             this.element.style.display = 'none';
-            
+
             appStore.set(`layout.panels.${this.panelId}`, panelInfo);
         }
     }
 
     public showPanel(): void {
-        const panels = appStore.get('layout.panels');
+        const panels = appStore.get('layout.panels') as Record<string, PanelInfo>;
         const panelInfo = panels[this.panelId];
         
         if (panelInfo) {
@@ -424,8 +424,8 @@ export class LayoutManager {
     }
 
     private initializePanels(): void {
-        const panels = appStore.get('layout.panels');
-        
+        const panels = appStore.get('layout.panels') as Record<string, PanelInfo>;
+
         for (const [panelId, panelInfo] of Object.entries(panels)) {
             const element = document.querySelector(`[data-panel-id="${panelId}"]`) as HTMLElement;
             
@@ -477,15 +477,16 @@ export class LayoutManager {
 
     public saveLayout(name?: string): void {
         if (!name) {
-            name = prompt('请输入布局名称：', `布局_${new Date().toLocaleDateString()}`);
-            if (!name) return;
+            const inputName = prompt('请输入布局名称：', `布局_${new Date().toLocaleDateString()}`);
+            if (!inputName) return;
+            name = inputName;
         }
-        
-        const currentPanels = appStore.get('layout.panels');
-        const savedLayouts = appStore.get('layout.savedLayouts');
-        
+
+        const currentPanels = appStore.get('layout.panels') as Record<string, PanelInfo>;
+        const savedLayouts = appStore.get('layout.savedLayouts') as Record<string, Record<string, PanelInfo>>;
+
         savedLayouts[name] = JSON.parse(JSON.stringify(currentPanels));
-        
+
         appStore.set('layout.savedLayouts', savedLayouts);
         appStore.set('layout.activeLayout', name);
         
@@ -496,22 +497,23 @@ export class LayoutManager {
 
     public loadLayout(name?: string): void {
         if (!name) {
-            const savedLayouts = appStore.get('layout.savedLayouts');
+            const savedLayouts = appStore.get('layout.savedLayouts') as Record<string, Record<string, PanelInfo>>;
             const layoutNames = Object.keys(savedLayouts);
-            
+
             if (layoutNames.length === 0) {
                 alert('没有已保存的布局');
                 return;
             }
-            
-            name = prompt(`请选择要加载的布局：\n${layoutNames.join('\n')}`, layoutNames[0]);
-            if (!name || !savedLayouts[name]) {
+
+            const inputName = prompt(`请选择要加载的布局：\n${layoutNames.join('\n')}`, layoutNames[0]);
+            if (!inputName || !savedLayouts[inputName]) {
                 alert('布局不存在');
                 return;
             }
+            name = inputName;
         }
-        
-        const savedLayouts = appStore.get('layout.savedLayouts');
+
+        const savedLayouts = appStore.get('layout.savedLayouts') as Record<string, Record<string, PanelInfo>>;
         const layout = savedLayouts[name];
         
         if (layout) {
@@ -539,9 +541,9 @@ export class LayoutManager {
     }
 
     private updateSavedLayoutsList(): void {
-        const savedLayouts = appStore.get('layout.savedLayouts');
+        const savedLayouts = appStore.get('layout.savedLayouts') as Record<string, Record<string, PanelInfo>>;
         const listElement = document.querySelector('.layout-saved-list');
-        
+
         if (listElement) {
             const activeLayout = appStore.get('layout.activeLayout');
             listElement.innerHTML = Object.entries(savedLayouts).map(([name, layout]) => `
@@ -566,7 +568,7 @@ export class LayoutManager {
 
     private deleteLayout(name: string): void {
         if (confirm(`确定要删除布局 "${name}" 吗？`)) {
-            const savedLayouts = appStore.get('layout.savedLayouts');
+            const savedLayouts = appStore.get('layout.savedLayouts') as Record<string, Record<string, PanelInfo>>;
             delete savedLayouts[name];
             
             appStore.set('layout.savedLayouts', savedLayouts);

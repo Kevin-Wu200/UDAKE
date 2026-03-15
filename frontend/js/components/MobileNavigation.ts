@@ -233,14 +233,14 @@ class MobileNavigation {
         let touchStartX = 0;
         let touchStartY = 0;
 
-        mapContainer.addEventListener('touchstart', (e: TouchEvent) => {
-            touchStartX = e.touches[0].clientX;
-            touchStartY = e.touches[0].clientY;
+        mapContainer.addEventListener('touchstart', (e: Event) => {
+            touchStartX = (e as TouchEvent).touches[0].clientX;
+            touchStartY = (e as TouchEvent).touches[0].clientY;
         }, { passive: true });
 
-        mapContainer.addEventListener('touchend', (e: TouchEvent) => {
-            const touchEndX = e.changedTouches[0].clientX;
-            const touchEndY = e.changedTouches[0].clientY;
+        mapContainer.addEventListener('touchend', (e: Event) => {
+            const touchEndX = (e as TouchEvent).changedTouches[0].clientX;
+            const touchEndY = (e as TouchEvent).changedTouches[0].clientY;
 
             const deltaX = touchEndX - touchStartX;
             const deltaY = touchEndY - touchStartY;

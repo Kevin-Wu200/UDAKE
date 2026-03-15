@@ -181,7 +181,7 @@ export class SamplingRecommendationPanel {
                 task_id: this.currentTaskId,
                 strategy: strategy,
                 n_recommendations: count
-            });
+            }) as { recommendations: Recommendation[] };
             this.recommendations = response.recommendations || [];
             this.displayRecommendations();
             this.displayMarkers();

@@ -1,0 +1,375 @@
+/**
+ * 骨架屏样式
+ * 提供多种骨架屏类型的视觉效果和动画
+ */
+
+/* 基础骨架屏样式 */
+.skeleton {
+    background: #e0e0e0;
+    border-radius: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+.skeleton::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+    transform: translateX(-100%);
+}
+
+/* Shimmer 动画 */
+.skeleton-shimmer .skeleton::before {
+    animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(100%);
+    }
+}
+
+/* Pulse 动画 */
+.skeleton-pulse .skeleton {
+    animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.5;
+    }
+}
+
+/* Wave 动画 */
+.skeleton-wave .skeleton::before {
+    animation: wave 2s ease-in-out infinite;
+}
+
+@keyframes wave {
+    0% {
+        transform: translateX(-100%) translateY(0);
+    }
+    50% {
+        transform: translateX(100%) translateY(-10px);
+    }
+    100% {
+        transform: translateX(-100%) translateY(0);
+    }
+}
+
+/* 文本骨架屏 */
+.skeleton-text {
+    height: 16px;
+    margin-bottom: 8px;
+}
+
+/* 标题骨架屏 */
+.skeleton-title {
+    height: 24px;
+    margin-bottom: 16px;
+}
+
+/* 矩形骨架屏 */
+.skeleton-rect {
+    height: 100px;
+    border-radius: 8px;
+}
+
+/* 头像骨架屏 */
+.skeleton-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    flex-shrink: 0;
+}
+
+/* 面板骨架屏 */
+.skeleton-panel {
+    padding: 20px;
+    background: #f5f5f5;
+    border-radius: 8px;
+}
+
+/* 列表骨架屏 */
+.skeleton-list-item {
+    display: flex;
+    align-items: flex-start;
+    padding: 16px 0;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.skeleton-list-item:last-child {
+    border-bottom: none;
+}
+
+.skeleton-list-content {
+    flex: 1;
+    margin-left: 12px;
+}
+
+/* 卡片骨架屏 */
+.skeleton-card {
+    background: #f5f5f5;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.skeleton-card-image {
+    width: 100%;
+    height: 200px;
+    background: #e0e0e0;
+}
+
+.skeleton-card-content {
+    padding: 16px;
+}
+
+/* 图表骨架屏 */
+.skeleton-chart {
+    padding: 20px;
+    background: #f5f5f5;
+    border-radius: 8px;
+}
+
+.skeleton-chart-title {
+    margin-bottom: 16px;
+}
+
+.skeleton-chart-area {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-around;
+    height: 200px;
+    margin-bottom: 16px;
+    padding: 20px 0;
+    background: #e8e8e8;
+    border-radius: 4px;
+}
+
+.skeleton-chart-bar {
+    width: 40px;
+    background: #d0d0d0;
+    border-radius: 4px 4px 0 0;
+}
+
+.skeleton-chart-legend {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+/* 地图骨架屏 */
+.skeleton-map {
+    position: relative;
+    width: 100%;
+    height: 400px;
+    background: #f0f0f0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.skeleton-map-background {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+        45deg,
+        #e8e8e8,
+        #e8e8e8 10px,
+        #f0f0f0 10px,
+        #f0f0f0 20px
+    );
+}
+
+.skeleton-map-marker {
+    position: absolute;
+    width: 24px;
+    height: 24px;
+    background: #d0d0d0;
+    border-radius: 50% 50% 50% 0;
+    transform: rotate(-45deg);
+}
+
+.skeleton-map-controls {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.skeleton-map-control {
+    width: 40px;
+    height: 40px;
+    background: #d0d0d0;
+    border-radius: 4px;
+}
+
+/* 侧边栏骨架屏 */
+.skeleton-sidebar {
+    padding: 20px;
+    background: #f5f5f5;
+}
+
+.skeleton-sidebar-header {
+    margin-bottom: 20px;
+}
+
+.skeleton-sidebar-section {
+    margin-bottom: 24px;
+}
+
+/* 骨架屏容器 */
+.skeleton-wrapper {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.skeleton-wrapper.skeleton-visible {
+    opacity: 1;
+}
+
+.skeleton-wrapper.skeleton-hidden {
+    opacity: 0;
+}
+
+/* 深色主题 */
+.skeleton-dark .skeleton {
+    background: #2d2d2d;
+}
+
+.skeleton-dark .skeleton::before {
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+}
+
+.skeleton-dark .skeleton-panel,
+.skeleton-dark .skeleton-card,
+.skeleton-dark .skeleton-chart,
+.skeleton-dark .skeleton-sidebar {
+    background: #1a1a1a;
+}
+
+.skeleton-dark .skeleton-list-item {
+    border-color: #2d2d2d;
+}
+
+.skeleton-dark .skeleton-chart-area {
+    background: #2d2d2d;
+}
+
+.skeleton-dark .skeleton-chart-bar {
+    background: #3d3d3d;
+}
+
+.skeleton-dark .skeleton-map {
+    background: #1a1a1a;
+}
+
+.skeleton-dark .skeleton-map-background {
+    background: repeating-linear-gradient(
+        45deg,
+        #2d2d2d,
+        #2d2d2d 10px,
+        #1a1a1a 10px,
+        #1a1a1a 20px
+    );
+}
+
+.skeleton-dark .skeleton-map-marker {
+    background: #3d3d3d;
+}
+
+.skeleton-dark .skeleton-map-control {
+    background: #3d3d3d;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .skeleton-chart-area {
+        height: 150px;
+    }
+
+    .skeleton-chart-bar {
+        width: 30px;
+    }
+
+    .skeleton-map {
+        height: 300px;
+    }
+
+    .skeleton-card-image {
+        height: 150px;
+    }
+}
+
+@media (max-width: 480px) {
+    .skeleton-chart-area {
+        height: 120px;
+    }
+
+    .skeleton-chart-bar {
+        width: 25px;
+    }
+
+    .skeleton-map {
+        height: 250px;
+    }
+
+    .skeleton-card-image {
+        height: 120px;
+    }
+
+    .skeleton-avatar {
+        width: 40px;
+        height: 40px;
+    }
+}
+
+/* 无障碍支持 */
+.skeleton-wrapper[aria-hidden="true"] {
+    display: none;
+}
+
+.skeleton-wrapper[role="status"] {
+    position: relative;
+}
+
+.skeleton-wrapper[role="status"]::after {
+    content: '加载中...';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+}
+
+/* 性能优化 */
+.skeleton-wrapper {
+    will-change: opacity;
+}
+
+.skeleton::before {
+    will-change: transform;
+}
+
+/* 打印样式 */
+@media print {
+    .skeleton-wrapper {
+        display: none;
+    }
+}

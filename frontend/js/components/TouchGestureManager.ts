@@ -233,7 +233,7 @@ class TouchGestureManager {
         if (!this.options.enableHaptic) return;
 
         try {
-            await Haptics.notification({ type: 'error' });
+            await Haptics.notification({ type: NotificationType.Error as any });
         } catch (e) {
             if ('vibrate' in navigator) {
                 navigator.vibrate([100, 50, 100]);

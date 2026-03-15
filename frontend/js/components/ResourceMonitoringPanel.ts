@@ -45,8 +45,8 @@ interface ResourceSuggestion {
 
 export class ResourceMonitoringPanel {
     private container: HTMLElement;
-    private overlay: HTMLElement;
-    private panel: HTMLElement;
+    private overlay!: HTMLElement;
+    private panel!: HTMLElement;
     private pollingInterval: number | null = null;
 
     constructor(container: HTMLElement | string) {

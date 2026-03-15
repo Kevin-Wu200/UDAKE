@@ -83,7 +83,7 @@ export class SensorManager {
   /**
    * 初始化传感器
    */
-  private async initializeSensors(): Promise<void> {
+  public async initializeSensors(): Promise<void> {
     try {
       // 检查位置权限
       const permissionStatus = await Geolocation.checkPermissions();
@@ -186,7 +186,7 @@ export class SensorManager {
           enableHighAccuracy: this.config.location.enableHighAccuracy,
           timeout: this.config.location.timeout,
           distanceFilter: this.config.location.distanceFilter,
-        },
+        } as any,
         (position, error) => {
           if (error) {
             console.error('位置监听错误:', error);

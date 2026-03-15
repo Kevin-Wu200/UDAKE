@@ -14,10 +14,10 @@ interface SettingsOptions {
 
 export class SettingsPanel {
     private container: HTMLElement;
-    private overlay: HTMLElement;
-    private panel: HTMLElement;
+    private overlay!: HTMLElement;
+    private panel!: HTMLElement;
     private onLanguageChange: ((language: string) => void) | null;
-    
+
     // 自定义下拉组件实例
     private coordinateSystemSelect: CustomSelect | null = null;
     private lengthUnitSelect: CustomSelect | null = null;

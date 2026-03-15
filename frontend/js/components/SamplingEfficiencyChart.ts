@@ -373,9 +373,12 @@ export class SamplingEfficiencyChart {
     // 绑定事件
     const canvas = chartDiv.querySelector('#efficiency-canvas') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d');
-    if (ctx) {
-      this.drawHTMLChart(canvas, ctx);
+    if (!ctx) {
+      console.error('无法获取 2D 上下文');
+      return;
     }
+
+    this.drawHTMLChart(canvas, ctx);
 
     // 生成策略图例
     const legendDiv = chartDiv.querySelector('#strategy-legend');

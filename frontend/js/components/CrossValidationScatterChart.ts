@@ -304,9 +304,12 @@ export class CrossValidationScatterChart {
     // 绑定事件
     const canvas = chartDiv.querySelector('#scatter-canvas') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d');
-    if (ctx) {
-      this.drawHTMLChart(canvas, ctx);
+    if (!ctx) {
+      console.error('无法获取 2D 上下文');
+      return;
     }
+
+    this.drawHTMLChart(canvas, ctx);
 
     // 按钮事件
     const resetBtn = chartDiv.querySelector('#reset-zoom');
