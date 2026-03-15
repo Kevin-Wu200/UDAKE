@@ -13,6 +13,7 @@ from ..schemas.任务队列模型 import (
 )
 from ..schemas.输出结果模型 import TaskStatus
 from ..tasks.任务管理器 import TaskManager
+from .websocket_service import websocket_service
 import uuid
 
 class TaskQueueManager:
@@ -306,6 +307,7 @@ class TaskQueueManager:
                 task = self.running_tasks[task_id]
                 if success:
                     task.status = QueueTaskStatus.COMPLETED
+                    task.progress = 100
                 else:
                     task.status = QueueTaskStatus.FAILED
                     task.error = error
@@ -317,11 +319,49 @@ class TaskQueueManager:
                 del self.running_tasks[task_id]
                 self.task_history.append(task)
 
+                # 通过 WebSocket 通知订阅者
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                update = {
+                    'status': task.status.value,
+                    'progress': task.progress,
+                    'error': task.error,
+                    'updated_at': datetime.now().isoformat()
+                }
+                if success:
+                    update['result'] = {'task_id': task_id, 'completed_at': task.completed_at.isoformat()}
+                loop.run_until_complete(
+                    websocket_service.notify_task_update(task_id, update)
+                )
+
     def update_task_progress(self, task_id: str, progress: float):
         """更新任务进度"""
         with self.lock:
             if task_id in self.tasks:
                 self.tasks[task_id].progress = progress
+
+                # 通过 WebSocket 通知订阅者
+                import asyncio
+                try:
+                    loop = asyncio.get_event_loop()
+                except RuntimeError:
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                task = self.tasks[task_id]
+                update = {
+                    'status': task.status.value,
+                    'progress': progress,
+                    'updated_at': datetime.now().isoformat()
+                }
+                loop.run_until_complete(
+                    websocket_service.notify_task_update(task_id, update)
+                )
 
     def get_task(self, task_id: str) -> Optional[QueueTaskInfo]:
         """获取任务信息"""

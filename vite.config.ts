@@ -30,6 +30,12 @@ export default defineConfig(({ mode }) => {
           target: env.VITE_API_BASE_URL || 'http://localhost:8000',
           changeOrigin: true,
         },
+        // 代理 WebSocket 连接
+        '/ws': {
+          target: env.VITE_WS_URL || 'ws://localhost:8000',
+          ws: true,
+          changeOrigin: true,
+        },
       },
     },
 
@@ -184,6 +190,12 @@ export default defineConfig(({ mode }) => {
       proxy: {
         '/api': {
           target: env.VITE_API_BASE_URL || 'http://localhost:8000',
+          changeOrigin: true,
+        },
+        // 代理 WebSocket 连接
+        '/ws': {
+          target: env.VITE_WS_URL || 'ws://localhost:8000',
+          ws: true,
           changeOrigin: true,
         },
       },

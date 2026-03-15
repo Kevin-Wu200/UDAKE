@@ -9,10 +9,11 @@ from pathlib import Path
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .config import settings
+from .services.websocket_service import websocket_service
 from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口
 import logging
 
@@ -77,6 +78,42 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+# WebSocket 端点
+@app.websocket("/ws/{client_id}")
+async def websocket_endpoint(websocket: WebSocket, client_id: str):
+    await websocket_service.connect(websocket, client_id)
+    try:
+        while True:
+            data = await websocket.receive_json()
+            await handle_websocket_message(client_id, data)
+    except WebSocketDisconnect:
+        websocket_service.disconnect(client_id)
+
+async def handle_websocket_message(client_id: str, message: dict):
+    message_type = message.get('type')
+
+    if message_type == 'subscribe_task':
+        task_id = message.get('task_id')
+        await websocket_service.subscribe_to_task(client_id, task_id)
+        await websocket_service.send_personal_message({
+            'type': 'subscription_confirmed',
+            'task_id': task_id
+        }, client_id)
+
+    elif message_type == 'unsubscribe_task':
+        task_id = message.get('task_id')
+        await websocket_service.unsubscribe_from_task(client_id, task_id)
+        await websocket_service.send_personal_message({
+            'type': 'unsubscription_confirmed',
+            'task_id': task_id
+        }, client_id)
+
+    elif message_type == 'ping':
+        await websocket_service.send_personal_message({
+            'type': 'pong',
+            'timestamp': datetime.now().isoformat()
+        }, client_id)
 
 if __name__ == "__main__":
     import uvicorn

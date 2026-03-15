@@ -8,6 +8,7 @@ import { TaskQueue } from './TaskQueue';
 import { TaskStorage } from './TaskStorage';
 import { LocalNotifications } from '@capacitor/local-notifications';
 import notificationManager from '../components/NotificationManager';
+import { webSocketService, TaskUpdateMessage } from '../services/WebSocketService';
 
 const DEFAULT_MANAGER_OPTIONS: TaskManagerOptions = {
     enablePersistence: true,
@@ -26,6 +27,9 @@ export class TaskManager {
     private eventListeners: Map<string, Set<Function>> = new Map();
     private isRunning: boolean = false;
     private processingInterval: number | null = null;
+    private subscribedTasks: Set<string> = new Set();
+    private pollingInterval: number | null = null;
+    private useWebSocket: boolean = false;
 
     private constructor(options?: Partial<TaskManagerOptions>) {
         this.options = { ...DEFAULT_MANAGER_OPTIONS, ...options };
@@ -63,12 +67,117 @@ export class TaskManager {
                 await this.initializeNotifications();
             }
 
+            // 初始化 WebSocket
+            await this.initializeWebSocket();
+
             // 启动任务处理循环
             this.startProcessing();
 
             console.log('[TaskManager] 初始化完成');
         } catch (error) {
             console.error('[TaskManager] 初始化失败:', error);
+        }
+    }
+
+    /**
+     * 初始化 WebSocket
+     */
+    private async initializeWebSocket(): Promise<void> {
+        try {
+            const clientId = this.generateClientId();
+            await webSocketService.connect(clientId);
+
+            // 监听任务更新
+            webSocketService.on('task_update', (message: TaskUpdateMessage) => {
+                this.handleTaskUpdate(message);
+            });
+
+            this.useWebSocket = true;
+            console.log('[TaskManager] WebSocket 已初始化');
+        } catch (error) {
+            console.error('[TaskManager] WebSocket 初始化失败，使用轮询模式:', error);
+            this.startPolling();
+        }
+    }
+
+    /**
+     * 生成客户端 ID
+     */
+    private generateClientId(): string {
+        return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    }
+
+    /**
+     * 处理任务更新
+     */
+    private handleTaskUpdate(message: TaskUpdateMessage): void {
+        const { task_id, data } = message;
+
+        // 查找任务
+        const task = this.queue.getAllTasks().find(t => t.id === task_id);
+        if (!task) return;
+
+        // 更新任务状态和进度
+        if (data.status !== task.status || data.progress !== task.progress) {
+            task.status = data.status as TaskStatus;
+            task.progress = data.progress || 0;
+
+            if (data.error) {
+                task.error = data.error;
+            }
+
+            // 保存任务
+            this.storage.saveTask(task);
+
+            // 触发事件
+            if (data.status === 'running') {
+                this.dispatchEvent('started', task);
+            } else if (data.status === 'completed') {
+                this.dispatchEvent('completed', task);
+                if (task.notifyOnCompletion) {
+                    this.sendCompletionNotification(task);
+                }
+                this.storage.moveToHistory(task);
+            } else if (data.status === 'failed') {
+                this.dispatchEvent('failed', task);
+                if (task.notifyOnCompletion) {
+                    this.sendFailureNotification(task, data.error || '任务失败');
+                }
+                this.storage.moveToHistory(task);
+            }
+
+            this.dispatchEvent('progress', task);
+        }
+    }
+
+    /**
+     * 开始轮询
+     */
+    private startPolling(): void {
+        if (this.pollingInterval) return;
+
+        this.pollingInterval = window.setInterval(() => {
+            this.subscribedTasks.forEach(taskId => {
+                this.pollTaskStatus(taskId);
+            });
+        }, 5000);
+
+        console.log('[TaskManager] 已启用轮询模式');
+    }
+
+    /**
+     * 轮询任务状态
+     */
+    private async pollTaskStatus(taskId: string): Promise<void> {
+        try {
+            const task = await this.getTask(taskId);
+            if (task && (task.status === 'pending' || task.status === 'running')) {
+                // 这里可以调用 API 获取最新状态
+                // const status = await this.apiClient.getTaskStatus(taskId);
+                // this.handleTaskUpdate({ ...status });
+            }
+        } catch (error) {
+            console.error('[TaskManager] 轮询任务状态失败:', error);
         }
     }
 
@@ -168,6 +277,12 @@ export class TaskManager {
         // 持久化
         if (this.options.enablePersistence) {
             await this.storage.saveTask(task);
+        }
+
+        // 订阅任务更新
+        if (this.useWebSocket) {
+            webSocketService.subscribeToTask(task.id);
+            this.subscribedTasks.add(task.id);
         }
 
         // 触发事件
@@ -352,6 +467,12 @@ export class TaskManager {
         if (!task) {
             console.warn(`[TaskManager] 未找到任务: ${taskId}`);
             return false;
+        }
+
+        // 取消订阅
+        if (this.useWebSocket) {
+            webSocketService.unsubscribeFromTask(taskId);
+            this.subscribedTasks.delete(taskId);
         }
 
         await this.storage.saveTask(task);
@@ -546,6 +667,19 @@ export class TaskManager {
      */
     public destroy(): void {
         this.stopProcessing();
+
+        // 停止轮询
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
+
+        // 断开 WebSocket
+        if (this.useWebSocket) {
+            webSocketService.disconnect();
+            this.subscribedTasks.clear();
+        }
+
         this.queue.clear();
         this.storage.close();
         this.eventListeners.clear();
