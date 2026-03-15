@@ -13,6 +13,15 @@ import type {
 
 import { OfflineManager } from '../utils/OfflineManager';
 import { TwoLevelCache } from '../utils/cache/TwoLevelCache';
+import { errorHandler, ApplicationError, NetworkError, ValidationError, AuthenticationError, NotFoundError, ServerError } from '../utils/errors/ErrorHandler';
+import type { AppError, ErrorContext } from '../../types/errors';
+
+interface RequestConfig {
+    url: string;
+    method?: string;
+    body?: BodyInit | null;
+    headers?: HeadersInit;
+}
 
 export class APIService implements IAPIService {
     public baseURL: string;
@@ -168,6 +177,100 @@ export class APIService implements IAPIService {
         return `请求失败 (${status}): ${statusText}，请稍后重试`;
     }
 
+    /**
+     * 将错误转换为 AppError
+     */
+    private convertToAppError(error: any, config: RequestConfig): AppError {
+        // Axios 或 Fetch 错误
+        if (error.response) {
+            // 服务器响应了错误状态码
+            const status = error.response.status;
+            const data = error.response.data;
+
+            const context: ErrorContext = {
+                url: config.url,
+                method: config.method || 'GET',
+                status,
+                timestamp: new Date()
+            };
+
+            if (status === 401) {
+                return new AuthenticationError(
+                    data?.message || '认证失败',
+                    data,
+                    context,
+                    error
+                );
+            } else if (status === 403) {
+                return new AuthenticationError(
+                    data?.message || '权限不足',
+                    data,
+                    context,
+                    error
+                );
+            } else if (status === 404) {
+                return new NotFoundError(
+                    data?.message || '资源不存在',
+                    data,
+                    context,
+                    error
+                );
+            } else if (status >= 500) {
+                return new ServerError(
+                    data?.message || '服务器错误',
+                    data,
+                    context,
+                    error
+                );
+            } else if (status === 422) {
+                return new ValidationError(
+                    data?.message || '数据验证失败',
+                    data,
+                    context,
+                    error
+                );
+            } else {
+                return new ApplicationError(
+                    'validation' as any,
+                    'REQUEST_ERROR',
+                    data?.message || `请求错误 (${status})`,
+                    'medium' as any,
+                    data,
+                    context,
+                    error
+                );
+            }
+        } else if (error.request) {
+            // 请求已发出但没有收到响应
+            return new NetworkError(
+                '网络连接失败',
+                {
+                    message: error.message
+                },
+                {
+                    url: config.url,
+                    method: config.method || 'GET',
+                    timestamp: new Date()
+                },
+                error
+            );
+        } else {
+            // 其他错误
+            return new ApplicationError(
+                'unknown' as any,
+                'UNKNOWN_ERROR',
+                error.message,
+                'high' as any,
+                {
+                    url: config.url,
+                    method: config.method || 'GET'
+                },
+                undefined,
+                error
+            );
+        }
+    }
+
     public async request<T = unknown>(url: string, options: RequestInit = {}): Promise<T> {
         const method = options.method || 'GET';
         const requestKey = `${method}_${url}`;
@@ -240,7 +343,10 @@ export class APIService implements IAPIService {
                     });
 
                     if (!response) {
-                        throw new Error('网络连接失败，请检查后端服务是否启动');
+                        const error = new Error('网络连接失败，请检查后端服务是否启动');
+                        const appError = this.convertToAppError(error, { url, method });
+                        errorHandler.handle(appError);
+                        throw appError;
                     }
 
                     if (!response.ok) {
@@ -255,7 +361,10 @@ export class APIService implements IAPIService {
                         }
 
                         console.error(`API请求失败 [${response.status}]:`, errorData);
-                        throw new Error(userMessage);
+                        const error = new Error(userMessage);
+                        const appError = this.convertToAppError(error, { url, method });
+                        errorHandler.handle(appError);
+                        throw appError;
                     }
 
                     const data: T = await response.json();
@@ -288,16 +397,32 @@ export class APIService implements IAPIService {
                         continue;
                     }
 
-                    // 非重试错误，直接抛出
+                    // 非重试错误，转换为 AppError 并处理
                     if (error instanceof TypeError && error.message.includes('fetch')) {
-                        throw new Error('网络连接失败，请检查后端服务是否启动');
+                        const appError = this.convertToAppError(new Error('网络连接失败，请检查后端服务是否启动'), { url, method });
+                        errorHandler.handle(appError);
+                        throw appError;
+                    }
+                    
+                    // 其他错误
+                    if (error instanceof ApplicationError) {
+                        errorHandler.handle(error);
+                    } else {
+                        const appError = this.convertToAppError(error instanceof Error ? error : new Error(String(error)), { url, method });
+                        errorHandler.handle(appError);
+                        throw appError;
                     }
                     throw error;
                 }
             }
 
             // 所有重试都失败
-            throw lastError || new Error('请求失败，已达到最大重试次数');
+            if (lastError) {
+                const appError = this.convertToAppError(lastError, { url, method });
+                errorHandler.handle(appError);
+                throw appError;
+            }
+            throw new Error('请求失败，已达到最大重试次数');
         })();
 
         this.pendingRequests.set(requestKey, requestPromise);
