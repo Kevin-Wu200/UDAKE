@@ -55,13 +55,14 @@ function createWindow() {
   })
 
   // 设置内容安全策略 - 添加高德地图支持
+  // 注意：高德地图 SDK 需要 'unsafe-eval' 权限来执行动态代码
   win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self';",
-          "script-src 'self' 'unsafe-inline' blob: https://js.arcgis.com https://webapi.amap.com https://*.amap.com;",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://js.arcgis.com https://webapi.amap.com https://*.amap.com;",
           "style-src 'self' 'unsafe-inline' blob: https://js.arcgis.com https://webapi.amap.com;",
           "img-src 'self' data: blob: https: https://*.arcgis.com https://*.autonavi.com https://*.amap.com;",
           "font-src 'self' data: blob:;",
