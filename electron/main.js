@@ -45,6 +45,8 @@ function createWindow() {
       plugins: false, // 禁用插件
       webGL: true, // 启用 WebGL
       sandbox: true, // 启用沙箱以提高安全性
+      allowRunningInsecureContent: false,
+      webviewTag: true, // 允许使用 webview 标签（支持 iframe）
       preload: path.join(__dirname, 'preload.js')
     },
     icon: path.join(__dirname, '../logo/UDAKE.icns'),
@@ -52,23 +54,24 @@ function createWindow() {
     titleBarStyle: 'hiddenInset', // macOS 风格标题栏
   })
 
-  // 设置内容安全策略 - 移除 'unsafe-eval' 以提高安全性
+  // 设置内容安全策略 - 添加高德地图支持
   win.webContents.session.webRequest.onHeadersReceived((details, callback) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self';",
-          "script-src 'self' 'unsafe-inline' blob: https://js.arcgis.com;",
-          "style-src 'self' 'unsafe-inline' blob: https://js.arcgis.com;",
-          "img-src 'self' data: blob: https:;",
+          "script-src 'self' 'unsafe-inline' blob: https://js.arcgis.com https://webapi.amap.com https://*.amap.com;",
+          "style-src 'self' 'unsafe-inline' blob: https://js.arcgis.com https://webapi.amap.com;",
+          "img-src 'self' data: blob: https: https://*.arcgis.com https://*.autonavi.com https://*.amap.com;",
           "font-src 'self' data: blob:;",
-          "connect-src 'self' http://localhost:8000 ws://localhost:8000 https: wss: blob:;",
+          "connect-src 'self' http://localhost:8000 ws://localhost:8000 https: wss: blob: https://*.amap.com;",
           "media-src 'self' data: blob:;",
           "object-src 'none';",
           "base-uri 'self';",
           "form-action 'self';",
           "worker-src 'self' blob:;",
+          "frame-src 'self' https://*.arcgis.com https://*.amap.com;",
           "frame-ancestors 'self';",
           "upgrade-insecure-requests;"
         ].join(' ')
