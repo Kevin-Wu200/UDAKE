@@ -1,0 +1,20 @@
+{
+  "task_id": "6c1bce30-1008-45a5-a689-374aec13a5e8",
+  "task_type": "test_task_443",
+  "priority": "low",
+  "status": "waiting",
+  "parameters": {
+    "data": 443,
+    "iteration": 443
+  },
+  "metadata": {
+    "benchmark": true
+  },
+  "created_at": "2026-03-15T20:44:29.575365",
+  "started_at": null,
+  "completed_at": null,
+  "progress": 0.0,
+  "error": null,
+  "retry_count": 0,
+  "actual_duration": null
+}

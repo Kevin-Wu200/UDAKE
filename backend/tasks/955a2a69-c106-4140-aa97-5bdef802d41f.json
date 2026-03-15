@@ -1,0 +1,17 @@
+{
+  "task_id": "955a2a69-c106-4140-aa97-5bdef802d41f",
+  "task_type": "test_task_449",
+  "priority": "medium",
+  "status": "waiting",
+  "parameters": {
+    "data": 449
+  },
+  "metadata": {},
+  "created_at": "2026-03-15T20:44:29.611163",
+  "started_at": null,
+  "completed_at": null,
+  "progress": 0.0,
+  "error": null,
+  "retry_count": 0,
+  "actual_duration": null
+}

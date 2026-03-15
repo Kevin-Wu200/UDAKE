@@ -1,0 +1,20 @@
+{
+  "task_id": "23421d01-ebcf-4a2d-a4f4-2a5cfb54f107",
+  "task_type": "test_task_365",
+  "priority": "high",
+  "status": "waiting",
+  "parameters": {
+    "data": 365,
+    "iteration": 365
+  },
+  "metadata": {
+    "benchmark": true
+  },
+  "created_at": "2026-03-15T20:44:29.574678",
+  "started_at": null,
+  "completed_at": null,
+  "progress": 0.0,
+  "error": null,
+  "retry_count": 0,
+  "actual_duration": null
+}

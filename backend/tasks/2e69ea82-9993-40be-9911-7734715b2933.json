@@ -1,0 +1,20 @@
+{
+  "task_id": "2e69ea82-9993-40be-9911-7734715b2933",
+  "task_type": "test_task_402",
+  "priority": "medium",
+  "status": "waiting",
+  "parameters": {
+    "data": 402,
+    "iteration": 402
+  },
+  "metadata": {
+    "benchmark": true
+  },
+  "created_at": "2026-03-15T20:44:29.575016",
+  "started_at": null,
+  "completed_at": null,
+  "progress": 0.0,
+  "error": null,
+  "retry_count": 0,
+  "actual_duration": null
+}

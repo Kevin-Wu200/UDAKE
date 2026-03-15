@@ -1,0 +1,20 @@
+{
+  "task_id": "030dd58d-6d76-41a1-a009-5be2c03846d0",
+  "task_type": "test_task_308",
+  "priority": "urgent",
+  "status": "waiting",
+  "parameters": {
+    "data": 308,
+    "iteration": 308
+  },
+  "metadata": {
+    "benchmark": true
+  },
+  "created_at": "2026-03-15T20:44:29.535737",
+  "started_at": null,
+  "completed_at": null,
+  "progress": 0.0,
+  "error": null,
+  "retry_count": 0,
+  "actual_duration": null
+}

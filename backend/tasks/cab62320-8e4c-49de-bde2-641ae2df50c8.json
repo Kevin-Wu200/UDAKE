@@ -1,0 +1,20 @@
+{
+  "task_id": "cab62320-8e4c-49de-bde2-641ae2df50c8",
+  "task_type": "test_task_54",
+  "priority": "medium",
+  "status": "waiting",
+  "parameters": {
+    "data": 54,
+    "iteration": 54
+  },
+  "metadata": {
+    "benchmark": true
+  },
+  "created_at": "2026-03-15T20:44:29.533170",
+  "started_at": null,
+  "completed_at": null,
+  "progress": 0.0,
+  "error": null,
+  "retry_count": 0,
+  "actual_duration": null
+}

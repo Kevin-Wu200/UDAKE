@@ -1,0 +1,17 @@
+{
+  "task_id": "4102558d-cafe-43a4-bf17-52b47e9f9145",
+  "task_type": "test_task_218",
+  "priority": "medium",
+  "status": "waiting",
+  "parameters": {
+    "data": 218
+  },
+  "metadata": {},
+  "created_at": "2026-03-15T20:44:29.608127",
+  "started_at": null,
+  "completed_at": null,
+  "progress": 0.0,
+  "error": null,
+  "retry_count": 0,
+  "actual_duration": null
+}
