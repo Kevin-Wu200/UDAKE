@@ -63,9 +63,27 @@ async def create_optimization_task(request: OptimizationRequest):
     try:
         task_id = f"task_{int(datetime.now().timestamp() * 1000)}"
 
+        # 提取variance_grid数据
+        variance_grid_data = request.variance_grid
+        if isinstance(variance_grid_data, dict):
+            variance_grid_array = np.array(variance_grid_data.get('data', []))
+            bounds = variance_grid_data.get('bounds', {})
+            x_coords = np.array([bounds.get('minX', 0.0), bounds.get('maxX', 1.0)])
+            y_coords = np.array([bounds.get('minY', 0.0), bounds.get('maxY', 1.0)])
+        else:
+            # 如果是列表格式，尝试转换
+            variance_grid_array = np.array(variance_grid_data)
+            x_coords = np.array([0.0, 1.0])
+            y_coords = np.array([0.0, 1.0])
+
         # 创建目标函数
         objectives = [
-            VarianceObjective(weight=request.weights.get('variance', 0.5)),
+            VarianceObjective(
+                variance_grid=variance_grid_array,
+                x_coords=x_coords,
+                y_coords=y_coords,
+                weight=request.weights.get('variance', 0.5)
+            ),
             CostObjective(weight=request.weights.get('cost', 0.3)),
             AccessibilityObjective(weight=request.weights.get('accessibility', 0.2))
         ]
@@ -75,7 +93,23 @@ async def create_optimization_task(request: OptimizationRequest):
 
         if 'boundary' in request.constraints:
             boundary = request.constraints['boundary']
-            constraints.append(BoundaryConstraint(boundary))
+            # 转换边界格式：字典 -> 坐标点列表
+            if isinstance(boundary, dict):
+                # 假设字典包含minX, minY, maxX, maxY
+                min_x = boundary.get('minX', 0.0)
+                min_y = boundary.get('minY', 0.0)
+                max_x = boundary.get('maxX', 1.0)
+                max_y = boundary.get('maxY', 1.0)
+                boundary_points = [
+                    [min_x, min_y],
+                    [max_x, min_y],
+                    [max_x, max_y],
+                    [min_x, max_y],
+                    [min_x, min_y]  # 闭合多边形
+                ]
+                constraints.append(BoundaryConstraint(boundary_points))
+            else:
+                constraints.append(BoundaryConstraint(boundary))
 
         if 'min_distance' in request.constraints:
             constraints.append(DistanceConstraint(request.constraints['min_distance']))
@@ -87,7 +121,8 @@ async def create_optimization_task(request: OptimizationRequest):
         optimizer = NSGA2Optimizer(
             objectives=objectives,
             constraints=constraints,
-            population_size=request.algorithm_params.get('population_size', 100) if request.algorithm_params else 100
+            n_candidates=request.algorithm_params.get('n_candidates', 1000) if request.algorithm_params else 1000,
+            n_samples=request.n_samples
         )
 
         # 存储任务
