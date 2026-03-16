@@ -160,7 +160,7 @@ start_backend() {
         
         # 等待后端启动并检查状态
         log_info "等待后端服务就绪..."
-        local max_wait=15
+        local max_wait=30
         local wait_count=0
         
         while [ $wait_count -lt $max_wait ]; do
@@ -168,15 +168,22 @@ start_backend() {
                 log_error "后端服务启动失败，查看日志: /tmp/udake_backend.log"
                 echo ""
                 echo "=== 错误日志 ==="
-                tail -20 /tmp/udake_backend.log
+                tail -30 /tmp/udake_backend.log
                 echo "================"
                 exit 1
             fi
             
             # 检查端口是否开始监听
             if check_port 8000; then
-                log_success "后端服务就绪"
-                return 0
+                # 检查API是否真的可用（测试/industries接口）
+                if curl -s http://localhost:8000/api/industries > /dev/null 2>&1; then
+                    echo ""
+                    log_success "后端服务就绪，API接口正常响应"
+                    return 0
+                else
+                    # 端口已监听但API还没准备好
+                    log_info "API接口尚未就绪，继续等待..."
+                fi
             fi
             
             sleep 1
@@ -185,7 +192,13 @@ start_backend() {
         done
         
         echo ""
-        log_warning "后端服务启动时间较长，继续启动前端..."
+        log_error "后端服务启动超时，无法访问API接口"
+        log_error "查看日志: /tmp/udake_backend.log"
+        echo ""
+        echo "=== 错误日志 ==="
+        tail -30 /tmp/udake_backend.log
+        echo "================"
+        exit 1
         
     else
         log_warning "未找到后端启动脚本，跳过后端启动"
@@ -295,7 +308,13 @@ health_check() {
     
     if [ ! -z "$BACKEND_PID" ]; then
         if ps -p $BACKEND_PID > /dev/null; then
-            echo -e "${GREEN}✓${NC} 后端服务 (PID: $BACKEND_PID)"
+            # 检查后端进程和API可用性
+            if check_port 8000 && curl -s http://localhost:8000/api/industries > /dev/null 2>&1; then
+                echo -e "${GREEN}✓${NC} 后端服务 (PID: $BACKEND_PID, API正常)"
+            else
+                echo -e "${YELLOW}⚠${NC} 后端服务运行中但API异常 (PID: $BACKEND_PID)"
+                healthy=false
+            fi
         else
             echo -e "${RED}✗${NC} 后端服务已停止"
             healthy=false
@@ -332,10 +351,16 @@ main() {
     # 检查依赖
     check_dependencies
     
-    # 启动服务
-    start_backend
-    start_frontend
-    start_electron
+    # 启动服务（确保后端就绪后再启动前端）
+    log_info "启动服务流程..."
+    if start_backend; then
+        log_success "后端服务启动成功，继续启动前端"
+        start_frontend
+        start_electron
+    else
+        log_error "后端服务启动失败，停止启动流程"
+        exit 1
+    fi
     
     # 显示信息
     show_info
