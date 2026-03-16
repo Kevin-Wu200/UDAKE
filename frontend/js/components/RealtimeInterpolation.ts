@@ -8,6 +8,7 @@
 
 import { WebSocketService, WebSocketMessage } from '../services/WebSocketService';
 import { NotificationManager } from './NotificationManager';
+import notificationManagerInstance from './NotificationManager';
 
 export interface RealtimeSubscription {
     id: string;
@@ -71,7 +72,7 @@ export class RealtimeInterpolation {
     private monitorInterval: number | null = null;
 
     constructor() {
-        this.notificationManager = new NotificationManager();
+        this.notificationManager = notificationManagerInstance;
         this.performanceMetrics = {
             lastUpdateTime: new Date(),
             averageUpdateDuration: 0,
@@ -114,7 +115,7 @@ export class RealtimeInterpolation {
      * 订阅实时数据
      */
     async subscribe(subscription: Omit<RealtimeSubscription, 'id' | 'createdAt'>): Promise<RealtimeSubscription> {
-        if (!this.wsService || !this.wsService.isConnected()) {
+        if (!this.wsService || !this.wsService.getConnectionStatus()) {
             throw new Error('WebSocket未连接');
         }
 
@@ -298,7 +299,7 @@ export class RealtimeInterpolation {
 
             // 显示通知
             if (hotspots.length > 0) {
-                this.notificationManager.notify({
+                this.notificationManager.show({
                     type: 'dataUpdate',
                     title: `检测到 ${hotspots.length} 个热点区域`,
                     body: hotspots.map(h => `${h.id}: ${h.intensity.toFixed(2)}`).join(', '),
@@ -339,7 +340,7 @@ export class RealtimeInterpolation {
         this.errorCallbacks.forEach(callback => callback(error));
 
         // 显示通知
-        this.notificationManager.notify({
+        this.notificationManager.show({
             type: 'interpolationError',
             title: '实时插值错误',
             body: message.data.message || '发生未知错误',
@@ -384,13 +385,13 @@ export class RealtimeInterpolation {
      * 收集性能指标
      */
     private collectPerformanceMetrics(): void {
-        if (performance && performance.memory) {
-            this.performanceMetrics.memoryUsage = performance.memory.usedJSHeapSize / 1024 / 1024;
+        if (performance && (performance as any).memory) {
+            this.performanceMetrics.memoryUsage = (performance as any).memory.usedJSHeapSize / 1024 / 1024;
         }
 
         // CPU使用率需要在后端计算
         // 这里仅发送请求获取最新指标
-        if (this.wsService && this.wsService.isConnected()) {
+        if (this.wsService && this.wsService.getConnectionStatus()) {
             this.wsService.send({
                 type: 'get_metrics',
                 timestamp: new Date().toISOString()

@@ -454,7 +454,7 @@ export class RealtimeControlPanel {
             this.addLog('info', `订阅已移除: ${subscriptionId}`);
             this.refreshSubscriptions();
         } catch (error) {
-            this.addLog('error', `移除订阅失败: ${error.message}`);
+            this.addLog('error', `移除订阅失败: ${(error as Error).message}`);
         }
     }
 

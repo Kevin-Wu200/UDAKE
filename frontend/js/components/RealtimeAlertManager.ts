@@ -7,7 +7,9 @@
  */
 
 import { RealtimeInterpolation, PerformanceMetrics, HotspotArea } from './RealtimeInterpolation';
-import { NotificationManager, NotificationType, NotificationPriority } from './NotificationManager';
+import { NotificationManager } from './NotificationManager';
+import type { NotificationType, NotificationPriority } from './NotificationManager';
+import notificationManagerInstance from './NotificationManager';
 
 export interface AlertRule {
     id: string;
@@ -65,11 +67,10 @@ export class RealtimeAlertManager {
 
     constructor(
         realtimeInterpolation: RealtimeInterpolation,
-        notificationManager: NotificationManager,
         settings: Partial<AlertSettings> = {}
     ) {
         this.realtimeInterpolation = realtimeInterpolation;
-        this.notificationManager = notificationManager;
+        this.notificationManager = notificationManagerInstance;
         this.settings = {
             enabled: true,
             soundEnabled: true,
@@ -292,7 +293,7 @@ export class RealtimeAlertManager {
 
         // 桌面通知
         if (this.settings.desktopNotifications) {
-            this.notificationManager.notify({
+            this.notificationManager.show({
                 type: notificationType,
                 title: `${alert.ruleName} (${alert.severity})`,
                 body: alert.message,

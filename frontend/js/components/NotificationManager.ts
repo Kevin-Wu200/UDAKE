@@ -43,7 +43,7 @@ interface StoredNotification extends NotificationOptions {
     read: boolean;
 }
 
-class NotificationManager {
+export class NotificationManager {
     private settings: NotificationSettings;
     private notifications: Map<string, StoredNotification> = new Map();
     private notificationHistory: StoredNotification[] = [];
