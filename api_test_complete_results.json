@@ -1,0 +1,219 @@
+[
+  {
+    "endpoint": "/",
+    "method": "GET",
+    "status": "success",
+    "response_time": 0.004851,
+    "error": null,
+    "response_data": {
+      "message": "智能不确定性驱动空间决策平台",
+      "version": "1.0.0",
+      "status": "running"
+    },
+    "timestamp": "2026-03-16T19:44:35.501514"
+  },
+  {
+    "endpoint": "/health",
+    "method": "GET",
+    "status": "success",
+    "response_time": 0.001355,
+    "error": null,
+    "response_data": {
+      "status": "healthy"
+    },
+    "timestamp": "2026-03-16T19:44:35.502926"
+  },
+  {
+    "endpoint": "/api/upload-data",
+    "method": "POST",
+    "status": "success",
+    "response_time": 0.00158,
+    "error": null,
+    "response_data": {
+      "data_id": "e8853f0c-214c-4eae-b868-94892f9ae02e",
+      "point_count": 5,
+      "bounds": {
+        "min_x": 116.3874,
+        "min_y": 39.8842,
+        "max_x": 116.4274,
+        "max_y": 39.9242
+      },
+      "message": "数据上传成功"
+    },
+    "timestamp": "2026-03-16T19:44:35.504596"
+  },
+  {
+    "endpoint": "/api/interpolation",
+    "method": "POST",
+    "status": "success",
+    "response_time": 0.001124,
+    "error": null,
+    "response_data": "429c9476-0ef1-40c3-aac5-b8d5c427563c",
+    "timestamp": "2026-03-16T19:44:35.505777"
+  },
+  {
+    "endpoint": "/api/interpolation/429c9476-0ef1-40c3-aac5-b8d5c427563c",
+    "method": "GET",
+    "status": "success",
+    "response_time": 0.001255,
+    "error": null,
+    "response_data": {
+      "id": "429c9476-0ef1-40c3-aac5-b8d5c427563c",
+      "grid": [
+        [
+          0.0
+        ]
+      ],
+      "variance": [
+        [
+          0.0
+        ]
+      ],
+      "bounds": {
+        "minX": 0.0,
+        "minY": 0.0,
+        "maxX": 1.0,
+        "maxY": 1.0
+      },
+      "cellSize": 0.1,
+      "statistics": {
+        "mean": 0.0,
+        "std": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      }
+    },
+    "timestamp": "2026-03-16T19:44:35.507067"
+  },
+  {
+    "endpoint": "/api/sampling",
+    "method": "POST",
+    "status": "success",
+    "response_time": 0.001332,
+    "error": null,
+    "response_data": {
+      "taskId": "d4679f5c-1293-4286-b6e7-7a09992cba15",
+      "points": [],
+      "count": 0
+    },
+    "timestamp": "2026-03-16T19:44:35.508450"
+  },
+  {
+    "endpoint": "/api/analysis",
+    "method": "POST",
+    "status": "success",
+    "response_time": 0.001291,
+    "error": null,
+    "response_data": {
+      "taskId": "def28ade-9c3e-47f5-b01a-c94bf704a45b",
+      "analysisType": "basic",
+      "result": {},
+      "generatedAt": "2026-03-16T19:44:35.509561"
+    },
+    "timestamp": "2026-03-16T19:44:35.509784"
+  },
+  {
+    "endpoint": "/api/analysis/def28ade-9c3e-47f5-b01a-c94bf704a45b/report",
+    "method": "GET",
+    "status": "success",
+    "response_time": 0.001195,
+    "error": null,
+    "response_data": {
+      "id": "def28ade-9c3e-47f5-b01a-c94bf704a45b",
+      "title": "分析报告",
+      "content": "报告内容占位符",
+      "format": "markdown",
+      "generatedAt": "2026-03-16T19:44:35.510810"
+    },
+    "timestamp": "2026-03-16T19:44:35.511023"
+  },
+  {
+    "endpoint": "/api/subscriptions",
+    "method": "POST",
+    "status": "failed (400)",
+    "response_time": 0.001572,
+    "error": "{\"detail\":\"空间范围格式错误\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:44:35.512637"
+  },
+  {
+    "endpoint": "/api/multi-objective/optimize",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001799,
+    "error": "{\"detail\":[{\"type\":\"dict_type\",\"loc\":[\"body\",\"variance_grid\"],\"msg\":\"Input should be a valid dictionary\",\"input\":[[0.5,0.6],[0.6,0.5]]}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:44:35.514470"
+  },
+  {
+    "endpoint": "/api/sampling-impact/evaluate-candidates",
+    "method": "POST",
+    "status": "failed (404)",
+    "response_time": 0.002028,
+    "error": "{\"detail\":\"方差栅格不存在，请先完成插值计算\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:44:35.516529"
+  },
+  {
+    "endpoint": "/api/sampling-impact/preview-effect",
+    "method": "POST",
+    "status": "failed (404)",
+    "response_time": 0.001557,
+    "error": "{\"detail\":\"方差栅格不存在，请先完成插值计算\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:44:35.518113"
+  },
+  {
+    "endpoint": "/api/sampling-impact/recommend-optimal",
+    "method": "POST",
+    "status": "failed (404)",
+    "response_time": 0.001314,
+    "error": "{\"detail\":\"方差栅格不存在，请先完成插值计算\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:44:35.519457"
+  },
+  {
+    "endpoint": "/api/export",
+    "method": "POST",
+    "status": "success",
+    "response_time": 0.00118,
+    "error": null,
+    "response_data": {
+      "fileId": "58c9ca4f-3b71-4643-9385-b140277f5420",
+      "fileName": "export_58c9ca4f-3b71-4643-9385-b140277f5420.geojson",
+      "format": "geojson",
+      "size": 0,
+      "downloadUrl": "/api/export/58c9ca4f-3b71-4643-9385-b140277f5420",
+      "expiresAt": "2026-03-16T19:44:35.520471",
+      "recordCount": 0
+    },
+    "timestamp": "2026-03-16T19:44:35.520670"
+  },
+  {
+    "endpoint": "/api/import",
+    "method": "POST",
+    "status": "success",
+    "response_time": 0.00118,
+    "error": null,
+    "response_data": {
+      "datasetId": "27b072ae-212f-466d-acb2-958ad6b0a80b",
+      "fileName": "imported_data",
+      "recordCount": 0,
+      "bounds": {
+        "minX": 0.0,
+        "minY": 0.0,
+        "maxX": 1.0,
+        "maxY": 1.0
+      },
+      "statistics": {
+        "count": 0.0,
+        "min": 0.0,
+        "max": 0.0,
+        "mean": 0.0,
+        "std": 0.0
+      },
+      "validation": null
+    },
+    "timestamp": "2026-03-16T19:44:35.521892"
+  }
+]

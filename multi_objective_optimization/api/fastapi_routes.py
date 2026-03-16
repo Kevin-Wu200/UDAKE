@@ -154,6 +154,40 @@ async def get_task_status(task_id: str):
         raise HTTPException(status_code=500, detail=f"查询任务状态失败: {str(e)}")
 
 
+@router.get("/multi-objective/tasks/{task_id}", response_model=OptimizationResponse)
+async def get_task_info(task_id: str):
+    """
+    获取优化任务信息
+    """
+    try:
+        if task_id not in tasks_db:
+            raise HTTPException(status_code=404, detail="任务不存在")
+
+        task = tasks_db[task_id]
+
+        return OptimizationResponse(
+            success=True,
+            message="查询成功",
+            data={
+                'task_id': task['task_id'],
+                'status': task['status'],
+                'input_params': task.get('input_params', {}),
+                'results': task.get('results'),
+                'statistics': task.get('statistics'),
+                'created_at': task.get('created_at'),
+                'started_at': task.get('started_at'),
+                'completed_at': task.get('completed_at')
+            },
+            timestamp=datetime.now().isoformat(),
+            request_id=task_id
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"查询任务信息失败: {str(e)}")
+
+
 @router.get("/multi-objective/tasks/{task_id}/results", response_model=OptimizationResponse)
 async def get_task_results(task_id: str, format: str = "detailed"):
     """
@@ -390,3 +424,63 @@ async def export_geojson(task_id: str, solution_id: Optional[int] = None):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"导出GeoJSON失败: {str(e)}")
+
+
+# ==================== 系统状态接口 ====================
+
+@router.get("/multi-objective/status", response_model=OptimizationResponse)
+async def get_optimization_status():
+    """
+    获取多目标优化系统状态
+
+    返回多目标优化系统的整体状态信息，包括：
+    - 活跃任务数
+    - 完成任务数
+    - 系统健康状态
+    - 可用算法和目标函数
+    """
+    try:
+        # 获取任务统计信息
+        all_tasks = list(tasks_db.values())
+        active_tasks = [t for t in all_tasks if t.get('status') in ['pending', 'running']]
+        completed_tasks = [t for t in all_tasks if t.get('status') == 'completed']
+
+        # 可用算法
+        available_algorithms = [
+            {"id": "NSGA-II", "name": "非支配排序遗传算法 II", "description": "基于非支配排序的多目标进化算法"}
+        ]
+
+        # 可用目标函数
+        available_objectives = [
+            {"id": "variance", "name": "方差最小化", "description": "最小化插值预测方差"},
+            {"id": "cost", "name": "成本最小化", "description": "最小化采样总成本"},
+            {"id": "accessibility", "name": "可达性最大化", "description": "最大化采样点可达性"}
+        ]
+
+        # 可用约束
+        available_constraints = [
+            {"id": "boundary", "name": "边界约束", "description": "限制采样点在指定边界内"},
+            {"id": "min_distance", "name": "最小间距约束", "description": "限制采样点最小间距"},
+            {"id": "budget", "name": "预算约束", "description": "限制采样总成本"}
+        ]
+
+        status_data = {
+            "system": "healthy",
+            "active_tasks": len(active_tasks),
+            "completed_tasks": len(completed_tasks),
+            "total_tasks": len(all_tasks),
+            "available_algorithms": available_algorithms,
+            "available_objectives": available_objectives,
+            "available_constraints": available_constraints
+        }
+
+        return OptimizationResponse(
+            success=True,
+            message="获取状态成功",
+            data=status_data,
+            timestamp=datetime.now().isoformat(),
+            request_id="system_status"
+        )
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取状态失败: {str(e)}")

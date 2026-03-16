@@ -1,45 +1,63 @@
-wuchenkai@wuchenkaideMacBook-Air scripts % bash dev.sh 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  UDAKE 开发模式启动
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-构建前端项目...
-
-> udake_macos@1.0.0 build
-> tsc --noEmit && vite build
-
-vite v8.0.0 building client environment for production...
-✓ 56 modules transformed.
-computing gzip size...
-frontend/dist/index.html                          8.09 kB │ gzip:  1.87 kB
-frontend/dist/assets/index-DzEf0qQf.css          22.03 kB │ gzip:  4.29 kB
-frontend/dist/assets/chunk-k65a01in.js            0.26 kB │ gzip:  0.21 kB
-frontend/dist/assets/BaseMapEngine-CcqLfJfn.js    0.51 kB │ gzip:  0.28 kB │ map:   5.95 kB
-frontend/dist/assets/ArcGISAdapter-DTeBha4R.js   14.10 kB │ gzip:  4.61 kB │ map:  42.97 kB
-frontend/dist/assets/AMapAdapter-BlhE-jt2.js     17.31 kB │ gzip:  5.10 kB │ map:  47.07 kB
-frontend/dist/assets/index-BFH79e6m.js          181.65 kB │ gzip: 48.89 kB │ map: 471.56 kB
-
-[INEFFECTIVE_DYNAMIC_IMPORT] Warning: frontend/js/config/map.config.js is dynamically imported by frontend/js/地图初始化.ts but also statically imported by frontend/js/components/SamplingRecommendationPanel.ts, frontend/js/sampling/RegionSampling.ts, dynamic import will not move module into another chunk.
-
-✓ built in 97ms
-启动 Electron 应用...
-
-> udake@1.0.0 start
-> npx electron .
-
-[2026-03-13T15:15:57.455Z] 应用启动
-[2026-03-13T15:15:57.460Z] 使用端口: 18082
-[2026-03-13T15:15:57.460Z] 后端路径: /Users/wuchenkai/UDAKE/UDAKE_macOS/backend
-[2026-03-13T15:15:57.460Z] Python路径: python3
-[2026-03-13T15:15:58.662Z] [Backend Error] INFO:     Started server process [65634]
+wuchenkai@wuchenkaideMacBook-Air backend % python3 run.py
+🚀 当前环境: development
+📝 配置文件: .env
+🔧 调试模式: True
+🚀 启动 智能不确定性驱动空间决策平台
+📍 地址: http://0.0.0.0:8000
+📖 API文档: http://0.0.0.0:8000/docs
+INFO:     Will watch for changes in these directories: ['/Users/wuchenkai/UDAKE/backend']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [39876] using StatReload
+🚀 当前环境: development
+📝 配置文件: .env
+🔧 调试模式: True
+INFO:     Started server process [39901]
 INFO:     Waiting for application startup.
-[2026-03-13T15:15:58.662Z] [Backend Error] INFO:     Application startup complete.
-INFO:     Uvicorn running on http://127.0.0.1:18082 (Press CTRL+C to quit)
-[2026-03-13T15:15:59.473Z] 后端服务启动成功
-[2026-03-13T15:15:59.727Z] [Backend] INFO:     127.0.0.1:59861 - "GET /api/industries HTTP/1.1" 200 OK
-2026-03-13 23:16:11.254 Electron[65613:790457] TSM AdjustCapsLockLEDForKeyTransitionHandling - _ISSetPhysicalKeyboardCapsLockLED Inhibit
-[2026-03-13T15:16:12.210Z] [Backend] INFO:     127.0.0.1:59867 - "POST /api/recommend-by-industry HTTP/1.1" 404 Not Found
-[2026-03-13T15:16:24.704Z] [Backend] INFO:     127.0.0.1:59873 - "GET /api/templates/topography_template.geojson HTTP/1.1" 200 OK
-[2026-03-13T15:16:50.976Z] [Backend] INFO:     127.0.0.1:59886 - "POST /api/recommend-by-industry HTTP/1.1" 404 Not Found
-^C[2026-03-13T15:17:10.837Z] 应用退出
-/Users/wuchenkai/UDAKE/UDAKE_macOS/dist/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron exited with signal SIGINT
+INFO:     Application startup complete.
+INFO:     172.20.10.2:51757 - "GET /docs HTTP/1.1" 200 OK
+INFO:     172.20.10.2:51757 - "GET /openapi.json HTTP/1.1" 200 OK
+INFO:     172.20.10.2:51975 - "HEAD /health HTTP/1.1" 405 Method Not Allowed
+INFO:     172.20.10.2:51976 - "HEAD /api/config/all HTTP/1.1" 405 Method Not Allowed
+INFO:     172.20.10.2:51978 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.20.10.2:51979 - "GET /api/config/all HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52005 - "HEAD /api/industries HTTP/1.1" 405 Method Not Allowed
+INFO:     172.20.10.2:52006 - "HEAD /api/route-planning/algorithms HTTP/1.1" 405 Method Not Allowed
+INFO:     172.20.10.2:52007 - "HEAD /api/system/status HTTP/1.1" 405 Method Not Allowed
+INFO:     172.20.10.2:52008 - "HEAD /api/multi-objective/config HTTP/1.1" 405 Method Not Allowed
+INFO:     172.20.10.2:52009 - "GET /api/industries HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52010 - "GET /api/route-planning/algorithms HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52011 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52012 - "GET /api/multi-objective/config HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52088 - "GET / HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52167 - "GET /api/projects HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52168 - "GET /api/health HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52169 - "POST /api/projects HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52170 - "GET /api/config/defaults HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52174 - "GET / HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52175 - "GET /health HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52176 - "GET /api/config/defaults HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52177 - "GET /api/industries HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52180 - "GET /api/config/all HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52179 - "GET /api/config/map HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52181 - "GET /api/upload HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52182 - "GET /api/tasks HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52184 - "GET /api/upload-data HTTP/1.1" 405 Method Not Allowed
+INFO:     172.20.10.2:52187 - "GET /api/route-planning/vehicle-types HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52188 - "GET /api/route-planning/algorithms HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52189 - "GET /api/route-planning/optimization-goals HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52190 - "GET /api/route-planning/templates HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52194 - "GET /api/realtime/status HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52195 - "GET /api/model-fusion/status HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52196 - "GET /api/multi-objective/status HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52201 - "GET /api/model-fusion/fusion/weight-methods HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52202 - "GET /api/model-fusion/fusion/strategies HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52203 - "GET /api/realtime/system/status HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52204 - "GET /api/multi-objective/config HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52207 - "GET /api/fusion/strategies HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52208 - "GET /api/fusion/weight-methods HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52209 - "GET /api/system/status HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52210 - "GET /api/cache/statistics HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52212 - "GET /api/industries/mining HTTP/1.1" 200 OK
+INFO:     172.20.10.2:52213 - "GET /api/industries/mining/template HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52214 - "GET /api/sampling/recommendations HTTP/1.1" 404 Not Found
+INFO:     172.20.10.2:52215 - "GET /api/model-recommendation HTTP/1.1" 404 Not Found

@@ -1,0 +1,234 @@
+{
+  "test_time": "2026-03-16T23:33:03.510634",
+  "backend_url": "http://localhost:8000",
+  "frontend_url": "http://10.200.3.71:5173",
+  "summary": {
+    "total": 17,
+    "success": 7,
+    "failed": 10,
+    "success_rate": "41.2%"
+  },
+  "details": [
+    {
+      "test_name": "健康检查",
+      "endpoint": "/health",
+      "method": "GET",
+      "status": "success",
+      "response_time": 0.0017049312591552734,
+      "error": null,
+      "response_data": {
+        "status": "healthy"
+      },
+      "timestamp": "2026-03-16T23:33:03.489935"
+    },
+    {
+      "test_name": "API文档",
+      "endpoint": "/docs",
+      "method": "GET",
+      "status": "success",
+      "response_time": 0.001294851303100586,
+      "error": null,
+      "response_data": "\n    <!DOCTYPE html>\n    <html>\n    <head>\n    <link type=\"text/css\" rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css\">\n    <link rel=\"shortcut icon\" href=\"https://fastapi.tiangolo.com/img/favicon.png\">\n    <title>智能不确定性驱动空间决策平台 - Swagger UI</title>\n    </head>\n    <body>\n    <div id=\"swagger-ui\">\n    </div>\n    <script src=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js\"></script>\n    <!-- `SwaggerUIBundle` is now available on the page -->\n    <script>\n    const ui = SwaggerUIBundle({\n        url: '/openapi.json',\n    \"dom_id\": \"#swagger-ui\",\n\"layout\": \"BaseLayout\",\n\"deepLinking\": true,\n\"showExtensions\": true,\n\"showCommonExtensions\": true,\noauth2RedirectUrl: window.location.origin + '/docs/oauth2-redirect',\n    presets: [\n        SwaggerUIBundle.presets.apis,\n        SwaggerUIBundle.SwaggerUIStandalonePreset\n        ],\n    })\n    </script>\n    </body>\n    </html>\n    ",
+      "timestamp": "2026-03-16T23:33:03.491289"
+    },
+    {
+      "test_name": "根路径",
+      "endpoint": "/",
+      "method": "GET",
+      "status": "success",
+      "response_time": 0.001190185546875,
+      "error": null,
+      "response_data": {
+        "message": "智能不确定性驱动空间决策平台",
+        "version": "1.0.0",
+        "status": "running"
+      },
+      "timestamp": "2026-03-16T23:33:03.492510"
+    },
+    {
+      "test_name": "上传GeoJSON数据",
+      "endpoint": "/api/upload-data",
+      "method": "POST",
+      "status": "success",
+      "response_time": 0.001682281494140625,
+      "error": null,
+      "response_data": {
+        "data_id": "5af3181c-9a2c-4414-aa06-ef669ded3dd3",
+        "point_count": 5,
+        "bounds": {
+          "min_x": 116.3874,
+          "min_y": 39.8842,
+          "max_x": 116.4274,
+          "max_y": 39.9242
+        },
+        "message": "数据上传成功"
+      },
+      "timestamp": "2026-03-16T23:33:03.494303"
+    },
+    {
+      "test_name": "上传Kriging数据",
+      "endpoint": "/api/upload-data",
+      "method": "POST",
+      "status": "success",
+      "response_time": 0.0016400814056396484,
+      "error": null,
+      "response_data": {
+        "data_id": "f6bb1b55-0fad-4f8e-a1c7-66873daed440",
+        "point_count": 20,
+        "bounds": {
+          "min_x": 116.3874,
+          "min_y": 39.8842,
+          "max_x": 116.435,
+          "max_y": 39.9325
+        },
+        "message": "数据上传成功"
+      },
+      "timestamp": "2026-03-16T23:33:03.496033"
+    },
+    {
+      "test_name": "创建插值任务",
+      "endpoint": "/api/interpolation",
+      "method": "POST",
+      "status": "success",
+      "response_time": 0.0013246536254882812,
+      "error": null,
+      "response_data": "9799f195-d53d-4ad4-8461-2b0bf0e8ff78",
+      "timestamp": "2026-03-16T23:33:03.497409"
+    },
+    {
+      "test_name": "查询插值结果",
+      "endpoint": "/api/interpolation/9799f195-d53d-4ad4-8461-2b0bf0e8ff78",
+      "method": "GET",
+      "status": "success",
+      "response_time": 0.0013060569763183594,
+      "error": null,
+      "response_data": {
+        "id": "9799f195-d53d-4ad4-8461-2b0bf0e8ff78",
+        "grid": [
+          [
+            0.0
+          ]
+        ],
+        "variance": [
+          [
+            0.0
+          ]
+        ],
+        "bounds": {
+          "minX": 0.0,
+          "minY": 0.0,
+          "maxX": 1.0,
+          "maxY": 1.0
+        },
+        "cellSize": 0.1,
+        "statistics": {
+          "mean": 0.0,
+          "std": 0.0,
+          "min": 0.0,
+          "max": 0.0
+        }
+      },
+      "timestamp": "2026-03-16T23:33:03.498753"
+    },
+    {
+      "test_name": "创建订阅",
+      "endpoint": "/api/subscriptions",
+      "method": "POST",
+      "status": "failed (400)",
+      "response_time": 0.0011641979217529297,
+      "error": "{\"detail\":\"空间范围格式错误\"}",
+      "response_data": null,
+      "timestamp": "2026-03-16T23:33:03.499971"
+    },
+    {
+      "test_name": "创建优化任务",
+      "endpoint": "/api/multi-objective/optimize",
+      "method": "POST",
+      "status": "failed (422)",
+      "response_time": 0.0013229846954345703,
+      "error": "{\"detail\":[{\"type\":\"dict_type\",\"loc\":[\"body\",\"variance_grid\"],\"msg\":\"Input should be a valid dictionary\",\"input\":[[0.5,0.6],[0.6,0.5]]}]}",
+      "response_data": null,
+      "timestamp": "2026-03-16T23:33:03.501322"
+    },
+    {
+      "test_name": "评估候选点",
+      "endpoint": "/api/sampling-impact/evaluate-candidates",
+      "method": "POST",
+      "status": "failed (404)",
+      "response_time": 0.0012221336364746094,
+      "error": "{\"detail\":\"方差栅格不存在，请先完成插值计算\"}",
+      "response_data": null,
+      "timestamp": "2026-03-16T23:33:03.502574"
+    },
+    {
+      "test_name": "预览添加效果",
+      "endpoint": "/api/sampling-impact/preview-effect",
+      "method": "POST",
+      "status": "failed (404)",
+      "response_time": 0.0010869503021240234,
+      "error": "{\"detail\":\"方差栅格不存在，请先完成插值计算\"}",
+      "response_data": null,
+      "timestamp": "2026-03-16T23:33:03.503685"
+    },
+    {
+      "test_name": "推荐最优采样点",
+      "endpoint": "/api/sampling-impact/recommend-optimal",
+      "method": "POST",
+      "status": "failed (404)",
+      "response_time": 0.0010731220245361328,
+      "error": "{\"detail\":\"方差栅格不存在，请先完成插值计算\"}",
+      "response_data": null,
+      "timestamp": "2026-03-16T23:33:03.504783"
+    },
+    {
+      "test_name": "模型推荐",
+      "endpoint": "/api/model-recommendation",
+      "method": "POST",
+      "status": "failed (404)",
+      "response_time": 0.0011107921600341797,
+      "error": "{\"detail\":\"Not Found\"}",
+      "response_data": null,
+      "timestamp": "2026-03-16T23:33:03.505918"
+    },
+    {
+      "test_name": "不确定性分级",
+      "endpoint": "/api/uncertainty-classification",
+      "method": "POST",
+      "status": "failed (404)",
+      "response_time": 0.0010981559753417969,
+      "error": "{\"detail\":\"Not Found\"}",
+      "response_data": null,
+      "timestamp": "2026-03-16T23:33:03.507037"
+    },
+    {
+      "test_name": "风险指数计算",
+      "endpoint": "/api/risk-index",
+      "method": "POST",
+      "status": "failed (404)",
+      "response_time": 0.0010950565338134766,
+      "error": "{\"detail\":\"Not Found\"}",
+      "response_data": null,
+      "timestamp": "2026-03-16T23:33:03.508154"
+    },
+    {
+      "test_name": "获取决策阈值",
+      "endpoint": "/api/decision-thresholds",
+      "method": "GET",
+      "status": "failed (404)",
+      "response_time": 0.0010807514190673828,
+      "error": "{\"detail\":\"Not Found\"}",
+      "response_data": null,
+      "timestamp": "2026-03-16T23:33:03.509257"
+    },
+    {
+      "test_name": "设置决策阈值",
+      "endpoint": "/api/decision-thresholds",
+      "method": "POST",
+      "status": "failed (404)",
+      "response_time": 0.0012438297271728516,
+      "error": "{\"detail\":\"Not Found\"}",
+      "response_data": null,
+      "timestamp": "2026-03-16T23:33:03.510524"
+    }
+  ]
+}

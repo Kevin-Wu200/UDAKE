@@ -1,0 +1,2533 @@
+\documentclass[12pt,a4paper,openany]{report}
+\usepackage[UTF8]{ctex}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{enumitem}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+
+% 页面设置
+\geometry{left=2.5cm,right=2.5cm,top=2.5cm,bottom=2.5cm}
+\raggedbottom % 避免页面拉伸产生的空白
+
+% 颜色定义
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.95,0.95,0.92}
+
+% 代码样式设置
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\footnotesize,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=5pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=2
+}
+\lstset{style=mystyle}
+
+% 页眉页脚设置
+\pagestyle{fancy}
+\fancyhead[LE,RO]{\leftmark}
+\fancyhead[RE,LO]{\thepage}
+\fancyfoot[C]{\thepage}
+
+% 章节标题设置
+\titleformat{\chapter}[display]
+{\normalfont\huge\bfseries\color{blue!70!black}}{\chaptertitlename\ \thechapter}{20pt}{\Huge}
+
+% 超链接设置
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue,
+    filecolor=magenta,
+    urlcolor=cyan,
+    pdfpagemode=FullScreen,
+}
+
+% 文档信息
+\title{\textbf{UDAKE 项目测试规范文档}}
+\author{UDAKE 开发团队}
+\date{\today}
+
+\begin{document}
+
+% 设置目录深度
+\setcounter{tocdepth}{3}
+\setcounter{secnumdepth}{3}
+
+% 封面
+\maketitle
+\thispagestyle{empty}
+
+% 目录
+\tableofcontents
+
+% 第一章：概述与测试策略
+\chapter{概述与测试策略}
+
+\section{文档目的}
+
+本文档旨在为 UDAKE 项目提供全面的测试规范指南，涵盖前端、后端、通讯及功能模块的所有测试相关内容。本文档从测试角度出发，包含测试策略、测试范围、具体测试步骤以及所有功能的输入输出和API接口定义。
+
+\section{项目概述}
+
+UDAKE 是一个集成了实时插值、多目标优化、模型融合、路径规划等多个专业功能模块的空间数据分析与优化平台。项目采用前后端分离架构，前端使用 TypeScript + React/Vue，后端使用 Python FastAPI，支持 WebSocket 实时通讯。
+
+\section{测试策略}
+
+\subsection{测试分层策略}
+
+\begin{enumerate}
+    \item \textbf{单元测试}：测试独立的函数、类和组件
+    \item \textbf{集成测试}：测试模块间的交互和数据流
+    \item \textbf{系统测试}：测试完整的业务流程
+    \item \textbf{性能测试}：测试系统性能指标和资源使用
+    \item \textbf{安全测试}：测试安全防护措施和漏洞
+    \item \textbf{E2E 测试}：测试完整的用户工作流
+\end{enumerate}
+
+\subsection{测试覆盖率要求}
+
+\begin{table}[h]
+\centering
+\caption{测试覆盖率要求}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{覆盖率类型} & \textbf{目标值} & \textbf{说明} \\
+\hline
+语句覆盖率 & $\ge$ 80\% & 至少执行80\%的代码语句 \\
+函数覆盖率 & $\ge$ 80\% & 至少调用80\%的函数 \\
+分支覆盖率 & $\ge$ 80\% & 至少覆盖80\%的条件分支 \\
+行覆盖率 & $\ge$ 80\% & 至少执行80\%的代码行 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{测试范围}
+
+\subsubsection{前端测试范围}
+
+\begin{itemize}
+    \item 组件测试：UI组件的渲染和交互
+    \item 服务层测试：API服务、WebSocket服务、配置服务等
+    \item 状态管理测试：数据存储和状态更新
+    \item 性能测试：加载时间、内存使用、Core Web Vitals
+    \item 安全测试：XSS防护、CSP策略、敏感信息泄露
+    \item E2E测试：完整用户流程和跨浏览器测试
+\end{itemize}
+
+\subsubsection{后端测试范围}
+
+\begin{itemize}
+    \item API测试：所有API端点的功能和性能
+    \item 单元测试：核心算法和业务逻辑
+    \item 集成测试：模块间交互和数据流
+    \item 数据库测试：数据存储和查询
+    \item 性能测试：响应时间、吞吐量、资源使用
+    \item WebSocket测试：实时通讯和消息处理
+\end{itemize}
+
+\subsubsection{功能模块测试范围}
+
+\begin{itemize}
+    \item 实时插值系统：订阅管理、数据点添加、增量更新
+    \item 多目标优化系统：优化算法、约束条件、帕累托解
+    \item 模型融合系统：权重计算、融合策略、性能评估
+    \item 路径规划系统：路径计算、约束验证、优化目标
+    \item 采样建议系统：采样点生成、影响评估、优先级排序
+    \item 不确定性分析：分级算法、风险计算、决策支持
+\end{itemize}
+
+\section{测试环境}
+
+\subsection{开发环境}
+
+\begin{itemize}
+    \item 操作系统：macOS / Linux / Windows
+    \item 前端框架：React/Vue + TypeScript
+    \item 后端框架：Python 3.9+ + FastAPI
+    \item 数据库：SQLite（开发）/ PostgreSQL（生产）
+    \item 浏览器：Chrome / Firefox / Safari / Edge
+\end{itemize}
+
+\subsection{测试工具}
+
+\begin{table}[h]
+\centering
+\caption{测试工具清单}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{工具类型} & \textbf{工具名称} & \textbf{用途} \\
+\hline
+前端单元测试 & Vitest & JavaScript/TypeScript单元测试 \\
+前端E2E测试 & Playwright & 端到端测试和跨浏览器测试 \\
+后端单元测试 & pytest & Python单元测试和集成测试 \\
+代码覆盖率 & @vitest/coverage-v8 & 代码覆盖率统计 \\
+API测试 & requests & HTTP API测试 \\
+性能测试 & pytest-benchmark & 性能基准测试 \\
+WebSocket测试 & pytest-asyncio & 异步WebSocket测试 \\
+\hline
+\end{tabular}
+\end{table}
+
+% 第二章：前端测试规范
+\chapter{前端测试规范}
+
+\section{测试框架}
+
+\subsection{Vitest 框架}
+
+Vitest 是项目使用的主要前端单元测试框架，提供快速的测试执行和现代化的测试API。
+
+\subsubsection{配置文件}
+
+\begin{lstlisting}[language=JavaScript, caption=vitest.config.js]
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'json', 'html', 'lcov'],
+      exclude: ['node_modules/', 'dist/', 'build/'],
+      thresholds: {
+        lines: 80,
+        functions: 80,
+        branches: 80,
+        statements: 80
+      }
+    }
+  }
+});
+\end{lstlisting}
+
+\subsubsection{测试脚本}
+
+\begin{lstlisting}[language=JSON, caption=package.json测试脚本]
+{
+  "scripts": {
+    "test": "vitest --run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest --run --coverage",
+    "test:security": "vitest --run tests/security.test.ts",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:performance": "vitest --run tests/performance-monitor.test.ts"
+  }
+}
+\end{lstlisting}
+
+\subsection{Playwright 框架}
+
+Playwright 用于端到端测试，支持多浏览器和移动设备测试。
+
+\subsubsection{配置文件}
+
+\begin{lstlisting}[language=TypeScript, caption=playwright.config.ts]
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+  testDir: './tests/e2e',
+  fullyParallel: true,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: 'html',
+  use: {
+    baseURL: 'http://localhost:5173',
+    trace: 'on-first-retry',
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'webkit',
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'Mobile Chrome',
+      use: { ...devices['Pixel 5'] },
+    },
+    {
+      name: 'Mobile Safari',
+      use: { ...devices['iPhone 12'] },
+    },
+  ],
+  webServer: {
+    command: 'npm run dev',
+    url: 'http://localhost:5173',
+    reuseExistingServer: !process.env.CI,
+  },
+});
+\end{lstlisting}
+
+\section{测试文件结构}
+
+\subsection{测试文件分类}
+
+前端测试文件共39个，按功能分类如下：
+
+\subsubsection{API相关测试（8个文件）}
+
+\begin{itemize}
+    \item \texttt{tests/api.test.js} - API基础功能测试
+    \item \texttt{tests/api/api-service.test.ts} - API服务详细测试
+    \item \texttt{tests/anomaly-detect-api.test.js} - 异常检测API测试
+    \item \texttt{tests/config-api.test.js} - 配置API测试
+    \item \texttt{tests/decision-thresholds-api.test.js} - 决策阈值API测试
+    \item \texttt{tests/error-predict-api.test.js} - 误差预测API测试
+    \item \texttt{tests/model-evaluation-api.test.js} - 模型评估API测试
+    \item \texttt{tests/risk-calculate-api.test.js} - 风险计算API测试
+    \item \texttt{tests/risk-report-api.test.js} - 风险报告API测试
+    \item \texttt{tests/uncertainty-classify-api.test.js} - 不确定性分类API测试
+\end{itemize}
+
+\subsubsection{功能模块测试（12个文件）}
+
+\begin{itemize}
+    \item \texttt{tests/advancedfilter.test.js} - 高级过滤器测试
+    \item \texttt{tests/batchoperations.test.js} - 批量操作测试
+    \item \texttt{tests/confirmdialog.test.js} - 确认对话框测试
+    \item \texttt{tests/datacomparison.test.js} - 数据对比测试
+    \item \texttt{tests/exportenhancer.test.js} - 导出增强测试
+    \item \texttt{tests/feedbackcollector.test.js} - 反馈收集器测试
+    \item \texttt{tests/formvalidator.test.js} - 表单验证器测试
+    \item \texttt{tests/historymanager.test.js} - 历史管理器测试
+    \item \texttt{tests/offlinemanager.test.js} - 离线管理器测试
+    \item \texttt{tests/preferencespanel.test.js} - 偏好设置面板测试
+    \item \texttt{tests/templatedownloader.test.js} - 模板下载器测试
+    \item \texttt{tests/thememanager.test.js} - 主题管理器测试
+\end{itemize}
+
+\subsubsection{性能和安全测试（5个文件）}
+
+\begin{itemize}
+    \item \texttt{tests/performance-monitor.test.ts} - 性能监控测试
+    \item \texttt{tests/performancemonitor.test.js} - 性能监控器测试
+    \item \texttt{tests/cache-performance.test.js} - 缓存性能测试
+    \item \texttt{tests/security.test.ts} - 安全测试套件
+    \item \texttt{tests/performance-benchmark.js} - 性能基准测试
+\end{itemize}
+
+\subsubsection{服务层测试（3个文件）}
+
+\begin{itemize}
+    \item \texttt{tests/websocket.test.ts} - WebSocket服务测试
+    \item \texttt{tests/location-service.test.js} - 位置服务测试
+    \item \texttt{tests/cache.test.js} - 缓存系统测试
+\end{itemize}
+
+\subsubsection{UI和交互测试（4个文件）}
+
+\begin{itemize}
+    \item \texttt{tests/gesture-enhancement.test.js} - 手势增强测试
+    \item \texttt{tests/keyboardmanager.test.js} - 键盘管理器测试
+    \item \texttt{tests/loadingmanager.test.js} - 加载管理器测试
+    \item \texttt{tests/skeletonloader.test.js} - 骨架屏加载器测试
+\end{itemize}
+
+\subsubsection{E2E测试（1个文件）}
+
+\begin{itemize}
+    \item \texttt{tests/e2e/workflow.test.ts} - 完整工作流E2E测试
+\end{itemize}
+
+\section{核心测试用例}
+
+\subsection{API服务测试}
+
+\subsubsection{缓存机制测试}
+
+\begin{lstlisting}[language=JavaScript, caption=缓存机制测试用例]
+describe('缓存机制', () => {
+  it('GET 请求应该被缓存', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ data: 'test' })
+    });
+
+    const url = 'http://localhost:8000/api/test';
+    const result1 = await api.request(url);
+    const result2 = await api.request(url);
+
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(result1).toEqual({ data: 'test' });
+    expect(result2).toEqual({ data: 'test' });
+  });
+
+  it('POST 请求不应该被缓存', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ ok: true })
+    });
+
+    const url = 'http://localhost:8000/api/test';
+    await api.request(url, { method: 'POST', body: '{}' });
+    await api.request(url, { method: 'POST', body: '{}' });
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('clearCache 应该清除所有缓存', async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ data: 1 })
+    });
+
+    await api.request('http://localhost:8000/api/test');
+    api.clearCache();
+    await api.request('http://localhost:8000/api/test');
+
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+});
+\end{lstlisting}
+
+\subsubsection{错误处理测试}
+
+\begin{lstlisting}[language=JavaScript, caption=错误处理测试用例]
+describe('错误处理', () => {
+  it('HTTP 错误应该抛出异常', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 400,
+      json: () => Promise.resolve({ detail: '服务器错误' })
+    });
+    await expect(api.request(url)).rejects.toThrow('服务器错误');
+  });
+
+  it('网络错误应该重试', async () => {
+    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    mockFetch.mockRejectedValueOnce(new Error('Network error'));
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ data: 'success' })
+    });
+
+    const result = await api.get('/retry-test');
+    expect(result).toEqual({ data: 'success' });
+  });
+});
+\end{lstlisting}
+
+\subsection{WebSocket服务测试}
+
+\begin{lstlisting}[language=TypeScript, caption=WebSocket服务测试用例]
+describe('WebSocketService', () => {
+  let wsService: WebSocketService;
+
+  beforeEach(() => {
+    wsService = new WebSocketService('ws://localhost:8000');
+  });
+
+  it('应该能够连接到服务器', async () => {
+    await wsService.connect('client-001');
+    expect(wsService.isConnected).toBe(true);
+  });
+
+  it('应该能够发送消息', async () => {
+    await wsService.connect('client-001');
+    wsService.send({
+      type: 'test',
+      data: { message: 'hello' },
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  it('应该能够接收消息', (done) => {
+    wsService.on('test', (message) => {
+      expect(message.data).toEqual({ message: 'hello' });
+      done();
+    });
+  });
+
+  it('连接失败时应该自动重连', async () => {
+    const mockSocket = {
+      connect: vi.fn().mockRejectedValue(new Error('Connection failed'))
+    };
+    // 测试重连逻辑
+  });
+});
+\end{lstlisting}
+
+\subsection{性能监控测试}
+
+\begin{lstlisting}[language=TypeScript, caption=性能监控测试用例]
+describe('性能监控', () => {
+  let monitor: PerformanceMonitor;
+
+  beforeEach(() => {
+    monitor = new PerformanceMonitor();
+  });
+
+  it('应该能够获取 LCP', () => {
+    const lcpEntry = { startTime: 1500 };
+    mockPerformance.getEntriesByType.mockReturnValueOnce([lcpEntry]);
+    const vitals = monitor.getWebVitals();
+    expect(vitals.lcp).toBe(1500);
+  });
+
+  it('应该检测 LCP 过高', () => {
+    mockPerformance.getEntriesByName.mockReturnValueOnce([{ startTime: 3000 }]);
+    const result = monitor.checkPerformanceThresholds();
+    expect(result.passed).toBe(false);
+    expect(result.issues.some(issue => issue.includes('LCP'))).toBe(true);
+  });
+
+  it('应该监控内存使用', () => {
+    mockPerformance.memory.usedJSHeapSize = 50 * 1024 * 1024; // 50MB
+    mockPerformance.memory.totalJSHeapSize = 100 * 1024 * 1024; // 100MB
+    const memoryUsage = monitor.getMemoryUsage();
+    expect(memoryUsage.used).toBe(50 * 1024 * 1024);
+  });
+});
+\end{lstlisting}
+
+\subsection{安全测试}
+
+\begin{lstlisting}[language=TypeScript, caption=安全测试用例]
+describe('安全测试', () => {
+  it('应正确转义用户输入', () => {
+    const userInput = '<script>alert("XSS")</script>';
+    const escapedInput = userInput
+      .replace(/</g, '\&lt;')
+      .replace(/>/g, '\&gt;');
+    expect(escapedInput).not.toContain('<script>');
+  });
+
+  it('应验证文件路径，防止路径遍历攻击', () => {
+    const validPath = '/home/user/data/file.txt';
+    const invalidPath = '../../../etc/passwd';
+    expect(isValidPath(validPath)).toBe(true);
+    expect(isValidPath(invalidPath)).toBe(false);
+  });
+
+  it('应检查CSP策略', () => {
+    const cspHeader = "default-src 'self'; script-src 'self' 'unsafe-inline'";
+    expect(validateCSP(cspHeader)).toBe(true);
+  });
+});
+\end{lstlisting}
+
+\subsection{E2E测试}
+
+\begin{lstlisting}[language=TypeScript, caption=E2E测试用例]
+test('应该能够处理数据导入流程', async ({ page }) => {
+  await page.goto('http://localhost:5173');
+  const importButton = page.locator('button').filter({ hasText: /导入|import/i });
+  await importButton.click();
+  await expect(page.locator('input[type="file"]')).toBeVisible();
+});
+
+test('应该能够响应式布局', async ({ page }) => {
+  await page.goto('http://localhost:5173');
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await page.setViewportSize({ width: 375, height: 667 });
+});
+
+test('应该能够完成完整的插值工作流', async ({ page }) => {
+  await page.goto('http://localhost:5173');
+  // 1. 上传数据
+  await page.locator('input[type="file"]').setInputFiles('test-data.geojson');
+  // 2. 配置参数
+  await page.locator('#variogram-model').selectOption('spherical');
+  // 3. 启动插值
+  await page.locator('button#start-kriging').click();
+  // 4. 等待完成
+  await expect(page.locator('.status-completed')).toBeVisible();
+});
+\end{lstlisting}
+
+\section{测试执行}
+
+\subsection{运行单元测试}
+
+\begin{lstlisting}[language=bash, caption=运行单元测试]
+# 运行所有测试
+npm test
+
+# 运行测试并监听变化
+npm run test:watch
+
+# 运行测试并生成覆盖率报告
+npm run test:coverage
+
+# 运行特定测试文件
+npx vitest tests/api.test.js
+
+# 运行匹配模式的测试
+npx vitest --pattern "api"
+\end{lstlisting}
+
+\subsection{运行E2E测试}
+
+\begin{lstlisting}[language=bash, caption=运行E2E测试]
+# 运行所有E2E测试
+npm run test:e2e
+
+# 运行E2E测试并显示UI
+npm run test:e2e:ui
+
+# 运行特定浏览器
+npx playwright test --project=chromium
+
+# 调试模式
+npx playwright test --debug
+\end{lstlisting}
+
+% 第三章：后端测试规范
+\chapter{后端测试规范}
+
+\section{测试框架}
+
+\subsection{pytest 框架}
+
+pytest 是项目使用的主要后端测试框架，支持单元测试、集成测试和异步测试。
+
+\subsubsection{配置文件}
+
+\begin{lstlisting}[language=Python, caption=pytest.ini]
+[pytest]
+testpaths = .
+python_files = test_*.py
+python_classes = Test*
+python_functions = test_*
+addopts =
+    -v
+    --tb=short
+    --strict-markers
+    --disable-warnings
+    --cov=app
+    --cov-report=term-missing
+    --cov-report=html
+asyncio_mode = auto
+markers =
+    slow: marks tests as slow
+    integration: marks tests as integration tests
+    unit: marks tests as unit tests
+\end{lstlisting}
+
+\subsubsection{测试依赖}
+
+\begin{lstlisting}[language=text, caption=requirements.txt测试依赖]
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-benchmark==4.0.0
+requests==2.31.0
+httpx==0.25.2
+\end{lstlisting}
+
+\section{测试文件结构}
+
+\subsection{测试文件分类}
+
+后端测试文件共20个，按功能分类如下：
+
+\subsubsection{核心模块测试（12个文件）}
+
+\begin{itemize}
+    \item \texttt{backend/tests/test\_model\_fusion.py} - 模型融合系统测试
+    \item \texttt{backend/tests/test\_route\_planning.py} - 路径规划系统测试
+    \item \texttt{backend/tests/test\_anomaly\_detector.py} - 异常检测器测试
+    \item \texttt{backend/tests/test\_decision\_threshold\_analyzer.py} - 决策阈值分析器测试
+    \item \texttt{backend/tests/test\_error\_predictor.py} - 误差预测器测试
+    \item \texttt{backend/tests/test\_model\_evaluator.py} - 模型评估器测试
+    \item \texttt{backend/tests/test\_risk\_index\_calculator.py} - 风险指数计算器测试
+    \item \texttt{backend/tests/test\_sampling\_algorithms.py} - 采样算法测试
+    \item \texttt{backend/tests/test\_spatial\_risk\_reporter.py} - 空间风险报告器测试
+    \item \texttt{backend/tests/test\_uncertainty\_classifier.py} - 不确定性分类器测试
+    \item \texttt{backend/tests/test\_websocket.py} - WebSocket服务测试
+    \item \texttt{backend/test\_backend.py} - 后端集成测试
+\end{itemize}
+
+\subsubsection{实时插值系统测试（5个文件）}
+
+\begin{itemize}
+    \item \texttt{realtime\_interpolation/tests/test\_accuracy.py} - 准确性验证测试
+    \item \texttt{realtime\_interpolation/tests/test\_performance.py} - 性能测试
+    \item \texttt{realtime\_interpolation/tests/test\_integration.py} - 集成测试
+    \item \texttt{realtime\_interpolation/tests/test\_cache\_system.py} - 缓存系统测试
+    \item \texttt{realtime\_interpolation/tests/test\_incremental\_kriging.py} - 增量克里金测试
+\end{itemize}
+
+\subsubsection{多目标优化系统测试（1个文件）}
+
+\begin{itemize}
+    \item \texttt{multi\_objective\_optimization/tests/test\_core.py} - 核心算法测试
+\end{itemize}
+
+\subsubsection{API集成测试（2个文件）}
+
+\begin{itemize}
+    \item \texttt{api\_test.py} - 基础端点测试
+    \item \texttt{api\_test\_complete.py} - 完整工作流测试
+\end{itemize}
+
+\section{核心测试用例}
+
+\subsection{模型融合测试}
+
+\begin{lstlisting}[language=Python, caption=权重计算器测试]
+class TestWeightCalculator:
+    """权重计算器测试"""
+
+    @pytest.fixture
+    def calculator(self):
+        return WeightCalculator()
+
+    @pytest.fixture
+    def sample_metrics(self):
+        return [
+            ModelMetrics(
+                model_id="model1",
+                model_name="Model 1",
+                rmse=1.2,
+                mae=0.8,
+                r2=0.85,
+                stability=0.9
+            ),
+            ModelMetrics(
+                model_id="model2",
+                model_name="Model 2",
+                rmse=1.5,
+                mae=1.0,
+                r2=0.80,
+                stability=0.85
+            ),
+            ModelMetrics(
+                model_id="model3",
+                model_name="Model 3",
+                rmse=1.0,
+                mae=0.7,
+                r2=0.90,
+                stability=0.95
+            )
+        ]
+
+    def test_calculate_weights_rmse_based(self, calculator, sample_metrics):
+        """测试基于RMSE的权重计算"""
+        weights = calculator.calculate_weights(
+            sample_metrics,
+            method='rmse_based'
+        )
+        assert len(weights) == 3
+        assert all(0 <= w <= 1 for w in weights.values())
+        assert abs(sum(weights.values()) - 1.0) < 1e-6
+
+    def test_calculate_weights_r2_based(self, calculator, sample_metrics):
+        """测试基于R²的权重计算"""
+        weights = calculator.calculate_weights(
+            sample_metrics,
+            method='r2_based'
+        )
+        assert len(weights) == 3
+        assert weights['model3'] > weights['model1']  # model3的R²最高
+\end{lstlisting}
+
+\subsection{WebSocket测试}
+
+\begin{lstlisting}[language=Python, caption=WebSocket异步测试]
+@pytest.mark.asyncio
+async def test_websocket_connection():
+    """测试 WebSocket 连接"""
+    client = TestClient(app)
+    with client.websocket_connect("/ws/test_client") as websocket:
+        # 发送消息
+        await websocket.send_json({
+            "type": "subscribe_task",
+            "task_id": "task_123"
+        })
+
+        # 接收确认消息
+        response = await websocket.receive_json()
+        assert response["type"] == "subscription_confirmed"
+        assert response["task_id"] == "task_123"
+
+@pytest.mark.asyncio
+async def test_task_update_notification():
+    """测试任务更新通知"""
+    client = TestClient(app)
+    with client.websocket_connect("/ws/test_client") as websocket:
+        # 订阅任务
+        await websocket.send_json({
+            "type": "subscribe_task",
+            "task_id": "task_123"
+        })
+        await websocket.receive_json()
+
+        # 触发任务更新
+        await notify_task_update("task_123", {"status": "running"})
+
+        # 接收更新通知
+        update = await websocket.receive_json()
+        assert update["type"] == "task_update"
+        assert update["data"]["status"] == "running"
+\end{lstlisting}
+
+\subsection{API测试}
+
+\begin{lstlisting}[language=Python, caption=API端点测试]
+def test_create_kriging_task():
+    """测试创建克里金任务"""
+    response = client.post("/start-kriging", json={
+        "data_id": "data-123",
+        "variogram_model": "spherical",
+        "range": 100.0,
+        "sill": 1.0,
+        "nugget": 0.1,
+        "grid_resolution": 50
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert "task_id" in data
+    assert data["status"] == "pending"
+
+def test_get_task_status():
+    """测试获取任务状态"""
+    # 先创建任务
+    create_response = client.post("/start-kriging", json={...})
+    task_id = create_response.json()["task_id"]
+
+    # 查询状态
+    response = client.get(f"/task-status/{task_id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert "status" in data
+    assert "progress" in data
+
+def test_get_prediction_result():
+    """测试获取预测结果"""
+    response = client.get(f"/result/prediction/{task_id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert "prediction" in data
+    assert "variance" in data
+\end{lstlisting}
+
+\subsection{性能测试}
+
+\begin{lstlisting}[language=Python, caption=性能基准测试]
+def test_incremental_update_performance(benchmark):
+    """测试增量更新性能"""
+    # 准备测试数据
+    subscription = create_test_subscription()
+    new_point = DataPoint(x=50, y=50, value=10, id="test")
+
+    # 基准测试
+    result = benchmark(
+        perform_incremental_update,
+        subscription,
+        new_point
+    )
+
+    # 性能断言
+    assert result.update_time_ms < 100  # 更新时间小于100ms
+
+def test_large_dataset_performance(benchmark):
+    """测试大数据集性能"""
+    # 创建大型方差网格（1000x1000）
+    variance_grid = np.random.rand(1000, 1000)
+
+    # 基准测试
+    result = benchmark(
+        optimize_sampling,
+        variance_grid,
+        n_samples=100
+    )
+
+    # 性能断言
+    assert result.total_time < 10.0  # 总时间小于10秒
+\end{lstlisting}
+
+\section{测试执行}
+
+\subsection{运行单元测试}
+
+\begin{lstlisting}[language=bash, caption=运行后端单元测试]
+# 运行所有测试
+pytest
+
+# 运行特定测试文件
+pytest backend/tests/test_model_fusion.py
+
+# 运行特定测试函数
+pytest backend/tests/test_model_fusion.py::TestWeightCalculator::test_calculate_weights_rmse_based
+
+# 运行标记的测试
+pytest -m integration
+pytest -m "not slow"
+
+# 运行测试并生成覆盖率报告
+pytest --cov=app --cov-report=html
+
+# 详细输出
+pytest -v
+\end{lstlisting}
+
+\subsection{运行异步测试}
+
+\begin{lstlisting}[language=bash, caption=运行异步测试]
+# 运行异步测试
+pytest -m asyncio
+
+# 运行特定异步测试
+pytest backend/tests/test_websocket.py::test_websocket_connection
+\end{lstlisting}
+
+% 第四章：通讯与集成测试
+\chapter{通讯与集成测试}
+
+\section{通讯架构}
+
+\subsection{通讯架构图}
+
+\begin{verbatim}
+前端                    后端
+┌─────────────┐      ┌─────────────┐
+│  API封装层   │ ───▶ │  FastAPI    │
+│   Fetch     │      │  REST API   │
+└─────────────┘      └──────┬──────┘
+                            │
+┌─────────────┐      ┌──────▼──────┐
+│WebSocketSvc │ ◀───▶ │WebSocketSrv │
+│ Socket.IO   │      │ FastAPI WS  │
+└─────────────┘      └─────────────┘
+                            │
+                    ┌───────▼────────┐
+                    │ 任务队列管理器  │
+                    │ notify_task    │
+                    └────────────────┘
+\end{verbatim}
+
+\section{WebSocket通讯测试}
+
+\subsection{连接管理测试}
+
+\begin{itemize}
+    \item 测试连接建立和断开
+    \item 测试自动重连机制
+    \item 测试心跳检测
+    \item 测试连接状态管理
+\end{itemize}
+
+\subsection{消息处理测试}
+
+\begin{itemize}
+    \item 测试消息发送和接收
+    \item 测试消息确认机制
+    \item 测试批量消息处理
+    \item 测试消息队列管理
+\end{itemize}
+
+\subsection{任务订阅测试}
+
+\begin{itemize}
+    \item 测试任务订阅和取消订阅
+    \item 测试任务更新通知
+    \item 测试多任务并发订阅
+    \item 测试订阅超时处理
+\end{itemize}
+
+\section{HTTP/REST API通讯测试}
+
+\subsection{请求处理测试}
+
+\begin{itemize}
+    \item 测试GET请求缓存
+    \item 测试POST请求不缓存
+    \item 测试请求去重
+    \item 测试错误重试机制
+\end{itemize}
+
+\subsection{响应处理测试}
+
+\begin{itemize}
+    \item 测试成功响应处理
+    \item 测试错误响应处理
+    \item 测试超时处理
+    \item 测试响应数据验证
+\end{itemize}
+
+\section{集成测试}
+
+\subsection{前后端集成测试}
+
+\begin{lstlisting}[language=Python, caption=前后端集成测试]
+def test_full_interpolation_workflow():
+    """测试完整的插值工作流"""
+    # 1. 前端上传数据
+    upload_response = client.post("/upload-data", files={
+        "file": ("test.geojson", open("test.geojson", "rb"), "application/json")
+    })
+    data_id = upload_response.json()["data_id"]
+
+    # 2. 启动插值任务
+    task_response = client.post("/start-kriging", json={
+        "data_id": data_id,
+        "variogram_model": "spherical",
+        "range": 100.0,
+        "sill": 1.0,
+        "nugget": 0.1
+    })
+    task_id = task_response.json()["task_id"]
+
+    # 3. 等待任务完成
+    import time
+    for _ in range(60):  # 最多等待60秒
+        status_response = client.get(f"/task-status/{task_id}")
+        status = status_response.json()["status"]
+        if status == "completed":
+            break
+        time.sleep(1)
+
+    # 4. 获取结果
+    result_response = client.get(f"/result/prediction/{task_id}")
+    assert result_response.status_code == 200
+    result = result_response.json()
+    assert "prediction" in result
+\end{lstlisting}
+
+\subsection{WebSocket与HTTP集成测试}
+
+\begin{lstlisting}[language=Python, caption=WebSocket与HTTP集成测试]
+@pytest.mark.asyncio
+async def test_http_task_creation_with_websocket_updates():
+    """测试HTTP创建任务，WebSocket接收更新"""
+    client = TestClient(app)
+
+    # 1. 建立WebSocket连接
+    with client.websocket_connect("/ws/test_client") as websocket:
+        # 2. 订阅任务
+        await websocket.send_json({
+            "type": "subscribe_task",
+            "task_id": "task_123"
+        })
+        await websocket.receive_json()  # 确认消息
+
+        # 3. 通过HTTP创建任务
+        task_response = client.post("/start-kriging", json={...})
+        task_id = task_response.json()["task_id"]
+
+        # 4. 通过WebSocket接收更新
+        update = await websocket.receive_json()
+        assert update["type"] == "task_update"
+        assert update["task_id"] == task_id
+\end{lstlisting}
+
+% 第五章：功能模块测试
+\chapter{功能模块测试}
+
+\section{实时插值系统}
+
+\subsection{功能概述}
+
+实时插值系统支持增量更新和实时预测，主要用于处理时序空间数据。
+
+\subsection{输入输出格式}
+
+\subsubsection{创建订阅请求}
+
+\begin{lstlisting}[language=JSON, caption=创建订阅请求]
+{
+    "subscription_id": "sub_001",
+    "data_type": "generic",
+    "spatial_extent": {
+        "min_x": 0.0,
+        "max_x": 100.0,
+        "min_y": 0.0,
+        "max_y": 100.0
+    },
+    "update_frequency": 5,
+    "interpolation_params": {
+        "model_type": "spherical",
+        "sill": 1.0,
+        "range": 10.0,
+        "nugget": 0.1
+    },
+    "notification_config": {}
+}
+\end{lstlisting}
+
+\subsubsection{添加数据点请求}
+
+\begin{lstlisting}[language=JSON, caption=添加数据点请求]
+{
+    "subscription_id": "sub_001",
+    "point": {
+        "id": "point_001",
+        "x": 50.0,
+        "y": 50.0,
+        "value": 10.5,
+        "timestamp": "2026-03-16T10:00:00Z",
+        "metadata": {}
+    }
+}
+\end{lstlisting}
+
+\subsubsection{查询预测响应}
+
+\begin{lstlisting}[language=JSON, caption=查询预测响应]
+{
+    "x": 50.0,
+    "y": 50.0,
+    "prediction": 10.5,
+    "variance": 0.5,
+    "confidence": 0.95,
+    "version": 1,
+    "timestamp": "2026-03-16T10:00:00Z"
+}
+\end{lstlisting}
+
+\subsection{测试用例}
+
+\subsubsection{订阅管理测试}
+
+\begin{lstlisting}[language=Python, caption=订阅管理测试]
+def test_create_subscription():
+    """测试创建订阅"""
+    response = client.post("/subscriptions", json={
+        "subscription_id": "sub_001",
+        "data_type": "sensor",
+        "spatial_extent": {
+            "min_x": 0.0,
+            "max_x": 100.0,
+            "min_y": 0.0,
+            "max_y": 100.0
+        },
+        "update_frequency": 5
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["subscription_id"] == "sub_001"
+
+def test_get_subscription():
+    """测试获取订阅信息"""
+    response = client.get("/subscriptions/sub_001")
+    assert response.status_code == 200
+    data = response.json()
+    assert data["subscription_id"] == "sub_001"
+    assert "spatial_extent" in data
+
+def test_delete_subscription():
+    """测试删除订阅"""
+    response = client.delete("/subscriptions/sub_001")
+    assert response.status_code == 200
+
+    # 验证删除
+    response = client.get("/subscriptions/sub_001")
+    assert response.status_code == 404
+\end{lstlisting}
+
+\subsubsection{增量更新测试}
+
+\begin{lstlisting}[language=Python, caption=增量更新测试]
+def test_incremental_update():
+    """测试增量更新"""
+    # 1. 创建订阅并添加初始数据
+    client.post("/subscriptions", json={...})
+    client.post("/updates", json={
+        "subscription_id": "sub_001",
+        "point": {"id": "p1", "x": 50, "y": 50, "value": 10}
+    })
+
+    # 2. 添加新数据点
+    response = client.post("/updates", json={
+        "subscription_id": "sub_001",
+        "point": {"id": "p2", "x": 60, "y": 60, "value": 12}
+    })
+    assert response.status_code == 200
+
+    # 3. 查询预测值
+    query_response = client.get(
+        "/subscriptions/sub_001/query?x=55&y=55"
+    )
+    assert query_response.status_code == 200
+    result = query_response.json()
+    assert "prediction" in result
+    assert "variance" in result
+\end{lstlisting}
+
+\subsubsection{性能测试}
+
+\begin{lstlisting}[language=Python, caption=性能测试]
+def test_update_performance(benchmark):
+    """测试更新性能"""
+    subscription = create_test_subscription()
+    new_point = DataPoint(x=50, y=50, value=10, id="test")
+
+    result = benchmark(
+        perform_incremental_update,
+        subscription,
+        new_point
+    )
+
+    assert result.update_time_ms < 100
+    assert result.affected_points > 0
+\end{lstlisting}
+
+\section{多目标优化系统}
+
+\subsection{功能概述}
+
+多目标优化系统使用NSGA-II算法，在多个目标（方差、成本、可达性）之间寻找最优解。
+
+\subsection{输入输出格式}
+
+\subsubsection{优化请求}
+
+\begin{lstlisting}[language=JSON, caption=优化请求]
+{
+    "variance_grid": {
+        "shape": [100, 100],
+        "x_coords": [0, 1, 2, ..., 99],
+        "y_coords": [0, 1, 2, ..., 99],
+        "values": [[0.1, 0.2, ...], ...]
+    },
+    "existing_points": [
+        {"x": 10.5, "y": 20.3},
+        {"x": 15.2, "y": 25.7}
+    ],
+    "n_samples": 20,
+    "weights": {
+        "variance": 0.5,
+        "cost": 0.3,
+        "accessibility": 0.2
+    },
+    "constraints": {
+        "boundary": {
+            "type": "Polygon",
+            "coordinates": [[[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]]]
+        },
+        "min_distance": 50,
+        "budget": 10000
+    },
+    "algorithm": "NSGA-II",
+    "algorithm_params": {
+        "population_size": 100,
+        "n_generations": 100,
+        "crossover_prob": 0.9,
+        "mutation_prob": 0.1
+    },
+    "is_async": true
+}
+\end{lstlisting}
+
+\subsubsection{优化结果}
+
+\begin{lstlisting}[language=JSON, caption=优化结果]
+{
+    "success": true,
+    "message": "获取成功",
+    "data": {
+        "task_id": "task_1234567890",
+        "status": "completed",
+        "pareto_solutions": [
+            {
+                "id": 1,
+                "objectives": {
+                    "variance": 0.125,
+                    "cost": 8500,
+                    "accessibility": -0.23
+                },
+                "sampling_points": [
+                    {"id": 1, "x": 10.5, "y": 20.3, "variance": 0.15},
+                    {"id": 2, "x": 15.2, "y": 25.7, "variance": 0.12}
+                ],
+                "metrics": {
+                    "total_cost": 8500,
+                    "avg_variance": 0.125,
+                    "avg_accessibility": 0.23
+                }
+            }
+        ],
+        "recommended_solution": {
+            "id": 5,
+            "objectives": {
+                "variance": 0.135,
+                "cost": 7200,
+                "accessibility": -0.28
+            },
+            "sampling_points": [...],
+            "rank": 1,
+            "crowding_distance": 0.45
+        },
+        "convergence_history": [...],
+        "statistics": {
+            "n_pareto_solutions": 15,
+            "n_evaluations": 10000,
+            "total_time": 8.2,
+            "convergence_generation": 85
+        }
+    }
+}
+\end{lstlisting}
+
+\subsection{测试用例}
+
+\subsubsection{优化算法测试}
+
+\begin{lstlisting}[language=Python, caption=优化算法测试]
+def test_optimization_algorithm():
+    """测试优化算法"""
+    # 准备测试数据
+    variance_grid = np.random.rand(50, 50)
+
+    # 创建优化任务
+    response = client.post("/multi-objective/optimize", json={
+        "variance_grid": {
+            "shape": [50, 50],
+            "x_coords": np.arange(50).tolist(),
+            "y_coords": np.arange(50).tolist(),
+            "values": variance_grid.tolist()
+        },
+        "n_samples": 10,
+        "weights": {
+            "variance": 0.5,
+            "cost": 0.3,
+            "accessibility": 0.2
+        }
+    })
+    assert response.status_code == 200
+    task_id = response.json()["data"]["task_id"]
+
+    # 等待完成
+    wait_for_task_completion(task_id)
+
+    # 获取结果
+    result_response = client.get(f"/multi-objective/tasks/{task_id}/results")
+    assert result_response.status_code == 200
+    result = result_response.json()
+
+    # 验证结果
+    assert len(result["data"]["pareto_solutions"]) > 0
+    assert "recommended_solution" in result["data"]
+\end{lstlisting}
+
+\subsubsection{约束条件测试}
+
+\begin{lstlisting}[language=Python, caption=约束条件测试]
+def test_boundary_constraint():
+    """测试边界约束"""
+    response = client.post("/multi-objective/optimize", json={
+        "variance_grid": {...},
+        "n_samples": 10,
+        "constraints": {
+            "boundary": {
+                "type": "Polygon",
+                "coordinates": [[[0, 0], [100, 0], [100, 100], [0, 100], [0, 0]]]
+            }
+        }
+    })
+    # 验证所有采样点都在边界内
+    result = get_optimization_result(response.json()["task_id"])
+    for solution in result["pareto_solutions"]:
+        for point in solution["sampling_points"]:
+            assert 0 <= point["x"] <= 100
+            assert 0 <= point["y"] <= 100
+
+def test_distance_constraint():
+    """测试距离约束"""
+    response = client.post("/multi-objective/optimize", json={
+        "variance_grid": {...},
+        "n_samples": 10,
+        "constraints": {
+            "min_distance": 50.0
+        }
+    })
+    # 验证采样点之间的最小距离
+    result = get_optimization_result(response.json()["task_id"])
+    for solution in result["pareto_solutions"]:
+        points = solution["sampling_points"]
+        for i in range(len(points)):
+            for j in range(i + 1, len(points)):
+                distance = calculate_distance(points[i], points[j])
+                assert distance >= 50.0
+
+def test_budget_constraint():
+    """测试预算约束"""
+    response = client.post("/multi-objective/optimize", json={
+        "variance_grid": {...},
+        "n_samples": 10,
+        "constraints": {
+            "budget": 10000.0
+        }
+    })
+    # 验证总成本不超过预算
+    result = get_optimization_result(response.json()["task_id"])
+    for solution in result["pareto_solutions"]:
+        assert solution["metrics"]["total_cost"] <= 10000.0
+\end{lstlisting}
+
+\section{模型融合系统}
+
+\subsection{功能概述}
+
+模型融合系统支持多种融合策略，用于整合多个模型的预测结果。
+
+\subsection{输入输出格式}
+
+\subsubsection{创建融合任务请求}
+
+\begin{lstlisting}[language=JSON, caption=创建融合任务请求]
+{
+    "models": [
+        {
+            "model_id": "model_1",
+            "model_name": "普通克里金",
+            "predictions": [10.5, 11.2, 10.8],
+            "variances": [0.5, 0.6, 0.4]
+        },
+        {
+            "model_id": "model_2",
+            "model_name": "泛克里金",
+            "predictions": [10.8, 11.0, 10.9],
+            "variances": [0.4, 0.5, 0.3]
+        }
+    ],
+    "config": {
+        "strategy": "weighted_average",
+        "weight_method": "rmse_based",
+        "min_weight": 0.0,
+        "max_weight": 1.0,
+        "normalize": true,
+        "smoothing": false,
+        "enable_cross_validation": true,
+        "enable_stability_check": true,
+        "n_folds": 5
+    },
+    "true_values": [10.6, 11.0, 10.9]
+}
+\end{lstlisting}
+
+\subsubsection{融合结果}
+
+\begin{lstlisting}[language=JSON, caption=融合结果]
+{
+    "success": true,
+    "result": {
+        "task_id": "fusion_task_001",
+        "fused_predictions": [10.65, 11.1, 10.85],
+        "fused_variances": [0.45, 0.55, 0.35],
+        "weights": {
+            "model_1": 0.5,
+            "model_2": 0.5
+        },
+        "metrics": {
+            "rmse": 0.05,
+            "mae": 0.04,
+            "r2": 0.98
+        },
+        "strategy": "weighted_average",
+        "weight_method": "rmse_based"
+    }
+}
+\end{lstlisting}
+
+\subsection{测试用例}
+
+\subsubsection{权重计算测试}
+
+\begin{lstlisting}[language=Python, caption=权重计算测试]
+def test_weight_calculation():
+    """测试权重计算"""
+    response = client.post("/fusion/create-task", json={
+        "models": [
+            {
+                "model_id": "model_1",
+                "predictions": [10.5, 11.2, 10.8],
+                "variances": [0.5, 0.6, 0.4]
+            },
+            {
+                "model_id": "model_2",
+                "predictions": [10.8, 11.0, 10.9],
+                "variances": [0.4, 0.5, 0.3]
+            }
+        ],
+        "config": {
+            "strategy": "weighted_average",
+            "weight_method": "rmse_based"
+        },
+        "true_values": [10.6, 11.0, 10.9]
+    })
+    assert response.status_code == 200
+    result = response.json()
+
+    # 验证权重
+    weights = result["result"]["weights"]
+    assert abs(sum(weights.values()) - 1.0) < 1e-6
+    assert all(0 <= w <= 1 for w in weights.values())
+\end{lstlisting}
+
+\subsubsection{融合策略测试}
+
+\begin{lstlisting}[language=Python, caption=融合策略测试]
+def test_fusion_strategies():
+    """测试不同融合策略"""
+    strategies = ["weighted_average", "minimum_variance", "ensemble"]
+
+    for strategy in strategies:
+        response = client.post("/fusion/create-task", json={
+            "models": [...],
+            "config": {
+                "strategy": strategy,
+                "weight_method": "rmse_based"
+            }
+        })
+        assert response.status_code == 200
+        result = response.json()
+        assert result["result"]["strategy"] == strategy
+\end{lstlisting}
+
+\section{路径规划系统}
+
+\subsection{功能概述}
+
+路径规划系统用于优化采样点的访问路径，支持多种优化目标和约束条件。
+
+\subsection{输入输出格式}
+
+\subsubsection{路径规划请求}
+
+\begin{lstlisting}[language=JSON, caption=路径规划请求]
+{
+    "sampling_points": [
+        {
+            "id": "point1",
+            "name": "采样点1",
+            "latitude": 39.9042,
+            "longitude": 116.4074,
+            "priority": 5,
+            "service_time": 10,
+            "is_reachable": true
+        }
+    ],
+    "start_point": {
+        "id": "start",
+        "name": "起点",
+        "latitude": 39.8942,
+        "longitude": 116.3974,
+        "priority": 1,
+        "service_time": 0,
+        "is_reachable": true
+    },
+    "constraints": {
+        "vehicle_type": "car",
+        "time_windows": false,
+        "priority_constraint": false,
+        "max_distance": 100000,
+        "max_duration": 3600,
+        "max_cost": 1000
+    },
+    "optimization_goal": "shortest_distance",
+    "algorithm": "tsp",
+    "return_multiple_routes": true
+}
+\end{lstlisting}
+
+\subsubsection{路径规划结果}
+
+\begin{lstlisting}[language=JSON, caption=路径规划结果]
+{
+    "success": true,
+    "routes": [
+        {
+            "route_id": "uuid",
+            "point_sequence": ["start", "point1", "point2"],
+            "segments": [
+                {
+                    "from": "start",
+                    "to": "point1",
+                    "distance": 500,
+                    "duration": 60,
+                    "cost": 10
+                }
+            ],
+            "total_distance": 5000,
+            "total_duration": 600,
+            "total_cost": 100,
+            "start_time": "2024-01-01T10:00:00",
+            "end_time": "2024-01-01T10:10:00"
+        }
+    ],
+    "best_route": {...},
+    "statistics": {
+        "total_routes": 1,
+        "best_distance": 5000,
+        "computation_time": 1.23
+    },
+    "warnings": []
+}
+\end{lstlisting}
+
+\subsection{测试用例}
+
+\subsubsection{路径计算测试}
+
+\begin{lstlisting}[language=Python, caption=路径计算测试]
+def test_route_calculation():
+    """测试路径计算"""
+    response = client.post("/api/route-planning/plan", json={
+        "sampling_points": [
+            {
+                "id": "point1",
+                "latitude": 39.9042,
+                "longitude": 116.4074
+            },
+            {
+                "id": "point2",
+                "latitude": 39.9142,
+                "longitude": 116.4174
+            }
+        ],
+        "start_point": {
+            "id": "start",
+            "latitude": 39.8942,
+            "longitude": 116.3974
+        },
+        "optimization_goal": "shortest_distance",
+        "algorithm": "tsp"
+    })
+    assert response.status_code == 200
+    result = response.json()
+
+    # 验证路径
+    assert len(result["routes"]) > 0
+    assert "best_route" in result
+    assert result["best_route"]["total_distance"] > 0
+\end{lstlisting}
+
+\subsubsection{约束验证测试}
+
+\begin{lstlisting}[language=Python, caption=约束验证测试]
+def test_constraint_validation():
+    """测试约束验证"""
+    response = client.post("/api/route-planning/plan", json={
+        "sampling_points": [...],
+        "constraints": {
+            "max_distance": 1000,
+            "max_duration": 600
+        }
+    })
+    assert response.status_code == 200
+    result = response.json()
+
+    # 验证约束
+    for route in result["routes"]:
+        assert route["total_distance"] <= 1000
+        assert route["total_duration"] <= 600
+\end{lstlisting}
+
+\section{其他功能模块}
+
+\subsection{采样建议系统}
+
+\subsubsection{功能概述}
+
+采样建议系统根据方差栅格生成最优采样点推荐。
+
+\subsubsection{测试用例}
+
+\begin{lstlisting}[language=Python, caption=采样建议测试]
+def test_sampling_recommendations():
+    """测试采样建议生成"""
+    response = client.get(
+        "/api/sampling-recommendations/generate?task_id=task_001&strategy=hybrid&n_recommendations=20"
+    )
+    assert response.status_code == 200
+    result = response.json()
+
+    # 验证结果
+    assert len(result["recommendations"]) == 20
+    assert all("x" in rec and "y" in rec for rec in result["recommendations"])
+    assert all("variance" in rec for rec in result["recommendations"])
+\end{lstlisting}
+
+\subsection{不确定性分级系统}
+
+\subsubsection{功能概述}
+
+不确定性分级系统根据预测方差对空间区域进行分级。
+
+\subsubsection{测试用例}
+
+\begin{lstlisting}[language=Python, caption=不确定性分级测试]
+def test_uncertainty_classification():
+    """测试不确定性分级"""
+    response = client.post("/uncertainty/classify", json={
+        "task_id": "task-001",
+        "prediction": [[10.5, 11.2, 10.8], [11.0, 10.9, 11.3]],
+        "variance": [[0.5, 0.8, 0.6], [0.7, 0.9, 0.4]],
+        "x_coords": [120.1, 120.2, 120.3],
+        "y_coords": [30.1, 30.2]
+    })
+    assert response.status_code == 200
+    result = response.json()
+
+    # 验证分级结果
+    assert "statistics" in result
+    assert "color_map" in result
+    assert "critical_zones" in result
+\end{lstlisting}
+
+% 第六章：API接口测试
+\chapter{API接口测试}
+
+\section{API接口总览}
+
+\subsection{接口分类统计}
+
+\begin{table}[h]
+\centering
+\caption{API接口分类统计}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{分类} & \textbf{接口数量} & \textbf{主要功能} \\
+\hline
+核心插值 & 8个 & 插值任务、结果查询、报告生成 \\
+采样优化 & 7个 & 采样建议、影响评估、预览 \\
+不确定性分析 & 4个 & 分级、风险指数、决策阈值 \\
+批量处理 & 11个 & 批量插值、报告、对比 \\
+AI扩展 & 8个 & 模型评估、误差预测、异常检测、模型融合 \\
+系统管理 & 25个 & 配置、任务队列、资源监控、性能报告 \\
+专业系统 & 35个 & 实时插值、多目标优化、路径规划 \\
+数据管理 & 18个 & 上传、导出、项目管理 \\
+\hline
+\textbf{总计} & \textbf{116个} & \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{核心插值接口}
+
+\subsection{接口列表}
+
+\begin{longtable}{|l|l|l|l|}
+\hline
+\textbf{方法} & \textbf{路径} & \textbf{功能} & \textbf{文件位置} \\
+\hline
+\endhead
+POST & \texttt{/start-kriging} & 启动克里金插值任务 & \texttt{插值任务接口.py:19} \\
+GET & \texttt{/task-status/\{task\_id\}} & 查询任务状态 & \texttt{任务状态接口.py:17} \\
+GET & \texttt{/result/prediction/\{task\_id\}} & 获取预测结果 & \texttt{结果查询接口.py:20} \\
+GET & \texttt{/result/variance/\{task\_id\}} & 获取方差结果 & \texttt{结果查询接口.py:32} \\
+GET & \texttt{/result/report/\{task\_id\}} & 生成克里金分析报告 & \texttt{报告生成接口.py:19} \\
+GET & \texttt{/result/download/\{task\_id\}/\{filename\}} & 下载导出文件 & \texttt{结果查询接口.py:46} \\
+GET & \texttt{/progress-detail/\{task\_id\}} & 获取任务进度详情 & \texttt{进度详情接口.py:17} \\
+GET & \texttt{/estimated-remaining-time/\{task\_id\}} & 获取预计剩余时间 & \texttt{进度详情接口.py:29} \\
+\hline
+\end{longtable}
+
+\subsection{接口测试用例}
+
+\subsubsection{启动克里金任务}
+
+\begin{lstlisting}[language=Python, caption=启动克里金任务测试]
+def test_start_kriging():
+    """测试启动克里金任务"""
+    response = client.post("/start-kriging", json={
+        "data_id": "data-123",
+        "variogram_model": "spherical",
+        "range": 100.0,
+        "sill": 1.0,
+        "nugget": 0.1,
+        "grid_resolution": 50,
+        "nlags": 6
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert "task_id" in data
+    assert data["status"] == "pending"
+
+def test_start_kriging_invalid_parameters():
+    """测试启动克里金任务（无效参数）"""
+    response = client.post("/start-kriging", json={
+        "data_id": "data-123",
+        "variogram_model": "invalid",
+        "range": -100.0,
+        "sill": -1.0
+    })
+    assert response.status_code == 422
+\end{lstlisting}
+
+\subsubsection{查询任务状态}
+
+\begin{lstlisting}[language=Python, caption=查询任务状态测试]
+def test_get_task_status():
+    """测试查询任务状态"""
+    # 先创建任务
+    create_response = client.post("/start-kriging", json={...})
+    task_id = create_response.json()["task_id"]
+
+    # 查询状态
+    response = client.get(f"/task-status/{task_id}")
+    assert response.status_code == 200
+    data = response.json()
+    assert "status" in data
+    assert "progress" in data
+    assert data["task_id"] == task_id
+
+def test_get_task_status_not_found():
+    """测试查询任务状态（任务不存在）"""
+    response = client.get("/task-status/nonexistent-task")
+    assert response.status_code == 404
+\end{lstlisting}
+
+\section{实时插值系统接口}
+
+\subsection{接口列表}
+
+\begin{longtable}{|l|l|l|l|}
+\hline
+\textbf{方法} & \textbf{路径} & \textbf{功能} & \textbf{文件位置} \\
+\hline
+\endhead
+POST & \texttt{/subscriptions} & 创建订阅 & \texttt{fastapi\_routes.py:64} \\
+GET & \texttt{/subscriptions/\{subscription\_id\}} & 获取订阅信息 & \texttt{fastapi\_routes.py:92} \\
+GET & \texttt{/subscriptions} & 列出所有订阅 & \texttt{fastapi\_routes.py:125} \\
+DELETE & \texttt{/subscriptions/\{subscription\_id\}} & 删除订阅 & \texttt{fastapi\_routes.py:146} \\
+POST & \texttt{/updates} & 添加数据点并触发增量更新 & \texttt{fastapi\_routes.py:167} \\
+POST & \texttt{/subscriptions/\{subscription\_id\}/data-points} & 添加数据点 & \texttt{fastapi\_routes.py:200} \\
+GET & \texttt{/subscriptions/\{subscription\_id\}/query} & 查询指定点的预测值 & \texttt{fastapi\_routes.py:233} \\
+GET & \texttt{/subscriptions/\{subscription\_id\}/prediction} & 获取预测值 & \texttt{fastapi\_routes.py:257} \\
+GET & \texttt{/cache/statistics} & 获取缓存统计信息 & \texttt{fastapi\_routes.py:281} \\
+DELETE & \texttt{/cache} & 清除缓存 & \texttt{fastapi\_routes.py:311} \\
+GET & \texttt{/system/status} & 获取系统状态 & \texttt{fastapi\_routes.py:333} \\
+GET & \texttt{/system/metrics} & 获取性能指标 & \texttt{fastapi\_routes.py:364} \\
+GET & \texttt{/system/alerts} & 获取告警列表 & \texttt{fastapi\_routes.py:388} \\
+\hline
+\end{longtable}
+
+\subsection{接口测试用例}
+
+\subsubsection{创建订阅}
+
+\begin{lstlisting}[language=Python, caption=创建订阅测试]
+def test_create_subscription():
+    """测试创建订阅"""
+    response = client.post("/subscriptions", json={
+        "subscription_id": "sub_001",
+        "data_type": "sensor",
+        "spatial_extent": {
+            "min_x": 0.0,
+            "max_x": 100.0,
+            "min_y": 0.0,
+            "max_y": 100.0
+        },
+        "update_frequency": 5,
+        "interpolation_params": {
+            "model_type": "spherical",
+            "sill": 1.0,
+            "range": 10.0,
+            "nugget": 0.1
+        }
+    })
+    assert response.status_code == 201
+    data = response.json()
+    assert data["subscription_id"] == "sub_001"
+
+def test_create_subscription_invalid_extent():
+    """测试创建订阅（无效空间范围）"""
+    response = client.post("/subscriptions", json={
+        "subscription_id": "sub_001",
+        "spatial_extent": {
+            "min_x": 100.0,
+            "max_x": 0.0,  # 无效：min > max
+            "min_y": 0.0,
+            "max_y": 100.0
+        }
+    })
+    assert response.status_code == 422
+\end{lstlisting}
+
+\section{多目标优化系统接口}
+
+\subsection{接口列表}
+
+\begin{longtable}{|l|l|l|l|}
+\hline
+\textbf{方法} & \textbf{路径} & \textbf{功能} & \textbf{文件位置} \\
+\hline
+\endhead
+POST & \texttt{/multi-objective/optimize} & 创建并执行优化任务 & \texttt{fastapi\_routes.py:77} \\
+GET & \texttt{/multi-objective/tasks/\{task\_id\}/status} & 查询优化任务状态 & \texttt{fastapi\_routes.py:124} \\
+GET & \texttt{/multi-objective/tasks/\{task\_id\}} & 获取优化任务信息 & \texttt{fastapi\_routes.py:152} \\
+GET & \texttt{/multi-objective/tasks/\{task\_id\}/results} & 获取优化任务结果 & \texttt{fastapi\_routes.py:184} \\
+DELETE & \texttt{/multi-objective/tasks/\{task\_id\}} & 取消优化任务 & \texttt{fastapi\_routes.py:211} \\
+GET & \texttt{/multi-objective/config} & 获取系统配置 & \texttt{fastapi\_routes.py:239} \\
+GET & \texttt{/multi-objective/tasks} & 获取优化任务列表 & \texttt{fastapi\_routes.py:295} \\
+GET & \texttt{/multi-objective/tasks/\{task\_id\}/export/geojson} & 导出优化结果为GeoJSON & \texttt{fastapi\_routes.py:329} \\
+GET & \texttt{/multi-objective/status} & 获取系统状态 & \texttt{fastapi\_routes.py:368} \\
+\hline
+\end{longtable}
+
+\subsection{接口测试用例}
+
+\subsubsection{创建优化任务}
+
+\begin{lstlisting}[language=Python, caption=创建优化任务测试]
+def test_create_optimization_task():
+    """测试创建优化任务"""
+    variance_grid = np.random.rand(50, 50)
+
+    response = client.post("/multi-objective/optimize", json={
+        "variance_grid": {
+            "shape": [50, 50],
+            "x_coords": np.arange(50).tolist(),
+            "y_coords": np.arange(50).tolist(),
+            "values": variance_grid.tolist()
+        },
+        "n_samples": 10,
+        "weights": {
+            "variance": 0.5,
+            "cost": 0.3,
+            "accessibility": 0.2
+        },
+        "constraints": {
+            "boundary": {
+                "type": "Polygon",
+                "coordinates": [[[0, 0], [50, 0], [50, 50], [0, 50], [0, 0]]]
+            },
+            "min_distance": 5,
+            "budget": 1000
+        },
+        "algorithm": "NSGA-II",
+        "algorithm_params": {
+            "population_size": 50,
+            "n_generations": 50,
+            "crossover_prob": 0.9,
+            "mutation_prob": 0.1
+        }
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert "task_id" in data["data"]
+\end{lstlisting}
+
+\section{模型融合接口}
+
+\subsection{接口列表}
+
+\begin{longtable}{|l|l|l|l|}
+\hline
+\textbf{方法} & \textbf{路径} & \textbf{功能} & \textbf{文件位置} \\
+\hline
+\endhead
+POST & \texttt{/fusion/create-task} & 创建模型融合任务 & \texttt{模型融合接口.py:57} \\
+GET & \texttt{/fusion/task/\{task\_id\}/status} & 获取融合任务状态 & \texttt{模型融合接口.py:80} \\
+GET & \texttt{/fusion/task/\{task\_id\}/result} & 获取融合任务结果 & \texttt{模型融合接口.py:96} \\
+POST & \texttt{/fusion/compare-strategies} & 比较不同融合策略 & \texttt{模型融合接口.py:125} \\
+POST & \texttt{/fusion/optimize-weights} & 优化权重计算方法 & \texttt{模型融合接口.py:155} \\
+GET & \texttt{/fusion/tasks} & 列出所有融合任务 & \texttt{模型融合接口.py:184} \\
+GET & \texttt{/fusion/strategies} & 列出所有可用的融合策略 & \texttt{模型融合接口.py:196} \\
+GET & \texttt{/fusion/weight-methods} & 列出所有可用的权重计算方法 & \texttt{模型融合接口.py:219} \\
+GET & \texttt{/fusion/status} & 获取模型融合系统状态 & \texttt{模型融合接口.py:249} \\
+\hline
+\end{longtable}
+
+\subsection{接口测试用例}
+
+\subsubsection{创建融合任务}
+
+\begin{lstlisting}[language=Python, caption=创建融合任务测试]
+def test_create_fusion_task():
+    """测试创建融合任务"""
+    response = client.post("/fusion/create-task", json={
+        "models": [
+            {
+                "model_id": "model_1",
+                "model_name": "普通克里金",
+                "predictions": [10.5, 11.2, 10.8],
+                "variances": [0.5, 0.6, 0.4]
+            },
+            {
+                "model_id": "model_2",
+                "model_name": "泛克里金",
+                "predictions": [10.8, 11.0, 10.9],
+                "variances": [0.4, 0.5, 0.3]
+            }
+        ],
+        "config": {
+            "strategy": "weighted_average",
+            "weight_method": "rmse_based"
+        },
+        "true_values": [10.6, 11.0, 10.9]
+    })
+    assert response.status_code == 200
+    data = response.json()
+    assert "task_id" in data["result"]
+\end{lstlisting}
+
+\section{路径规划接口}
+
+\subsection{接口列表}
+
+\begin{longtable}{|l|l|l|l|}
+\hline
+\textbf{方法} & \textbf{路径} & \textbf{功能} & \textbf{文件位置} \\
+\hline
+\endhead
+POST & \texttt{/api/route-planning/plan} & 执行路径规划 & \texttt{路径规划接口.py:38} \\
+POST & \texttt{/api/route-planning/optimize} & 优化现有路径 & \texttt{路径规划接口.py:52} \\
+POST & \texttt{/api/route-planning/add-point} & 向路径中添加新采样点 & \texttt{路径规划接口.py:108} \\
+POST & \texttt{/api/route-planning/remove-point} & 从路径中移除采样点 & \texttt{路径规划接口.py:167} \\
+POST & \texttt{/api/route-planning/reorder} & 重新排序路径中的采样点 & \texttt{路径规划接口.py:225} \\
+POST & \texttt{/api/route-planning/templates} & 创建路径模板 & \texttt{路径规划接口.py:283} \\
+GET & \texttt{/api/route-planning/templates} & 获取所有路径模板 & \texttt{路径规划接口.py:295} \\
+GET & \texttt{/api/route-planning/templates/\{template\_id\}} & 获取指定路径模板 & \texttt{路径规划接口.py:306} \\
+DELETE & \texttt{/api/route-planning/templates/\{template\_id\}} & 删除路径模板 & \texttt{路径规划接口.py:321} \\
+GET & \texttt{/api/route-planning/algorithms} & 获取可用的路径规划算法 & \texttt{路径规划接口.py:333} \\
+GET & \texttt{/api/route-planning/vehicle-types} & 获取支持的车辆类型 & \texttt{路径规划接口.py:361} \\
+GET & \texttt{/api/route-planning/optimization-goals} & 获取支持的优化目标 & \texttt{路径规划接口.py:381} \\
+POST & \texttt{/api/route-planning/validate} & 验证路径是否满足约束条件 & \texttt{路径规划接口.py:401} \\
+\hline
+\end{longtable}
+
+\section{API状态码定义}
+
+\begin{table}[h]
+\centering
+\caption{API状态码定义}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{状态码} & \textbf{含义} & \textbf{使用场景} \\
+\hline
+200 & 成功 & 请求成功处理并返回结果 \\
+201 & 创建成功 & 资源创建成功（如任务、项目） \\
+400 & 请求错误 & 参数验证失败、数据格式错误 \\
+401 & 未授权 & 需要认证但未提供 \\
+403 & 禁止访问 & 权限不足 \\
+404 & 未找到 & 资源不存在（任务、数据等） \\
+409 & 冲突 & 数据冲突、重复提交 \\
+422 & 数据验证失败 & 请求数据不符合验证规则 \\
+429 & 请求过多 & 超出请求频率限制 \\
+500 & 服务器错误 & 服务器内部错误 \\
+502 & 网关错误 & 网关或代理服务器错误 \\
+503 & 服务不可用 & 服务暂时不可用 \\
+504 & 超时 & 请求超时 \\
+\hline
+\end{tabular}
+\end{table}
+
+% 第七章：测试文件与用例
+\chapter{测试文件与用例}
+
+\section{前端测试文件详细列表}
+
+\subsection{API相关测试文件}
+
+\begin{table}[h]
+\centering
+\caption{API相关测试文件}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{文件名} & \textbf{测试内容} & \textbf{测试用例数} \\
+\hline
+\texttt{tests/api.test.js} & API基础功能 & 15 \\
+\texttt{tests/api/api-service.test.ts} & API服务详细测试 & 25 \\
+\texttt{tests/anomaly-detect-api.test.js} & 异常检测API & 10 \\
+\texttt{tests/config-api.test.js} & 配置API & 8 \\
+\texttt{tests/decision-thresholds-api.test.js} & 决策阈值API & 12 \\
+\texttt{tests/error-predict-api.test.js} & 误差预测API & 10 \\
+\texttt{tests/model-evaluation-api.test.js} & 模型评估API & 15 \\
+\texttt{tests/risk-calculate-api.test.js} & 风险计算API & 10 \\
+\texttt{tests/risk-report-api.test.js} & 风险报告API & 8 \\
+\texttt{tests/uncertainty-classify-api.test.js} & 不确定性分类API & 12 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{功能模块测试文件}
+
+\begin{table}[h]
+\centering
+\caption{功能模块测试文件}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{文件名} & \textbf{测试内容} & \textbf{测试用例数} \\
+\hline
+\texttt{tests/advancedfilter.test.js} & 高级过滤器 & 15 \\
+\texttt{tests/batchoperations.test.js} & 批量操作 & 20 \\
+\texttt{tests/confirmdialog.test.js} & 确认对话框 & 10 \\
+\texttt{tests/datacomparison.test.js} & 数据对比 & 12 \\
+\texttt{tests/exportenhancer.test.js} & 导出增强 & 15 \\
+\texttt{tests/feedbackcollector.test.js} & 反馈收集器 & 8 \\
+\texttt{tests/formvalidator.test.js} & 表单验证器 & 20 \\
+\texttt{tests/historymanager.test.js} & 历史管理器 & 15 \\
+\texttt{tests/offlinemanager.test.js} & 离线管理器 & 18 \\
+\texttt{tests/preferencespanel.test.js} & 偏好设置面板 & 10 \\
+\texttt{tests/templatedownloader.test.js} & 模板下载器 & 8 \\
+\texttt{tests/thememanager.test.js} & 主题管理器 & 12 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{性能和安全测试文件}
+
+\begin{table}[h]
+\centering
+\caption{性能和安全测试文件}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{文件名} & \textbf{测试内容} & \textbf{测试用例数} \\
+\hline
+\texttt{tests/performance-monitor.test.ts} & 性能监控 & 20 \\
+\texttt{tests/performancemonitor.test.js} & 性能监控器 & 15 \\
+\texttt{tests/cache-performance.test.js} & 缓存性能 & 10 \\
+\texttt{tests/security.test.ts} & 安全测试套件 & 25 \\
+\texttt{tests/performance-benchmark.js} & 性能基准测试 & 8 \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{后端测试文件详细列表}
+
+\subsection{核心模块测试文件}
+
+\begin{table}[h]
+\centering
+\caption{核心模块测试文件}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{文件名} & \textbf{测试内容} & \textbf{测试用例数} \\
+\hline
+\texttt{backend/tests/test\_model\_fusion.py} & 模型融合系统 & 30 \\
+\texttt{backend/tests/test\_route\_planning.py} & 路径规划系统 & 25 \\
+\texttt{backend/tests/test\_anomaly\_detector.py} & 异常检测器 & 15 \\
+\texttt{backend/tests/test\_decision\_threshold\_analyzer.py} & 决策阈值分析器 & 12 \\
+\texttt{backend/tests/test\_error\_predictor.py} & 误差预测器 & 15 \\
+\texttt{backend/tests/test\_model\_evaluator.py} & 模型评估器 & 20 \\
+\texttt{backend/tests/test\_risk\_index\_calculator.py} & 风险指数计算器 & 12 \\
+\texttt{backend/tests/test\_sampling\_algorithms.py} & 采样算法 & 18 \\
+\texttt{backend/tests/test\_spatial\_risk\_reporter.py} & 空间风险报告器 & 10 \\
+\texttt{backend/tests/test\_uncertainty\_classifier.py} & 不确定性分类器 & 15 \\
+\texttt{backend/tests/test\_websocket.py} & WebSocket服务 & 20 \\
+\texttt{backend/test\_backend.py} & 后端集成测试 & 25 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{实时插值系统测试文件}
+
+\begin{table}[h]
+\centering
+\caption{实时插值系统测试文件}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{文件名} & \textbf{测试内容} & \textbf{测试用例数} \\
+\hline
+\texttt{realtime\_interpolation/tests/test\_accuracy.py} & 准确性验证 & 20 \\
+\texttt{realtime\_interpolation/tests/test\_performance.py} & 性能测试 & 15 \\
+\texttt{realtime\_interpolation/tests/test\_integration.py} & 集成测试 & 25 \\
+\texttt{realtime\_interpolation/tests/test\_cache\_system.py} & 缓存系统 & 18 \\
+\texttt{realtime\_interpolation/tests/test\_incremental\_kriging.py} & 增量克里金 & 22 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{多目标优化系统测试文件}
+
+\begin{table}[h]
+\centering
+\caption{多目标优化系统测试文件}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{文件名} & \textbf{测试内容} & \textbf{测试用例数} \\
+\hline
+\texttt{multi\_objective\_optimization/tests/test\_core.py} & 核心算法测试 & 35 \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{测试用例统计}
+
+\begin{table}[h]
+\centering
+\caption{测试用例统计}
+\begin{tabular}{|l|l|l|l|}
+\hline
+\textbf{类别} & \textbf{文件数} & \textbf{测试用例数} & \textbf{占比} \\
+\hline
+前端单元测试 & 39 & 400 & 45\% \\
+前端E2E测试 & 1 & 10 & 1\% \\
+后端单元测试 & 18 & 300 & 34\% \\
+后端集成测试 & 2 & 50 & 6\% \\
+专业系统测试 & 6 & 120 & 14\% \\
+\hline
+\textbf{总计} & \textbf{66} & \textbf{880} & \textbf{100\%} \\
+\hline
+\end{tabular}
+\end{table}
+
+% 第八章：测试执行与报告
+\chapter{测试执行与报告}
+
+\section{测试执行流程}
+
+\subsection{测试准备}
+
+\begin{enumerate}
+    \item 安装测试依赖
+    \item 配置测试环境
+    \item 准备测试数据
+    \item 启动测试服务器
+\end{enumerate}
+
+\subsection{运行测试}
+
+\subsubsection{前端测试}
+
+\begin{lstlisting}[language=bash, caption=运行前端测试]
+# 1. 安装依赖
+npm install
+
+# 2. 运行单元测试
+npm test
+
+# 3. 运行E2E测试
+npm run test:e2e
+
+# 4. 生成覆盖率报告
+npm run test:coverage
+\end{lstlisting}
+
+\subsubsection{后端测试}
+
+\begin{lstlisting}[language=bash, caption=运行后端测试]
+# 1. 安装依赖
+pip install -r requirements.txt
+
+# 2. 运行单元测试
+pytest
+
+# 3. 运行特定模块测试
+pytest backend/tests/test_model_fusion.py
+
+# 4. 生成覆盖率报告
+pytest --cov=app --cov-report=html
+\end{lstlisting}
+
+\subsubsection{API集成测试}
+
+\begin{lstlisting}[language=bash, caption=运行API集成测试]
+# 1. 启动后端服务器
+python backend/run.py
+
+# 2. 运行基础API测试
+python api_test.py
+
+# 3. 运行完整工作流测试
+python api_test_complete.py
+\end{lstlisting}
+
+\section{测试报告}
+
+\subsection{覆盖率报告}
+
+\subsubsection{前端覆盖率报告}
+
+前端覆盖率报告生成在 \texttt{coverage/} 目录下，包括：
+
+\begin{itemize}
+    \item \texttt{coverage/index.html} - HTML格式报告
+    \item \texttt{coverage/coverage-final.json} - JSON格式报告
+    \item \texttt{coverage/lcov.info} - LCOV格式报告
+\end{itemize}
+
+\subsubsection{后端覆盖率报告}
+
+后端覆盖率报告生成在 \texttt{htmlcov/} 目录下，包括：
+
+\begin{itemize}
+    \item \texttt{htmlcov/index.html} - HTML格式报告
+    \item 终端输出显示覆盖率摘要
+\end{itemize}
+
+\subsection{性能报告}
+
+\subsubsection{前端性能报告}
+
+前端性能测试结果包括：
+
+\begin{itemize}
+    \item Core Web Vitals指标（LCP、FID、CLS）
+    \item 内存使用情况
+    \item 资源加载时间
+    \item 性能阈值检查结果
+\end{itemize}
+
+\subsubsection{后端性能报告}
+
+后端性能测试结果包括：
+
+\begin{itemize}
+    \item API响应时间
+    \item 吞吐量（QPS）
+    \item 资源使用情况（CPU、内存）
+    \item 算法执行时间
+\end{itemize}
+
+\subsection{测试结果分析}
+
+\begin{enumerate}
+    \item 检查测试通过率
+    \item 分析失败的测试用例
+    \item 检查覆盖率是否达标
+    \item 识别性能瓶颈
+    \item 提出改进建议
+\end{enumerate}
+
+\section{持续集成}
+
+\subsection{CI/CD配置}
+
+\begin{itemize}
+    \item GitHub Actions自动运行测试
+    \item 测试失败时阻止合并
+    \item 自动生成测试报告
+    \item 覆盖率阈值检查
+\end{itemize}
+
+\subsection{测试策略}
+
+\begin{itemize}
+    \item 每次提交触发单元测试
+    \item 每次PR触发完整测试套件
+    \item 每日运行性能测试
+    \item 每周运行E2E测试
+\end{itemize}
+
+\section{测试最佳实践}
+
+\subsection{编写测试用例}
+
+\begin{itemize}
+    \item 遵循AAA模式（Arrange-Act-Assert）
+    \item 测试应该独立且可重复
+    \item 使用有意义的测试名称
+    \item 测试正常情况和边界情况
+    \item 避免测试实现细节
+\end{itemize}
+
+\subsection{Mock和Stub}
+
+\begin{itemize}
+    \item Mock外部依赖
+    \item Stub函数返回值
+    \item 隔离被测单元
+    \item 避免过度Mock
+\end{itemize}
+
+\subsection{测试数据管理}
+
+\begin{itemize}
+    \item 使用测试数据工厂
+    \item 避免硬编码测试数据
+    \item 使用测试数据库
+    \item 清理测试数据
+\end{itemize}
+
+\section{测试维护}
+
+\subsection{定期审查}
+
+\begin{itemize}
+    \item 每月审查测试覆盖率
+    \item 每季度审查测试策略
+    \item 定期更新测试依赖
+    \item 优化慢速测试
+\end{itemize}
+
+\subsection{问题追踪}
+
+\begin{itemize}
+    \item 记录测试失败原因
+    \item 追踪测试问题修复
+    \item 定期review测试代码
+    \item 重构重复测试代码
+\end{itemize}
+
+% 附录：数据格式与参考文档
+\appendix
+
+\chapter{数据格式参考}
+
+\section{实时插值数据格式}
+
+\subsection{DataPoint数据结构}
+
+\begin{lstlisting}[language=Python, caption=DataPoint数据结构]
+@dataclass
+class DataPoint:
+    """数据点"""
+    x: float              # X坐标
+    y: float              # Y坐标
+    value: float          # 观测值
+    id: str               # 唯一标识符
+    timestamp: Optional[datetime] = None   # 时间戳
+    metadata: Optional[Dict[str, Any]] = None  # 元数据
+\end{lstlisting}
+
+\subsection{Subscription数据结构}
+
+\begin{lstlisting}[language=Python, caption=Subscription数据结构]
+@dataclass
+class Subscription:
+    """订阅"""
+    subscription_id: str
+    data_type: str
+    spatial_extent: BoundingBox
+    update_frequency: int
+    interpolation_params: VariogramModel
+    notification_config: Dict[str, Any]
+    created_at: datetime
+    updated_at: datetime
+\end{lstlisting}
+
+\section{多目标优化数据格式}
+
+\subsection{OptimizationRequest数据结构}
+
+\begin{lstlisting}[language=Python, caption=OptimizationRequest数据结构]
+@dataclass
+class OptimizationRequest:
+    """优化请求"""
+    variance_grid: Dict[str, Any]
+    existing_points: List[Dict[str, float]]
+    n_samples: int
+    weights: Dict[str, float]
+    constraints: Dict[str, Any]
+    algorithm: str
+    algorithm_params: Dict[str, Any]
+    is_async: bool
+\end{lstlisting}
+
+\subsection{ParetoSolution数据结构}
+
+\begin{lstlisting}[language=Python, caption=ParetoSolution数据结构]
+@dataclass
+class ParetoSolution:
+    """帕累托解"""
+    id: int
+    objectives: Dict[str, float]
+    sampling_points: List[Dict[str, Any]]
+    metrics: Dict[str, float]
+    rank: int
+    crowding_distance: float
+\end{lstlisting}
+
+\section{模型融合数据格式}
+
+\subsection{ModelInput数据结构}
+
+\begin{lstlisting}[language=Python, caption=ModelInput数据结构]
+@dataclass
+class ModelInput:
+    """模型输入"""
+    model_id: str
+    model_name: str
+    predictions: List[float]
+    variances: List[float]
+\end{lstlisting}
+
+\subsection{FusionResult数据结构}
+
+\begin{lstlisting}[language=Python, caption=FusionResult数据结构]
+@dataclass
+class FusionResult:
+    """融合结果"""
+    task_id: str
+    fused_predictions: List[float]
+    fused_variances: List[float]
+    weights: Dict[str, float]
+    metrics: Dict[str, float]
+    strategy: str
+    weight_method: str
+\end{lstlisting}
+
+\chapter{参考文档}
+
+\section{项目文档}
+
+\begin{itemize}
+    \item \texttt{docs/系统架构.md} - 系统架构文档
+    \item \texttt{docs/开发指南.md} - 开发指南
+    \item \texttt{docs/使用手册.md} - 用户手册
+    \item \texttt{docs/插件开发.md} - 插件开发文档
+\end{itemize}
+
+\section{API文档}
+
+\begin{itemize}
+    \item \texttt{realtime\_interpolation/接口设计文档.md} - 实时插值API文档
+    \item \texttt{multi\_objective\_optimization/API接口设计文档.md} - 多目标优化API文档
+    \item \texttt{docs/插件架构.md} - 插件API文档
+\end{itemize}
+
+\section{算法文档}
+
+\begin{itemize}
+    \item \texttt{realtime\_interpolation/算法设计文档.md} - 实时插值算法文档
+    \item \texttt{multi\_objective\_optimization/算法设计文档.md} - 多目标优化算法文档
+    \item \texttt{docs/模型融合系统文档.md} - 模型融合算法文档
+\end{itemize}
+
+\section{外部资源}
+
+\begin{itemize}
+    \item Vitest官方文档：\url{https://vitest.dev/}
+    \item Playwright官方文档：\url{https://playwright.dev/}
+    \item pytest官方文档：\url{https://docs.pytest.org/}
+    \item FastAPI官方文档：\url{https://fastapi.tiangolo.com/}
+\end{itemize}
+
+\chapter{术语表}
+
+\begin{description}
+    \item[克里金插值] 一种基于统计学的空间插值方法
+    \item[NSGA-II] 非支配排序遗传算法II，用于多目标优化
+    \item[帕累托前沿] 多目标优化中的最优解集合
+    \item[WebSocket] 一种在单个TCP连接上进行全双工通讯的协议
+    \item[E2E测试] 端到端测试，测试完整的用户工作流
+    \item[覆盖率] 测试覆盖的代码比例
+    \item[Core Web Vitals] Google提出的Web性能指标
+    \item[LCP] Largest Contentful Paint，最大内容绘制时间
+    \item[FID] First Input Delay，首次输入延迟
+    \item[CLS] Cumulative Layout Shift，累积布局偏移
+    \item[API] Application Programming Interface，应用程序接口
+    \item[REST] Representational State Transfer，表述性状态转移
+    \item[JSON] JavaScript Object Notation，一种轻量级的数据交换格式
+    \item[GeoJSON] 一种基于JSON的地理空间数据格式
+    \item[WebSocket] 一种全双工通信协议
+    \item[SSE] Server-Sent Events，服务器推送事件
+    \item[Mock] 模拟对象，用于隔离测试
+    \item[Stub] 桩函数，用于提供预设的返回值
+\end{description}
+
+\end{document}

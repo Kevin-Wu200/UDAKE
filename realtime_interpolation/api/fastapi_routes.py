@@ -202,6 +202,37 @@ async def add_data_point(request: DataPointRequest):
         raise HTTPException(status_code=500, detail=f"添加数据点失败: {str(e)}")
 
 
+@router.post("/subscriptions/{subscription_id}/data-points")
+async def add_data_point_alias(subscription_id: str, point: Dict[str, Any]):
+    """
+    添加数据点并触发增量更新（前端兼容别名）
+    """
+    try:
+        result = realtime_service.add_data_point(subscription_id, point)
+
+        if result['success']:
+            update_result = {
+                'update_id': result['update_id'],
+                'subscription_id': subscription_id,
+                'timestamp': None,
+                'update_type': 'incremental',
+                'affected_region': result['affected_region'],
+                'version': result.get('version', 0),
+                'statistics': {
+                    'update_time_ms': result.get('processing_time', 0) * 1000,
+                    'affected_points': result.get('statistics', {}).get('affected_points', 0)
+                }
+            }
+            return update_result
+        else:
+            raise HTTPException(status_code=400, detail=result['error'])
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"添加数据点失败: {str(e)}")
+
+
 # ==================== 查询接口 ====================
 
 @router.get("/subscriptions/{subscription_id}/query")
@@ -229,6 +260,33 @@ async def query_point(subscription_id: str, x: float, y: float):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")
+
+
+@router.get("/subscriptions/{subscription_id}/prediction")
+async def get_prediction_alias(subscription_id: str, x: float, y: float):
+    """
+    获取指定点的预测值（前端兼容别名）
+    """
+    try:
+        result = realtime_service.get_prediction(subscription_id, x, y)
+
+        if result['success']:
+            return {
+                'x': x,
+                'y': y,
+                'prediction': result['prediction'],
+                'variance': result['variance'],
+                'confidence': result['confidence'],
+                'version': None,
+                'timestamp': None
+            }
+        else:
+            raise HTTPException(status_code=404, detail=result['error'])
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"获取预测失败: {str(e)}")
 
 
 # ==================== 缓存管理接口 ====================

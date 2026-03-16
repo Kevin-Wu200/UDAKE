@@ -1,0 +1,300 @@
+[
+  {
+    "endpoint": "/",
+    "method": "GET",
+    "status": "success",
+    "response_time": 0.006902,
+    "error": null,
+    "response_data": {
+      "message": "智能不确定性驱动空间决策平台",
+      "version": "1.0.0",
+      "status": "running"
+    },
+    "timestamp": "2026-03-16T19:37:48.903840"
+  },
+  {
+    "endpoint": "/health",
+    "method": "GET",
+    "status": "success",
+    "response_time": 0.001338,
+    "error": null,
+    "response_data": {
+      "status": "healthy"
+    },
+    "timestamp": "2026-03-16T19:37:48.905223"
+  },
+  {
+    "endpoint": "/api/upload-data",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001606,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"file\"],\"msg\":\"Field required\",\"input\":null}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.906865"
+  },
+  {
+    "endpoint": "/api/start-kriging",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001285,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"data_id\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.908182"
+  },
+  {
+    "endpoint": "/api/task-status/test-task-id",
+    "method": "GET",
+    "status": "failed (404)",
+    "response_time": 0.002797,
+    "error": "{\"detail\":\"任务不存在\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.911005"
+  },
+  {
+    "endpoint": "/api/result/prediction/test-task-id",
+    "method": "GET",
+    "status": "failed (404)",
+    "response_time": 0.001449,
+    "error": "{\"detail\":\"结果不存在\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.912483"
+  },
+  {
+    "endpoint": "/api/result/variance/test-task-id",
+    "method": "GET",
+    "status": "failed (404)",
+    "response_time": 0.00106,
+    "error": "{\"detail\":\"Not Found\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.913570"
+  },
+  {
+    "endpoint": "/api/result/report/test-task-id",
+    "method": "GET",
+    "status": "failed (404)",
+    "response_time": 0.001236,
+    "error": "{\"detail\":\"报告生成失败\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.914834"
+  },
+  {
+    "endpoint": "/api/result/download/test-task-id/test-file.geojson",
+    "method": "GET",
+    "status": "failed (400)",
+    "response_time": 0.001357,
+    "error": "{\"detail\":\"文件名不合法\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.916222"
+  },
+  {
+    "endpoint": "/api/sampling-impact/evaluate-candidates",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.002022,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"task_id\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}},{\"type\":\"missing\",\"loc\":[\"body\",\"candidate_points\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.918277"
+  },
+  {
+    "endpoint": "/api/sampling-impact/preview-effect",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001482,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"task_id\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}},{\"type\":\"missing\",\"loc\":[\"body\",\"new_point\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.919789"
+  },
+  {
+    "endpoint": "/api/sampling-impact/recommend-optimal",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001306,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"task_id\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.921124"
+  },
+  {
+    "endpoint": "/api/sampling-impact/batch-simulate",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001968,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"task_id\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}},{\"type\":\"missing\",\"loc\":[\"body\",\"sampling_plans\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.923122"
+  },
+  {
+    "endpoint": "/api/subscriptions",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001479,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"subscription_id\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}},{\"type\":\"missing\",\"loc\":[\"body\",\"spatial_extent\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.924636"
+  },
+  {
+    "endpoint": "/api/subscriptions/test-sub-id",
+    "method": "GET",
+    "status": "failed (404)",
+    "response_time": 0.001471,
+    "error": "{\"detail\":\"订阅不存在\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.926138"
+  },
+  {
+    "endpoint": "/api/subscriptions/test-sub-id",
+    "method": "DELETE",
+    "status": "failed (404)",
+    "response_time": 0.00123,
+    "error": "{\"detail\":\"订阅不存在: test-sub-id\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.927400"
+  },
+  {
+    "endpoint": "/api/subscriptions/test-sub-id/data-points",
+    "method": "POST",
+    "status": "failed (400)",
+    "response_time": 0.001386,
+    "error": "{\"detail\":\"缺少必需字段: x\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.928819"
+  },
+  {
+    "endpoint": "/api/subscriptions/test-sub-id/prediction",
+    "method": "GET",
+    "status": "failed (404)",
+    "response_time": 0.001257,
+    "error": "{\"detail\":\"订阅不存在: test-sub-id\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.930104"
+  },
+  {
+    "endpoint": "/api/multi-objective/optimize",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001684,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"variance_grid\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}},{\"type\":\"missing\",\"loc\":[\"body\",\"existing_points\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}},{\"type\":\"missing\",\"loc\":[\"body\",\"n_samples\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}},{\"type\":\"missing\",\"loc\":[\"body\",\"weights\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}},{\"type\":\"missing\",\"loc\":[\"body\",\"constraints\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.931815"
+  },
+  {
+    "endpoint": "/api/multi-objective/tasks/test-task-id",
+    "method": "GET",
+    "status": "failed (404)",
+    "response_time": 0.001264,
+    "error": "{\"detail\":\"任务不存在\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.933109"
+  },
+  {
+    "endpoint": "/api/multi-objective/tasks/test-task-id/results",
+    "method": "GET",
+    "status": "failed (404)",
+    "response_time": 0.001254,
+    "error": "{\"detail\":\"任务不存在\"}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.934389"
+  },
+  {
+    "endpoint": "/api/interpolation",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001141,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"points\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}},{\"type\":\"missing\",\"loc\":[\"body\",\"parameters\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.935557"
+  },
+  {
+    "endpoint": "/api/interpolation/test-id",
+    "method": "GET",
+    "status": "success",
+    "response_time": 0.001165,
+    "error": null,
+    "response_data": {
+      "id": "test-id",
+      "grid": [
+        [
+          0.0
+        ]
+      ],
+      "variance": [
+        [
+          0.0
+        ]
+      ],
+      "bounds": {
+        "minX": 0.0,
+        "minY": 0.0,
+        "maxX": 1.0,
+        "maxY": 1.0
+      },
+      "cellSize": 0.1,
+      "statistics": {
+        "mean": 0.0,
+        "std": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      }
+    },
+    "timestamp": "2026-03-16T19:37:48.936754"
+  },
+  {
+    "endpoint": "/api/sampling",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001097,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"parameters\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.937877"
+  },
+  {
+    "endpoint": "/api/analysis",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001104,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"parameters\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.939008"
+  },
+  {
+    "endpoint": "/api/analysis/test-id/report",
+    "method": "GET",
+    "status": "success",
+    "response_time": 0.001082,
+    "error": null,
+    "response_data": {
+      "id": "test-id",
+      "title": "分析报告",
+      "content": "报告内容占位符",
+      "format": "markdown",
+      "generatedAt": "2026-03-16T19:37:48.939936"
+    },
+    "timestamp": "2026-03-16T19:37:48.940122"
+  },
+  {
+    "endpoint": "/api/export",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001107,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"format\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.941256"
+  },
+  {
+    "endpoint": "/api/import/parse",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001106,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"file\"],\"msg\":\"Field required\",\"input\":null}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.942390"
+  },
+  {
+    "endpoint": "/api/import",
+    "method": "POST",
+    "status": "failed (422)",
+    "response_time": 0.001324,
+    "error": "{\"detail\":[{\"type\":\"missing\",\"loc\":[\"body\",\"format\"],\"msg\":\"Field required\",\"input\":{\"test\":\"data\"}}]}",
+    "response_data": null,
+    "timestamp": "2026-03-16T19:37:48.943741"
+  }
+]

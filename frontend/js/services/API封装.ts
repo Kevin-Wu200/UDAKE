@@ -60,7 +60,6 @@ export class APIService implements IAPIService {
         this.cacheConfig = new Map([
             ['/api/data/list', 60 * 1000], // 1分钟
             ['/api/config', 10 * 60 * 1000], // 10分钟
-            ['/api/tasks', 30 * 1000], // 30秒
             ['/api/results', 5 * 60 * 1000], // 5分钟
             ['/config', 10 * 60 * 1000] // 10分钟
         ]);

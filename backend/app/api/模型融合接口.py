@@ -303,6 +303,54 @@ def _get_weight_method_description(method: Any) -> str:
         "cross_validation": "交叉验证权重",
         "bma": "贝叶斯模型平均权重",
         "uncertainty_based": "基于不确定性的权重",
-        "adaptive": "自适应权重"
     }
     return descriptions.get(method.value, method.value)
+
+
+@router.get("/fusion/status")
+async def get_fusion_status():
+    """
+    获取模型融合系统状态
+
+    返回模型融合系统的整体状态信息，包括：
+    - 活跃任务数
+    - 完成任务数
+    - 系统健康状态
+    - 可用策略和方法
+    """
+    try:
+        # 获取任务统计信息
+        all_tasks = fusion_service.list_tasks()
+        active_tasks = [t for t in all_tasks if t.get("status") in ["pending", "running"]]
+        completed_tasks = [t for t in all_tasks if t.get("status") == "completed"]
+
+        # 获取可用策略和方法
+        from ..model_fusion.core.fusion_models import FusionStrategy, WeightMethod
+
+        strategies = [
+            {"value": s.value, "name": s.name}
+            for s in FusionStrategy
+        ]
+
+        weight_methods = [
+            {"value": w.value, "name": w.name}
+            for w in WeightMethod
+        ]
+
+        return {
+            "success": True,
+            "status": {
+                "system": "healthy",
+                "active_tasks": len(active_tasks),
+                "completed_tasks": len(completed_tasks),
+                "total_tasks": len(all_tasks),
+                "available_strategies": len(strategies),
+                "available_weight_methods": len(weight_methods)
+            },
+            "strategies": strategies,
+            "weight_methods": weight_methods
+        }
+
+    except Exception as e:
+        logger.error(f"获取融合状态失败: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取状态失败: {str(e)}")
