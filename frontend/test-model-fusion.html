@@ -1,0 +1,761 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模型融合系统测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 0.9em;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #e9ecef;
+        }
+
+        h2 {
+            color: #495057;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #495057;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="number"],
+        select,
+        textarea {
+            width: 100%;
+            padding: 10px;
+            border: 2px solid #dee2e6;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: white;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+            display: none;
+        }
+
+        .result.show {
+            display: block;
+        }
+
+        .result h3 {
+            color: #495057;
+            margin-bottom: 10px;
+        }
+
+        .result pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status.pending {
+            background: #ffc107;
+            color: #333;
+        }
+
+        .status.running {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .status.completed {
+            background: #28a745;
+            color: white;
+        }
+
+        .status.failed {
+            background: #dc3545;
+            color: white;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        .metric-value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+
+        .model-inputs {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+
+        .model-input {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #dee2e6;
+        }
+
+        .model-input h3 {
+            color: #495057;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            background: #e9ecef;
+            border: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            font-weight: 600;
+            color: #495057;
+            transition: all 0.3s;
+        }
+
+        .tab.active {
+            background: white;
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            background: white;
+            padding: 20px;
+            border-radius: 0 8px 8px 8px;
+            border: 2px solid #e9ecef;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔮 模型融合系统</h1>
+        <p class="subtitle">集成多个克里金模型的预测结果，通过加权平均、堆叠等方法提高预测稳定性和准确性</p>
+
+        <div class="tabs">
+            <button class="tab active" onclick="showTab('simple')">简单融合</button>
+            <button class="tab" onclick="showTab('compare')">策略对比</button>
+            <button class="tab" onclick="showTab('optimize')">权重优化</button>
+        </div>
+
+        <!-- 简单融合 -->
+        <div id="simple" class="tab-content active">
+            <div class="section">
+                <h2>模型输入</h2>
+                <div class="model-inputs" id="modelInputs">
+                    <div class="model-input">
+                        <h3>模型 1</h3>
+                        <div class="form-group">
+                            <label>模型ID</label>
+                            <input type="text" id="model1_id" value="model_1">
+                        </div>
+                        <div class="form-group">
+                            <label>模型名称</label>
+                            <input type="text" id="model1_name" value="普通克里金">
+                        </div>
+                        <div class="form-group">
+                            <label>预测值 (逗号分隔)</label>
+                            <textarea id="model1_predictions" rows="3">10.5, 11.2, 10.8, 11.5, 10.9, 11.1, 10.7, 11.3, 10.6, 11.0</textarea>
+                        </div>
+                    </div>
+
+                    <div class="model-input">
+                        <h3>模型 2</h3>
+                        <div class="form-group">
+                            <label>模型ID</label>
+                            <input type="text" id="model2_id" value="model_2">
+                        </div>
+                        <div class="form-group">
+                            <label>模型名称</label>
+                            <input type="text" id="model2_name" value="泛克里金">
+                        </div>
+                        <div class="form-group">
+                            <label>预测值 (逗号分隔)</label>
+                            <textarea id="model2_predictions" rows="3">10.8, 11.0, 10.9, 11.3, 11.1, 10.8, 10.9, 11.1, 10.8, 11.2</textarea>
+                        </div>
+                    </div>
+
+                    <div class="model-input">
+                        <h3>模型 3</h3>
+                        <div class="form-group">
+                            <label>模型ID</label>
+                            <input type="text" id="model3_id" value="model_3">
+                        </div>
+                        <div class="form-group">
+                            <label>模型名称</label>
+                            <input type="text" id="model3_name" value="分块克里金">
+                        </div>
+                        <div class="form-group">
+                            <label>预测值 (逗号分隔)</label>
+                            <textarea id="model3_predictions" rows="3">10.7, 11.1, 10.7, 11.4, 10.8, 11.0, 10.8, 11.2, 10.7, 11.1</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2>融合配置</h2>
+                <div class="form-group">
+                    <label>真实值 (可选，用于评估)</label>
+                    <textarea id="true_values" rows="1">10.6, 11.0, 10.9, 11.2, 10.8, 11.1, 10.7, 11.2, 10.6, 11.0</textarea>
+                </div>
+                <div class="form-group">
+                    <label>融合策略</label>
+                    <select id="fusion_strategy">
+                        <option value="simple_average">简单平均</option>
+                        <option value="weighted_average" selected>加权平均</option>
+                        <option value="median">中位数融合</option>
+                        <option value="stacking">堆叠融合</option>
+                        <option value="bayesian_model_average">贝叶斯模型平均</option>
+                        <option value="variance_weighted">方差加权</option>
+                        <option value="max_min">最大最小融合</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>权重计算方法</label>
+                    <select id="weight_method">
+                        <option value="equal">等权重</option>
+                        <option value="rmse_based" selected>基于RMSE</option>
+                        <option value="mae_based">基于MAE</option>
+                        <option value="r2_based">基于R²</option>
+                        <option value="cross_validation">交叉验证</option>
+                        <option value="bma">贝叶斯模型平均</option>
+                        <option value="uncertainty_based">基于不确定性</option>
+                        <option value="adaptive">自适应</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>最小权重</label>
+                    <input type="number" id="min_weight" value="0.0" step="0.1" min="0" max="1">
+                </div>
+                <div class="form-group">
+                    <label>最大权重</label>
+                    <input type="number" id="max_weight" value="1.0" step="0.1" min="0" max="1">
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="normalize" checked> 归一化权重
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="smoothing"> 平滑权重
+                    </label>
+                </div>
+                <button onclick="createFusionTask()">创建融合任务</button>
+                <button onclick="checkTaskStatus()" id="checkStatusBtn" disabled>检查状态</button>
+            </div>
+
+            <div class="result" id="taskResult">
+                <h3>任务结果</h3>
+                <pre id="resultContent"></pre>
+            </div>
+        </div>
+
+        <!-- 策略对比 -->
+        <div id="compare" class="tab-content">
+            <div class="section">
+                <h2>策略对比</h2>
+                <p>对比不同融合策略的性能</p>
+                <button onclick="compareStrategies()">执行策略对比</button>
+                <div class="result" id="compareResult">
+                    <h3>对比结果</h3>
+                    <pre id="compareContent"></pre>
+                </div>
+            </div>
+        </div>
+
+        <!-- 权重优化 -->
+        <div id="optimize" class="tab-content">
+            <div class="section">
+                <h2>权重优化</h2>
+                <p>自动选择最佳权重计算方法</p>
+                <button onclick="optimizeWeights()">执行权重优化</button>
+                <div class="result" id="optimizeResult">
+                    <h3>优化结果</h3>
+                    <pre id="optimizeContent"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8000/api';
+        let currentTaskId = null;
+
+        function showTab(tabId) {
+            // 隐藏所有tab内容
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            // 移除所有tab的active类
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            // 显示选中的tab内容
+            document.getElementById(tabId).classList.add('active');
+            // 添加active类到选中的tab
+            event.target.classList.add('active');
+        }
+
+        function parseArray(str) {
+            return str.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+        }
+
+        async function createFusionTask() {
+            const models = [
+                {
+                    model_id: document.getElementById('model1_id').value,
+                    model_name: document.getElementById('model1_name').value,
+                    predictions: parseArray(document.getElementById('model1_predictions').value)
+                },
+                {
+                    model_id: document.getElementById('model2_id').value,
+                    model_name: document.getElementById('model2_name').value,
+                    predictions: parseArray(document.getElementById('model2_predictions').value)
+                },
+                {
+                    model_id: document.getElementById('model3_id').value,
+                    model_name: document.getElementById('model3_name').value,
+                    predictions: parseArray(document.getElementById('model3_predictions').value)
+                }
+            ];
+
+            const trueValuesStr = document.getElementById('true_values').value;
+            const trueValues = trueValuesStr ? parseArray(trueValuesStr) : null;
+
+            const config = {
+                strategy: document.getElementById('fusion_strategy').value,
+                weight_method: document.getElementById('weight_method').value,
+                min_weight: parseFloat(document.getElementById('min_weight').value),
+                max_weight: parseFloat(document.getElementById('max_weight').value),
+                normalize: document.getElementById('normalize').checked,
+                smoothing: document.getElementById('smoothing').checked,
+                enable_cross_validation: true,
+                enable_stability_check: true,
+                enable_uncertainty_propagation: true,
+                n_folds: 5
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/fusion/create-task`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ models, config, true_values: trueValues })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    currentTaskId = data.task_id;
+                    document.getElementById('checkStatusBtn').disabled = false;
+                    showResult(`任务创建成功！任务ID: ${data.task_id}`);
+                    setTimeout(checkTaskStatus, 1000);
+                } else {
+                    showResult('任务创建失败');
+                }
+            } catch (error) {
+                showResult(`错误: ${error.message}`);
+            }
+        }
+
+        async function checkTaskStatus() {
+            if (!currentTaskId) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/fusion/task/${currentTaskId}/status`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const status = data.status.status;
+                    showResult(`任务状态: ${status}`);
+
+                    if (status === 'completed') {
+                        await getTaskResult();
+                    } else if (status === 'running') {
+                        setTimeout(checkTaskStatus, 1000);
+                    } else if (status === 'failed') {
+                        showResult(`任务失败: ${data.status.error}`);
+                    }
+                }
+            } catch (error) {
+                showResult(`错误: ${error.message}`);
+            }
+        }
+
+        async function getTaskResult() {
+            if (!currentTaskId) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/fusion/task/${currentTaskId}/result`);
+                const data = await response.json();
+
+                if (data.success && data.result) {
+                    displayFusionResult(data.result);
+                }
+            } catch (error) {
+                showResult(`错误: ${error.message}`);
+            }
+        }
+
+        function displayFusionResult(result) {
+            let html = `
+                <h3>融合结果</h3>
+                <div class="metrics-grid">
+                    <div class="metric-card">
+                        <div class="metric-value">${result.metrics.rmse.toFixed(4)}</div>
+                        <div class="metric-label">RMSE</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${result.metrics.mae.toFixed(4)}</div>
+                        <div class="metric-label">MAE</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${result.metrics.r2.toFixed(4)}</div>
+                        <div class="metric-label">R²</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">${result.fusion_strategy}</div>
+                        <div class="metric-label">融合策略</div>
+                    </div>
+                </div>
+
+                <h3 style="margin-top: 20px;">模型权重</h3>
+                <div class="metrics-grid">
+            `;
+
+            for (const [modelId, weight] of Object.entries(result.weights)) {
+                html += `
+                    <div class="metric-card">
+                        <div class="metric-value">${(weight * 100).toFixed(1)}%</div>
+                        <div class="metric-label">${modelId}</div>
+                    </div>
+                `;
+            }
+
+            html += '</div>';
+
+            if (result.improvement) {
+                html += '<h3 style="margin-top: 20px;">性能改进</h3><ul>';
+                for (const [key, value] of Object.entries(result.improvement)) {
+                    html += `<li>${key}: ${value.toFixed(2)}%</li>`;
+                }
+                html += '</ul>';
+            }
+
+            const resultDiv = document.getElementById('taskResult');
+            resultDiv.innerHTML = html;
+            resultDiv.classList.add('show');
+
+            // 也显示原始JSON
+            document.getElementById('resultContent').textContent = JSON.stringify(result, null, 2);
+        }
+
+        function showResult(message) {
+            const resultDiv = document.getElementById('taskResult');
+            resultDiv.classList.add('show');
+            document.getElementById('resultContent').textContent = message;
+        }
+
+        async function compareStrategies() {
+            const models = [
+                {
+                    model_id: document.getElementById('model1_id').value,
+                    model_name: document.getElementById('model1_name').value,
+                    predictions: parseArray(document.getElementById('model1_predictions').value)
+                },
+                {
+                    model_id: document.getElementById('model2_id').value,
+                    model_name: document.getElementById('model2_name').value,
+                    predictions: parseArray(document.getElementById('model2_predictions').value)
+                },
+                {
+                    model_id: document.getElementById('model3_id').value,
+                    model_name: document.getElementById('model3_name').value,
+                    predictions: parseArray(document.getElementById('model3_predictions').value)
+                }
+            ];
+
+            const trueValuesStr = document.getElementById('true_values').value;
+            const trueValues = trueValuesStr ? parseArray(trueValuesStr) : null;
+
+            const config = {
+                strategy: 'weighted_average',
+                weight_method: 'rmse_based',
+                enable_cross_validation: true
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/fusion/compare-strategies`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ models, config, true_values: trueValues })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showCompareResult(`策略对比任务创建成功！任务ID: ${data.task_id}`);
+                    // 等待结果
+                    setTimeout(() => pollForResult(data.task_id, 'compare'), 1000);
+                }
+            } catch (error) {
+                showCompareResult(`错误: ${error.message}`);
+            }
+        }
+
+        async function optimizeWeights() {
+            const models = [
+                {
+                    model_id: document.getElementById('model1_id').value,
+                    model_name: document.getElementById('model1_name').value,
+                    predictions: parseArray(document.getElementById('model1_predictions').value)
+                },
+                {
+                    model_id: document.getElementById('model2_id').value,
+                    model_name: document.getElementById('model2_name').value,
+                    predictions: parseArray(document.getElementById('model2_predictions').value)
+                },
+                {
+                    model_id: document.getElementById('model3_id').value,
+                    model_name: document.getElementById('model3_name').value,
+                    predictions: parseArray(document.getElementById('model3_predictions').value)
+                }
+            ];
+
+            const trueValuesStr = document.getElementById('true_values').value;
+            const trueValues = trueValuesStr ? parseArray(trueValuesStr) : null;
+
+            if (!trueValues) {
+                showOptimizeResult('权重优化需要提供真实值');
+                return;
+            }
+
+            const config = {
+                strategy: 'weighted_average',
+                weight_method: 'rmse_based'
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/fusion/optimize-weights`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ models, config, true_values: trueValues })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    showOptimizeResult(`权重优化任务创建成功！任务ID: ${data.task_id}`);
+                    setTimeout(() => pollForResult(data.task_id, 'optimize'), 1000);
+                }
+            } catch (error) {
+                showOptimizeResult(`错误: ${error.message}`);
+            }
+        }
+
+        async function pollForResult(taskId, type) {
+            try {
+                const response = await fetch(`${API_BASE}/fusion/task/${taskId}/status`);
+                const data = await response.json();
+
+                if (data.success) {
+                    const status = data.status.status;
+
+                    if (status === 'completed') {
+                        await getTaskResultById(taskId, type);
+                    } else if (status === 'running') {
+                        setTimeout(() => pollForResult(taskId, type), 1000);
+                    } else if (status === 'failed') {
+                        const resultDiv = document.getElementById(`${type}Result`);
+                        resultDiv.innerHTML = `<h3>任务失败</h3><p>${data.status.error}</p>`;
+                        resultDiv.classList.add('show');
+                    }
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        async function getTaskResultById(taskId, type) {
+            try {
+                const response = await fetch(`${API_BASE}/fusion/task/${taskId}/result`);
+                const data = await response.json();
+
+                if (data.success && data.result) {
+                    const contentDiv = document.getElementById(`${type}Content`);
+                    contentDiv.textContent = JSON.stringify(data.result, null, 2);
+                    document.getElementById(`${type}Result`).classList.add('show');
+                }
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        function showCompareResult(message) {
+            const resultDiv = document.getElementById('compareResult');
+            resultDiv.classList.add('show');
+            document.getElementById('compareContent').textContent = message;
+        }
+
+        function showOptimizeResult(message) {
+            const resultDiv = document.getElementById('optimizeResult');
+            resultDiv.classList.add('show');
+            document.getElementById('optimizeContent').textContent = message;
+        }
+
+        // 页面加载时获取可用策略和方法
+        window.onload = async function() {
+            try {
+                const strategiesResponse = await fetch(`${API_BASE}/fusion/strategies`);
+                const strategiesData = await strategiesResponse.json();
+                console.log('可用策略:', strategiesData);
+
+                const methodsResponse = await fetch(`${API_BASE}/fusion/weight-methods`);
+                const methodsData = await methodsResponse.json();
+                console.log('可用权重方法:', methodsData);
+            } catch (error) {
+                console.error('获取配置失败:', error);
+            }
+        };
+    </script>
+</body>
+</html>

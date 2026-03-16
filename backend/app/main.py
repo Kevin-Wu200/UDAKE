@@ -67,6 +67,7 @@ app.include_router(误差预测接口.router, prefix="/api", tags=["误差预测
 app.include_router(模型评估接口.router, prefix="/api", tags=["模型评估"])
 app.include_router(配置接口.router, tags=["配置管理"])
 app.include_router(路径规划接口.router, tags=["路径规划"])
+app.include_router(模型融合接口.router, tags=["模型融合"])
 
 @app.get("/")
 async def root():
