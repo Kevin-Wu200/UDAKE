@@ -20,7 +20,8 @@ from .constraint_utils import (
     check_time_window_constraint,
     check_distance_constraint,
     check_duration_constraint,
-    check_cost_constraint
+    check_cost_constraint,
+    check_all_constraints
 )
 
 __all__ = [
@@ -37,5 +38,6 @@ __all__ = [
     "check_time_window_constraint",
     "check_distance_constraint",
     "check_duration_constraint",
-    "check_cost_constraint"
+    "check_cost_constraint",
+    "check_all_constraints"
 ]
