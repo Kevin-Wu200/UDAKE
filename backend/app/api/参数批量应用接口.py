@@ -57,6 +57,52 @@ async def get_all_parameter_templates():
         raise HTTPException(status_code=500, detail=f"获取模板失败: {str(e)}")
 
 
+@router.get("/api/parameter-templates/defaults")
+async def get_default_templates():
+    """
+    获取默认参数模板列表
+
+    返回系统预设的参数模板
+    """
+    try:
+        default_templates = [
+            {
+                "name": "环境监测模板",
+                "description": "适用于环境监测数据",
+                "industry": "environment"
+            },
+            {
+                "name": "农业采样模板",
+                "description": "适用于农业土壤采样数据",
+                "industry": "agriculture"
+            },
+            {
+                "name": "地质勘探模板",
+                "description": "适用于地质勘探数据",
+                "industry": "geology"
+            },
+            {
+                "name": "水文监测模板",
+                "description": "适用于水文监测数据",
+                "industry": "hydrology"
+            },
+            {
+                "name": "气象监测模板",
+                "description": "适用于气象监测数据",
+                "industry": "meteorology"
+            }
+        ]
+
+        return {
+            "default_templates": default_templates,
+            "total": len(default_templates)
+        }
+
+    except Exception as e:
+        logger.error(f"获取默认参数模板失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"获取默认模板失败: {str(e)}")
+
+
 @router.get("/api/parameter-templates/{template_id}", response_model=ParameterTemplate)
 async def get_parameter_template(template_id: str):
     """
@@ -260,49 +306,3 @@ async def auto_adjust_parameters(parameters: KrigingParameters, data_id: str):
     except Exception as e:
         logger.error(f"自动调整参数失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"自动调整参数失败: {str(e)}")
-
-
-@router.get("/api/parameter-templates/defaults")
-async def get_default_templates():
-    """
-    获取默认参数模板列表
-
-    返回系统预设的参数模板
-    """
-    try:
-        default_templates = [
-            {
-                "name": "环境监测模板",
-                "description": "适用于环境监测数据",
-                "industry": "environment"
-            },
-            {
-                "name": "农业采样模板",
-                "description": "适用于农业土壤采样数据",
-                "industry": "agriculture"
-            },
-            {
-                "name": "地质勘探模板",
-                "description": "适用于地质勘探数据",
-                "industry": "geology"
-            },
-            {
-                "name": "水文监测模板",
-                "description": "适用于水文监测数据",
-                "industry": "hydrology"
-            },
-            {
-                "name": "气象监测模板",
-                "description": "适用于气象监测数据",
-                "industry": "meteorology"
-            }
-        ]
-
-        return {
-            "default_templates": default_templates,
-            "total": len(default_templates)
-        }
-
-    except Exception as e:
-        logger.error(f"获取默认参数模板失败: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"获取默认模板失败: {str(e)}")
