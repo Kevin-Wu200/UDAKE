@@ -330,22 +330,21 @@ def test_advanced_features():
     print("=" * 80)
     print("【高级功能测试】")
     print("=" * 80)
-    
+
     # 测试模型推荐
-    test_endpoint("模型推荐", "/api/model-recommendation", "POST", 
-                 data={"points": [{"x": 1, "y": 1, "value": 10}, {"x": 2, "y": 2, "value": 20}]})
-    
+    test_endpoint("模型推荐", "/api/recommend-parameters", "POST",
+                 data={"data_id": "test-data-id", "enable_auto_model": True})
+
     # 测试不确定性分级
-    test_endpoint("不确定性分级", "/api/uncertainty-classification", "POST",
-                 data={"grid": [[0.1, 0.2], [0.3, 0.4]], "n_levels": 3})
-    
+    test_endpoint("不确定性分级", "/api/uncertainty/classify", "POST",
+                 data={"task_id": "test-task", "prediction": [[0.1, 0.2], [0.3, 0.4]], "variance": [[0.1, 0.2], [0.3, 0.4]], "x_coords": [0.0, 1.0], "y_coords": [0.0, 1.0]})
+
     # 测试风险指数
-    test_endpoint("风险指数计算", "/api/risk-index", "POST",
+    test_endpoint("风险指数计算", "/api/risk/calculate", "POST",
                  data={"variance_grid": [[0.1, 0.2], [0.3, 0.4]], "threshold": 0.25})
-    
+
     # 测试决策阈值
-    test_endpoint("获取决策阈值", "/api/decision-thresholds", "GET")
-    test_endpoint("设置决策阈值", "/api/decision-thresholds", "POST",
+    test_endpoint("设置决策阈值", "/api/decision/thresholds", "POST",
                  data={"thresholds": {"low": 0.1, "medium": 0.3, "high": 0.5}})
 
 def generate_report():
