@@ -237,7 +237,7 @@ async def list_fusion_strategies():
             {
                 "value": strategy.value,
                 "name": strategy.name,
-                "description": self._get_strategy_description(strategy)
+                "description": _get_strategy_description(strategy)
             }
             for strategy in FusionStrategy
         ]
@@ -264,7 +264,7 @@ async def list_weight_methods():
             {
                 "value": method.value,
                 "name": method.name,
-                "description": self._get_weight_method_description(method)
+                "description": _get_weight_method_description(method)
             }
             for method in WeightMethod
         ]
