@@ -3,7 +3,8 @@
  * 提供统一的错误处理机制
  */
 
-import type { AppError, ErrorType, ErrorSeverity } from '../../types/errors';
+import type { AppError } from '../../types/errors';
+import { ErrorType, ErrorSeverity } from '../../types/errors';
 import { ApplicationError, NetworkError, ValidationError, AuthenticationError, AuthorizationError, NotFoundError, ServerError, PluginError, CacheError } from './AppError';
 import i18n from '../../i18n/config';
 
@@ -188,7 +189,7 @@ export class ErrorHandler {
 
   private reportError(error: AppError): void {
     // TODO: 集成错误报告服务（如 Sentry）
-    console.log('报告错误:', error.toJSON());
+    console.log('报告错误:', (error as any).toJSON ? (error as any).toJSON() : error);
   }
 
   private notifyUser(error: AppError): void {

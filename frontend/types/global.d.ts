@@ -142,6 +142,16 @@ declare module 'https://js.arcgis.com/4.28/@arcgis/core/geometry/projection.js' 
 
 // 处理 HTML 扩展
 declare global {
+    // Node.js process 类型定义（用于浏览器环境）
+    interface Process {
+        env: {
+            NODE_ENV?: string;
+            [key: string]: string | undefined;
+        };
+    }
+
+    var process: Process;
+
     interface HTMLInputElement {
         files: FileList | null;
     }

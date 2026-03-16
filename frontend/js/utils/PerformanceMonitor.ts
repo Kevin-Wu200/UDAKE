@@ -511,6 +511,27 @@ export class PerformanceMonitor {
             issues
         };
     }
+
+    // 静态方法委托给单例
+    private static instance: PerformanceMonitor;
+
+    public static init(): void {
+        if (!PerformanceMonitor.instance) {
+            PerformanceMonitor.instance = new PerformanceMonitor();
+        }
+    }
+
+    public static mark(name: string): void {
+        if (typeof performance !== 'undefined') {
+            performance.mark(name);
+        }
+    }
+
+    public static measure(name: string, startMark: string, endMark: string): void {
+        if (typeof performance !== 'undefined') {
+            performance.measure(name, startMark, endMark);
+        }
+    }
 }
 
 // 导出单例

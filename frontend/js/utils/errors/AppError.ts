@@ -3,7 +3,8 @@
  * 提供统一的应用错误处理机制
  */
 
-import type { AppError, ErrorType, ErrorSeverity, ErrorContext } from '../../types/errors';
+import type { AppError, ErrorContext } from '../../types/errors';
+import { ErrorType, ErrorSeverity } from '../../types/errors';
 
 export class ApplicationError extends Error implements AppError {
   public readonly type: ErrorType;
@@ -37,8 +38,10 @@ export class ApplicationError extends Error implements AppError {
     this.originalError = originalError;
     this.isOperational = true;
 
-    // 维护正确的堆栈跟踪
-    Error.captureStackTrace(this, this.constructor);
+    // 维护正确的堆栈跟踪（仅在 Node.js 环境中可用）
+    if (typeof (Error as any).captureStackTrace === 'function') {
+      (Error as any).captureStackTrace(this, this.constructor);
+    }
   }
 
   toJSON(): any {

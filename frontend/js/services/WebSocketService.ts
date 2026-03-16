@@ -4,6 +4,7 @@ export interface WebSocketMessage {
   type: string;
   data?: any;
   timestamp: string;
+  id?: string;
 }
 
 export interface TaskUpdateMessage extends WebSocketMessage {
@@ -29,11 +30,11 @@ export class WebSocketService {
     message: WebSocketMessage;
     resolve: Function;
     reject: Function;
-    timeout: NodeJS.Timeout;
+    timeout: number;
   }> = new Map();
   private messageId = 0;
   private messageQueue: WebSocketMessage[] = [];
-  private batchTimer: NodeJS.Timeout | null = null;
+  private batchTimer: number | null = null;
   private batchSize = 10;
   private batchDelay = 100; // 100ms
 
@@ -173,7 +174,7 @@ export class WebSocketService {
   async sendWithAck(message: WebSocketMessage, timeout = 10000): Promise<any> {
     return new Promise((resolve, reject) => {
       const id = this.messageId++;
-      const messageWithId = { ...message, id };
+      const messageWithId = { ...message, id: id.toString() };
 
       this.pendingMessages.set(id.toString(), {
         message: messageWithId,

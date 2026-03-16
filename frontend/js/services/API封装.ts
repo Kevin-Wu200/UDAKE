@@ -13,8 +13,9 @@ import type {
 
 import { OfflineManager } from '../utils/OfflineManager';
 import { TwoLevelCache } from '../utils/cache/TwoLevelCache';
-import { errorHandler, ApplicationError, NetworkError, ValidationError, AuthenticationError, NotFoundError, ServerError } from '../utils/errors/ErrorHandler';
-import type { AppError, ErrorContext } from '../../types/errors';
+import { errorHandler } from '../utils/errors/ErrorHandler';
+import { ApplicationError, NetworkError, ValidationError, AuthenticationError, NotFoundError, ServerError } from '../utils/errors/AppError';
+import type { AppError, ErrorContext } from '../types/errors';
 
 interface RequestConfig {
     url: string;
@@ -198,36 +199,31 @@ export class APIService implements IAPIService {
                 return new AuthenticationError(
                     data?.message || '认证失败',
                     data,
-                    context,
-                    error
+                    context
                 );
             } else if (status === 403) {
                 return new AuthenticationError(
                     data?.message || '权限不足',
                     data,
-                    context,
-                    error
+                    context
                 );
             } else if (status === 404) {
                 return new NotFoundError(
                     data?.message || '资源不存在',
                     data,
-                    context,
-                    error
+                    context
                 );
             } else if (status >= 500) {
                 return new ServerError(
                     data?.message || '服务器错误',
                     data,
-                    context,
-                    error
+                    context
                 );
             } else if (status === 422) {
                 return new ValidationError(
                     data?.message || '数据验证失败',
                     data,
-                    context,
-                    error
+                    context
                 );
             } else {
                 return new ApplicationError(
@@ -251,8 +247,7 @@ export class APIService implements IAPIService {
                     url: config.url,
                     method: config.method || 'GET',
                     timestamp: new Date()
-                },
-                error
+                }
             );
         } else {
             // 其他错误

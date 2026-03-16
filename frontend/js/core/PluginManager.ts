@@ -7,12 +7,12 @@ import type {
   Plugin,
   PluginManifest,
   PluginType,
-  PluginStatus,
   PluginInfo,
   PluginContext,
   ServiceRegistry,
   EventBus
 } from '../types/plugin';
+import { PluginStatus } from '../types/plugin';
 
 /**
  * 插件加载器接口

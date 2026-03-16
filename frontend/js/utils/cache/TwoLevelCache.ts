@@ -14,6 +14,7 @@ export class TwoLevelCache<K = string, V = any> {
   private enableAutoPromote: boolean;
   private promoteThreshold: number;
   private isDestroyed: boolean = false;
+  private ttlStore: Map<K, number> = new Map();
 
   constructor(
     memoryConfig: Partial<CacheConfig> = {},
@@ -46,7 +47,7 @@ export class TwoLevelCache<K = string, V = any> {
 
     // 监听内存缓存的访问事件
     this.memoryCache.on('hit', (_event, key) => {
-      this._trackAccess(key);
+      this._trackAccess(key as K);
     });
   }
 
@@ -83,7 +84,7 @@ export class TwoLevelCache<K = string, V = any> {
   /**
    * 设置缓存值
    */
-  async set(key: K, value: V): Promise<void> {
+  async set(key: K, value: V, ttl?: number): Promise<void> {
     if (this.isDestroyed) {
       console.warn('[TwoLevelCache] 缓存已销毁，无法设置值');
       return;
@@ -92,6 +93,11 @@ export class TwoLevelCache<K = string, V = any> {
     // 同时写入两层缓存
     this.memoryCache.set(key, value);
     this.diskCache.set(key, value);
+
+    // 如果指定了 TTL，设置过期时间
+    if (ttl) {
+      this.ttlStore.set(key, Date.now() + ttl);
+    }
 
     // 重置访问计数
     this.memoryToDiskPromoter.set(key, 0);
