@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多目标优化采样系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px 40px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            padding: 40px;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .slider {
+            flex: 1;
+            -webkit-appearance: none;
+            height: 8px;
+            border-radius: 4px;
+            background: #e0e0e0;
+            outline: none;
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: #667eea;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .slider-value {
+            min-width: 60px;
+            text-align: right;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .btn {
+            padding: 14px 32px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+        }
+
+        .card {
+            background: #f9f9f9;
+            border-radius: 12px;
+            padding: 25px;
+            border: 2px solid #e0e0e0;
+            transition: all 0.3s;
+        }
+
+        .card:hover {
+            border-color: #667eea;
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.1);
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .chart-container {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            height: 400px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            transition: width 0.3s;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .status-pending {
+            background: #ffe0b2;
+            color: #e65100;
+        }
+
+        .status-running {
+            background: #e3f2fd;
+            color: #1565c0;
+        }
+
+        .status-completed {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+
+        .status-failed {
+            background: #ffcdd2;
+            color: #c62828;
+        }
+
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .results-table th,
+        .results-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .results-table th {
+            background: #f9f9f9;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .results-table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #e0e0e0;
+            border-top-color: #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .loading-text {
+            font-size: 18px;
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+
+        .metric-card {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 32px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .metric-label {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            padding: 10px 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .tab.active {
+            background: #667eea;
+            color: white;
+            border-color: #667eea;
+        }
+
+        .tab:hover:not(.active) {
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .grid-2,
+            .grid-3 {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .main-content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 多目标优化采样系统</h1>
+            <p>综合考虑方差、成本、可达性等多个目标，智能推荐最优采样点组合</p>
+        </div>
+
+        <div class="main-content">
+            <!-- 参数配置 -->
+            <div class="section">
+                <h2 class="section-title">⚙️ 参数配置</h2>
+
+                <div class="grid-3">
+                    <div class="card">
+                        <h3 class="card-title">📊 方差权重</h3>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="varianceWeight" min="0" max="100" value="50">
+                            <span class="slider-value" id="varianceWeightValue">0.50</span>
+                        </div>
+                        <p style="margin-top: 10px; font-size: 12px; color: #666;">最小化插值预测方差</p>
+                    </div>
+
+                    <div class="card">
+                        <h3 class="card-title">💰 成本权重</h3>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="costWeight" min="0" max="100" value="30">
+                            <span class="slider-value" id="costWeightValue">0.30</span>
+                        </div>
+                        <p style="margin-top: 10px; font-size: 12px; color: #666;">最小化采样总成本</p>
+                    </div>
+
+                    <div class="card">
+                        <h3 class="card-title">🚀 可达性权重</h3>
+                        <div class="slider-container">
+                            <input type="range" class="slider" id="accessibilityWeight" min="0" max="100" value="20">
+                            <span class="slider-value" id="accessibilityWeightValue">0.20</span>
+                        </div>
+                        <p style="margin-top: 10px; font-size: 12px; color: #666;">最大化采样点可达性</p>
+                    </div>
+                </div>
+
+                <div class="grid-2" style="margin-top: 30px;">
+                    <div class="card">
+                        <h3 class="card-title">🎯 采样参数</h3>
+                        <div class="form-group">
+                            <label>采样点数量</label>
+                            <input type="number" class="form-control" id="nSamples" value="20" min="1" max="100">
+                        </div>
+                        <div class="form-group">
+                            <label>进化代数</label>
+                            <input type="number" class="form-control" id="nGenerations" value="100" min="10" max="500">
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 class="card-title">🔒 约束条件</h3>
+                        <div class="form-group">
+                            <label>最小间距（米）</label>
+                            <input type="number" class="form-control" id="minDistance" value="50" min="0">
+                        </div>
+                        <div class="form-group">
+                            <label>预算限制（元）</label>
+                            <input type="number" class="form-control" id="budget" value="50000" min="0">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="text-align: center; margin-top: 30px;">
+                    <button class="btn btn-primary" id="optimizeBtn" onclick="startOptimization()">
+                        <span>🚀 开始优化</span>
+                    </button>
+                    <button class="btn btn-secondary" id="resetBtn" onclick="resetParameters()">
+                        <span>🔄 重置参数</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 优化进度 -->
+            <div class="section hidden" id="progressSection">
+                <h2 class="section-title">📈 优化进度</h2>
+                <div class="card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div>
+                            <span class="status-badge status-running" id="taskStatus">运行中</span>
+                            <span style="margin-left: 15px; font-weight: 600;" id="progressText">0%</span>
+                        </div>
+                        <div style="color: #666;" id="elapsedTime">已耗时: 0s</div>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 优化结果 -->
+            <div class="section hidden" id="resultsSection">
+                <h2 class="section-title">✅ 优化结果</h2>
+
+                <div class="tabs">
+                    <div class="tab active" onclick="switchTab('pareto')">帕累托前沿</div>
+                    <div class="tab" onclick="switchTab('recommended')">推荐方案</div>
+                    <div class="tab" onclick="switchTab('metrics')">性能指标</div>
+                </div>
+
+                <div id="paretoTab" class="tab-content active">
+                    <div class="card">
+                        <h3 class="card-title">📊 帕累托前沿可视化</h3>
+                        <div class="chart-container" id="paretoChart">
+                            <canvas id="paretoCanvas"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="recommendedTab" class="tab-content">
+                    <div class="card">
+                        <h3 class="card-title">🌟 推荐方案详情</h3>
+                        <div id="recommendedDetails"></div>
+                    </div>
+                </div>
+
+                <div id="metricsTab" class="tab-content">
+                    <div class="metrics-grid" id="metricsGrid"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="loading-overlay hidden" id="loadingOverlay">
+        <div class="spinner"></div>
+        <div class="loading-text">正在优化中，请稍候...</div>
+    </div>
+
+    <script>
+        // 全局变量
+        let optimizationTaskId = null;
+        let progressInterval = null;
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            initSliders();
+        });
+
+        // 初始化滑块
+        function initSliders() {
+            const sliders = ['varianceWeight', 'costWeight', 'accessibilityWeight'];
+            sliders.forEach(id => {
+                const slider = document.getElementById(id);
+                const valueSpan = document.getElementById(id + 'Value');
+                slider.addEventListener('input', function() {
+                    valueSpan.textContent = (this.value / 100).toFixed(2);
+                });
+            });
+        }
+
+        // 开始优化
+        async function startOptimization() {
+            // 获取参数
+            const varianceWeight = document.getElementById('varianceWeight').value / 100;
+            const costWeight = document.getElementById('costWeight').value / 100;
+            const accessibilityWeight = document.getElementById('accessibilityWeight').value / 100;
+            const nSamples = parseInt(document.getElementById('nSamples').value);
+            const nGenerations = parseInt(document.getElementById('nGenerations').value);
+            const minDistance = parseFloat(document.getElementById('minDistance').value);
+            const budget = parseFloat(document.getElementById('budget').value);
+
+            // 创建测试数据
+            const varianceGrid = {
+                shape: [100, 100],
+                x_coords: Array.from({length: 100}, (_, i) => i),
+                y_coords: Array.from({length: 100}, (_, i) => i),
+                values: Array.from({length: 100}, () =>
+                    Array.from({length: 100}, () => Math.random())
+                )
+            };
+
+            const weights = {
+                variance: varianceWeight,
+                cost: costWeight,
+                accessibility: accessibilityWeight
+            };
+
+            const constraints = {
+                min_distance: minDistance,
+                budget: budget
+            };
+
+            const algorithmParams = {
+                population_size: 100,
+                n_generations: nGenerations,
+                crossover_prob: 0.9,
+                mutation_prob: 0.1
+            };
+
+            // 显示进度
+            document.getElementById('progressSection').classList.remove('hidden');
+            document.getElementById('optimizeBtn').disabled = true;
+
+            // 模拟优化过程（实际应该调用API）
+            await simulateOptimization();
+
+            // 显示结果
+            displayResults();
+        }
+
+        // 模拟优化过程
+        async function simulateOptimization() {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            const elapsedTime = document.getElementById('elapsedTime');
+
+            let progress = 0;
+            let seconds = 0;
+
+            return new Promise((resolve) => {
+                const interval = setInterval(() => {
+                    progress += Math.random() * 5;
+                    seconds += 0.1;
+
+                    if (progress >= 100) {
+                        progress = 100;
+                        clearInterval(interval);
+                        resolve();
+                    }
+
+                    progressFill.style.width = progress + '%';
+                    progressText.textContent = Math.round(progress) + '%';
+                    elapsedTime.textContent = '已耗时: ' + seconds.toFixed(1) + 's';
+                }, 100);
+            });
+        }
+
+        // 显示结果
+        function displayResults() {
+            document.getElementById('progressSection').classList.add('hidden');
+            document.getElementById('resultsSection').classList.remove('hidden');
+            document.getElementById('optimizeBtn').disabled = false;
+
+            // 更新状态
+            document.getElementById('taskStatus').textContent = '已完成';
+            document.getElementById('taskStatus').className = 'status-badge status-completed';
+
+            // 绘制帕累托前沿
+            drawParetoFront();
+
+            // 显示推荐方案
+            displayRecommendedSolution();
+
+            // 显示性能指标
+            displayMetrics();
+        }
+
+        // 绘制帕累托前沿
+        function drawParetoFront() {
+            const canvas = document.getElementById('paretoCanvas');
+            const ctx = canvas.getContext('2d');
+
+            // 设置canvas尺寸
+            canvas.width = canvas.parentElement.clientWidth - 40;
+            canvas.height = canvas.parentElement.clientHeight - 40;
+
+            // 生成模拟的帕累托前沿数据
+            const paretoPoints = [];
+            for (let i = 0; i < 50; i++) {
+                const x = 0.1 + (i / 50) * 0.8;
+                const y = 0.1 + Math.random() * 0.3;
+                paretoPoints.push({x, y});
+            }
+
+            // 清空画布
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制坐标轴
+            ctx.strokeStyle = '#e0e0e0';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(50, canvas.height - 50);
+            ctx.lineTo(canvas.width - 30, canvas.height - 50);
+            ctx.moveTo(50, canvas.height - 50);
+            ctx.lineTo(50, 30);
+            ctx.stroke();
+
+            // 绘制坐标轴标签
+            ctx.fillStyle = '#666';
+            ctx.font = '14px Arial';
+            ctx.fillText('方差', canvas.width - 150, canvas.height - 25);
+            ctx.fillText('成本', 20, 80);
+
+            // 绘制帕累托前沿点
+            paretoPoints.forEach((point, index) => {
+                const x = 50 + point.x * (canvas.width - 80);
+                const y = canvas.height - 50 - point.y * (canvas.height - 80);
+
+                ctx.beginPath();
+                ctx.arc(x, y, 6, 0, 2 * Math.PI);
+
+                // 渐变色
+                const gradient = ctx.createRadialGradient(x, y, 0, x, y, 6);
+                gradient.addColorStop(0, '#667eea');
+                gradient.addColorStop(1, '#764ba2');
+                ctx.fillStyle = gradient;
+
+                ctx.fill();
+
+                // 高亮推荐方案
+                if (index === 25) {
+                    ctx.strokeStyle = '#ff6b6b';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                }
+            });
+
+            // 添加图例
+            ctx.fillStyle = '#666';
+            ctx.font = '12px Arial';
+            ctx.fillText('蓝色点: 帕累托最优解', 80, 30);
+            ctx.fillStyle = '#ff6b6b';
+            ctx.fillText('红色边框: 推荐方案', 250, 30);
+        }
+
+        // 显示推荐方案
+        function displayRecommendedSolution() {
+            const container = document.getElementById('recommendedDetails');
+            container.innerHTML = `
+                <div class="grid-3">
+                    <div class="metric-card">
+                        <div class="metric-value">0.125</div>
+                        <div class="metric-label">平均方差</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">¥7,200</div>
+                        <div class="metric-label">总成本</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">0.85</div>
+                        <div class="metric-label">可达性得分</div>
+                    </div>
+                </div>
+
+                <div style="margin-top: 30px;">
+                    <h4 style="margin-bottom: 15px; color: #333;">采样点坐标</h4>
+                    <table class="results-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>X坐标</th>
+                                <th>Y坐标</th>
+                                <th>方差</th>
+                                <th>优先级</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${Array.from({length: 5}, (_, i) => `
+                                <tr>
+                                    <td>${i + 1}</td>
+                                    <td>${(Math.random() * 100).toFixed(2)}</td>
+                                    <td>${(Math.random() * 100).toFixed(2)}</td>
+                                    <td>${(Math.random() * 0.3).toFixed(4)}</td>
+                                    <td>${i < 2 ? '高' : '中'}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        }
+
+        // 显示性能指标
+        function displayMetrics() {
+            const container = document.getElementById('metricsGrid');
+            container.innerHTML = `
+                <div class="metric-card">
+                    <div class="metric-value">15</div>
+                    <div class="metric-label">帕累托解数量</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">0.85</div>
+                    <div class="metric-label">超体积指标</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">0.12</div>
+                    <div class="metric-label">间距指标</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">0.78</div>
+                    <div class="metric-label">多样性</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">100%</div>
+                    <div class="metric-label">可行解比例</div>
+                </div>
+                <div class="metric-card">
+                    <div class="metric-value">8.2s</div>
+                    <div class="metric-label">优化时间</div>
+                </div>
+            `;
+        }
+
+        // 切换标签页
+        function switchTab(tabName) {
+            // 更新标签样式
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // 更新内容显示
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+
+        // 重置参数
+        function resetParameters() {
+            document.getElementById('varianceWeight').value = 50;
+            document.getElementById('costWeight').value = 30;
+            document.getElementById('accessibilityWeight').value = 20;
+            document.getElementById('nSamples').value = 20;
+            document.getElementById('nGenerations').value = 100;
+            document.getElementById('minDistance').value = 50;
+            document.getElementById('budget').value = 50000;
+
+            // 更新显示值
+            document.getElementById('varianceWeightValue').textContent = '0.50';
+            document.getElementById('costWeightValue').textContent = '0.30';
+            document.getElementById('accessibilityWeightValue').textContent = '0.20';
+
+            // 隐藏结果
+            document.getElementById('resultsSection').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
