@@ -396,32 +396,40 @@ export function loadAMapScript(containerId) {
                             // 异步更新方法
                             setCenter: (center) => {
                                 cachedCenter = center;
-                                iframe.contentWindow.postMessage({
-                                    type: 'MAP_SET_CENTER',
-                                    center: center
-                                }, '*');
+                                if (iframe.contentWindow) {
+                                    iframe.contentWindow.postMessage({
+                                        type: 'MAP_SET_CENTER',
+                                        center: center
+                                    }, '*');
+                                }
                             },
                             
                             setZoom: (zoom) => {
                                 cachedZoom = zoom;
-                                iframe.contentWindow.postMessage({
-                                    type: 'MAP_SET_ZOOM',
-                                    zoom: zoom
-                                }, '*');
+                                if (iframe.contentWindow) {
+                                    iframe.contentWindow.postMessage({
+                                        type: 'MAP_SET_ZOOM',
+                                        zoom: zoom
+                                    }, '*');
+                                }
                             },
                             
                             setStatus: (status) => {
-                                iframe.contentWindow.postMessage({
-                                    type: 'MAP_SET_STATUS',
-                                    status: status
-                                }, '*');
+                                if (iframe.contentWindow) {
+                                    iframe.contentWindow.postMessage({
+                                        type: 'MAP_SET_STATUS',
+                                        status: status
+                                    }, '*');
+                                }
                             },
                             
                             setZooms: (zooms) => {
-                                iframe.contentWindow.postMessage({
-                                    type: 'MAP_SET_ZOOMS',
-                                    zooms: zooms
-                                }, '*');
+                                if (iframe.contentWindow) {
+                                    iframe.contentWindow.postMessage({
+                                        type: 'MAP_SET_ZOOMS',
+                                        zooms: zooms
+                                    }, '*');
+                                }
                             },
                             
                             on: (event, callback) => {

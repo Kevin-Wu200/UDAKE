@@ -1058,12 +1058,16 @@ class App {
                 this.layerManager.clearAllLayers();
             }
 
+            // 清理旧的iframe，确保完全移除
             const iframes = document.querySelectorAll('iframe[id^="amap-loader-iframe"]');
             iframes.forEach(iframe => {
                 if (iframe.parentNode) {
                     iframe.parentNode.removeChild(iframe);
                 }
             });
+
+            // 等待DOM完全更新，确保iframe完全清理
+            await new Promise(resolve => setTimeout(resolve, 100));
 
             const mapContainer = document.getElementById('viewDiv');
             if (mapContainer) {
