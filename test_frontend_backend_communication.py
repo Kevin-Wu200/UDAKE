@@ -21,6 +21,7 @@ test_results = []
 task_ids = []
 subscription_ids = []
 optimization_task_ids = []
+data_ids = []
 
 def log_test(test_name: str, endpoint: str, method: str, status: str, 
              response_time: float, error: str = None, response_data: Any = None):
@@ -139,13 +140,13 @@ def test_data_upload():
             files = {'file': ('示例数据.geojson', f, 'application/geo+json')}
             success, data = test_endpoint("上传GeoJSON数据", "/api/upload-data", "POST", files=files)
             if success and data:
-                task_id = data.get('task_id')
-                if task_id:
-                    task_ids.append(task_id)
-                    print(f"   创建的任务ID: {task_id}")
+                data_id = data.get('data_id')
+                if data_id:
+                    data_ids.append(data_id)
+                    print(f"   创建的数据ID: {data_id}")
     else:
         print(f"✗ 测试文件不存在: {geojson_file}")
-    
+
     # 测试上传test_kriging.geojson
     kriging_file = os.path.join(DATA_DIR, "test_kriging.geojson")
     if os.path.exists(kriging_file):
@@ -154,10 +155,10 @@ def test_data_upload():
             files = {'file': ('test_kriging.geojson', f, 'application/geo+json')}
             success, data = test_endpoint("上传Kriging数据", "/api/upload-data", "POST", files=files)
             if success and data:
-                task_id = data.get('task_id')
-                if task_id:
-                    task_ids.append(task_id)
-                    print(f"   创建的任务ID: {task_id}")
+                data_id = data.get('data_id')
+                if data_id:
+                    data_ids.append(data_id)
+                    print(f"   创建的数据ID: {data_id}")
 
 def test_interpolation():
     """测试插值功能"""
@@ -342,9 +343,12 @@ def test_advanced_features():
     print("【高级功能测试】")
     print("=" * 80)
 
-    # 测试模型推荐
-    test_endpoint("模型推荐", "/api/recommend-parameters", "POST",
-                 data={"data_id": "test-data-id", "enable_auto_model": True})
+    # 测试模型推荐（使用实际上传的数据ID）
+    if data_ids:
+        test_endpoint("模型推荐", "/api/recommend-parameters", "POST",
+                     data={"data_id": data_ids[0], "enable_auto_model": True})
+    else:
+        print("✗ 模型推荐：没有可用的数据ID")
 
     # 测试不确定性分级
     test_endpoint("不确定性分级", "/api/uncertainty/classify", "POST",
@@ -352,11 +356,11 @@ def test_advanced_features():
 
     # 测试风险指数
     test_endpoint("风险指数计算", "/api/risk/calculate", "POST",
-                 data={"variance_grid": [[0.1, 0.2], [0.3, 0.4]], "threshold": 0.25})
+                 data={"task_id": "test-task", "prediction": [[0.1, 0.2], [0.3, 0.4]], "variance": [[0.1, 0.2], [0.3, 0.4]], "x_coords": [0.0, 1.0], "y_coords": [0.0, 1.0], "threshold": 0.25})
 
     # 测试决策阈值
     test_endpoint("设置决策阈值", "/api/decision/thresholds", "POST",
-                 data={"thresholds": {"low": 0.1, "medium": 0.3, "high": 0.5}})
+                 data={"task_id": "test-task", "prediction": [[0.1, 0.2], [0.3, 0.4]], "variance": [[0.1, 0.2], [0.3, 0.4]], "x_coords": [0.0, 1.0], "y_coords": [0.0, 1.0], "decision_goal": "minimize_risk", "thresholds": {"low": 0.1, "medium": 0.3, "high": 0.5}})
 
 def generate_report():
     """生成测试报告"""
