@@ -44,6 +44,17 @@ class IncrementalKriging:
             'variogram_model',
             {'model_type': 'spherical', 'sill': 1.0, 'range': 100.0, 'nugget': 0.1}
         )
+
+        # 如果variogram_model是字符串，转换为完整参数字典
+        if isinstance(variogram_params, str):
+            model_type = variogram_params
+            variogram_params = {
+                'model_type': model_type,
+                'sill': 1.0,
+                'range': 100.0,
+                'nugget': 0.1
+            }
+
         self.variogram = VariogramModel(**variogram_params)
 
         # 初始化空间索引
