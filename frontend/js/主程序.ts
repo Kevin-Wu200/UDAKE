@@ -75,6 +75,9 @@ class App {
     public currentProject: IProject | null = null;
     public samplingComponent: ISamplingComponent | null = null;
 
+    // 切换状态
+    private isSwitchingMap: boolean = false;
+
     // 管理器
     private componentInitializer: ComponentInitializer;
     private eventBinder: EventBinder;
@@ -1046,6 +1049,14 @@ class App {
      * 处理地图引擎切换
      */
     private async handleMapEngineSwitch(newProvider: 'arcgis' | 'amap'): Promise<void> {
+        // 检查是否正在切换，防止重复切换
+        if (this.isSwitchingMap) {
+            console.warn('⚠️ 地图引擎正在切换中，请稍候');
+            return;
+        }
+
+        this.isSwitchingMap = true;
+
         try {
             LoadingManager.show('正在切换地图引擎...');
 
@@ -1066,8 +1077,8 @@ class App {
                 }
             });
 
-            // 等待DOM完全更新，确保iframe完全清理
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // 等待DOM完全更新，确保iframe完全清理（增加延迟以确保所有异步操作完成）
+            await new Promise(resolve => setTimeout(resolve, 300));
 
             const mapContainer = document.getElementById('viewDiv');
             if (mapContainer) {
@@ -1111,6 +1122,9 @@ class App {
             const errorMessage = error instanceof Error ? error.message : '未知错误';
             this.showStatus(`切换失败: ${errorMessage}`, 'error');
             throw error;
+        } finally {
+            // 重置切换状态标志
+            this.isSwitchingMap = false;
         }
     }
 
