@@ -203,10 +203,15 @@ def test_realtime_interpolation():
     print("=" * 80)
     print("【实时插值系统测试】")
     print("=" * 80)
-    
+
+    # 使用时间戳生成唯一ID
+    import time
+    unique_id = int(time.time() * 1000)
+    subscription_id = f"test-subscription-{unique_id}"
+
     # 创建订阅
     subscription_data = {
-        "subscription_id": "test-subscription-001",
+        "subscription_id": subscription_id,
         "data_type": "generic",
         "spatial_extent": {
             "min_x": 116.39,
@@ -219,12 +224,11 @@ def test_realtime_interpolation():
             "variogram_model": "spherical"
         }
     }
-    
+
     success, data = test_endpoint("创建订阅", "/api/subscriptions", "POST", data=subscription_data)
     if success:
-        subscription_id = "test-subscription-001"
         subscription_ids.append(subscription_id)
-        
+
         # 查询订阅信息
         test_endpoint("查询订阅信息", f"/api/subscriptions/{subscription_id}", "GET")
         
