@@ -322,7 +322,7 @@ export class RoutePlanningPanel {
         try {
             // 显示加载状态
             const planBtn = document.getElementById('plan-route-btn');
-            if (planBtn) {
+            if (planBtn instanceof HTMLButtonElement) {
                 planBtn.disabled = true;
                 planBtn.textContent = '规划中...';
             }
@@ -339,7 +339,7 @@ export class RoutePlanningPanel {
         } finally {
             // 恢复按钮状态
             const planBtn = document.getElementById('plan-route-btn');
-            if (planBtn) {
+            if (planBtn instanceof HTMLButtonElement) {
                 planBtn.disabled = false;
                 planBtn.textContent = '开始规划';
             }
