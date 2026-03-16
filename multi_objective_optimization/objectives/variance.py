@@ -4,7 +4,7 @@ Variance Minimization Objective
 """
 
 import numpy as np
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Any
 from .base import BaseObjective
 from ..core.population import Individual
 
