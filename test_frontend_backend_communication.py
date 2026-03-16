@@ -206,13 +206,15 @@ def test_realtime_interpolation():
     # 创建订阅
     subscription_data = {
         "subscription_id": "test-subscription-001",
+        "data_type": "generic",
         "spatial_extent": {
-            "minX": 116.39,
-            "minY": 39.89,
-            "maxX": 116.43,
-            "maxY": 39.93
+            "min_x": 116.39,
+            "min_y": 39.89,
+            "max_x": 116.43,
+            "max_y": 39.93
         },
-        "parameters": {
+        "update_frequency": 5,
+        "interpolation_params": {
             "variogram_model": "spherical"
         }
     }
@@ -251,7 +253,16 @@ def test_multi_objective_optimization():
     
     # 创建优化任务
     optimization_data = {
-        "variance_grid": [[0.5, 0.6], [0.6, 0.5]],
+        "variance_grid": {
+            "data": [[0.5, 0.6], [0.6, 0.5]],
+            "bounds": {
+                "minX": 0.0,
+                "minY": 0.0,
+                "maxX": 1.0,
+                "maxY": 1.0
+            },
+            "resolution": 0.5
+        },
         "existing_points": [
             {"x": 116.4074, "y": 39.9042},
             {"x": 116.4174, "y": 39.9142}
