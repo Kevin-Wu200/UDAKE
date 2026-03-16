@@ -360,7 +360,7 @@ def test_advanced_features():
 
     # 测试决策阈值
     test_endpoint("设置决策阈值", "/api/decision/thresholds", "POST",
-                 data={"task_id": "test-task", "prediction": [[0.1, 0.2], [0.3, 0.4]], "variance": [[0.1, 0.2], [0.3, 0.4]], "x_coords": [0.0, 1.0], "y_coords": [0.0, 1.0], "decision_goal": "minimize_risk", "thresholds": {"low": 0.1, "medium": 0.3, "high": 0.5}})
+                 data={"task_id": "test-task", "prediction": [[0.1, 0.2], [0.3, 0.4]], "variance": [[0.1, 0.2], [0.3, 0.4]], "x_coords": [0.0, 1.0], "y_coords": [0.0, 1.0], "decision_goal": "最小化风险", "custom_thresholds": [0.1, 0.2, 0.3]})
 
 def generate_report():
     """生成测试报告"""
