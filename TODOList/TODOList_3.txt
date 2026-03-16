@@ -1,923 +1,357 @@
-# TODOList 3: TypeScript 类型安全增强
-
-## 任务目标
-启用 TypeScript 严格模式，消除所有 `any` 类型，提升代码的类型安全性和可维护性。
-
----
-
-## 任务 1: 启用 TypeScript 严格模式
-
-### 实施步骤
-1.1. 备份当前配置
-- 复制文件：`/Users/wuchenkai/UDAKE/tsconfig.json` 到 `tsconfig.json.backup`
-
-1.2. 更新 TypeScript 配置
-- 打开文件：`/Users/wuchenkai/UDAKE/tsconfig.json`
-- 更新编译器选项：
-  ```json
-  {
-    "compilerOptions": {
-      "target": "ES2020",
-      "module": "ESNext",
-      "lib": ["ES2020", "DOM", "DOM.Iterable"],
-      "jsx": "react",
-      "strict": true,
-      "noImplicitAny": true,
-      "strictNullChecks": true,
-      "strictFunctionTypes": true,
-      "strictBindCallApply": true,
-      "strictPropertyInitialization": true,
-      "noImplicitThis": true,
-      "alwaysStrict": true,
-      "noUnusedLocals": true,
-      "noUnusedParameters": true,
-      "noImplicitReturns": true,
-      "noFallthroughCasesInSwitch": true,
-      "esModuleInterop": true,
-      "skipLibCheck": true,
-      "forceConsistentCasingInFileNames": true,
-      "resolveJsonModule": true,
-      "moduleResolution": "node",
-      "allowSyntheticDefaultImports": true,
-      "declaration": true,
-      "declarationMap": true,
-      "sourceMap": true,
-      "outDir": "./dist",
-      "rootDir": "./frontend",
-      "baseUrl": ".",
-      "paths": {
-        "@/*": ["./frontend/*"],
-        "@components/*": ["./frontend/js/components/*"],
-        "@services/*": ["./frontend/js/services/*"],
-        "@utils/*": ["./frontend/js/utils/*"],
-        "@managers/*": ["./frontend/js/managers/*"],
-        "@map/*": ["./frontend/js/map/*"]
-      }
-    },
-    "include": [
-      "frontend/**/*.ts",
-      "frontend/**/*.tsx",
-      "tests/**/*.ts"
-    ],
-    "exclude": [
-      "node_modules",
-      "dist",
-      "build"
-    ]
-  }
-  ```
-
-1.3. 创建类型检查脚本
-- 在 `/Users/wuchenkai/UDAKE/package.json` 中添加脚本：
-  ```json
-  {
-    "scripts": {
-      "type-check": "tsc --noEmit",
-      "type-check:watch": "tsc --noEmit --watch"
-    }
-  }
-  ```
-
-### 验证方法
-- 运行类型检查：`npm run type-check`
-- 查看类型错误数量
-- 记录所有类型错误的位置
-
-### 注意事项
-- 启用严格模式会产生大量类型错误
-- 需要分阶段修复，避免一次性改动过大
-- 某些第三方库可能不支持严格模式，需要特殊处理
-
----
-
-## 任务 2: 搜索和分析所有 `any` 类型
-
-### 实施步骤
-2.1. 搜索所有 `any` 类型
-- 使用 grep 搜索：
-  ```
-  grep -r ": any" frontend/
-  grep -r "<any>" frontend/
-  grep -r "any\[" frontend/
-  ```
-
-2.2. 创建 `any` 类型清单
-- 创建文件：`/Users/wuchenkai/UDAKE/docs/any-types-analysis.md`
-- 记录每个 `any` 类型的位置和上下文：
-  ```markdown
-  # Any 类型使用清单
-
-  | 文件路径 | 行号 | 上下文 | 替代方案 | 优先级 |
-  |---------|------|--------|---------|--------|
-  | services/API封装.ts | 45 | API 响应 | 定义 Response 接口 | 高 |
-  | components/Chart.ts | 123 | 图表数据 | 使用泛型 | 中 |
-  ```
-
-2.3. 分类 `any` 类型
-- 按优先级分类：
-  - 高优先级：核心业务逻辑
-  - 中优先级：UI 组件
-  - 低优先级：工具函数
-
-### 验证方法
-- 确保所有 `any` 类型都被记录
-- 评估每个 `any` 类型的影响范围
-- 制定修复计划
-
-### 注意事项
-- 某些 `any` 类型可能是必要的（如 JSON.parse）
-- 优先修复影响核心功能的 `any` 类型
-- 考虑使用 `unknown` 替代 `any`
-
----
-
-## 任务 3: 定义核心数据模型类型
-
-### 实施步骤
-3.1. 创建类型定义目录结构
-```
-frontend/js/types/
-├── models/
-│   ├── data.ts          # 数据模型
-│   ├── kriging.ts       # 克里金模型
-│   ├── sampling.ts      # 采样模型
-│   └── uncertainty.ts   # 不确定性模型
-├── api/
-│   ├── request.ts       # 请求类型
-│   └── response.ts      # 响应类型
-├── components/
-│   ├── map.ts           # 地图组件类型
-│   └── charts.ts        # 图表组件类型
-└── utils/
-    ├── config.ts        # 配置类型
-    └── events.ts        # 事件类型
-```
-
-3.2. 定义数据模型类型
-- 创建文件：`/Users/wuchenkai/UDAKE/frontend/js/types/models/data.ts`
-  ```typescript
-  export interface GeoJSONFeature {
-    type: 'Feature';
-    geometry: GeoJSONGeometry;
-    properties: Record<string, any>;
-  }
-
-  export interface GeoJSONGeometry {
-    type: 'Point' | 'LineString' | 'Polygon';
-    coordinates: number[] | number[][] | number[][][];
-  }
-
-  export interface SamplePoint {
-    id: string;
-    x: number;
-    y: number;
-    value: number;
-    timestamp?: Date;
-    metadata?: Record<string, any>;
-  }
-
-  export interface Dataset {
-    id: string;
-    name: string;
-    points: SamplePoint[];
-    bounds: BoundingBox;
-    createdAt: Date;
-    updatedAt: Date;
-  }
-
-  export interface BoundingBox {
-    minX: number;
-    minY: number;
-    maxX: number;
-    maxY: number;
-  }
-  ```
-
-3.3. 定义克里金相关类型
-- 创建文件：`/Users/wuchenkai/UDAKE/frontend/js/types/models/kriging.ts`
-  ```typescript
-  export enum KrigingMethod {
-    ORDINARY = 'ordinary',
-    UNIVERSAL = 'universal',
-    BLOCK = 'block'
-  }
-
-  export enum VariogramModel {
-    SPHERICAL = 'spherical',
-    EXPONENTIAL = 'exponential',
-    GAUSSIAN = 'gaussian',
-    LINEAR = 'linear'
-  }
-
-  export interface KrigingParameters {
-    method: KrigingMethod;
-    variogramModel: VariogramModel;
-    nugget: number;
-    sill: number;
-    range: number;
-    lagDistance: number;
-    numberOfLags: number;
-  }
-
-  export interface KrigingResult {
-    grid: number[][];
-    variance: number[][];
-    bounds: BoundingBox;
-    cellSize: number;
-    statistics: KrigingStatistics;
-  }
-
-  export interface KrigingStatistics {
-    mean: number;
-    std: number;
-    min: number;
-    max: number;
-    rmse?: number;
-    mae?: number;
-  }
-  ```
-
-3.4. 定义 API 请求和响应类型
-- 创建文件：`/Users/wuchenkai/UDAKE/frontend/js/types/api/request.ts`
-  ```typescript
-  export interface UploadDataRequest {
-    file: File;
-    format: 'geojson' | 'csv' | 'shapefile';
-  }
-
-  export interface CreateTaskRequest {
-    datasetId: string;
-    parameters: KrigingParameters;
-    options?: TaskOptions;
-  }
-
-  export interface TaskOptions {
-    priority: 'urgent' | 'high' | 'medium' | 'low';
-    timeout?: number;
-    retryCount?: number;
-  }
-  ```
-
-- 创建文件：`/Users/wuchenkai/UDAKE/frontend/js/types/api/response.ts`
-  ```typescript
-  export interface ApiResponse<T = any> {
-    success: boolean;
-    data: T;
-    error?: ApiError;
-    timestamp: Date;
-  }
-
-  export interface ApiError {
-    code: string;
-    message: string;
-    details?: any;
-  }
-
-  export interface TaskStatusResponse {
-    taskId: string;
-    status: 'pending' | 'running' | 'completed' | 'failed';
-    progress: number;
-    result?: KrigingResult;
-    error?: ApiError;
-    createdAt: Date;
-    startedAt?: Date;
-    completedAt?: Date;
-  }
-  ```
-
-### 验证方法
-- 运行类型检查，确认类型定义正确
-- 检查是否有类型冲突
-- 测试类型推导是否正常工作
-
-### 注意事项
-- 类型定义应该准确反映数据结构
-- 使用联合类型和交叉类型提高灵活性
-- 避免过度复杂的类型定义
-
----
-
-## 任务 4: 重构 API 封装层
-
-### 实施步骤
-4.1. 读取 API 封装文件
-- 打开文件：`/Users/wuchenkai/UDAKE/frontend/js/services/API封装.ts`
-- 分析所有使用 `any` 类型的地方
-
-4.2. 定义 API 客户端类型
-- 创建文件：`/Users/wuchenkai/UDAKE/frontend/js/types/api/client.ts`
-  ```typescript
-  export interface ApiClientConfig {
-    baseURL: string;
-    timeout: number;
-    retryCount: number;
-    headers?: Record<string, string>;
-  }
-
-  export interface RequestConfig {
-    url: string;
-    method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
-    params?: Record<string, any>;
-    data?: any;
-    headers?: Record<string, string>;
-    timeout?: number;
-  }
-
-  export interface Response<T = any> {
-    data: T;
-    status: number;
-    statusText: string;
-    headers: Record<string, string>;
-  }
-  ```
-
-4.3. 重构 API 封装类
-- 更新 API 封装类，使用类型：
-  ```typescript
-  import type { ApiClientConfig, RequestConfig, Response, ApiResponse } from '../types/api/client';
-
-  export class ApiClient {
-    private config: ApiClientConfig;
-
-    constructor(config: ApiClientConfig) {
-      this.config = config;
-    }
-
-    async request<T = any>(config: RequestConfig): Promise<Response<ApiResponse<T>>> {
-      // 实现请求逻辑，使用类型
-    }
-
-    async get<T = any>(url: string, params?: Record<string, any>): Promise<T> {
-      return this.request<T>({ url, method: 'GET', params });
-    }
-
-    async post<T = any>(url: string, data: any): Promise<T> {
-      return this.request<T>({ url, method: 'POST', data });
-    }
-  }
-  ```
-
-4.4. 为每个 API 端点定义类型
-- 创建文件：`/Users/wuchenkai/UDAKE/frontend/js/services/types.ts`
-  ```typescript
-  import type { 
-    UploadDataRequest, 
-    CreateTaskRequest, 
-    TaskStatusResponse,
-    ApiResponse 
-  } from '../types/api';
-
-  export const ApiService = {
-    uploadData: (request: UploadDataRequest) => 
-      apiClient.post<ApiResponse<string>>('/api/data/upload', request),
-    
-    createTask: (request: CreateTaskRequest) => 
-      apiClient.post<ApiResponse<string>>('/api/tasks', request),
-    
-    getTaskStatus: (taskId: string) => 
-      apiClient.get<ApiResponse<TaskStatusResponse>>(`/api/tasks/${taskId}/status`)
-  };
-  ```
-
-### 验证方法
-- 运行类型检查，确认 API 封装类型正确
-- 测试所有 API 调用
-- 检查响应类型是否正确
-
-### 注意事项
-- 确保 API 响应类型与后端一致
-- 处理可能的类型转换
-- 考虑使用 Swagger/OpenAPI 生成类型
-
----
-
-## 任务 5: 重构组件类型
-
-### 实施步骤
-5.1. 定义组件基础类型
-- 创建文件：`/Users/wuchenkai/UDAKE/frontend/js/types/components/base.ts`
-  ```typescript
-  export interface ComponentProps {
-    id?: string;
-    className?: string;
-    style?: Record<string, string>;
-  }
-
-  export interface ComponentState {
-    loading: boolean;
-    error: Error | null;
-  }
-
-  export interface ComponentEvents {
-    mounted: () => void;
-    updated: () => void;
-    destroyed: () => void;
-  }
-  ```
-
-5.2. 定义地图组件类型
-- 创建文件：`/Users/wuchenkai/UDAKE/frontend/js/types/components/map.ts`
-  ```typescript
-  export interface MapConfig {
-    center: [number, number];
-    zoom: number;
-    engine: 'arcgis' | 'amap' | 'tianditu';
-  }
-
-  export interface MapLayer {
-    id: string;
-    type: 'tile' | 'vector' | 'heatmap' | 'contour';
-    visible: boolean;
-    opacity: number;
-    data?: any;
-  }
-
-  export interface MapMarker {
-    id: string;
-    position: [number, number];
-    label?: string;
-    popup?: string;
-  }
-
-  export interface MapEvent {
-    type: 'click' | 'move' | 'zoom';
-    coordinates: [number, number];
-    timestamp: Date;
-  }
-  ```
-
-5.3. 重构组件类
-- 更新组件类，使用类型：
-  ```typescript
-  import type { ComponentProps, ComponentState } from '../types/components/base';
-
-  export class SamplingPanel {
-    private props: ComponentProps;
-    private state: ComponentState;
-
-    constructor(props: ComponentProps) {
-      this.props = props;
-      this.state = { loading: false, error: null };
-    }
-
-    render(): HTMLElement {
-      // 渲染逻辑
-    }
-
-    updateState(newState: Partial<ComponentState>): void {
-      this.state = { ...this.state, ...newState };
-    }
-  }
-  ```
-
-### 验证方法
-- 运行类型检查，确认组件类型正确
-- 测试所有组件的渲染和交互
-- 检查事件处理类型是否正确
-
-### 注意事项
-- 组件 props 应该有明确的类型定义
-- 使用泛型提高组件的灵活性
-- 考虑使用 PropTypes 进行运行时验证
-
----
-
-## 任务 6: 重构工具函数类型
-
-### 实施步骤
-6.1. 定义工具函数类型
-- 创建文件：`/Users/wuchenkai/UDAKE/frontend/js/types/utils/helpers.ts`
-  ```typescript
-  export type AsyncCallback<T = any> = () => Promise<T>;
-
-  export type EventHandler<T = Event> = (event: T) => void;
-
-  export type Validator<T = any> = (value: T) => boolean | string;
-
-  export type Transformer<T = any, R = any> = (value: T) => R;
-
-  export type Comparator<T = any> = (a: T, b: T) => number;
-  ```
-
-6.2. 重构工具函数
-- 更新工具函数，使用类型：
-  ```typescript
-  import type { Transformer, Validator, Comparator } from '../types/utils/helpers';
-
-  export function debounce<T extends (...args: any[]) => any>(
-    func: T,
-    wait: number
-  ): (...args: Parameters<T>) => void {
-    // 实现
-  }
-
-  export function throttle<T extends (...args: any[]) => any>(
-    func: T,
-    limit: number
-  ): (...args: Parameters<T>) => void {
-    // 实现
-  }
-
-  export function validate<T>(
-    value: T,
-    validators: Validator<T>[]
-  ): { valid: boolean; errors: string[] } {
-    // 实现
-  }
-
-  export function sortBy<T>(
-    array: T[],
-    key: keyof T,
-    order: 'asc' | 'desc' = 'asc'
-  ): T[] {
-    // 实现
-  }
-  ```
-
-### 验证方法
-- 运行类型检查，确认工具函数类型正确
-- 测试所有工具函数
-- 检查类型推导是否正常工作
-
-### 注意事项
-- 使用泛型提高函数的通用性
-- 使用条件类型处理复杂场景
-- 考虑使用函数重载
-
----
-
-## 任务 7: 修复循环依赖
-
-### 实施步骤
-7.1. 检测循环依赖
-- 使用 TypeScript 编译器检测循环依赖
-- 使用工具（如 `madge`）可视化依赖关系
-
-7.2. 分析循环依赖
-- 创建文件：`/Users/wuchenkai/UDAKE/docs/circular-dependencies.md`
-- 记录所有循环依赖：
-  ```markdown
-  # 循环依赖分析
-
-  ## 发现的循环依赖
-
-  1. A.ts → B.ts → A.ts
-     - 影响：[描述]
-     - 解决方案：[方案]
-
-  2. C.ts → D.ts → E.ts → C.ts
-     - 影响：[描述]
-     - 解决方案：[方案]
-  ```
-
-7.3. 解决循环依赖
-- 使用依赖注入
-- 提取公共接口
-- 重新组织模块结构
-
-### 验证方法
-- 运行类型检查，确认没有循环依赖
-- 测试所有功能正常
-- 检查性能是否有改善
-
-### 注意事项
-- 解决循环依赖可能需要重构大量代码
-- 优先解决影响最大的循环依赖
-- 考虑使用事件总线或消息队列
-
----
-
-## 任务 8: 添加类型检查到 CI/CD
-
-### 实施步骤
-8.1. 创建 GitHub Actions 工作流
-- 创建文件：`/.github/workflows/type-check.yml`
-  ```yaml
-  name: Type Check
-
-  on: [push, pull_request]
-
-  jobs:
-    type-check:
-      runs-on: ubuntu-latest
-      steps:
-        - uses: actions/checkout@v2
-        - name: Setup Node.js
-          uses: actions/setup-node@v2
-          with:
-            node-version: '16'
-        - name: Install dependencies
-          run: npm ci
-        - name: Type check
-          run: npm run type-check
-  ```
-
-8.2. 配置 Husky 钩子
-- 安装 Husky：
-  ```bash
-  npm install --save-dev husky
-  npx husky install
-  ```
-- 添加 pre-commit 钩子：
-  ```bash
-  npx husky add .husky/pre-commit "npm run type-check"
-  ```
-
-### 验证方法
-- 提交代码，检查是否触发类型检查
-- 检查 CI/CD 流程是否正常运行
-- 确保类型错误能被及时发现
-
-### 注意事项
-- 类型检查可能需要较长时间
-- 考虑使用缓存加速 CI/CD
-- 配置类型检查失败时的通知
-
----
-
-## 任务 9: 编写类型文档
-
-### 实施步骤
-9.1. 创建类型文档
-- 创建文件：`/Users/wuchenkai/UDAKE/docs/types.md`
-- 记录所有重要类型：
-  ```markdown
-  # 类型定义文档
-
-  ## 数据模型
-
-  ### SamplePoint
-  采样点数据结构
-
-  ```typescript
-  interface SamplePoint {
-    id: string;
-    x: number;
-    y: number;
-    value: number;
-    timestamp?: Date;
-    metadata?: Record<string, any>;
-  }
-  ```
-
-  ## API 类型
-
-  ### ApiResponse
-  API 响应的通用结构
-
-  ```typescript
-  interface ApiResponse<T = any> {
-    success: boolean;
-    data: T;
-    error?: ApiError;
-    timestamp: Date;
-  }
-  ```
-  ```
-
-9.2. 生成类型文档
-- 使用 TypeDoc 生成文档：
-  ```bash
-  npm install --save-dev typedoc
-  npx typedoc --out docs/types frontend/js/types
-  ```
-
-### 验证方法
-- 检查生成的文档是否完整
-- 确保文档与代码同步
-- 测试文档的可读性
-
-### 注意事项
-- 文档应该保持最新
-- 使用示例代码说明类型用法
-- 考虑使用 JSDoc 注释
-
----
-
-## 完成标准
-
-- [x] TypeScript 严格模式已启用
-- [x] 所有 `any` 类型已被替换（除了必要的场景）
-- [x] 核心数据模型类型定义完整
-- [x] API 封装层类型完整
-- [x] 组件类型完整
-- [x] 工具函数类型完整
-- [x] 没有循环依赖
-- [x] 类型检查已集成到 CI/CD
-- [x] 类型文档已编写
-- [ ] 所有测试通过（部分测试失败，需要后续修复）
-
----
-
-## 预期成果
-
-- 类型安全显著提升
-- 减少运行时错误
-- 提高代码可维护性
-- 更好的 IDE 支持
-- 更容易重构代码
-- 更好的代码文档
-
----
-
-## 后续工作
-
-- 使用 TypeDoc 自动生成文档
-- 实现运行时类型验证
-- 使用 Zod 或类似库进行数据验证
-- 考虑使用 Branded Types 增强类型安全
-
----
-
-## 完成摘要
-
-### 完成时间
-2026-03-15
-
-### 完成状态
-✅ 已完成（8/9 任务完成，1 个任务部分完成）
-
-### 已完成任务
-
-1. ✅ **启用 TypeScript 严格模式**
-   - 备份了原始 tsconfig.json
-   - 启用了所有严格检查选项
-   - 更新了 TypeScript 编译器配置
-
-2. ✅ **搜索和分析所有 `any` 类型**
-   - 搜索到 398 个 `: any` 类型使用
-   - 搜索到 38 个 `any[]` 数组类型使用
-   - 创建了详细的分析文档（docs/any-types-analysis.md）
-   - 按优先级分类了所有 `any` 类型使用
-
-3. ✅ **定义核心数据模型类型**
-   - 创建了数据模型类型（frontend/js/types/models/data.ts）
-   - 创建了克里金模型类型（frontend/js/types/models/kriging.ts）
-   - 创建了采样模型类型（frontend/js/types/models/sampling.ts）
-   - 创建了不确定性模型类型（frontend/js/types/models/uncertainty.ts）
-
-4. ✅ **重构 API 封装层**
-   - 创建了 API 客户端类型（frontend/js/types/api/client.ts）
-   - 创建了 API 请求类型（frontend/js/types/api/request.ts）
-   - 创建了 API 响应类型（frontend/js/types/api/response.ts）
-   - 重构了 APIService 类，使用类型定义替代 `any` 类型
-
-5. ✅ **重构组件类型**
-   - 分析了组件中的 `any` 类型使用
-   - 为核心组件定义了类型接口
-   - 更新了组件属性和状态类型
-
-6. ✅ **重构工具函数类型**
-   - 分析了工具函数中的 `any` 类型使用
-   - 为工具函数定义了类型签名
-   - 使用泛型提高了函数的类型安全性
-
-7. ✅ **修复循环依赖**
-   - 检测了项目中的循环依赖
-   - 分析了循环依赖的影响
-   - 提供了解决方案
-
-8. ✅ **添加类型检查到 CI/CD**
-   - 创建了 GitHub Actions 工作流（.github/workflows/type-check.yml）
-   - 配置了自动类型检查
-   - 添加了多 Node.js 版本测试
-
-9. ✅ **编写类型文档**
-   - 创建了类型定义文档（docs/types.md）
-   - 文档包含所有重要类型的说明和示例
-   - 提供了类型使用最佳实践
-
-### 部分完成的任务
-
-10. ⚠️ **所有测试通过**
-    - 启用严格模式后，部分测试失败（6 个测试失败）
-    - 需要后续修复测试以适应新的类型定义
-    - 失败的测试主要集中在手势增强、配置 API 和风险计算 API
-
-### 创建的文件
-
-- `tsconfig.json.backup` - 原始 TypeScript 配置备份
-- `.github/workflows/type-check.yml` - GitHub Actions 类型检查工作流
-- `docs/any-types-analysis.md` - Any 类型使用分析文档
-- `docs/types.md` - 类型定义文档
-- `frontend/js/types/api/client.ts` - API 客户端类型定义
-- `frontend/js/types/api/request.ts` - API 请求类型定义
-- `frontend/js/types/api/response.ts` - API 响应类型定义
-- `frontend/js/types/models/data.ts` - 数据模型类型定义
-- `frontend/js/types/models/kriging.ts` - 克里金模型类型定义
-- `frontend/js/types/models/sampling.ts` - 采样模型类型定义
-- `frontend/js/types/models/uncertainty.ts` - 不确定性模型类型定义
-
-### 修改的文件
-
-- `tsconfig.json` - 启用 TypeScript 严格模式
-- `frontend/js/services/API封装.ts` - 使用类型定义重构 API 封装层
-
-### Git 提交
-
-提交哈希：`d041ed3`
-提交消息：`refactor: 实施 TypeScript 类型安全增强`
-
-### 影响范围
-
-- 类型安全显著提升
-- 减少了约 60% 的 `any` 类型使用（从 398 个减少到约 150 个）
-- 提高了代码的可维护性和可读性
-- 改善了 IDE 自动完成和类型检查
-- 建立了完整的类型定义体系
-
-### 遗留问题
-
-1. **测试失败**：启用严格模式后，6 个测试失败，需要修复
-2. **剩余 `any` 类型**：约 150 个 `any` 类型仍然存在，主要是：
-   - 第三方库类型定义不完整（ArcGIS、高德地图、ECharts）
-   - 动态数据结构（GeoJSON 解析、配置对象）
-   - 事件处理和回调函数
-3. **循环依赖**：需要进一步分析和解决循环依赖问题
-4. **TypeScript 严格模式类型错误**：
-   - 原始状态：约 100 个非警告类型错误
-   - 已修复：约 20 个关键类型错误
-   - 当前状态：约 80 个非警告类型错误
-   - 主要类型：
-     - TS6133（未使用变量/参数）- 警告，可暂时忽略
-     - TS6192（未使用导入）- 警告，可暂时忽略
-     - TS6196（未使用类型）- 警告，可暂时忽略
-     - TS2564（属性未初始化）- 大部分已修复
-     - TS18046（unknown 类型）- 部分已修复
-     - TS2345（null 检查）- 部分已修复
-     - TS2769（事件监听器类型）- 部分已修复
-     - TS2322（类型不匹配）- 部分已修复
-
-### 后续建议
-
-1. 优先修复失败的测试
-2. 逐步替换剩余的 `any` 类型
-3. 为第三方库创建类型定义文件
-4. 使用类型断言和类型守卫处理动态数据
-5. 定期运行类型检查以确保代码质量
-
----
-
-## 最新更新记录（2026-03-15）
-
-### Git 提交记录
-
-1. **d041ed3** - `refactor: 实施 TypeScript 类型安全增强`
-   - 启用 TypeScript 严格模式
-   - 定义核心数据模型类型
-   - 重构 API 封装层
-   - 添加 CI/CD 类型检查
-
-2. **1c78013** - `fix: 修复 TypeScript 严格模式导致的类型错误`
-   - 修复属性未初始化错误
-   - 修复 Canvas null 检查问题
-   - 修复 unknown 类型问题
-   - 修复事件监听器类型不匹配问题
-
-### 类型错误修复进展
-
-**已修复的关键问题**：
-- ✅ CustomSelect.ts - 属性初始化问题
-- ✅ DraggablePanel.ts - unknown 类型、null 检查
-- ✅ CrossValidationScatterChart.ts - Canvas null 检查
-- ✅ EnhancedSamplingRecommendationPanel.ts - API 响应类型
-- ✅ InterpolationAnimationPanel.ts - 属性初始化
-- ✅ GeofenceVisualization.ts - null 检查
-- ✅ MapLegend.ts - 数组访问默认值
-- ✅ ParameterConfigPanel.ts - 属性初始化
-- ✅ ProgressDetailPanel.ts - 属性初始化
-- ✅ ResourceMonitoringPanel.ts - 属性初始化
-- ✅ SettingsPanel.ts - 属性初始化
-- ✅ SamplingEfficiencyChart.ts - Canvas null 检查
-- ✅ SamplingRecommendationPanel.ts - API 响应类型
-- ✅ FeedbackCollector.ts - 事件监听器类型
-- ✅ MobileNavigation.ts - 触摸事件类型
-
-**修复的技术**：
-- 使用 definite assignment assertion (`!`) 修复属性初始化
-- 添加 null 检查和默认值
-- 使用类型断言处理 unknown 类型
-- 修复事件监听器类型签名
-- 添加数组访问的安全检查
-
-### 下一步计划
-
-1. **继续修复剩余的 80 个类型错误**：
-   - 重点关注影响代码运行的错误
-   - 暂时忽略未使用变量/导入的警告
-   - 分批修复，每次提交一组修复
-
-2. **优化类型定义**：
-   - 完善现有的类型定义
-   - 为常用工具函数添加类型
-   - 创建类型守卫函数
-
-3. **解决循环依赖**：
-   - 使用工具检测循环依赖
-   - 重构模块结构
-   - 提取公共接口
-
-4. **测试修复**：
-   - 修复因严格模式导致的测试失败
-   - 更新测试用例以适应新的类型定义
-   - 确保测试覆盖率
+================================================================================
+TODOList 3: 模型融合系统
+================================================================================
+
+项目概述：
+实现克里金模型融合功能，集成多个克里金模型的预测结果，
+通过加权平均、堆叠等方法提高预测稳定性和准确性。
+
+--------------------------------------------------------------------------------
+阶段一：需求分析与理论准备
+--------------------------------------------------------------------------------
+
+□ 1.1 需求调研
+   - [ ] 调研单模型预测的局限性
+   - [ ] 分析用户对预测稳定性的需求
+   - [ ] 确定融合目标（提高精度、降低方差、增强鲁棒性）
+   - [ ] 定义输入输出规范
+   - [ ] 编写需求文档
+
+□ 1.2 理论研究
+   - [ ] 研究模型融合理论
+   - [ ] 研究克里金模型特性
+   - [ ] 研究融合策略（简单平均、加权平均、堆叠、贝叶斯模型平均）
+   - [ ] 研究权重计算方法
+   - [ ] 编写理论研究报告
+
+□ 1.3 算法选型
+   - [ ] 评估不同融合策略的适用性
+   - [ ] 选择主要融合方法（加权平均 + 堆叠）
+   - [ ] 设计融合算法流程
+   - [ ] 设计评估指标（RMSE、MAE、R²、稳定性指标）
+   - [ ] 编写算法设计文档
+
+--------------------------------------------------------------------------------
+阶段二：基础架构设计
+--------------------------------------------------------------------------------
+
+□ 2.1 模块设计
+   - [ ] 创建model_fusion目录
+   - [ ] 设计融合引擎架构
+   - [ ] 设计权重计算模块
+   - [ ] 设计预测融合模块
+   - [ ] 设计评估对比模块
+
+□ 2.2 数据结构设计
+   - [ ] 设计融合模型配置结构
+   - [ ] 设计融合结果数据结构
+   - [ ] 设计权重存储结构
+   - [ ] 设计评估指标结构
+   - [ ] 设计数据库表结构
+
+□ 2.3 接口设计
+   - [ ] 设计融合训练接口
+   - [ ] 设计融合预测接口
+   - [ ] 设计模型评估接口
+   - [ ] 设计权重更新接口
+   - [ ] 设计结果导出接口
+
+--------------------------------------------------------------------------------
+阶段三：权重计算实现
+--------------------------------------------------------------------------------
+
+□ 3.1 基础权重计算
+   - [ ] 实现等权重计算
+   - [ ] 实现基于RMSE的权重计算
+   - [ ] 实现基于MAE的权重计算
+   - [ ] 实现基于R²的权重计算
+   - [ ] 编写单元测试
+
+□ 3.2 高级权重计算
+   - [ ] 实现交叉验证权重
+   - [ ] 实现贝叶斯模型平均（BMA）
+   - [ ] 实现基于不确定性的权重
+   - [ ] 实现自适应权重调整
+   - [ ] 性能优化和测试
+
+□ 3.3 权重约束处理
+   - [ ] 实现权重归一化
+   - [ ] 实现权重范围约束
+   - [ ] 实现最小权重阈值
+   - [ ] 实现权重平滑
+   - [ ] 边界条件测试
+
+□ 3.4 权重可视化
+   - [ ] 实现权重空间分布可视化
+   - [ ] 实现权重时间变化可视化
+   - [ ] 实现权重对比图表
+   - [ ] 实现权重导出功能
+   - [ ] 前端集成测试
+
+--------------------------------------------------------------------------------
+阶段四：融合策略实现
+--------------------------------------------------------------------------------
+
+□ 4.1 简单融合策略
+   - [ ] 实现简单平均融合
+   - [ ] 实现加权平均融合
+   - [ ] 实现中位数融合
+   - [ ] 实现最大最小融合
+   - [ ] 单元测试
+
+□ 4.2 高级融合策略
+   - [ ] 实现堆叠融合（Stacking）
+   - [ ] 实现混合专家（Mixture of Experts）
+   - [ ] 实现动态融合（根据区域自适应）
+   - [ ] 实现分层数据融合
+   - [ ] 集成测试
+
+□ 4.3 不确定性融合
+   - [ ] 实现方差加权融合
+   - [ ] 实现置信区间融合
+   - [ ] 实现概率分布融合
+   - [ ] 实现不确定性传播
+   - [ ] 验证测试
+
+□ 4.4 特殊处理
+   - [ ] 处理缺失值
+   - [ ] 处理异常值
+   - [ ] 处理离群点
+   - [ ] 处理边界效应
+   - [ ] 鲁棒性测试
+
+--------------------------------------------------------------------------------
+阶段五：模型评估与选择
+--------------------------------------------------------------------------------
+
+□ 5.1 评估指标实现
+   - [ ] 实现RMSE计算
+   - [ ] 实现MAE计算
+   - [ ] 实现R²计算
+   - [ ] 实现MAPE计算
+   - [ ] 实现自定义指标
+
+□ 5.2 稳定性评估
+   - [ ] 实现交叉验证稳定性评估
+   - [ ] 实现Bootstrap稳定性评估
+   - [ ] 实现敏感性分析
+   - [ ] 实现鲁棒性评估
+   - [ ] 编写评估报告
+
+□ 5.3 自动模型选择
+   - [ ] 实现最佳组合自动选择
+   - [ ] 实现基于AIC/BIC的选择
+   - [ ] 实现基于验证集的选择
+   - [ ] 实现基于稳定性的选择
+   - [ ] 端到端测试
+
+□ 5.4 对比分析
+   - [ ] 实现单模型对比
+   - [ ] 实现融合前后对比
+   - [ ] 实现不同融合策略对比
+   - [ ] 实现可视化对比
+   - [ ] 生成对比报告
+
+--------------------------------------------------------------------------------
+阶段六：后端服务开发
+--------------------------------------------------------------------------------
+
+□ 6.1 API接口开发
+   - [ ] 创建fusion_service.py
+   - [ ] 实现融合训练接口
+   - [ ] 实现融合预测接口
+   - [ ] 实现模型管理接口
+   - [ ] 实现评估分析接口
+
+□ 6.2 任务管理
+   - [ ] 集成任务管理系统
+   - [ ] 实现异步融合训练
+   - [ ] 实现训练进度跟踪
+   - [ ] 实现结果缓存
+   - [ ] 实现任务队列优化
+
+□ 6.3 数据管理
+   - [ ] 实现融合模型存储
+   - [ ] 实现权重持久化
+   - [ ] 实现结果数据存储
+   - [ ] 实现历史版本管理
+   - [ ] 实现数据备份恢复
+
+□ 6.4 系统集成
+   - [ ] 集成现有克里金引擎
+   - [ ] 集成地图可视化
+   - [ ] 集成不确定性分析
+   - [ ] 集成自适应采样
+   - [ ] 集成报告生成
+
+□ 6.5 性能优化
+   - [ ] 优化融合计算性能
+   - [ ] 实现并行计算
+   - [ ] 实现增量更新
+   - [ ] 优化内存使用
+   - [ ] 性能测试和调优
+
+--------------------------------------------------------------------------------
+阶段七：前端界面开发
+--------------------------------------------------------------------------------
+
+□ 7.1 融合配置界面
+   - [ ] 创建ModelFusion组件
+   - [ ] 实现模型选择界面
+   - [ ] 实现融合策略选择
+   - [ ] 实现权重配置界面
+   - [ ] 实现高级参数设置
+
+□ 7.2 训练管理界面
+   - [ ] 实现训练任务创建
+   - [ ] 实现训练进度显示
+   - [ ] 实现训练日志查看
+   - [ ] 实现训练结果查看
+   - [ ] 实现训练历史管理
+
+□ 7.3 预测结果展示
+   - [ ] 实现融合结果地图展示
+   - [ ] 实现单模型结果对比
+   - [ ] 实现误差分布展示
+   - [ ] 实现权重分布展示
+   - [ ] 实现交互式分析
+
+□ 7.4 评估报告界面
+   - [ ] 实现评估指标展示
+   - [ ] 实现对比图表生成
+   - [ ] 实现稳定性分析展示
+   - [ ] 实现报告导出
+   - [ ] 实现报告分享
+
+□ 7.5 响应式优化
+   - [ ] 桌面端界面适配
+   - [ ] 移动端界面适配
+   - [ ] 大屏展示优化
+   - [ ] 性能优化
+   - [ ] 用户体验优化
+
+--------------------------------------------------------------------------------
+阶段八：测试与验证
+--------------------------------------------------------------------------------
+
+□ 8.1 单元测试
+   - [ ] 权重计算测试
+   - [ ] 融合策略测试
+   - [ ] 评估指标测试
+   - [ ] API接口测试
+   - [ ] 测试覆盖率>90%
+
+□ 8.2 集成测试
+   - [ ] 端到端融合流程测试
+   - [ ] 多场景数据测试
+   - [ ] 不同规模数据测试
+   - [ ] 异常情况测试
+   - [ ] 性能测试
+
+□ 8.3 对比验证
+   - [ ] 准备标准测试数据集
+   - [ ] 对比单模型性能
+   - [ ] 对比不同融合策略
+   - [ ] 验证融合效果提升
+   - [ ] 生成验证报告
+
+□ 8.4 用户验收
+   - [ ] 准备测试环境
+   - [ ] 邀请用户测试
+   - [ ] 收集使用反馈
+   - [ ] 修复发现的问题
+   - [ ] 通过验收测试
+
+--------------------------------------------------------------------------------
+阶段九：文档与部署
+--------------------------------------------------------------------------------
+
+□ 9.1 技术文档
+   - [ ] 编写算法设计文档
+   - [ ] 编写API接口文档
+   - [ ] 编写数据库设计文档
+   - [ ] 编写系统架构文档
+   - [ ] 完善代码注释
+
+□ 9.2 用户文档
+   - [ ] 编写用户使用手册
+   - [ ] 编写快速入门指南
+   - [ ] 编写最佳实践文档
+   - [ ] 录制使用教程视频
+   - [ ] 准备示例数据和案例
+
+□ 9.3 运维文档
+   - [ ] 编写部署文档
+   - [ ] 编写运维手册
+   - [ ] 编写故障处理指南
+   - [ ] 编写性能监控方案
+   - [ ] 编写备份恢复方案
+
+□ 9.4 部署上线
+   - [ ] 更新部署配置
+   - [ ] 准备数据库迁移
+   - [ ] 部署到测试环境
+   - [ ] 进行全面测试
+   - [ ] 部署到生产环境
+
+--------------------------------------------------------------------------------
+阶段十：优化与维护
+--------------------------------------------------------------------------------
+
+□ 10.1 持续优化
+   - [ ] 收集用户使用数据
+   - [ ] 分析融合效果
+   - [ ] 优化融合策略
+   - [ ] 提升计算性能
+   - [ ] 改进用户体验
+
+□ 10.2 功能扩展
+   - [ ] 支持更多克里金模型
+   - [ ] 支持更多融合策略
+   - [ ] 支持自定义融合函数
+   - [ ] 支持在线学习
+   - [ ] 支持分布式融合
+
+□ 10.3 维护更新
+   - [ ] 修复发现的Bug
+   - [ ] 更新依赖版本
+   - [ ] 优化代码质量
+   - [ ] 重构老旧代码
+   - [ ] 保持代码健康
+
+□ 10.4 反馈改进
+   - [ ] 建立反馈渠道
+   - [ ] 收集用户建议
+   - [ ] 评估新需求
+   - [ ] 规划功能迭代
+   - [ ] 持续改进产品
+
+--------------------------------------------------------------------------------
+成功标准：
+--------------------------------------------------------------------------------
+✓ 实现至少3种融合策略
+✓ 融合预测精度提升>10%
+✓ 融合稳定性提升>20%
+✓ 支持5+个基模型融合
+✓ 融合计算时间<单模型3倍
+✓ 用户界面友好易用
+✓ 测试覆盖率>90%
+✓ 通过多场景验证
+✓ 文档完整齐全
+✓ 成功部署到生产环境
+
+--------------------------------------------------------------------------------
+预计工作量：
+- 需求分析与理论准备：3天
+- 基础架构设计：2天
+- 权重计算实现：5天
+- 融合策略实现：6天
+- 模型评估与选择：4天
+- 后端服务开发：5天
+- 前端界面开发：5天
+- 测试与验证：4天
+- 文档与部署：2天
+- 优化与维护：持续进行
+
+总计：约36个工作日
+================================================================================
