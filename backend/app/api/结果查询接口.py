@@ -27,6 +27,19 @@ async def get_prediction_result(task_id: str = Depends(verify_task_id)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")
 
+
+@router.get("/result/variance/{task_id}", response_model=VarianceResult)
+async def get_variance_result(task_id: str = Depends(verify_task_id)):
+    """
+    获取方差结果
+    """
+    try:
+        result = task_manager.get_variance_result(task_id)
+        if not result:
+            raise HTTPException(status_code=404, detail="方差结果不存在")
+        return result
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")
 

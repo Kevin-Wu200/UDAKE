@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .services.websocket_service import websocket_service
-from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口
+from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口
 
 # 导入新增的系统路由
 from realtime_interpolation.api import fastapi_routes as realtime_routes
@@ -57,6 +57,7 @@ app.include_router(任务状态接口.router, prefix="/api", tags=["任务状态
 app.include_router(报告生成接口.router, prefix="/api", tags=["报告生成"])
 app.include_router(模型推荐接口.router, prefix="/api", tags=["模型推荐"])
 app.include_router(采样建议接口.router, prefix="/api", tags=["采样建议"])
+app.include_router(采样点影响评估接口.router, prefix="/api/sampling-impact", tags=["采样点影响评估"])
 app.include_router(行业配置接口.router, prefix="/api", tags=["行业配置"])
 app.include_router(进度详情接口.router, prefix="/api", tags=["进度详情"])
 app.include_router(资源监控接口.router, prefix="/api", tags=["资源监控"])
@@ -72,6 +73,8 @@ app.include_router(模型评估接口.router, prefix="/api", tags=["模型评估
 app.include_router(配置接口.router, tags=["配置管理"])
 app.include_router(路径规划接口.router, tags=["路径规划"])
 app.include_router(模型融合接口.router, prefix="/api", tags=["模型融合"])
+app.include_router(项目管理接口.router, tags=["项目管理"])
+app.include_router(通用数据处理接口.router, prefix="/api", tags=["通用数据处理"])
 
 # 注册新增的系统路由
 app.include_router(realtime_routes.router, prefix="/api", tags=["实时插值"])
