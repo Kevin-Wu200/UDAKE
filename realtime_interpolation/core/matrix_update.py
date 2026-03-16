@@ -6,7 +6,7 @@ Matrix Update Module
 """
 
 import numpy as np
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List
 import logging
 
 logger = logging.getLogger(__name__)

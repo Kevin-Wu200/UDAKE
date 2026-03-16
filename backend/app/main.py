@@ -15,6 +15,10 @@ from fastapi.staticfiles import StaticFiles
 from .config import settings
 from .services.websocket_service import websocket_service
 from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口
+
+# 导入新增的系统路由
+from realtime_interpolation.api import fastapi_routes as realtime_routes
+from multi_objective_optimization.api import fastapi_routes as multi_objective_routes
 import logging
 
 # 配置日志
@@ -68,6 +72,10 @@ app.include_router(模型评估接口.router, prefix="/api", tags=["模型评估
 app.include_router(配置接口.router, tags=["配置管理"])
 app.include_router(路径规划接口.router, tags=["路径规划"])
 app.include_router(模型融合接口.router, prefix="/api", tags=["模型融合"])
+
+# 注册新增的系统路由
+app.include_router(realtime_routes.router, prefix="/api", tags=["实时插值"])
+app.include_router(multi_objective_routes.router, prefix="/api", tags=["多目标优化"])
 
 @app.get("/")
 async def root():
