@@ -202,18 +202,38 @@ def _get_task_data(task_id: str):
             
             # 从栅格边界生成虚拟点（用于影响评估计算）
             if result:
-                # 使用栅格的中心点作为虚拟点
-                existing_points = np.array([
-                    [x_coords[0], y_coords[0]],  # 左上角
-                    [x_coords[-1], y_coords[0]],  # 右上角
-                    [x_coords[0], y_coords[-1]],  # 左下角
-                    [x_coords[-1], y_coords[-1]],  # 右下角
-                    [x_coords[len(x_coords)//2], y_coords[len(y_coords)//2]]  # 中心点
-                ])
-                existing_values = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
-                logger.info(f"使用虚拟点进行影响评估: {task_id}")
+                grid = np.array(result['grid'])
+                grid_shape = grid.shape
+                
+                # 使用栅格的几个关键点作为虚拟点，并获取对应的预测值
+                # 从grid中提取对应位置的值
+                rows, cols = grid_shape
+                
+                # 定义关键点位置（左上、右上、左下、右下、中心）
+                corner_positions = [
+                    (0, 0),  # 左上角
+                    (0, cols-1),  # 右上角
+                    (rows-1, 0),  # 左下角
+                    (rows-1, cols-1),  # 右下角
+                    (rows//2, cols//2)  # 中心点
+                ]
+                
+                existing_points = []
+                existing_values = []
+                
+                for r, c in corner_positions:
+                    existing_points.append([x_coords[c], y_coords[r]])
+                    existing_values.append(grid[r, c])
+                
+                existing_points = np.array(existing_points)
+                existing_values = np.array(existing_values)
+                
+                logger.info(f"使用虚拟点进行影响评估: {task_id}, 点数: {len(existing_points)}")
+                logger.info(f"虚拟点坐标范围: X[{existing_points[:, 0].min():.6f}, {existing_points[:, 0].max():.6f}], Y[{existing_points[:, 1].min():.6f}, {existing_points[:, 1].max():.6f}]")
+                logger.info(f"虚拟点值范围: [{existing_values.min():.6f}, {existing_values.max():.6f}]")
         except Exception as e:
             logger.warning(f"从插值结果存储获取数据失败: {str(e)}")
+            logger.warning(f"错误详情: {e}")
 
     if existing_points is None:
         raise HTTPException(status_code=404, detail="无法获取原始采样点数据")

@@ -87,7 +87,13 @@ class RealTimeSamplingPreview:
 
         # 计算方差减少
         variance_reduction = baseline_results['variance'] - new_results['variance']
-        variance_reduction_ratio = variance_reduction / baseline_results['variance'] if baseline_results['variance'] > 0 else 0
+        # 计算方差减少比例（避免除以零）
+        with np.errstate(divide='ignore', invalid='ignore'):
+            variance_reduction_ratio = np.where(
+                baseline_results['variance'] > 0,
+                variance_reduction / baseline_results['variance'],
+                0.0
+            )
 
         # 计算影响半径
         influence_radius = self._calculate_influence_radius(
@@ -119,7 +125,7 @@ class RealTimeSamplingPreview:
         return {
             'variance_reduction_map': variance_reduction_map,
             'total_variance_reduction': float(np.sum(variance_reduction)),
-            'variance_reduction_ratio': float(variance_reduction_ratio),
+            'variance_reduction_ratio': float(np.mean(variance_reduction_ratio)),  # 使用平均值作为标量
             'influence_radius': float(influence_radius),
             'improved_regions': improved_regions,
             'quantitative_metrics': quantitative_metrics,
@@ -268,9 +274,13 @@ class RealTimeSamplingPreview:
         max_radius = min(len(grid_x), len(grid_y)) // 2
 
         for radius in range(1, max_radius + 1):
-            # 检查半径范围内的最小方差减少量
-            y_indices, x_indices = np.ogrid[-y_idx:y_idx+1, -x_idx:x_idx+1]
-            mask = (x_indices**2 + y_indices**2) <= radius**2
+            # 创建与variance_reduction相同维度的mask
+            y_range, x_range = variance_reduction.shape
+            y_indices, x_indices = np.ogrid[:y_range, :x_range]
+            
+            # 计算每个点到新点的距离
+            dist_from_new_point = ((x_indices - x_idx)**2 + (y_indices - y_idx)**2)
+            mask = dist_from_new_point <= radius**2
 
             if np.any(mask):
                 reductions_in_radius = variance_reduction[mask]
