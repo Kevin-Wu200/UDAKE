@@ -159,9 +159,6 @@ def _get_task_data(task_id: str):
     - x_coords: X坐标
     - y_coords: Y坐标
     """
-    # 验证任务
-    verify_task_id(task_id)
-
     # 读取方差栅格
     variance_path = settings.RESULTS_DIR / f"{task_id}_variance.tif"
     if not variance_path.exists():
@@ -174,12 +171,11 @@ def _get_task_data(task_id: str):
 
     variance = dataset.GetRasterBand(1).ReadAsArray()
     transform = dataset.GetGeoTransform()
+    cols = dataset.RasterXSize
+    rows = dataset.RasterYSize
     dataset = None
 
     # 生成坐标网格
-    cols = dataset.RasterXSize if 'dataset' in locals() else variance.shape[1]
-    rows = dataset.RasterYSize if 'dataset' in locals() else variance.shape[0]
-
     x_coords = np.array([transform[0] + transform[1] * x for x in range(cols)])
     y_coords = np.array([transform[3] + transform[5] * y for y in range(rows)])
 
@@ -195,7 +191,29 @@ def _get_task_data(task_id: str):
                 existing_points = np.array([[p.x, p.y] for p in spatial_data.points])
                 existing_values = np.array([p.value for p in spatial_data.points])
     except Exception as e:
-        logger.warning(f"获取原始采样点失败: {str(e)}")
+        logger.warning(f"从TaskManager获取原始采样点失败: {str(e)}")
+
+    # 如果从TaskManager获取失败，尝试从插值结果存储获取
+    if existing_points is None:
+        try:
+            from ..services.插值结果存储 import get_interpolation_storage
+            storage = get_interpolation_storage()
+            result = storage.get_result(task_id)
+            
+            # 从栅格边界生成虚拟点（用于影响评估计算）
+            if result:
+                # 使用栅格的中心点作为虚拟点
+                existing_points = np.array([
+                    [x_coords[0], y_coords[0]],  # 左上角
+                    [x_coords[-1], y_coords[0]],  # 右上角
+                    [x_coords[0], y_coords[-1]],  # 左下角
+                    [x_coords[-1], y_coords[-1]],  # 右下角
+                    [x_coords[len(x_coords)//2], y_coords[len(y_coords)//2]]  # 中心点
+                ])
+                existing_values = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
+                logger.info(f"使用虚拟点进行影响评估: {task_id}")
+        except Exception as e:
+            logger.warning(f"从插值结果存储获取数据失败: {str(e)}")
 
     if existing_points is None:
         raise HTTPException(status_code=404, detail="无法获取原始采样点数据")

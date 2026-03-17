@@ -111,12 +111,172 @@ async def submit_interpolation(request: InterpolationRequest):
     提交插值任务
     """
     try:
+        import logging
+        logger = logging.getLogger(__name__)
+        
         interpolation_id = str(uuid.uuid4())
-        # 这里应该实际执行插值计算
-        # 目前返回一个占位符ID
+        logger.info(f"开始处理插值任务: {interpolation_id}")
+        
+        # 执行实际的插值计算
+        import numpy as np
+        from pykrige.ok import OrdinaryKriging
+        
+        # 提取数据点
+        x = [p['x'] for p in request.points]
+        y = [p['y'] for p in request.points]
+        z = [p['value'] for p in request.points]
+        
+        logger.info(f"输入数据点数: {len(x)}")
+        logger.info(f"X范围: [{min(x):.6f}, {max(x):.6f}]")
+        logger.info(f"Y范围: [{min(y):.6f}, {max(y):.6f}]")
+        logger.info(f"Z范围: [{min(z):.6f}, {max(z):.6f}]")
+        
+        # 获取参数
+        params = request.parameters
+        variogram_model = params.get('variogram_model', 'spherical')
+        nlags = params.get('nlags', 6)
+        grid_resolution = params.get('grid_resolution', 50)
+        
+        logger.info(f"插值参数: model={variogram_model}, nlags={nlags}, resolution={grid_resolution}")
+        
+        # 计算网格边界
+        x_min, x_max = min(x), max(x)
+        y_min, y_max = min(y), max(y)
+        gridx = np.linspace(x_min, x_max, grid_resolution)
+        gridy = np.linspace(y_min, y_max, grid_resolution)
+        
+        # 执行克里金插值
+        logger.info("开始执行克里金插值...")
+        ok = OrdinaryKriging(
+            x, y, z,
+            variogram_model=variogram_model,
+            verbose=False,
+            enable_plotting=False,
+            nlags=nlags
+        )
+        
+        # 计算预测值和方差
+        z_pred, ss_pred = ok.execute('grid', gridx, gridy)
+        
+        logger.info(f"插值完成，结果形状: {z_pred.shape}")
+        logger.info(f"预测值范围: [{np.min(z_pred):.6f}, {np.max(z_pred):.6f}]")
+        logger.info(f"方差范围: [{np.min(ss_pred):.6f}, {np.max(ss_pred):.6f}]")
+        
+        # 计算统计信息
+        mean_val = float(np.mean(z_pred))
+        std_val = float(np.std(z_pred))
+        min_val = float(np.min(z_pred))
+        max_val = float(np.max(z_pred))
+        
+        # 保存到内存存储
+        from ..services.插值结果存储 import get_interpolation_storage
+        storage = get_interpolation_storage()
+        
+        logger.info(f"保存插值结果到内存存储: {interpolation_id}")
+        storage.save_result(
+            interpolation_id,
+            z_pred.tolist(),
+            ss_pred.tolist(),
+            {
+                "minX": float(x_min),
+                "minY": float(y_min),
+                "maxX": float(x_max),
+                "maxY": float(y_max)
+            },
+            float((x_max - x_min) / grid_resolution),
+            {
+                "mean": mean_val,
+                "std": std_val,
+                "min": min_val,
+                "max": max_val
+            }
+        )
+        
+        # 保存到文件系统（GeoTIFF格式）
+        try:
+            from ..config import settings
+            from osgeo import gdal, osr
+            
+            logger.info(f"保存插值结果到文件系统: {interpolation_id}")
+            
+            # 确保结果目录存在
+            settings.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+            
+            # 保存预测值栅格
+            prediction_path = settings.RESULTS_DIR / f"{interpolation_id}_prediction.tif"
+            _save_geotiff(z_pred, gridx, gridy, prediction_path)
+            logger.info(f"已保存预测栅格: {prediction_path}")
+            
+            # 保存方差栅格
+            variance_path = settings.RESULTS_DIR / f"{interpolation_id}_variance.tif"
+            _save_geotiff(ss_pred, gridx, gridy, variance_path)
+            logger.info(f"已保存方差栅格: {variance_path}")
+            
+        except Exception as e:
+            logger.error(f"保存到文件系统失败: {str(e)}")
+            # 不影响主流程，继续返回
+        
         return interpolation_id
     except Exception as e:
+        import traceback
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"插值任务失败: {str(e)}")
+        logger.error(f"错误堆栈: {traceback.format_exc()}")
         raise HTTPException(status_code=500, detail=f"提交插值任务失败: {str(e)}")
+
+
+def _save_geotiff(data, x_coords, y_coords, output_path):
+    """
+    保存数组为GeoTIFF文件
+    
+    Args:
+        data: 要保存的二维数组
+        x_coords: X坐标数组
+        y_coords: Y坐标数组
+        output_path: 输出文件路径
+    """
+    from osgeo import gdal, osr
+    import numpy as np
+    
+    # 获取数组尺寸
+    rows, cols = data.shape
+    
+    # 计算地理变换参数
+    x_min, x_max = x_coords[0], x_coords[-1]
+    y_min, y_max = y_coords[0], y_coords[-1]
+    
+    # 假设坐标是递增的
+    pixel_width = (x_max - x_min) / (cols - 1) if cols > 1 else 1.0
+    pixel_height = (y_max - y_min) / (rows - 1) if rows > 1 else 1.0
+    
+    # 如果y坐标是递减的（常见于GIS），pixel_height应该是负的
+    if y_coords[-1] < y_coords[0]:
+        pixel_height = -abs(pixel_height)
+    
+    # 创建GeoTIFF文件
+    driver = gdal.GetDriverByName('GTiff')
+    dataset = driver.Create(str(output_path), cols, rows, 1, gdal.GDT_Float32)
+    
+    if dataset is None:
+        raise RuntimeError(f"无法创建GeoTIFF文件: {output_path}")
+    
+    # 设置地理变换
+    # 左上角坐标为 (x_min, y_max)
+    dataset.SetGeoTransform((x_min, pixel_width, 0, y_max, 0, pixel_height))
+    
+    # 设置空间参考系统（使用WGS84）
+    srs = osr.SpatialReference()
+    srs.ImportFromEPSG(4326)
+    dataset.SetProjection(srs.ExportToWkt())
+    
+    # 写入数据
+    band = dataset.GetRasterBand(1)
+    band.WriteArray(data)
+    band.FlushCache()
+    
+    # 关闭数据集
+    dataset = None
 
 
 @router.get("/interpolation/{interpolation_id}", response_model=InterpolationResponse)
@@ -125,16 +285,24 @@ async def get_interpolation_result(interpolation_id: str):
     获取插值结果
     """
     try:
-        # 这里应该从数据库或缓存中获取实际的插值结果
-        # 目前返回一个占位符结果
+        # 从存储中获取实际的插值结果
+        from ..services.插值结果存储 import InterpolationResultStorage
+        storage = InterpolationResultStorage()
+        result = storage.get_result(interpolation_id)
+        
+        if result is None:
+            raise HTTPException(status_code=404, detail="插值结果不存在")
+        
         return InterpolationResponse(
             id=interpolation_id,
-            grid=[[0.0]],
-            variance=[[0.0]],
-            bounds={"minX": 0.0, "minY": 0.0, "maxX": 1.0, "maxY": 1.0},
-            cellSize=0.1,
-            statistics={"mean": 0.0, "std": 0.0, "min": 0.0, "max": 0.0}
+            grid=result['grid'],
+            variance=result['variance'],
+            bounds=result['bounds'],
+            cellSize=result['cellSize'],
+            statistics=result['statistics']
         )
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取插值结果失败: {str(e)}")
 
