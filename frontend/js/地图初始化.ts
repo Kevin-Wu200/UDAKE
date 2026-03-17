@@ -5,12 +5,9 @@
 
 import { IMapAdapter } from '../types/map';
 import { MapEngineType } from '../types/core';
+import { MapConfig } from './config/map.config.js';
 
-// 动态导入配置和适配器
-async function importConfig() {
-    return import('./config/map.config.js');
-}
-
+// 动态导入适配器（保留动态导入，因为适配器较大且按需加载）
 async function importAdapters() {
     const ArcGISAdapter = await import('./adapters/ArcGISAdapter.js');
     const AMapAdapter = await import('./adapters/AMapAdapter.js');
@@ -29,8 +26,7 @@ export type MapProvider = 'arcgis' | 'amap';
  * @returns 地图适配器实例
  */
 export async function initializeMap(containerId: string): Promise<IMapAdapter> {
-    // 动态导入依赖
-    const { MapConfig } = await importConfig();
+    // 动态导入适配器
     const { ArcGISAdapter, AMapAdapter } = await importAdapters();
 
     // 获取地图引擎提供商
@@ -60,7 +56,6 @@ export async function initializeMap(containerId: string): Promise<IMapAdapter> {
  * @returns 'arcgis' 或 'amap'
  */
 export async function getMapProvider(): Promise<MapProvider> {
-    const { MapConfig } = await importConfig();
     const provider = MapConfig.getProvider() as MapProvider;
 
     if (provider !== 'arcgis' && provider !== 'amap') {

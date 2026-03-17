@@ -31,11 +31,14 @@ export class APIService implements IAPIService {
     private cacheConfig: Map<string, number>; // 不同端点的TTL配置
 
     // 重试配置
-    private readonly maxRetries: number = 3;
-    private readonly retryDelay: number = 1000; // 重试延迟（毫秒）
-    private readonly retryableStatusCodes: Set<number> = new Set([408, 429, 500, 502, 503, 504]);
+    private readonly maxRetries: number;
+    private readonly retryDelay: number;
+    private readonly retryableStatusCodes: Set<number>;
 
-    constructor(baseURL: string = '') {
+    constructor(baseURL: string = '', options?: { maxRetries?: number; retryDelay?: number }) {
+        this.maxRetries = options?.maxRetries ?? 3;
+        this.retryDelay = options?.retryDelay ?? 1000;
+        this.retryableStatusCodes = new Set([408, 429, 500, 502, 503, 504]);
         this.baseURL = baseURL;
         this.pendingRequests = new Map();
         this.cache = new TwoLevelCache(
@@ -287,11 +290,13 @@ export class APIService implements IAPIService {
                 const taskIdMatch = url.match(/task-status\/([^\/]+)/);
                 if (taskIdMatch) {
                     const taskId = taskIdMatch[1];
-                    const cachedResult = await OfflineManager.getCachedResult(taskId);
-                    if (cachedResult) {
-                        console.log(`[离线模式] 从 IndexedDB 返回结果: ${taskId}`);
-                        return cachedResult as T;
-                    }
+                    try {
+                        const cachedResult = await OfflineManager.getCachedResult(taskId);
+                        if (cachedResult) {
+                            console.log(`[离线模式] 从 IndexedDB 返回结果: ${taskId}`);
+                            return cachedResult as T;
+                        }
+                    } catch { /* IndexedDB 不可用时忽略 */ }
                 }
 
                 throw new Error('离线模式：无缓存数据可用');
@@ -375,7 +380,9 @@ export class APIService implements IAPIService {
                         const taskIdMatch = url.match(/task-status\/([^\/]+)|result\/prediction\/([^\/]+)/);
                         if (taskIdMatch) {
                             const taskId = taskIdMatch[1] || taskIdMatch[2];
-                            await OfflineManager.cacheResult(taskId, data);
+                            try {
+                                await OfflineManager.cacheResult(taskId, data);
+                            } catch { /* IndexedDB 不可用时忽略 */ }
                         }
                     }
 

@@ -9,7 +9,7 @@ describe('风险指数接口测试', () => {
     let api;
 
     beforeEach(() => {
-        api = new APIService('http://localhost:8000/api');
+        api = new APIService('http://localhost:8000/api', { maxRetries: 0 });
         mockFetch.mockReset();
     });
 

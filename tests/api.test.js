@@ -9,7 +9,7 @@ describe('APIService', () => {
     let api;
 
     beforeEach(() => {
-        api = new APIService('http://localhost:8000/api');
+        api = new APIService('http://localhost:8000/api', { maxRetries: 0 });
         mockFetch.mockReset();
     });
 
@@ -20,7 +20,7 @@ describe('APIService', () => {
                 json: () => Promise.resolve({ data: 'test' })
             });
 
-            const url = 'http://localhost:8000/api/test';
+            const url = 'http://localhost:8000/api/config/test';
             const result1 = await api.request(url);
             const result2 = await api.request(url);
 

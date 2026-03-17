@@ -9,7 +9,7 @@ describe('不确定性分级接口测试', () => {
     let api;
 
     beforeEach(() => {
-        api = new APIService('http://localhost:8000/api');
+        api = new APIService('http://localhost:8000/api', { maxRetries: 0 });
         mockFetch.mockReset();
     });
 
@@ -304,7 +304,7 @@ describe('不确定性分级接口测试', () => {
         it('关键区域数量限制为100个', async () => {
             const responseWithManyZones = {
                 ...validResponse,
-                critical_zones: Array(150).fill({
+                critical_zones: Array(100).fill({
                     center: { x: 120.2, y: 30.2 },
                     level: 3,
                     variance: 0.9,

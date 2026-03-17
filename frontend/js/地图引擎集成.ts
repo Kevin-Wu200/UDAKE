@@ -5,6 +5,9 @@
 
 import { IMapEngine } from '../types/map';
 import { GeoJSONFeature } from '../types/core';
+import { MapManager } from './managers/MapManager.js';
+import { ZoomControl } from './components/ZoomControl.js';
+import { MapConfig } from './config/map.config.js';
 
 /** 初始化选项接口 */
 interface InitializeMapOptions {
@@ -34,20 +37,6 @@ interface IZoomControl {
     create(containerId: string): void;
 }
 
-// 动态导入依赖
-async function importManagersAndControls() {
-    const [MapManagerModule, ZoomControlModule, MapConfigModule] = await Promise.all([
-        import('./managers/MapManager.js'),
-        import('./components/ZoomControl.js'),
-        import('./config/map.config.js')
-    ]);
-    return {
-        MapManager: MapManagerModule.MapManager,
-        ZoomControl: ZoomControlModule.ZoomControl,
-        MapConfig: MapConfigModule.MapConfig
-    };
-}
-
 /**
  * 使用新引擎架构初始化地图
  * @param containerId - 容器 ID
@@ -58,8 +47,6 @@ export async function initializeMapWithEngine(
     containerId: string,
     options: InitializeMapOptions = {}
 ): Promise<InitializeMapResult> {
-    const { MapManager, ZoomControl, MapConfig } = await importManagersAndControls();
-
     const provider = MapConfig.getProvider();
     console.log(`🗺️ 使用地图引擎: ${provider}`);
 

@@ -5,6 +5,7 @@
 
 import { BaseMapEngine } from './BaseMapEngine';
 import { initAMap } from '../../config/amap.config.js';
+import { LocationPermissionManager } from '../../utils/locationPermissionManager.js';
 import type { Bounds, MapInitOptions, ZoomCallback, MoveCallback } from '../../../types/map-engine';
 
 // 高德地图全局类型声明
@@ -323,9 +324,6 @@ export class AMapEngine extends BaseMapEngine {
 
         // 如果需要请求权限
         if (requestPermission) {
-            // 动态导入 LocationPermissionManager
-            const { LocationPermissionManager } = await import('../../utils/locationPermissionManager.js');
-            
             // 请求权限
             const status = await LocationPermissionManager.requestPermission();
             
