@@ -1,12 +1,12 @@
 {
-  "test_time": "2026-03-17T10:11:33.357402",
+  "test_time": "2026-03-17T10:39:42.607376",
   "backend_url": "http://localhost:8000",
   "frontend_url": "http://10.200.3.71:5173",
   "summary": {
     "total": 21,
-    "success": 20,
-    "failed": 1,
-    "success_rate": "95.2%"
+    "success": 21,
+    "failed": 0,
+    "success_rate": "100.0%"
   },
   "details": [
     {
@@ -14,46 +14,46 @@
       "endpoint": "/health",
       "method": "GET",
       "status": "success",
-      "response_time": 0.0019328594207763672,
+      "response_time": 0.0021257400512695312,
       "error": null,
       "response_data": {
         "status": "healthy"
       },
-      "timestamp": "2026-03-17T10:11:33.190056"
+      "timestamp": "2026-03-17T10:39:42.426757"
     },
     {
       "test_name": "API文档",
       "endpoint": "/docs",
       "method": "GET",
       "status": "success",
-      "response_time": 0.001316070556640625,
+      "response_time": 0.0013272762298583984,
       "error": null,
       "response_data": "\n    <!DOCTYPE html>\n    <html>\n    <head>\n    <link type=\"text/css\" rel=\"stylesheet\" href=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css\">\n    <link rel=\"shortcut icon\" href=\"https://fastapi.tiangolo.com/img/favicon.png\">\n    <title>智能不确定性驱动空间决策平台 - Swagger UI</title>\n    </head>\n    <body>\n    <div id=\"swagger-ui\">\n    </div>\n    <script src=\"https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js\"></script>\n    <!-- `SwaggerUIBundle` is now available on the page -->\n    <script>\n    const ui = SwaggerUIBundle({\n        url: '/openapi.json',\n    \"dom_id\": \"#swagger-ui\",\n\"layout\": \"BaseLayout\",\n\"deepLinking\": true,\n\"showExtensions\": true,\n\"showCommonExtensions\": true,\noauth2RedirectUrl: window.location.origin + '/docs/oauth2-redirect',\n    presets: [\n        SwaggerUIBundle.presets.apis,\n        SwaggerUIBundle.SwaggerUIStandalonePreset\n        ],\n    })\n    </script>\n    </body>\n    </html>\n    ",
-      "timestamp": "2026-03-17T10:11:33.191427"
+      "timestamp": "2026-03-17T10:39:42.428149"
     },
     {
       "test_name": "根路径",
       "endpoint": "/",
       "method": "GET",
       "status": "success",
-      "response_time": 0.001447916030883789,
+      "response_time": 0.0015077590942382812,
       "error": null,
       "response_data": {
         "message": "智能不确定性驱动空间决策平台",
         "version": "1.0.0",
         "status": "running"
       },
-      "timestamp": "2026-03-17T10:11:33.192907"
+      "timestamp": "2026-03-17T10:39:42.429698"
     },
     {
       "test_name": "上传GeoJSON数据",
       "endpoint": "/api/upload-data",
       "method": "POST",
       "status": "success",
-      "response_time": 0.0026369094848632812,
+      "response_time": 0.002466917037963867,
       "error": null,
       "response_data": {
-        "data_id": "be91d83d-811d-45ce-945b-fb362d4d8ac6",
+        "data_id": "bc40d31d-c145-457a-895c-01c3e78a4f1d",
         "point_count": 5,
         "bounds": {
           "min_x": 116.3874,
@@ -63,17 +63,17 @@
         },
         "message": "数据上传成功"
       },
-      "timestamp": "2026-03-17T10:11:33.195629"
+      "timestamp": "2026-03-17T10:39:42.432258"
     },
     {
       "test_name": "上传Kriging数据",
       "endpoint": "/api/upload-data",
       "method": "POST",
       "status": "success",
-      "response_time": 0.0017077922821044922,
+      "response_time": 0.0016701221466064453,
       "error": null,
       "response_data": {
-        "data_id": "c6c0b16d-c5ea-40b9-a478-d0fe09fb3d37",
+        "data_id": "96692328-0eab-4c30-af73-dc3ae6c14ad2",
         "point_count": 20,
         "bounds": {
           "min_x": 116.3874,
@@ -83,27 +83,27 @@
         },
         "message": "数据上传成功"
       },
-      "timestamp": "2026-03-17T10:11:33.197420"
+      "timestamp": "2026-03-17T10:39:42.434014"
     },
     {
       "test_name": "创建插值任务",
       "endpoint": "/api/interpolation",
       "method": "POST",
       "status": "success",
-      "response_time": 0.005326747894287109,
+      "response_time": 0.030340909957885742,
       "error": null,
-      "response_data": "a716d1c8-a236-46ee-998b-0c68eba3192f",
-      "timestamp": "2026-03-17T10:11:33.202797"
+      "response_data": "1a0e4bc0-9818-4d1f-9d3c-e300ea48c860",
+      "timestamp": "2026-03-17T10:39:42.464410"
     },
     {
       "test_name": "查询插值结果",
-      "endpoint": "/api/interpolation/a716d1c8-a236-46ee-998b-0c68eba3192f",
+      "endpoint": "/api/interpolation/1a0e4bc0-9818-4d1f-9d3c-e300ea48c860",
       "method": "GET",
       "status": "success",
-      "response_time": 0.0030210018157958984,
+      "response_time": 0.0033600330352783203,
       "error": null,
       "response_data": {
-        "id": "a716d1c8-a236-46ee-998b-0c68eba3192f",
+        "id": "1a0e4bc0-9818-4d1f-9d3c-e300ea48c860",
         "grid": [
           [
             22.099999999999987,
@@ -5322,31 +5322,31 @@
           "max": 30.199999999999996
         }
       },
-      "timestamp": "2026-03-17T10:11:33.206438"
+      "timestamp": "2026-03-17T10:39:42.468411"
     },
     {
       "test_name": "创建订阅",
       "endpoint": "/api/subscriptions",
       "method": "POST",
       "status": "success",
-      "response_time": 0.0019960403442382812,
+      "response_time": 0.0021262168884277344,
       "error": null,
       "response_data": {
-        "subscription_id": "test-subscription-1773713493208",
+        "subscription_id": "test-subscription-1773715182470",
         "status": "created",
         "created_at": null
       },
-      "timestamp": "2026-03-17T10:11:33.210744"
+      "timestamp": "2026-03-17T10:39:42.472815"
     },
     {
       "test_name": "查询订阅信息",
-      "endpoint": "/api/subscriptions/test-subscription-1773713493208",
+      "endpoint": "/api/subscriptions/test-subscription-1773715182470",
       "method": "GET",
       "status": "success",
-      "response_time": 0.0015881061553955078,
+      "response_time": 0.001605987548828125,
       "error": null,
       "response_data": {
-        "subscription_id": "test-subscription-1773713493208",
+        "subscription_id": "test-subscription-1773715182470",
         "data_type": "generic",
         "spatial_extent": {
           "min_x": 116.39,
@@ -5359,21 +5359,21 @@
           "variogram_model": "spherical"
         },
         "notification_config": {},
-        "created_at": "2026-03-17T10:11:33.210448",
+        "created_at": "2026-03-17T10:39:42.472533",
         "active": true
       },
-      "timestamp": "2026-03-17T10:11:33.212371"
+      "timestamp": "2026-03-17T10:39:42.474467"
     },
     {
       "test_name": "添加数据点",
-      "endpoint": "/api/subscriptions/test-subscription-1773713493208/data-points",
+      "endpoint": "/api/subscriptions/test-subscription-1773715182470/data-points",
       "method": "POST",
       "status": "success",
-      "response_time": 0.0015749931335449219,
+      "response_time": 0.0017611980438232422,
       "error": null,
       "response_data": {
         "update_id": "update_0",
-        "subscription_id": "test-subscription-1773713493208",
+        "subscription_id": "test-subscription-1773715182470",
         "timestamp": null,
         "update_type": "incremental",
         "affected_region": {
@@ -5384,18 +5384,18 @@
         },
         "version": 0,
         "statistics": {
-          "update_time_ms": 0.112,
+          "update_time_ms": 0.125,
           "affected_points": 1
         }
       },
-      "timestamp": "2026-03-17T10:11:33.213986"
+      "timestamp": "2026-03-17T10:39:42.476281"
     },
     {
       "test_name": "查询预测值",
-      "endpoint": "/api/subscriptions/test-subscription-1773713493208/prediction",
+      "endpoint": "/api/subscriptions/test-subscription-1773715182470/prediction",
       "method": "GET",
       "status": "success",
-      "response_time": 0.0015711784362792969,
+      "response_time": 0.00156402587890625,
       "error": null,
       "response_data": {
         "x": 116.415,
@@ -5406,20 +5406,20 @@
         "version": null,
         "timestamp": null
       },
-      "timestamp": "2026-03-17T10:11:33.215600"
+      "timestamp": "2026-03-17T10:39:42.477895"
     },
     {
       "test_name": "获取系统状态",
       "endpoint": "/api/system/status",
       "method": "GET",
       "status": "success",
-      "response_time": 0.0014879703521728516,
+      "response_time": 0.0015499591827392578,
       "error": null,
       "response_data": {
         "timestamp": null,
         "system_status": "healthy",
         "performance": {
-          "avg_update_time_ms": 0.112,
+          "avg_update_time_ms": 0.125,
           "max_update_time_ms": 0,
           "concurrent_updates": 0,
           "cache_hit_rate": 0.0,
@@ -5432,14 +5432,14 @@
         },
         "alerts": []
       },
-      "timestamp": "2026-03-17T10:11:33.217131"
+      "timestamp": "2026-03-17T10:39:42.479493"
     },
     {
       "test_name": "获取缓存统计",
       "endpoint": "/api/cache/statistics",
       "method": "GET",
       "status": "success",
-      "response_time": 0.001508951187133789,
+      "response_time": 0.0016489028930664062,
       "error": null,
       "response_data": {
         "l1_cache": {
@@ -5459,38 +5459,38 @@
           "miss_rate": 1.0
         }
       },
-      "timestamp": "2026-03-17T10:11:33.218679"
+      "timestamp": "2026-03-17T10:39:42.481200"
     },
     {
       "test_name": "创建优化任务",
       "endpoint": "/api/multi-objective/optimize",
       "method": "POST",
       "status": "success",
-      "response_time": 0.0028390884399414062,
+      "response_time": 0.0027811527252197266,
       "error": null,
       "response_data": {
         "success": true,
         "message": "优化任务已创建",
         "data": {
-          "task_id": "task_1773713493221",
+          "task_id": "task_1773715182483",
           "status": "pending",
           "estimated_time": 8.5,
-          "created_at": "2026-03-17T10:11:33.221348"
+          "created_at": "2026-03-17T10:39:42.483813"
         },
-        "timestamp": "2026-03-17T10:11:33.221350",
-        "request_id": "task_1773713493221"
+        "timestamp": "2026-03-17T10:39:42.483815",
+        "request_id": "task_1773715182483"
       },
-      "timestamp": "2026-03-17T10:11:33.221567"
+      "timestamp": "2026-03-17T10:39:42.484031"
     },
     {
       "test_name": "评估候选点",
       "endpoint": "/api/sampling-impact/evaluate-candidates",
       "method": "POST",
       "status": "success",
-      "response_time": 0.012184858322143555,
+      "response_time": 0.013522863388061523,
       "error": null,
       "response_data": {
-        "task_id": "a716d1c8-a236-46ee-998b-0c68eba3192f",
+        "task_id": "1a0e4bc0-9818-4d1f-9d3c-e300ea48c860",
         "strategy": "impact_optimized",
         "n_candidates": 2,
         "n_evaluated": 2,
@@ -5524,21 +5524,21 @@
           "mean_variance_reduction": 1.8957193737852704,
           "max_variance_reduction": 2.0220364421043513,
           "mean_comprehensive_score": 0.22166498945037394,
-          "processing_time_seconds": 0.010395
+          "processing_time_seconds": 0.010614
         },
-        "evaluated_at": "2026-03-17T10:11:33.233458"
+        "evaluated_at": "2026-03-17T10:39:42.497258"
       },
-      "timestamp": "2026-03-17T10:11:33.233800"
+      "timestamp": "2026-03-17T10:39:42.497609"
     },
     {
       "test_name": "预览添加效果",
       "endpoint": "/api/sampling-impact/preview-effect",
       "method": "POST",
       "status": "success",
-      "response_time": 0.010053873062133789,
+      "response_time": 0.010509967803955078,
       "error": null,
       "response_data": {
-        "task_id": "a716d1c8-a236-46ee-998b-0c68eba3192f",
+        "task_id": "1a0e4bc0-9818-4d1f-9d3c-e300ea48c860",
         "new_point": {
           "x": 116.415,
           "y": 39.91,
@@ -10879,96 +10879,96 @@
           "max_variance_reduction_percent": 30.914005972926034,
           "coverage_area": 0.00047104263028526123,
           "average_improvement": 67.9239768894746,
-          "processing_time_seconds": 0.006933
+          "processing_time_seconds": 0.00686
         },
-        "previewed_at": "2026-03-17T10:11:33.242240"
+        "previewed_at": "2026-03-17T10:39:42.506529"
       },
-      "timestamp": "2026-03-17T10:11:33.244451"
+      "timestamp": "2026-03-17T10:39:42.508735"
     },
     {
       "test_name": "推荐最优采样点",
       "endpoint": "/api/sampling-impact/recommend-optimal",
       "method": "POST",
       "status": "success",
-      "response_time": 0.09898185729980469,
+      "response_time": 0.08501601219177246,
       "error": null,
       "response_data": {
-        "task_id": "a716d1c8-a236-46ee-998b-0c68eba3192f",
+        "task_id": "1a0e4bc0-9818-4d1f-9d3c-e300ea48c860",
         "strategy": "impact_optimized",
         "n_recommendations": 5,
         "recommendations": [
           {
-            "x": 116.39801224489797,
-            "y": 39.936444897959184,
-            "variance": 8.545513153076172,
-            "variance_reduction": 5.71117440185415,
-            "variance_reduction_ratio": 0.7115534091268604,
-            "local_improvement": 0.16661630461390037,
-            "comprehensive_score": 0.5480722777729723,
+            "x": 116.42311428571429,
+            "y": 39.92971020408163,
+            "variance": 13.25515079498291,
+            "variance_reduction": 5.890157429941191,
+            "variance_reduction_ratio": 0.7338528478849968,
+            "local_improvement": 0.16660302127263552,
+            "comprehensive_score": 0.5636778999012884,
+            "influence_radius": 0.04345716925777193,
+            "candidate_index": 4,
+            "id": 5
+          },
+          {
+            "x": 116.41637959183674,
+            "y": 39.94256734693877,
+            "variance": 1.7319749593734741,
+            "variance_reduction": 5.532067634949795,
+            "variance_reduction_ratio": 0.6892385537886818,
+            "local_improvement": 0.16500401217941635,
+            "comprehensive_score": 0.5319681913059021,
+            "influence_radius": 0.04345716925777193,
+            "candidate_index": 6,
+            "id": 8
+          },
+          {
+            "x": 116.41637959183674,
+            "y": 39.9346081632653,
+            "variance": 6.000614166259766,
+            "variance_reduction": 5.4239251071373165,
+            "variance_reduction_ratio": 0.6757651105137604,
+            "local_improvement": 0.16604464006240968,
+            "comprehensive_score": 0.5228489693783551,
+            "influence_radius": 0.04345716925777193,
+            "candidate_index": 9,
+            "id": 10
+          },
+          {
+            "x": 116.41270612244898,
+            "y": 39.94624081632653,
+            "variance": 4.895453453063965,
+            "variance_reduction": 5.4242544506849875,
+            "variance_reduction_ratio": 0.6758061433220114,
+            "local_improvement": 0.16587895104664574,
+            "comprehensive_score": 0.5228279856394016,
             "influence_radius": 0.04345716925777193,
             "candidate_index": 11,
-            "id": 11
+            "id": 12
           },
           {
-            "x": 116.41821632653061,
-            "y": 39.92664897959184,
-            "variance": 12.220539093017578,
-            "variance_reduction": 5.453045875772219,
-            "variance_reduction_ratio": 0.6793932578509932,
-            "local_improvement": 0.1661547162256617,
-            "comprehensive_score": 0.5254216953633938,
+            "x": 116.42372653061226,
+            "y": 39.950526530612244,
+            "variance": 4.058929443359375,
+            "variance_reduction": 5.619159010897897,
+            "variance_reduction_ratio": 0.7000892407229317,
+            "local_improvement": 0.10907482256088478,
+            "comprehensive_score": 0.5227849152743176,
             "influence_radius": 0.04345716925777193,
-            "candidate_index": 3,
-            "id": 3
-          },
-          {
-            "x": 116.42250204081633,
-            "y": 39.941955102040815,
-            "variance": 5.643159866333008,
-            "variance_reduction": 5.399001937128382,
-            "variance_reduction_ratio": 0.6726599406593172,
-            "local_improvement": 0.16585964634383468,
-            "comprehensive_score": 0.5206198523646725,
-            "influence_radius": 0.04345716925777193,
-            "candidate_index": 7,
-            "id": 7
-          },
-          {
-            "x": 116.40474693877552,
-            "y": 39.933995918367344,
-            "variance": 2.7988154888153076,
-            "variance_reduction": 5.395917077537523,
-            "variance_reduction_ratio": 0.6722755989803376,
-            "local_improvement": 0.16568077347565713,
-            "comprehensive_score": 0.5202971513289334,
-            "influence_radius": 0.04345716925777193,
-            "candidate_index": 23,
+            "candidate_index": 21,
             "id": 22
-          },
-          {
-            "x": 116.41882857142858,
-            "y": 39.93705714285714,
-            "variance": 6.043752193450928,
-            "variance_reduction": 5.388798568527685,
-            "variance_reduction_ratio": 0.6713887061983196,
-            "local_improvement": 0.16612446829810937,
-            "comprehensive_score": 0.5198094348282565,
-            "influence_radius": 0.04345716925777193,
-            "candidate_index": 20,
-            "id": 21
           }
         ],
         "constraints_applied": {},
-        "recommended_at": "2026-03-17T10:11:33.345309"
+        "recommended_at": "2026-03-17T10:39:42.595695"
       },
-      "timestamp": "2026-03-17T10:11:33.345766"
+      "timestamp": "2026-03-17T10:39:42.596120"
     },
     {
       "test_name": "模型推荐",
       "endpoint": "/api/recommend-parameters",
       "method": "POST",
       "status": "success",
-      "response_time": 0.003094196319580078,
+      "response_time": 0.003034830093383789,
       "error": null,
       "response_data": {
         "recommended_variogram_model": "spherical",
@@ -10980,14 +10980,14 @@
         "point_count": 5,
         "message": "参数推荐完成"
       },
-      "timestamp": "2026-03-17T10:11:33.348961"
+      "timestamp": "2026-03-17T10:39:42.599255"
     },
     {
       "test_name": "不确定性分级",
       "endpoint": "/api/uncertainty/classify",
       "method": "POST",
       "status": "success",
-      "response_time": 0.0026428699493408203,
+      "response_time": 0.0025000572204589844,
       "error": null,
       "response_data": {
         "task_id": "test-task",
@@ -11041,14 +11041,14 @@
         ],
         "message": "不确定性分级完成"
       },
-      "timestamp": "2026-03-17T10:11:33.351653"
+      "timestamp": "2026-03-17T10:39:42.601805"
     },
     {
       "test_name": "风险指数计算",
       "endpoint": "/api/risk/calculate",
       "method": "POST",
       "status": "success",
-      "response_time": 0.0027272701263427734,
+      "response_time": 0.0025322437286376953,
       "error": null,
       "response_data": {
         "task_id": "test-task",
@@ -11079,17 +11079,93 @@
         "risk_rating": "中等风险",
         "message": "风险指数计算完成"
       },
-      "timestamp": "2026-03-17T10:11:33.354445"
+      "timestamp": "2026-03-17T10:39:42.604406"
     },
     {
       "test_name": "设置决策阈值",
       "endpoint": "/api/decision/thresholds",
       "method": "POST",
-      "status": "failed (500)",
-      "response_time": 0.0027751922607421875,
-      "error": "Internal Server Error",
-      "response_data": null,
-      "timestamp": "2026-03-17T10:11:33.357274"
+      "status": "success",
+      "response_time": 0.002724885940551758,
+      "error": null,
+      "response_data": {
+        "task_id": "test-task",
+        "decision_goal": "最小化风险",
+        "threshold_analyses": {
+          "thresholds": [
+            0.1,
+            0.2,
+            0.3
+          ],
+          "analyses": {
+            "threshold_0.1": {
+              "exceeding_count": 3,
+              "exceeding_percentage": 75.0,
+              "avg_uncertainty": 0.3,
+              "max_uncertainty": 0.4,
+              "confidence": 0.2500000001875001
+            },
+            "threshold_0.2": {
+              "exceeding_count": 2,
+              "exceeding_percentage": 50.0,
+              "avg_uncertainty": 0.35,
+              "max_uncertainty": 0.4,
+              "confidence": 0.12500000021875013
+            },
+            "threshold_0.3": {
+              "exceeding_count": 1,
+              "exceeding_percentage": 25.0,
+              "avg_uncertainty": 0.4,
+              "max_uncertainty": 0.4,
+              "confidence": 2.5000002068509275e-10
+            }
+          },
+          "recommended_threshold": 0.1
+        },
+        "recommended_threshold": 0.1,
+        "risk_assessment": {
+          "threshold": 0.1,
+          "false_positive_risk": 0.75,
+          "false_negative_risk": 0.0,
+          "total_risk": 0.75,
+          "acceptable": false,
+          "risk_tolerance": 0.1
+        },
+        "recommendations": [
+          {
+            "threshold": 0.16000000000000003,
+            "confidence": 0.2500000001875001,
+            "risk": 1.0,
+            "exceeding_percentage": 75.0
+          },
+          {
+            "threshold": 0.205,
+            "confidence": 0.12500000021875013,
+            "risk": 1.0,
+            "exceeding_percentage": 50.0
+          },
+          {
+            "threshold": 0.25,
+            "confidence": 0.12500000021875013,
+            "risk": 1.0,
+            "exceeding_percentage": 50.0
+          },
+          {
+            "threshold": 0.295,
+            "confidence": 0.12500000021875013,
+            "risk": 1.0,
+            "exceeding_percentage": 50.0
+          },
+          {
+            "threshold": 0.34,
+            "confidence": 2.5000002068509275e-10,
+            "risk": 1.0,
+            "exceeding_percentage": 25.0
+          }
+        ],
+        "message": "决策阈值分析完成"
+      },
+      "timestamp": "2026-03-17T10:39:42.607193"
     }
   ]
 }
