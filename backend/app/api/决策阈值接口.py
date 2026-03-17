@@ -13,6 +13,7 @@ project_root = Path(__file__).parent.parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from uncertainty_dashboard.决策阈值分析 import DecisionThresholdAnalyzer
+from backend.app.utils.type_converter import numpy_to_python
 
 router = APIRouter()
 analyzer = DecisionThresholdAnalyzer()
@@ -461,6 +462,11 @@ async def analyze_decision_thresholds(request: DecisionThresholdRequest):
         recommendations = analyzer.generate_threshold_recommendations(
             prediction, variance, n_thresholds=5
         )
+
+        # 转换numpy类型为Python原生类型，防止Pydantic序列化错误
+        threshold_analyses = numpy_to_python(threshold_analyses)
+        risk_assessment = numpy_to_python(risk_assessment)
+        recommendations = numpy_to_python(recommendations)
 
         return DecisionThresholdResponse(
             task_id=request.task_id,

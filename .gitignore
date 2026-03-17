@@ -102,5 +102,6 @@ Key*.txt
 # TODOList
 TODOList/
 
-# Text文档
+# 项目文档
 *.txt
+*.md

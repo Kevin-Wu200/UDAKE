@@ -134,7 +134,7 @@ class DecisionThresholdAnalyzer:
             "false_positive_risk": float(false_positive_risk),
             "false_negative_risk": float(false_negative_risk),
             "total_risk": float(total_risk),
-            "acceptable": total_risk <= risk_tolerance,
+            "acceptable": bool(total_risk <= risk_tolerance),
             "risk_tolerance": risk_tolerance
         }
 
