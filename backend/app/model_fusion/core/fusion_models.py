@@ -1,7 +1,7 @@
 """
 融合模型定义
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Dict, Any, Optional
 from enum import Enum
 
@@ -31,6 +31,8 @@ class WeightMethod(str, Enum):
 
 class ModelPrediction(BaseModel):
     """模型预测结果"""
+    model_config = ConfigDict(protected_namespaces=())
+    
     model_id: str
     model_name: str
     predictions: List[float]
@@ -40,6 +42,8 @@ class ModelPrediction(BaseModel):
 
 class ModelMetrics(BaseModel):
     """模型评估指标"""
+    model_config = ConfigDict(protected_namespaces=())
+    
     model_id: str
     model_name: str
     rmse: float

@@ -642,6 +642,10 @@ def test_realtime_service():
     print("实时服务测试通过！")
 
 
+# 为兼容性添加别名
+RealtimeService = RealtimeInterpolationService
+
+
 if __name__ == "__main__":
     test_realtime_service()
     print("\n所有测试通过！")

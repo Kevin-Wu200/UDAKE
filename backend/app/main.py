@@ -20,6 +20,7 @@ from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任
 # 导入新增的系统路由
 from realtime_interpolation.api import fastapi_routes as realtime_routes
 from multi_objective_optimization.api import fastapi_routes as multi_objective_routes
+from .kriging_3d.api.路由 import router as kriging_3d_router
 import logging
 
 # 配置日志
@@ -80,6 +81,9 @@ app.include_router(通用数据处理接口.router, prefix="/api", tags=["通用
 # 注册新增的系统路由
 app.include_router(realtime_routes.router, prefix="/api", tags=["实时插值"])
 app.include_router(multi_objective_routes.router, prefix="/api", tags=["多目标优化"])
+
+# 注册3D克里金路由
+app.include_router(kriging_3d_router, prefix="/api", tags=["3D克里金"])
 
 @app.get("/")
 async def root():

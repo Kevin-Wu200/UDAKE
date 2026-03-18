@@ -151,21 +151,22 @@ class Settings(BaseSettings):
 # 根据环境变量获取当前环境
 environment = os.getenv("ENVIRONMENT", "development").lower()
 
-# 根据环境加载配置
-env_file_map = {
-    "development": ".env.development",
-    "testing": ".env.testing",
-    "production": ".env.production"
+# 根据环境加载配置 - 优先使用后端专用配置文件
+backend_env_file_map = {
+    "development": ".env.backend.development",
+    "testing": ".env.backend.testing",
+    "production": ".env.backend.production"
 }
 
-# 优先使用环境特定的配置文件，如果不存在则使用默认 .env
-current_env_file = env_file_map.get(environment, ".env")
+# 优先使用后端专用的环境配置文件，如果不存在则使用默认 .env
+current_env_file = backend_env_file_map.get(environment, ".env")
 if not Path(current_env_file).exists():
     current_env_file = ".env"
 
 class EnvironmentSettings(Settings):
     """环境特定的配置类"""
     class Config:
+        extra = 'ignore'  # 忽略额外的环境变量（如前端VITE_开头的变量）
         env_file = current_env_file
         env_file_encoding = "utf-8"
         case_sensitive = True

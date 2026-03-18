@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from ..schemas.数据模型 import SpatialData
 from ..services.数据预处理服务 import DataPreprocessor
 from ..services.模型选择服务 import ModelSelector
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Dict, Any
 import numpy as np
 
@@ -20,6 +20,8 @@ class ModelRecommendationRequest(BaseModel):
 
 class ModelRecommendationResponse(BaseModel):
     """模型推荐响应"""
+    model_config = ConfigDict(protected_namespaces=())
+    
     recommended_variogram_model: str
     recommended_method: str
     recommended_grid_resolution: int

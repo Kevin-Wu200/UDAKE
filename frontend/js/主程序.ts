@@ -31,6 +31,7 @@ import { FeedbackCollector } from './components/FeedbackCollector.js';
 import { PreferencesPanel } from './components/PreferencesPanel.js';
 import { StartupManager } from './utils/StartupManager.js';
 import { ResourceOptimizationManager } from './config/ResourceOptimizationConfig.js';
+import { Kriging3DPanel } from './components/Kriging3DPanel.js';
 
 // 导入管理器
 import { ComponentInitializer } from './managers/ComponentInitializer.js';
@@ -77,6 +78,7 @@ class App {
 
     // 切换状态
     private isSwitchingMap: boolean = false;
+    private kriging3DPanel: Kriging3DPanel | null = null;
 
     // 管理器
     private componentInitializer: ComponentInitializer;
@@ -348,6 +350,9 @@ class App {
 
             // 初始化缓存状态面板
             this.initializeCacheStatusPanel();
+
+            // 初始化3D克里金面板
+            this.initializeKriging3DPanel();
 
             // 初始化位置服务
             await this.initializeLocationService();
@@ -1202,6 +1207,21 @@ class App {
         const components = this.componentInitializer.getComponentRegistry();
         if (components.cacheManagementPanel) {
             components.cacheManagementPanel.show();
+        }
+    }
+
+    /**
+     * 初始化3D克里金面板
+     */
+    private initializeKriging3DPanel(): void {
+        const container = document.getElementById('kriging3d-container');
+        if (container) {
+            try {
+                this.kriging3DPanel = new Kriging3DPanel('kriging3d-container');
+                console.log('3D克里金面板初始化成功');
+            } catch (error) {
+                console.error('3D克里金面板初始化失败:', error);
+            }
         }
     }
 

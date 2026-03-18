@@ -2,7 +2,7 @@
 模型评估报告接口
 """
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import List, Dict, Any, Optional
 import numpy as np
 import sys
@@ -31,6 +31,27 @@ class ModelEvaluationRequest(BaseModel):
         x_coords: 可选的X坐标列表，用于空间分析
         y_coords: 可选的Y坐标列表，用于空间分析
     """
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra={
+            "example": {
+                "task_id": "task-20260314-001",
+                "actual_values": [10.3, 11.0, 10.9, 10.8, 10.6],
+                "predicted_values": [10.5, 11.2, 10.8, 11.0, 10.7],
+                "variance": [0.5, 0.8, 0.6, 0.7, 0.3],
+                "model_params": {
+                    "method": "kriging",
+                    "variogram_model": "spherical",
+                    "range": 100.0,
+                    "sill": 1.0,
+                    "nugget": 0.1
+                },
+                "x_coords": [120.1, 120.2, 120.3, 120.4, 120.5],
+                "y_coords": [30.1, 30.2, 30.3, 30.4, 30.5]
+            }
+        }
+    )
+    
     task_id: str = Field(
         ...,
         description="任务ID",
@@ -74,25 +95,6 @@ class ModelEvaluationRequest(BaseModel):
         example=[30.1, 30.2, 30.3, 30.4, 30.5]
     )
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "task_id": "task-20260314-001",
-                "actual_values": [10.3, 11.0, 10.9, 10.8, 10.6],
-                "predicted_values": [10.5, 11.2, 10.8, 11.0, 10.7],
-                "variance": [0.5, 0.8, 0.6, 0.7, 0.3],
-                "model_params": {
-                    "method": "kriging",
-                    "variogram_model": "spherical",
-                    "range": 100.0,
-                    "sill": 1.0,
-                    "nugget": 0.1
-                },
-                "x_coords": [120.1, 120.2, 120.3, 120.4, 120.5],
-                "y_coords": [30.1, 30.2, 30.3, 30.4, 30.5]
-            }
-        }
-
 class ModelEvaluationResponse(BaseModel):
     """模型评估响应
 
@@ -113,6 +115,52 @@ class ModelEvaluationResponse(BaseModel):
         recommendations: 改进建议列表
         message: 操作状态消息
     """
+    model_config = ConfigDict(
+        protected_namespaces=(),
+        json_schema_extra={
+            "example": {
+                "task_id": "task-20260314-001",
+                "report": {
+                    "task_id": "task-20260314-001",
+                    "evaluation_time": "2026-03-14T12:00:00Z",
+                    "sample_size": 5,
+                    "error_metrics": {
+                        "mae": 0.12,
+                        "rmse": 0.15,
+                        "mape": 1.2,
+                        "max_error": 0.2,
+                        "mean_error": 0.1
+                    },
+                    "variance_metrics": {
+                        "mean_variance": 0.58,
+                        "variance_coverage": 0.85
+                    },
+                    "diagnostics": {
+                        "residuals_normality": True,
+                        "homoscedasticity": True,
+                        "outliers": []
+                    }
+                },
+                "error_metrics": {
+                    "mae": 0.12,
+                    "rmse": 0.15,
+                    "mape": 1.2,
+                    "max_error": 0.2,
+                    "mean_error": 0.1
+                },
+                "correlation": 0.98,
+                "quality_score": 0.92,
+                "sample_size": 5,
+                "recommendations": [
+                    "模型性能良好，建议继续使用",
+                    "考虑增加采样点以提高精度",
+                    "检查高误差区域的异常情况"
+                ],
+                "message": "模型评估完成"
+            }
+        }
+    )
+    
     task_id: str = Field(
         ...,
         description="任务ID",
@@ -185,50 +233,6 @@ class ModelEvaluationResponse(BaseModel):
         description="操作状态消息",
         example="模型评估完成"
     )
-
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "task_id": "task-20260314-001",
-                "report": {
-                    "task_id": "task-20260314-001",
-                    "evaluation_time": "2026-03-14T12:00:00Z",
-                    "sample_size": 5,
-                    "error_metrics": {
-                        "mae": 0.12,
-                        "rmse": 0.15,
-                        "mape": 1.2,
-                        "max_error": 0.2,
-                        "mean_error": 0.1
-                    },
-                    "variance_metrics": {
-                        "mean_variance": 0.58,
-                        "variance_coverage": 0.85
-                    },
-                    "diagnostics": {
-                        "residuals_normality": True,
-                        "homoscedasticity": True,
-                        "outliers": []
-                    }
-                },
-                "error_metrics": {
-                    "mae": 0.12,
-                    "rmse": 0.15,
-                    "mape": 1.2,
-                    "max_error": 0.2,
-                    "mean_error": 0.1
-                },
-                "correlation": 0.98,
-                "quality_score": 0.92,
-                "sample_size": 5,
-                "recommendations": [
-                    "模型性能良好，建议继续使用",
-                    "考虑增加采样点以提高精度",
-                    "检查高误差区域的异常情况"
-                ],
-                "message": "模型评估完成"
-            }
-        }
 
 @router.post(
     "/model/evaluation",
