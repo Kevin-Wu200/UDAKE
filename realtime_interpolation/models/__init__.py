@@ -9,13 +9,51 @@ from datetime import datetime
 import numpy as np
 
 
-@dataclass
+@dataclass(init=False)
 class BoundingBox:
     """边界框"""
     min_x: float
     max_x: float
     min_y: float
     max_y: float
+
+    def __init__(self, *args, **kwargs):
+        # 兼容新格式: min_x/max_x/min_y/max_y
+        if {'min_x', 'max_x', 'min_y', 'max_y'}.issubset(kwargs.keys()):
+            self.min_x = float(kwargs['min_x'])
+            self.max_x = float(kwargs['max_x'])
+            self.min_y = float(kwargs['min_y'])
+            self.max_y = float(kwargs['max_y'])
+            return
+
+        # 兼容旧格式: min_lon/min_lat/max_lon/max_lat
+        if {'min_lon', 'min_lat', 'max_lon', 'max_lat'}.issubset(kwargs.keys()):
+            self.min_x = float(kwargs['min_lon'])
+            self.min_y = float(kwargs['min_lat'])
+            self.max_x = float(kwargs['max_lon'])
+            self.max_y = float(kwargs['max_lat'])
+            return
+
+        # 位置参数兼容:
+        # 新格式 (min_x, max_x, min_y, max_y)
+        # 旧格式 (min_lon, min_lat, max_lon, max_lat)
+        if len(args) == 4:
+            a, b, c, d = [float(v) for v in args]
+            if b < c:
+                # 旧格式
+                self.min_x = a
+                self.min_y = b
+                self.max_x = c
+                self.max_y = d
+            else:
+                # 新格式
+                self.min_x = a
+                self.max_x = b
+                self.min_y = c
+                self.max_y = d
+            return
+
+        raise ValueError("BoundingBox 参数格式错误")
 
     def contains(self, x: float, y: float) -> bool:
         """检查点是否在边界框内"""
@@ -41,6 +79,22 @@ class BoundingBox:
             "min_y": self.min_y,
             "max_y": self.max_y
         }
+
+    @property
+    def min_lon(self) -> float:
+        return self.min_x
+
+    @property
+    def max_lon(self) -> float:
+        return self.max_x
+
+    @property
+    def min_lat(self) -> float:
+        return self.min_y
+
+    @property
+    def max_lat(self) -> float:
+        return self.max_y
 
 
 @dataclass
@@ -81,7 +135,7 @@ class DataPoint:
         )
 
 
-@dataclass
+@dataclass(init=False)
 class Subscription:
     """数据订阅"""
     subscription_id: str
@@ -92,6 +146,39 @@ class Subscription:
     notification_config: Dict[str, Any]
     created_at: datetime = field(default_factory=datetime.now)
     active: bool = True
+
+    def __init__(
+        self,
+        subscription_id: Optional[str] = None,
+        data_type: str = 'generic',
+        spatial_extent: Optional[BoundingBox] = None,
+        update_frequency: int = 5,
+        interpolation_params: Optional[Dict[str, Any]] = None,
+        notification_config: Optional[Dict[str, Any]] = None,
+        created_at: Optional[datetime] = None,
+        active: bool = True,
+        **legacy_kwargs
+    ):
+        # 兼容旧版字段: id/name/area/update_interval
+        if subscription_id is None and 'id' in legacy_kwargs:
+            subscription_id = legacy_kwargs['id']
+        if 'name' in legacy_kwargs:
+            data_type = legacy_kwargs.get('name') or data_type
+        if spatial_extent is None and 'area' in legacy_kwargs:
+            spatial_extent = legacy_kwargs['area']
+        if 'update_interval' in legacy_kwargs:
+            interval = legacy_kwargs['update_interval']
+            # 旧版多为毫秒，这里统一转换为秒
+            update_frequency = max(1, int(interval / 1000)) if interval > 100 else int(interval)
+
+        self.subscription_id = subscription_id or f"sub_{int(datetime.now().timestamp())}"
+        self.data_type = data_type
+        self.spatial_extent = spatial_extent or BoundingBox(0.0, 100.0, 0.0, 100.0)
+        self.update_frequency = update_frequency
+        self.interpolation_params = interpolation_params or {}
+        self.notification_config = notification_config or {}
+        self.created_at = created_at or datetime.now()
+        self.active = active
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -105,6 +192,29 @@ class Subscription:
             "created_at": self.created_at.isoformat(),
             "active": self.active
         }
+
+    @property
+    def id(self) -> str:
+        return self.subscription_id
+
+    @property
+    def name(self) -> str:
+        return self.data_type
+
+    @property
+    def area(self) -> BoundingBox:
+        return self.spatial_extent
+
+    @property
+    def update_interval(self) -> int:
+        return self.update_frequency
+
+
+@dataclass
+class PredictionResult:
+    """预测结果（兼容测试接口）"""
+    value: float
+    variance: float
 
 
 @dataclass
