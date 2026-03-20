@@ -10,12 +10,29 @@ import threading
 
 class TaskManager:
     """任务管理器"""
+    _instance = None
+    _initialized = False
+
+    def __new__(cls, *args, **kwargs):
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
 
     def __init__(self):
+        if self.__class__._initialized:
+            return
         self.tasks: Dict[str, Dict[str, Any]] = {}
         self.results: Dict[str, Dict[str, Any]] = {}
         self.progress_details: Dict[str, ProgressDetail] = {}
         self.lock = threading.Lock()
+        self.__class__._initialized = True
+
+    def reset(self):
+        """重置任务状态（测试用）"""
+        with self.lock:
+            self.tasks.clear()
+            self.results.clear()
+            self.progress_details.clear()
 
     def create_task(self, task_id: str, params: KrigingParameters):
         """创建任务"""
