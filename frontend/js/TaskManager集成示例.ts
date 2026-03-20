@@ -44,47 +44,47 @@ export function initializeTaskManager(apiService: APIService): any {
  */
 function setupTaskEventListeners(taskManager: any): void {
     // 任务创建
-    taskManager.on('created', (event) => {
+    taskManager.on('created', (event: any) => {
         console.log(`[TaskEvent] 任务创建: ${event.task.id} - ${event.task.name}`);
         // 可以在这里更新UI，显示新任务
     });
 
     // 任务开始
-    taskManager.on('started', (event) => {
+    taskManager.on('started', (event: any) => {
         console.log(`[TaskEvent] 任务开始: ${event.task.id}`);
         // 可以在这里更新UI，显示任务开始
     });
 
     // 任务进度更新
-    taskManager.on('progress', (event) => {
+    taskManager.on('progress', (event: any) => {
         console.log(`[TaskEvent] 任务进度: ${event.task.id} - ${event.task.progress}%`);
         // 可以在这里更新UI，显示进度条
     });
 
     // 任务完成
-    taskManager.on('completed', (event) => {
+    taskManager.on('completed', (event: any) => {
         console.log(`[TaskEvent] 任务完成: ${event.task.id}`);
         // 可以在这里处理任务完成后的逻辑
     });
 
     // 任务失败
-    taskManager.on('failed', (event) => {
+    taskManager.on('failed', (event: any) => {
         console.error(`[TaskEvent] 任务失败: ${event.task.id} - ${event.task.error}`);
         // 可以在这里处理任务失败后的逻辑
     });
 
     // 任务取消
-    taskManager.on('cancelled', (event) => {
+    taskManager.on('cancelled', (event: any) => {
         console.log(`[TaskEvent] 任务取消: ${event.task.id}`);
     });
 
     // 任务暂停
-    taskManager.on('paused', (event) => {
+    taskManager.on('paused', (event: any) => {
         console.log(`[TaskEvent] 任务暂停: ${event.task.id}`);
     });
 
     // 任务恢复
-    taskManager.on('resumed', (event) => {
+    taskManager.on('resumed', (event: any) => {
         console.log(`[TaskEvent] 任务恢复: ${event.task.id}`);
     });
 }

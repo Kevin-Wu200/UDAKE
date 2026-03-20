@@ -38,7 +38,7 @@ export class ParameterConfigManager {
             return null;
         }
 
-        const configs = appStore.get('defaultParams.configs');
+        const configs = appStore.get('defaultParams.configs') as Record<string, ParamConfig>;
         return configs[activeConfigId as string] || null;
     }
 
@@ -46,7 +46,7 @@ export class ParameterConfigManager {
      * 设置活动配置
      */
     setActiveConfig(configId: string): void {
-        const configs = appStore.get('defaultParams.configs');
+        const configs = appStore.get('defaultParams.configs') as Record<string, ParamConfig>;
         if (configs[configId]) {
             appStore.set('defaultParams.activeConfig', configId);
         } else {
@@ -58,14 +58,14 @@ export class ParameterConfigManager {
      * 获取所有配置
      */
     getAllConfigs(): Record<string, ParamConfig> {
-        return appStore.get('defaultParams.configs');
+        return appStore.get('defaultParams.configs') as Record<string, ParamConfig>;
     }
 
     /**
      * 获取配置
      */
     getConfig(configId: string): ParamConfig | null {
-        const configs = appStore.get('defaultParams.configs');
+        const configs = appStore.get('defaultParams.configs') as Record<string, ParamConfig>;
         return configs[configId] || null;
     }
 
@@ -73,7 +73,7 @@ export class ParameterConfigManager {
      * 保存配置
      */
     saveConfig(config: ParamConfig): string {
-        const configs = appStore.get('defaultParams.configs');
+        const configs = appStore.get('defaultParams.configs') as Record<string, ParamConfig>;
         
         // 如果配置不存在，生成新的 ID
         if (!config.id) {
@@ -94,7 +94,7 @@ export class ParameterConfigManager {
      * 更新配置
      */
     updateConfig(configId: string, updates: Partial<ParamConfig>): void {
-        const configs = appStore.get('defaultParams.configs');
+        const configs = appStore.get('defaultParams.configs') as Record<string, ParamConfig>;
         const config = configs[configId];
 
         if (!config) {
@@ -117,7 +117,7 @@ export class ParameterConfigManager {
      * 删除配置
      */
     deleteConfig(configId: string): void {
-        const configs = appStore.get('defaultParams.configs');
+        const configs = appStore.get('defaultParams.configs') as Record<string, ParamConfig>;
         
         if (!configs[configId]) {
             throw new Error(`配置 ${configId} 不存在`);
@@ -136,7 +136,7 @@ export class ParameterConfigManager {
      * 获取预设配置
      */
     getPreset(presetType: ParamPresetType): ParamConfig {
-        const presets = appStore.get('defaultParams.presets');
+        const presets = appStore.get('defaultParams.presets') as Record<ParamPresetType, ParamConfig>;
         return presets[presetType];
     }
 
@@ -144,7 +144,7 @@ export class ParameterConfigManager {
      * 获取所有预设
      */
     getAllPresets(): Record<ParamPresetType, ParamConfig> {
-        return appStore.get('defaultParams.presets');
+        return appStore.get('defaultParams.presets') as Record<ParamPresetType, ParamConfig>;
     }
 
     /**
@@ -241,7 +241,7 @@ export class ParameterConfigManager {
      * 导出所有配置
      */
     exportAllConfigs(): string {
-        const configs = appStore.get('defaultParams.configs');
+        const configs = appStore.get('defaultParams.configs') as Record<string, ParamConfig>;
         return JSON.stringify(configs, null, 2);
     }
 
@@ -265,7 +265,7 @@ export class ParameterConfigManager {
 
             // 如果配置已存在，生成新的 ID
             if (config.id && this.getConfig(config.id)) {
-                delete config.id;
+                (config as Partial<ParamConfig>).id = undefined;
             }
 
             // 设置时间戳
@@ -317,10 +317,10 @@ export class ParameterConfigManager {
      * 搜索配置
      */
     searchConfigs(keyword: string): ParamConfig[] {
-        const configs = appStore.get('defaultParams.configs');
+        const configs = appStore.get('defaultParams.configs') as Record<string, ParamConfig>;
         const lowerKeyword = keyword.toLowerCase();
 
-        return Object.values(configs).filter(config =>
+        return (Object.values(configs) as ParamConfig[]).filter((config: ParamConfig) =>
             config.name.toLowerCase().includes(lowerKeyword) ||
             (config.description && config.description.toLowerCase().includes(lowerKeyword))
         );
@@ -334,9 +334,9 @@ export class ParameterConfigManager {
         byType: Record<ParamPresetType | 'custom', number>;
         active: string | null;
     } {
-        const configs = appStore.get('defaultParams.configs');
-        const configsArray = Object.values(configs);
-        
+        const configs = appStore.get('defaultParams.configs') as Record<string, ParamConfig>;
+        const configsArray = Object.values(configs) as ParamConfig[];
+
         const byType: Record<ParamPresetType | 'custom', number> = {
             'environment': 0,
             'agriculture': 0,
@@ -344,14 +344,14 @@ export class ParameterConfigManager {
             'custom': 0
         };
 
-        configsArray.forEach(config => {
+        configsArray.forEach((config: ParamConfig) => {
             byType[config.presetType]++;
         });
 
         return {
             total: configsArray.length,
             byType,
-            active: appStore.get('defaultParams.activeConfig')
+            active: appStore.get('defaultParams.activeConfig') as string | null
         };
     }
 

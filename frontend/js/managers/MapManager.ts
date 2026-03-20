@@ -123,8 +123,8 @@ export class MapManager {
         try {
             const mergedOptions = {
                 ...options,
-                center: currentCenter,
-                zoom: currentZoom
+                center: currentCenter ?? undefined,
+                zoom: currentZoom ?? undefined
             };
 
             await this.init(provider, this.containerId, mergedOptions);
@@ -141,8 +141,8 @@ export class MapManager {
             if (this.currentProvider) {
                 console.log(`🔄 尝试恢复到原引擎: ${this.currentProvider}`);
                 await this.init(this.currentProvider, this.containerId, {
-                    center: currentCenter,
-                    zoom: currentZoom
+                    center: currentCenter ?? undefined,
+                    zoom: currentZoom ?? undefined
                 });
                 if (currentMode === 'areaSampling' && currentGeojson) {
                     this.enterAreaSamplingMode(currentGeojson);

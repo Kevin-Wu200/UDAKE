@@ -80,15 +80,15 @@ export class ArcGISEngine extends BaseMapEngine {
 
         // 添加 Home 控件
         const homeWidget = new Home({ view: this.view });
-        this.view.ui.add(homeWidget, 'top-left');
+        this.view!.ui.add(homeWidget, 'top-left');
 
         // 监听缩放变化
-        this.view.watch('zoom', (newZoom: number) => {
+        this.view!.watch('zoom', (newZoom: number) => {
             this.triggerZoomCallbacks(newZoom);
         });
 
         // 监听中心点变化
-        this.view.watch('center', (newCenter: any) => {
+        this.view!.watch('center', (newCenter: any) => {
             if (newCenter) {
                 this.triggerMoveCallbacks([newCenter.longitude, newCenter.latitude]);
             }
@@ -102,7 +102,7 @@ export class ArcGISEngine extends BaseMapEngine {
             }
         });
 
-        await this.view.when();
+        await this.view!.when();
 
         console.log('✅ ArcGIS 引擎初始化完成');
     }

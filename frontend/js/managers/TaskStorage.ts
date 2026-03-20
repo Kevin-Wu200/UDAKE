@@ -314,7 +314,7 @@ export class TaskStorage {
 
         // 统计各状态任务数
         tasks.forEach(task => {
-            stats.byStatus[task.status]++;
+            stats.byStatus[task.status as TaskStatus]++;
         });
 
         return stats;

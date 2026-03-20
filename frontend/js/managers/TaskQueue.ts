@@ -25,7 +25,7 @@ export class TaskQueue {
      */
     addTask(task: Task): boolean {
         // 检查队列大小限制
-        if (this.queue.size >= this.options.maxQueueSize) {
+        if (this.queue.size >= this.options.maxQueueSize!) {
             console.warn('[TaskQueue] 队列已满，无法添加新任务');
             return false;
         }
@@ -63,12 +63,12 @@ export class TaskQueue {
         }
 
         // 检查是否达到最大并发数
-        if (this.runningTasks.size >= this.options.maxConcurrentTasks) {
+        if (this.runningTasks.size >= this.options.maxConcurrentTasks!) {
             return null;
         }
 
         // 按优先级获取任务
-        for (const priority of this.options.priorityOrder) {
+        for (const priority of this.options.priorityOrder!) {
             for (const [id, task] of this.queue.entries()) {
                 if (task.priority === priority && task.status === 'pending') {
                     // 从队列移除并添加到运行队列
@@ -252,7 +252,7 @@ export class TaskQueue {
         };
 
         allTasks.forEach(task => {
-            byPriority[task.priority]++;
+            byPriority[task.priority as TaskPriority]++;
         });
 
         return {

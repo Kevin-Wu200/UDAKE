@@ -364,7 +364,7 @@ export class TaskManager {
 
         // 执行任务
         const result = await Promise.race([
-            executor.execute(task, (progress) => {
+            executor.execute(task, (progress: number) => {
                 // 更新进度
                 this.queue.updateProgress(task.id, progress);
                 task.progress = progress;
@@ -539,7 +539,10 @@ export class TaskManager {
 
         // 统计当前任务
         allTasks.forEach(task => {
-            stats[task.status]++;
+            const key = task.status as keyof TaskStats;
+            if (key in stats && typeof stats[key] === 'number') {
+                (stats[key] as number)++;
+            }
         });
 
         // 统计历史任务

@@ -283,7 +283,7 @@ export class APIService implements IAPIService {
                 const cached = this._getFromCache<T>(cacheKey);
                 if (cached !== null) {
                     console.log(`[离线模式] 从缓存返回数据: ${url}`);
-                    return cached;
+                    return cached as T;
                 }
 
                 // 尝试从 IndexedDB 获取缓存

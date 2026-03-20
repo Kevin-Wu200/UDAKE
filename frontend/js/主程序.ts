@@ -544,7 +544,7 @@ class App {
      */
     public handleNewProject(): void {
         const modal = new NewProjectModal(
-            (project, config) => this.onProjectCreated(project, config),
+            (project: any, config: any) => this.onProjectCreated(project, config as ProjectConfig),
             this.view!
         );
         modal.show();
@@ -1374,7 +1374,7 @@ class App {
 
         // 更新面板标题
         const panelTitles = document.querySelectorAll('.panel-title');
-        const panelIndex = {
+        const panelIndex: Record<number, string> = {
             0: 'panel.project',
             1: 'upload.title',
             2: 'kriging.title',

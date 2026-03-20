@@ -94,7 +94,7 @@ export class ErrorMonitor {
             release: config.release || 'udake@1.0.0',
             serverName: config.serverName || 'UDAKE-Web',
             tracesSampleRate: config.tracesSampleRate || 0.1,
-            beforeSend(event, hint) {
+            beforeSend(event: any, hint: any) {
                 // 过滤掉第三方脚本错误
                 if (event.exception) {
                     const exception = event.exception.values?.[0];
@@ -112,7 +112,7 @@ export class ErrorMonitor {
                 }
                 return event;
             },
-            beforeBreadcrumb(breadcrumb) {
+            beforeBreadcrumb(breadcrumb: any) {
                 // 过滤掉不重要的面包屑
                 if (breadcrumb.category === 'xhr' && breadcrumb.data?.url) {
                     const url = breadcrumb.data.url as string;
