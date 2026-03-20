@@ -76,7 +76,6 @@ export interface StartupConfig {
     enablePerformanceMonitoring: boolean;
     enableResourcePreload: boolean;
     minDisplayTime: number;
-    enableSkipButton: boolean;
     maxRetries: number;
 }
 
@@ -113,7 +112,6 @@ export interface ProgressCallback {
 export type SplashScreenStage = 'initializing' | 'loading' | 'ready' | 'error';
 
 export interface SplashScreenOptions {
-    showSkipButton?: boolean;
     showProgress?: boolean;
     animationDuration?: number;
     minDisplayTime?: number;

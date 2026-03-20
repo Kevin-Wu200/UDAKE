@@ -2,9 +2,12 @@
  * 采样建议面板组件
  * 在右侧显示建议的待采样点，按不确定性排序
  */
+import { Capacitor } from '@capacitor/core';
+import { Geolocation } from '@capacitor/geolocation';
 import { APIService } from '../services/API封装.js';
 import { MapConfig } from '../config/map.config.js';
-import type { Bounds } from '../../types/core';
+import { unitManager } from '../services/UnitManager.js';
+import type { Bounds, CoordinateSystem } from '../../types/core';
 
 import { I18n } from '../utils/I18n.js';
 
@@ -26,6 +29,9 @@ interface MarkerEntry {
     rec: Recommendation;
 }
 
+type NavigationMode = 'driving' | 'riding' | 'walking';
+type DevicePlatform = 'android' | 'ios' | 'web';
+
 export class SamplingRecommendationPanel {
     private view: any;
     private layerManager: any;
@@ -41,6 +47,12 @@ export class SamplingRecommendationPanel {
     private _viewChangeTimer: ReturnType<typeof setTimeout> | null;
     private clusterHint: HTMLDivElement | null;
     private markerLayer: any;
+    private readonly LOCATION_CACHE_TTL_MS: number;
+    private readonly SOURCE_APP_NAME: string;
+    private devicePlatform: DevicePlatform;
+    private isMobileDevice: boolean;
+    private cachedUserLocation: { longitude: number; latitude: number; timestamp: number } | null;
+    private _onDocumentClick: ((event: MouseEvent) => void) | null;
 
     constructor(view: any, layerManager: any, onRecommendationSelect: ((rec: Recommendation) => void) | null) {
         this.view = view;
@@ -57,6 +69,12 @@ export class SamplingRecommendationPanel {
         this._viewChangeTimer = null;
         this.clusterHint = null;
         this.markerLayer = null;
+        this.LOCATION_CACHE_TTL_MS = 30000;
+        this.SOURCE_APP_NAME = 'UDAKE';
+        this.devicePlatform = this._detectDevicePlatform();
+        this.isMobileDevice = this.devicePlatform !== 'web';
+        this.cachedUserLocation = null;
+        this._onDocumentClick = null;
         this._setupViewportListener();
     }
 
@@ -154,6 +172,17 @@ export class SamplingRecommendationPanel {
             if (this.currentTaskId) this.generateRecommendations();
         });
         exportBtn.addEventListener('click', () => this.exportRecommendations());
+
+        if (this._onDocumentClick) {
+            document.removeEventListener('click', this._onDocumentClick);
+        }
+        this._onDocumentClick = (event: MouseEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (!target?.closest('.recommendation-card')) {
+                this._hideAllNavigationModeSelectors();
+            }
+        };
+        document.addEventListener('click', this._onDocumentClick);
     }
 
     setTaskId(taskId: string | null): void {
@@ -253,13 +282,54 @@ export class SamplingRecommendationPanel {
             </div>
             <div class="card-footer">
                 <button class="btn btn-card btn-locate" data-id="${rec.id}">定位</button>
+                <button class="btn btn-card btn-navigate" data-id="${rec.id}" ${this.isMobileDevice ? '' : 'disabled title="仅支持移动端设备"'}>
+                    ${this.isMobileDevice ? '导航' : '仅移动端'}
+                </button>
                 <button class="btn btn-card btn-select" data-id="${rec.id}">选择此点</button>
             </div>
+            <div class="navigation-mode-selector" aria-label="导航方式选择器">
+                <button class="btn-nav-mode" data-mode="driving">驾车</button>
+                <button class="btn-nav-mode" data-mode="riding">骑行</button>
+                <button class="btn-nav-mode" data-mode="walking">步行</button>
+            </div>
+            <div class="card-navigation-status" role="status" aria-live="polite"></div>
         `;
-        const locateBtn = card.querySelector('.btn-locate')!;
-        const selectBtn = card.querySelector('.btn-select')!;
-        locateBtn.addEventListener('click', () => this.locateRecommendation(rec));
-        selectBtn.addEventListener('click', () => this.selectRecommendation(rec));
+        const locateBtn = card.querySelector('.btn-locate') as HTMLButtonElement;
+        const selectBtn = card.querySelector('.btn-select') as HTMLButtonElement;
+        const navigateBtn = card.querySelector('.btn-navigate') as HTMLButtonElement | null;
+        const modeSelector = card.querySelector('.navigation-mode-selector') as HTMLDivElement | null;
+        const navigationStatus = card.querySelector('.card-navigation-status') as HTMLDivElement | null;
+        const modeButtons = card.querySelectorAll<HTMLButtonElement>('.btn-nav-mode');
+
+        locateBtn.addEventListener('click', (event: Event) => {
+            event.stopPropagation();
+            this._hideAllNavigationModeSelectors();
+            this.locateRecommendation(rec);
+        });
+        selectBtn.addEventListener('click', (event: Event) => {
+            event.stopPropagation();
+            this._hideAllNavigationModeSelectors();
+            this.selectRecommendation(rec);
+        });
+        if (navigateBtn && modeSelector && navigationStatus) {
+            navigateBtn.addEventListener('click', (event: MouseEvent) => {
+                event.stopPropagation();
+                this._toggleNavigationModeSelector(modeSelector, rec.id);
+                if (modeSelector.classList.contains('visible')) {
+                    this._setNavigationStatus(navigationStatus, '请选择导航方式', 'info');
+                }
+            });
+
+            modeButtons.forEach((button) => {
+                button.addEventListener('click', async (event: Event) => {
+                    event.stopPropagation();
+                    const mode = button.dataset.mode;
+                    if (!this._isNavigationMode(mode)) return;
+                    modeSelector.classList.remove('visible');
+                    await this._startNavigation(rec, mode, navigationStatus);
+                });
+            });
+        }
         card.addEventListener('mouseenter', () => this.highlightMarker(rec.id, true));
         card.addEventListener('mouseleave', () => this.highlightMarker(rec.id, false));
         card.addEventListener('focus', () => this.highlightMarker(rec.id, true));
@@ -270,6 +340,235 @@ export class SamplingRecommendationPanel {
             }
         });
         return card;
+    }
+
+    private _detectDevicePlatform(): DevicePlatform {
+        const runtimePlatform = Capacitor.getPlatform();
+        if (runtimePlatform === 'android' || runtimePlatform === 'ios') {
+            return runtimePlatform;
+        }
+        const ua = navigator.userAgent || '';
+        if (/iPhone|iPad|iPod/i.test(ua)) return 'ios';
+        if (/Android/i.test(ua)) return 'android';
+        return 'web';
+    }
+
+    private _toggleNavigationModeSelector(selector: HTMLDivElement, currentId: number): void {
+        const isVisible = selector.classList.contains('visible');
+        this._hideAllNavigationModeSelectors(currentId);
+        if (!isVisible) {
+            selector.classList.add('visible');
+        }
+    }
+
+    private _hideAllNavigationModeSelectors(excludeId?: number): void {
+        const selectors = document.querySelectorAll('.navigation-mode-selector.visible');
+        selectors.forEach((selector) => {
+            const parentCard = selector.closest('.recommendation-card') as HTMLElement | null;
+            const recId = parentCard?.dataset.id ? parseInt(parentCard.dataset.id, 10) : NaN;
+            if (excludeId !== undefined && recId === excludeId) return;
+            selector.classList.remove('visible');
+        });
+    }
+
+    private _isNavigationMode(mode: string | undefined): mode is NavigationMode {
+        return mode === 'driving' || mode === 'riding' || mode === 'walking';
+    }
+
+    private _setNavigationStatus(
+        statusEl: HTMLDivElement,
+        message: string,
+        level: 'info' | 'success' | 'error'
+    ): void {
+        statusEl.className = `card-navigation-status ${level}`;
+        statusEl.textContent = message;
+    }
+
+    private async _startNavigation(rec: Recommendation, mode: NavigationMode, statusEl: HTMLDivElement): Promise<void> {
+        if (!this.isMobileDevice) {
+            this._setNavigationStatus(statusEl, '导航仅支持移动端设备', 'error');
+            return;
+        }
+
+        this._setNavigationStatus(statusEl, '正在获取当前位置...', 'info');
+
+        try {
+            const currentLocation = await this._getCurrentLocation();
+            const [startLng, startLat] = unitManager.convertCoordinate(
+                currentLocation.longitude,
+                currentLocation.latitude,
+                'wgs84',
+                'gcj02'
+            );
+            const [targetLng, targetLat] = this._convertRecommendationToGcj02(rec.x, rec.y);
+            const { appUrl, webUrl } = this._buildAmapNavigationUrls(
+                startLng,
+                startLat,
+                targetLng,
+                targetLat,
+                mode,
+                rec.id
+            );
+
+            this._setNavigationStatus(statusEl, `正在打开高德地图（${this._getNavigationModeText(mode)}）...`, 'success');
+            this._openNavigationWithFallback(appUrl, webUrl);
+        } catch (error) {
+            this._setNavigationStatus(statusEl, this._formatLocationError(error), 'error');
+        }
+    }
+
+    private _getNavigationModeText(mode: NavigationMode): string {
+        const modeTextMap: Record<NavigationMode, string> = {
+            driving: '驾车',
+            riding: '骑行',
+            walking: '步行'
+        };
+        return modeTextMap[mode];
+    }
+
+    private async _getCurrentLocation(): Promise<{ longitude: number; latitude: number }> {
+        const now = Date.now();
+        if (this.cachedUserLocation && now - this.cachedUserLocation.timestamp <= this.LOCATION_CACHE_TTL_MS) {
+            return {
+                longitude: this.cachedUserLocation.longitude,
+                latitude: this.cachedUserLocation.latitude
+            };
+        }
+
+        const runtimePlatform = Capacitor.getPlatform();
+        try {
+            const permissionStatus = await Geolocation.checkPermissions();
+            const hasPermission = permissionStatus.location === 'granted' || permissionStatus.coarseLocation === 'granted';
+
+            if (!hasPermission && runtimePlatform !== 'web') {
+                const requestResult = await Geolocation.requestPermissions({ permissions: ['location'] });
+                const granted = requestResult.location === 'granted' || requestResult.coarseLocation === 'granted';
+                if (!granted) {
+                    throw new Error('定位权限未授权，请在系统设置中开启定位权限后重试');
+                }
+            }
+        } catch (error) {
+            // Web 平台可能不支持 requestPermissions，交给 getCurrentPosition 触发浏览器授权弹窗
+            if (runtimePlatform !== 'web') {
+                throw error;
+            }
+        }
+
+        const position = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 0
+        });
+
+        const location = {
+            longitude: position.coords.longitude,
+            latitude: position.coords.latitude
+        };
+        this.cachedUserLocation = { ...location, timestamp: now };
+        return location;
+    }
+
+    private _convertRecommendationToGcj02(lng: number, lat: number): [number, number] {
+        const currentSystem = unitManager.getCoordinateSystem() as CoordinateSystem;
+        return unitManager.convertCoordinate(lng, lat, currentSystem, 'gcj02');
+    }
+
+    private _buildAmapNavigationUrls(
+        startLng: number,
+        startLat: number,
+        targetLng: number,
+        targetLat: number,
+        mode: NavigationMode,
+        recommendationId: number
+    ): { appUrl: string; webUrl: string } {
+        const sLng = startLng.toFixed(6);
+        const sLat = startLat.toFixed(6);
+        const dLng = targetLng.toFixed(6);
+        const dLat = targetLat.toFixed(6);
+        const sName = '我的位置';
+        const dName = `采样点#${recommendationId}`;
+        const type = this._mapNavigationModeToAmapType(mode);
+
+        const commonParams = new URLSearchParams({
+            slat: sLat,
+            slon: sLng,
+            sname: sName,
+            dlat: dLat,
+            dlon: dLng,
+            dname: dName,
+            dev: '0',
+            t: String(type)
+        });
+
+        const appUrl =
+            this.devicePlatform === 'ios'
+                ? `iosamap://path?sourceApplication=${encodeURIComponent(this.SOURCE_APP_NAME)}&${commonParams.toString()}`
+                : `amapuri://route/plan/?${commonParams.toString()}`;
+
+        const webParams = new URLSearchParams({
+            from: `${sLng},${sLat},${sName}`,
+            to: `${dLng},${dLat},${dName}`,
+            mode: this._mapNavigationModeToWebMode(mode),
+            src: this.SOURCE_APP_NAME,
+            coordinate: 'gaode',
+            callnative: '0'
+        });
+
+        return {
+            appUrl,
+            webUrl: `https://uri.amap.com/navigation?${webParams.toString()}`
+        };
+    }
+
+    private _mapNavigationModeToAmapType(mode: NavigationMode): number {
+        const modeMap: Record<NavigationMode, number> = {
+            driving: 0,
+            riding: 3,
+            walking: 2
+        };
+        return modeMap[mode];
+    }
+
+    private _mapNavigationModeToWebMode(mode: NavigationMode): string {
+        const modeMap: Record<NavigationMode, string> = {
+            driving: 'car',
+            riding: 'ride',
+            walking: 'walk'
+        };
+        return modeMap[mode];
+    }
+
+    private _openNavigationWithFallback(appUrl: string, webUrl: string): void {
+        let switchedToApp = false;
+        const onVisibilityChange = (): void => {
+            if (document.hidden) {
+                switchedToApp = true;
+            }
+        };
+
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        window.location.href = appUrl;
+
+        window.setTimeout(() => {
+            document.removeEventListener('visibilitychange', onVisibilityChange);
+            if (!switchedToApp) {
+                window.location.href = webUrl;
+            }
+        }, 1500);
+    }
+
+    private _formatLocationError(error: unknown): string {
+        const message = error instanceof Error ? error.message : String(error || '');
+        if (message.includes('denied') || message.includes('授权')) {
+            return '定位权限未授权，请在系统设置中开启定位权限';
+        }
+        if (message.includes('timeout') || message.includes('超时')) {
+            return '定位超时，请检查网络或 GPS 后重试';
+        }
+        if (message.includes('unavailable') || message.includes('不可用')) {
+            return '定位服务不可用，请稍后重试';
+        }
+        return '无法获取当前位置，请稍后重试';
     }
 
     private getPriorityColor(priority: string): string {
@@ -536,6 +835,10 @@ export class SamplingRecommendationPanel {
     destroy(): void {
         if (this._viewChangeTimer !== null) {
             clearTimeout(this._viewChangeTimer);
+        }
+        if (this._onDocumentClick) {
+            document.removeEventListener('click', this._onDocumentClick);
+            this._onDocumentClick = null;
         }
         this.clearRecommendations();
         if (this.clusterHint) {

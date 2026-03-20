@@ -136,7 +136,6 @@ class App {
                 enablePerformanceMonitoring: true,
                 enableResourcePreload: true,
                 minDisplayTime: 2500,
-                enableSkipButton: true,
                 maxRetries: 3
             });
             await this.startupManager.start();
@@ -154,7 +153,6 @@ class App {
 
             // 显示启动画面
             this.splashScreen = SplashScreen.getInstance({
-                showSkipButton: true,
                 showProgress: true,
                 minDisplayTime: 2500
             });

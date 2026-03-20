@@ -7,7 +7,6 @@ export interface StartupConfig {
     enablePerformanceMonitoring: boolean;
     enableResourcePreload: boolean;
     minDisplayTime: number;
-    enableSkipButton: boolean;
     maxRetries: number;
 }
 
@@ -30,7 +29,6 @@ export class StartupManager {
             enablePerformanceMonitoring: config.enablePerformanceMonitoring ?? true,
             enableResourcePreload: config.enableResourcePreload ?? true,
             minDisplayTime: config.minDisplayTime ?? 2500,
-            enableSkipButton: config.enableSkipButton ?? true,
             maxRetries: config.maxRetries ?? 3
         };
     }

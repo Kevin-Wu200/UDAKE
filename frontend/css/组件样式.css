@@ -702,10 +702,11 @@
 .card-footer {
     display: flex;
     gap: 8px;
+    flex-wrap: wrap;
 }
 
 .btn-card {
-    flex: 1;
+    flex: 1 1 calc(33.333% - 6px);
     height: 32px;
     border: none;
     border-radius: 8px;
@@ -715,6 +716,12 @@
     transition: all var(--transition-fast);
 }
 
+.btn-card:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none !important;
+}
+
 .btn-locate {
     background-color: var(--bg-secondary);
     color: var(--text-primary);
@@ -722,6 +729,16 @@
 
 .btn-locate:hover {
     background-color: var(--bg-tertiary);
+    transform: scale(1.02);
+}
+
+.btn-navigate {
+    background: linear-gradient(135deg, #0ea5e9 0%, #0369a1 100%);
+    color: white;
+}
+
+.btn-navigate:hover {
+    opacity: 0.95;
     transform: scale(1.02);
 }
 
@@ -735,6 +752,61 @@
     transform: scale(1.02);
 }
 
+.navigation-mode-selector {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    pointer-events: none;
+    transform: translateY(-6px);
+    transition: max-height var(--transition-fast), opacity var(--transition-fast), transform var(--transition-fast);
+}
+
+.navigation-mode-selector.visible {
+    max-height: 44px;
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+}
+
+.btn-nav-mode {
+    flex: 1;
+    height: 30px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    color: var(--text-primary);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.btn-nav-mode:hover {
+    border-color: var(--primary-color);
+    background: rgba(0, 122, 255, 0.08);
+}
+
+.card-navigation-status {
+    margin-top: 8px;
+    min-height: 18px;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+}
+
+.card-navigation-status.info {
+    color: var(--text-secondary);
+}
+
+.card-navigation-status.success {
+    color: var(--success-color);
+}
+
+.card-navigation-status.error {
+    color: var(--error-color);
+}
+
 /* 地图标记样式 */
 .recommendation-marker {
     width: 16px;
@@ -744,6 +816,16 @@
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     transition: all var(--transition-fast);
     will-change: transform, z-index;
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .btn-card {
+        min-height: 36px;
+    }
+
+    .btn-nav-mode {
+        min-height: 32px;
+    }
 }
 
 /* 右侧面板容器样式 */
@@ -1794,4 +1876,3 @@ input[type="number"] {
 .tab-content.active {
     display: block;
 }
-

@@ -254,47 +254,6 @@
     letter-spacing: 0.05em;
 }
 
-/* 跳过按钮 */
-.splash-skip-button {
-    position: absolute;
-    bottom: 2rem;
-    right: 2rem;
-    padding: 0.5rem 1.5rem;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-    border-radius: 2rem;
-    color: white;
-    font-size: 0.875rem;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    backdrop-filter: blur(10px);
-    animation: skip-button-fade-in 0.8s ease-out 1.2s both;
-}
-
-.splash-skip-button:hover {
-    background: rgba(255, 255, 255, 0.2);
-    border-color: rgba(255, 255, 255, 0.5);
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-}
-
-.splash-skip-button:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-@keyframes skip-button-fade-in {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
 /* 显示状态 */
 .splash-screen.splash-visible {
     opacity: 1;
@@ -331,13 +290,6 @@
     .splash-progress-container {
         width: 250px;
     }
-
-    .splash-skip-button {
-        bottom: 1.5rem;
-        right: 1.5rem;
-        padding: 0.4rem 1.2rem;
-        font-size: 0.8rem;
-    }
 }
 
 /* 小屏幕适配 */
@@ -356,12 +308,5 @@
 
     .splash-progress-container {
         width: 200px;
-    }
-
-    .splash-skip-button {
-        bottom: 1rem;
-        right: 1rem;
-        padding: 0.3rem 1rem;
-        font-size: 0.75rem;
     }
 }

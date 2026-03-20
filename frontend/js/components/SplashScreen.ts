@@ -6,7 +6,6 @@
 export type SplashScreenStage = 'initializing' | 'loading' | 'ready' | 'error';
 
 export interface SplashScreenOptions {
-    showSkipButton?: boolean;
     showProgress?: boolean;
     animationDuration?: number;
     minDisplayTime?: number;
@@ -20,19 +19,14 @@ export class SplashScreen {
     private progressContainer: HTMLDivElement | null = null;
     private progressBar: HTMLDivElement | null = null;
     private progressText: HTMLDivElement | null = null;
-    private skipButton: HTMLButtonElement | null = null;
     private currentStage: SplashScreenStage = 'initializing';
     private startTime: number = 0;
     private minDisplayTime: number = 2000;
-    private showSkipButton: boolean = false;
     private showProgress: boolean = true;
-    private isSkipped: boolean = false;
     private progress: number = 0;
-    private onSkipCallback: (() => void) | null = null;
     private onReadyCallback: (() => void) | null = null;
 
     private constructor(options: SplashScreenOptions = {}) {
-        this.showSkipButton = options.showSkipButton ?? false;
         this.showProgress = options.showProgress ?? true;
         this.minDisplayTime = options.minDisplayTime ?? 2000;
         this.create();
@@ -74,7 +68,6 @@ export class SplashScreen {
                     </div>
                     <div class="splash-progress-text">0%</div>
                 </div>
-                <button class="splash-skip-button" style="display: none;">跳过</button>
             </div>
         `;
 
@@ -87,34 +80,16 @@ export class SplashScreen {
         this.progressContainer = splash.querySelector('.splash-progress-container');
         this.progressBar = splash.querySelector('.splash-progress-fill') as HTMLDivElement;
         this.progressText = splash.querySelector('.splash-progress-text') as HTMLDivElement;
-        this.skipButton = splash.querySelector('.splash-skip-button') as HTMLButtonElement;
-
-        // 绑定事件
-        this.bindEvents();
 
         // 设置初始状态
         if (!this.showProgress) {
             this.progressContainer!.style.display = 'none';
-        }
-        if (this.showSkipButton) {
-            this.skipButton!.style.display = 'block';
         }
 
         // 添加动画类
         requestAnimationFrame(() => {
             splash.classList.add('splash-visible');
         });
-    }
-
-    /**
-     * 绑定事件
-     */
-    private bindEvents(): void {
-        if (this.skipButton) {
-            this.skipButton.addEventListener('click', () => {
-                this.skip();
-            });
-        }
     }
 
     /**
@@ -126,7 +101,6 @@ export class SplashScreen {
         }
         this.startTime = Date.now();
         this.currentStage = 'initializing';
-        this.isSkipped = false;
         this.progress = 0;
         this.updateProgress(0);
         this.updateStatus('正在初始化...');
@@ -186,19 +160,6 @@ export class SplashScreen {
     }
 
     /**
-     * 跳过启动画面
-     */
-    public skip(): void {
-        if (this.isSkipped) return;
-
-        this.isSkipped = true;
-        if (this.onSkipCallback) {
-            this.onSkipCallback();
-        }
-        this.hide();
-    }
-
-    /**
      * 隐藏启动画面
      */
     public async hide(): Promise<void> {
@@ -206,7 +167,7 @@ export class SplashScreen {
 
         // 确保至少显示最短时间
         const elapsedTime = Date.now() - this.startTime;
-        if (elapsedTime < this.minDisplayTime && !this.isSkipped) {
+        if (elapsedTime < this.minDisplayTime) {
             await new Promise(resolve => setTimeout(resolve, this.minDisplayTime - elapsedTime));
         }
 
@@ -230,27 +191,10 @@ export class SplashScreen {
     }
 
     /**
-     * 设置跳过回调
-     */
-    public onSkip(callback: () => void): void {
-        this.onSkipCallback = callback;
-    }
-
-    /**
      * 设置就绪回调
      */
     public onReady(callback: () => void): void {
         this.onReadyCallback = callback;
-    }
-
-    /**
-     * 设置显示跳过按钮
-     */
-    public setShowSkipButton(show: boolean): void {
-        this.showSkipButton = show;
-        if (this.skipButton) {
-            this.skipButton.style.display = show ? 'block' : 'none';
-        }
     }
 
     /**
