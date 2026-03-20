@@ -98,7 +98,7 @@ class DijkstraAlgorithm:
                 new_distance = current_distance + edge_distance
 
                 # 如果找到更短的路径
-                if new_distance < distances[neighbor]:
+                if new_distance <= distances[neighbor]:
                     distances[neighbor] = new_distance
                     previous[neighbor] = current_node
                     heapq.heappush(pq, (new_distance, neighbor))
@@ -151,7 +151,7 @@ class DijkstraAlgorithm:
 
                 new_distance = current_distance + edge_distance
 
-                if new_distance < distances[neighbor]:
+                if new_distance <= distances[neighbor]:
                     distances[neighbor] = new_distance
                     previous[neighbor] = current_node
                     heapq.heappush(pq, (new_distance, neighbor))

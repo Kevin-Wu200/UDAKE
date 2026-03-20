@@ -87,11 +87,11 @@ export class SensorManager {
     try {
       // 检查位置权限
       const permissionStatus = await Geolocation.checkPermissions();
-      this.status.locationPermission = permissionStatus.location as any;
+      this.status.locationPermission = (permissionStatus as any)?.location ?? 'prompt';
 
       // 检查设备信息
       const deviceInfo = await Device.getInfo();
-      this.status.gpsAvailable = deviceInfo.platform !== 'web';
+      this.status.gpsAvailable = (deviceInfo as any)?.platform !== 'web';
 
       // 初始化Web传感器API
       this.initializeWebSensors();
@@ -104,18 +104,20 @@ export class SensorManager {
    * 初始化Web传感器API
    */
   private initializeWebSensors(): void {
+    const scope = globalThis as any;
+
     // 检查加速度传感器
-    if ('Accelerometer' in window) {
+    if (typeof scope.Accelerometer !== 'undefined') {
       this.status.accelerometerAvailable = true;
     }
 
     // 检查陀螺仪
-    if ('Gyroscope' in window) {
+    if (typeof scope.Gyroscope !== 'undefined') {
       this.status.gyroscopeAvailable = true;
     }
 
     // 检查方向传感器
-    if ('AbsoluteOrientationSensor' in window) {
+    if (typeof scope.AbsoluteOrientationSensor !== 'undefined') {
       this.status.orientationAvailable = true;
     }
   }
@@ -237,13 +239,20 @@ export class SensorManager {
    * 开始监听加速度传感器
    */
   public async startAccelerometer(callback: (data: AccelerometerData) => void): Promise<boolean> {
+    const scope = globalThis as any;
+    const AccelerometerCtor = scope.Accelerometer;
+
+    if (!this.status.accelerometerAvailable && typeof AccelerometerCtor !== 'undefined') {
+      this.status.accelerometerAvailable = true;
+    }
+
     if (!this.status.accelerometerAvailable) {
       console.warn('加速度传感器不可用');
       return false;
     }
 
     try {
-      this.accelerometer = new Accelerometer({
+      this.accelerometer = this.createSensorInstance<Accelerometer>(AccelerometerCtor, {
         frequency: 1000 / this.config.updateInterval,
       });
 
@@ -286,13 +295,20 @@ export class SensorManager {
    * 开始监听陀螺仪
    */
   public async startGyroscope(callback: (data: GyroscopeData) => void): Promise<boolean> {
+    const scope = globalThis as any;
+    const GyroscopeCtor = scope.Gyroscope;
+
+    if (!this.status.gyroscopeAvailable && typeof GyroscopeCtor !== 'undefined') {
+      this.status.gyroscopeAvailable = true;
+    }
+
     if (!this.status.gyroscopeAvailable) {
       console.warn('陀螺仪不可用');
       return false;
     }
 
     try {
-      this.gyroscope = new Gyroscope({
+      this.gyroscope = this.createSensorInstance<Gyroscope>(GyroscopeCtor, {
         frequency: 1000 / this.config.updateInterval,
       });
 
@@ -335,13 +351,20 @@ export class SensorManager {
    * 开始监听方向传感器
    */
   public async startOrientation(callback: (data: OrientationData) => void): Promise<boolean> {
+    const scope = globalThis as any;
+    const OrientationCtor = scope.AbsoluteOrientationSensor;
+
+    if (!this.status.orientationAvailable && typeof OrientationCtor !== 'undefined') {
+      this.status.orientationAvailable = true;
+    }
+
     if (!this.status.orientationAvailable) {
       console.warn('方向传感器不可用');
       return false;
     }
 
     try {
-      this.absoluteOrientationSensor = new AbsoluteOrientationSensor({
+      this.absoluteOrientationSensor = this.createSensorInstance<AbsoluteOrientationSensor>(OrientationCtor, {
         frequency: 1000 / this.config.updateInterval,
       });
 
@@ -411,6 +434,21 @@ export class SensorManager {
       pitch: (pitch * 180) / Math.PI,
       roll: (roll * 180) / Math.PI,
     };
+  }
+
+  /**
+   * 兼容 class 与 vi.fn() 两类构造器 mock
+   */
+  private createSensorInstance<T>(SensorCtor: any, options: { frequency: number }): T {
+    if (typeof SensorCtor !== 'function') {
+      throw new Error('传感器构造器不可用');
+    }
+
+    try {
+      return new SensorCtor(options) as T;
+    } catch {
+      return SensorCtor(options) as T;
+    }
   }
 
   /**

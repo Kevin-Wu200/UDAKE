@@ -45,7 +45,11 @@ class DecisionThresholdAnalyzer:
 
         # 统计
         exceeding_count = np.sum(exceeds_threshold)
-        exceeding_percentage = exceeding_count / prediction.size * 100
+        exceeding_percentage = (
+            exceeding_count / prediction.size * 100
+            if prediction.size > 0
+            else 0.0
+        )
 
         # 超过阈值区域的平均不确定性
         if exceeding_count > 0:
@@ -121,11 +125,11 @@ class DecisionThresholdAnalyzer:
         # 不确定性导致的误判风险
         false_positive_risk = np.sum(
             (lower_bound < threshold) & (prediction > threshold)
-        ) / prediction.size
+        ) / prediction.size if prediction.size > 0 else 0.0
 
         false_negative_risk = np.sum(
             (upper_bound > threshold) & (prediction < threshold)
-        ) / prediction.size
+        ) / prediction.size if prediction.size > 0 else 0.0
 
         total_risk = false_positive_risk + false_negative_risk
 

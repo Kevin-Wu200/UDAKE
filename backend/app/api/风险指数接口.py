@@ -34,57 +34,51 @@ class RiskCalculateRequest(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001",
+        examples=["task-20260314-001"],
         min_length=1
     )
     prediction: List[List[float]] = Field(
         ...,
         description="预测结果矩阵 (NxM 二维数组)",
-        example=[
+        examples=[[
             [10.5, 11.2, 10.8],
             [11.0, 10.9, 11.3],
             [10.7, 11.1, 10.6]
-        ]
-    )
+        ]])
     variance: List[List[float]] = Field(
         ...,
         description="方差数据矩阵 (NxM 二维数组，形状需与prediction一致)",
-        example=[
+        examples=[[
             [0.5, 0.8, 0.6],
             [0.7, 0.9, 0.4],
             [0.3, 0.6, 0.5]
-        ]
-    )
+        ]])
     x_coords: List[float] = Field(
         ...,
         description="X坐标列表 (长度为M)",
-        example=[120.1, 120.2, 120.3]
-    )
+        examples=[[120.1, 120.2, 120.3]])
     y_coords: List[float] = Field(
         ...,
         description="Y坐标列表 (长度为N)",
-        example=[30.1, 30.2, 30.3]
-    )
+        examples=[[30.1, 30.2, 30.3]])
     confidence_level: float = Field(
         default=0.95,
         description="置信度水平 (0-1之间，默认0.95)",
         ge=0.0,
         le=1.0,
-        example=0.95
-    )
+        examples=[0.95])
     threshold_values: Optional[Dict[str, float]] = Field(
         default=None,
         description="自定义阈值配置，键为阈值名称，值为阈值数值",
-        example={
+        examples=[{
             "low": 0.3,
             "medium": 0.6,
             "high": 0.9,
             "critical": 1.2
-        }
-    )
+        }])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "prediction": [
@@ -108,6 +102,7 @@ class RiskCalculateRequest(BaseModel):
                 }
             }
         }
+    }
 
 class RiskCalculateResponse(BaseModel):
     """风险指数计算响应
@@ -132,61 +127,53 @@ class RiskCalculateResponse(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001"
-    )
+        examples=["task-20260314-001"])
     risk_index: List[List[float]] = Field(
         ...,
         description="风险指数矩阵 (NxM 二维数组，每个值表示该位置的风险程度)",
-        example=[
+        examples=[[
             [0.5, 0.8, 0.6],
             [0.7, 0.9, 0.4],
             [0.3, 0.6, 0.5]
-        ]
-    )
+        ]])
     statistics: Dict[str, float] = Field(
         ...,
         description="统计信息，包括mean（均值）、std（标准差）、min（最小值）、max（最大值）等",
-        example={
+        examples=[{
             "mean": 0.6,
             "std": 0.2,
             "min": 0.3,
             "max": 0.9,
             "median": 0.6
-        }
-    )
+        }])
     risk_levels: Dict[str, int] = Field(
         ...,
         description="各风险等级的数量统计，键为等级名称，值为该等级的网格数量",
-        example={
+        examples=[{
             "low": 5,
             "medium": 3,
             "high": 1,
             "critical": 0
-        }
-    )
+        }])
     high_risk_area: int = Field(
         ...,
         description="高风险区域面积（网格单元数量）",
-        example=1
-    )
+        examples=[1])
     high_risk_percentage: float = Field(
         ...,
         description="高风险区域百分比（0-100之间）",
-        example=11.11
-    )
+        examples=[11.11])
     risk_rating: str = Field(
         ...,
         description="综合风险评级，根据高风险区域百分比确定",
-        example="低风险"
-    )
+        examples=["低风险"])
     message: str = Field(
         ...,
         description="操作状态消息",
-        example="风险指数计算完成"
-    )
+        examples=["风险指数计算完成"])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "risk_index": [
@@ -213,6 +200,7 @@ class RiskCalculateResponse(BaseModel):
                 "message": "风险指数计算完成"
             }
         }
+    }
 
 @router.post(
     "/risk/calculate",

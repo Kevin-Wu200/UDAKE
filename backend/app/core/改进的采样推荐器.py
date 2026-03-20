@@ -437,7 +437,7 @@ class ImprovedSamplingRecommender:
 
         # 执行聚类
         if len(sampled_points) >= n_clusters:
-            kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+            kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
             cluster_labels = kmeans.fit_predict(sampled_points)
             cluster_centers = kmeans.cluster_centers_
 

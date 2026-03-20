@@ -10,6 +10,13 @@ from app.config import settings
 warnings.filterwarnings("ignore", message=".*urllib3.*LibreSSL.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="urllib3")
 
+# 抑制 starlette 对 multipart 导入兼容层的待弃用提示
+warnings.filterwarnings(
+    "ignore",
+    message=".*import python_multipart.*",
+    category=PendingDeprecationWarning
+)
+
 if __name__ == "__main__":
     print(f"🚀 启动 {settings.APP_NAME}")
     print(f"📍 地址: http://{settings.HOST}:{settings.PORT}")

@@ -36,57 +36,50 @@ class DecisionThresholdRequest(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001",
+        examples=["task-20260314-001"],
         min_length=1
     )
     prediction: List[List[float]] = Field(
         ...,
         description="预测结果矩阵 (NxM 二维数组)",
-        example=[
+        examples=[[
             [10.5, 11.2, 10.8],
             [11.0, 10.9, 11.3],
             [10.7, 11.1, 10.6]
-        ]
-    )
+        ]])
     variance: List[List[float]] = Field(
         ...,
         description="方差数据矩阵 (NxM 二维数组，形状需与prediction一致)",
-        example=[
+        examples=[[
             [0.5, 0.8, 0.6],
             [0.7, 0.9, 0.4],
             [0.3, 0.6, 0.5]
-        ]
-    )
+        ]])
     x_coords: List[float] = Field(
         ...,
         description="X坐标列表 (长度为M)",
-        example=[120.1, 120.2, 120.3]
-    )
+        examples=[[120.1, 120.2, 120.3]])
     y_coords: List[float] = Field(
         ...,
         description="Y坐标列表 (长度为N)",
-        example=[30.1, 30.2, 30.3]
-    )
+        examples=[[30.1, 30.2, 30.3]])
     decision_goal: str = Field(
         ...,
         description="决策目标，描述阈值分析的用途和背景",
-        example="确定污染物预警阈值"
-    )
+        examples=["确定污染物预警阈值"])
     custom_thresholds: Optional[List[float]] = Field(
         default=None,
         description="自定义阈值列表，如果提供则覆盖默认生成的阈值",
-        example=[10.0, 10.5, 11.0, 11.5, 12.0]
-    )
+        examples=[[10.0, 10.5, 11.0, 11.5, 12.0]])
     risk_tolerance: float = Field(
         default=0.1,
         description="风险容忍度 (0-1之间，默认0.1)，用于评估阈值风险",
         ge=0.0,
         le=1.0,
-        example=0.1
-    )
+        examples=[0.1])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "prediction": [
@@ -106,6 +99,7 @@ class DecisionThresholdRequest(BaseModel):
                 "risk_tolerance": 0.1
             }
         }
+    }
 
 class DecisionThresholdResponse(BaseModel):
     """决策阈值分析响应
@@ -128,17 +122,15 @@ class DecisionThresholdResponse(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001"
-    )
+        examples=["task-20260314-001"])
     decision_goal: str = Field(
         ...,
         description="决策目标",
-        example="确定污染物预警阈值"
-    )
+        examples=["确定污染物预警阈值"])
     threshold_analyses: Dict[str, Any] = Field(
         ...,
         description="各阈值分析结果，包含不同阈值的效果评估",
-        example={
+        examples=[{
             "threshold_10.0": {
                 "threshold": 10.0,
                 "coverage": 45.0,
@@ -151,26 +143,23 @@ class DecisionThresholdResponse(BaseModel):
                 "risk_level": "medium",
                 "confidence": 0.88
             }
-        }
-    )
+        }])
     recommended_threshold: float = Field(
         ...,
         description="推荐的最优阈值",
-        example=10.8
-    )
+        examples=[10.8])
     risk_assessment: Dict[str, Any] = Field(
         ...,
         description="风险评估结果，包含风险等级和风险描述",
-        example={
+        examples=[{
             "risk_level": "low",
             "risk_score": 0.15,
             "description": "推荐阈值风险较低，适合使用"
-        }
-    )
+        }])
     recommendations: List[Dict[str, Any]] = Field(
         ...,
         description="阈值建议列表，包含多个备选阈值及其理由",
-        example=[
+        examples=[[
             {
                 "threshold": 10.8,
                 "priority": "high",
@@ -183,16 +172,14 @@ class DecisionThresholdResponse(BaseModel):
                 "reason": "保守选择，覆盖率较高",
                 "expected_accuracy": 0.88
             }
-        ]
-    )
+        ]])
     message: str = Field(
         ...,
         description="操作状态消息",
-        example="决策阈值分析完成"
-    )
+        examples=["决策阈值分析完成"])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "decision_goal": "确定污染物预警阈值",
@@ -233,6 +220,7 @@ class DecisionThresholdResponse(BaseModel):
                 "message": "决策阈值分析完成"
             }
         }
+    }
 
 @router.post(
     "/decision/thresholds",

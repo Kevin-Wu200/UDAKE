@@ -29,6 +29,7 @@ psutil==5.9.6
 
 # HTTP客户端
 httpx==0.25.2
+python-multipart==0.0.9
 
 # 开发工具
 pytest==7.4.3

@@ -96,7 +96,7 @@ export class TrackManager {
   /**
    * 创建新轨迹
    */
-  public async createTrack(name: string, description?: string): Promise<Track> {
+  public async createTrack(name: string, description?: string, setAsCurrent: boolean = false): Promise<Track> {
     const track: Track = {
       id: `track_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       name,
@@ -109,8 +109,10 @@ export class TrackManager {
     };
 
     this.tracks.set(track.id, track);
-    this.currentTrack = track;
-    this.pointBuffer = [];
+    if (setAsCurrent) {
+      this.currentTrack = track;
+      this.pointBuffer = [];
+    }
 
     await this.saveTracksToStorage();
 
@@ -137,7 +139,7 @@ export class TrackManager {
     }
 
     // 创建新轨迹
-    const track = await this.createTrack(name, description);
+    const track = await this.createTrack(name, description, true);
 
     // 开始监听位置
     const success = await locationService.startWatch();
@@ -257,7 +259,12 @@ export class TrackManager {
     track.totalDistance = totalDistance;
 
     // 计算平均速度
-    const duration = (track.endTime || Date.now()) - track.startTime;
+    let duration = (track.endTime || Date.now()) - track.startTime;
+    if (duration <= 0 && track.points.length >= 2) {
+      const firstPointTime = track.points[0].timestamp;
+      const lastPointTime = track.points[track.points.length - 1].timestamp;
+      duration = Math.max(0, lastPointTime - firstPointTime);
+    }
     if (duration > 0) {
       track.averageSpeed = totalDistance / (duration / 1000); // 米/秒
     }

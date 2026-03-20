@@ -53,6 +53,9 @@ class SpatialRiskReporter:
         """
         生成执行摘要
         """
+        if prediction.size == 0 or variance.size == 0 or risk_index.size == 0:
+            raise ValueError("输入数组不能为空")
+
         high_risk_percentage = np.sum(risk_index > 0.7) / risk_index.size * 100
         avg_uncertainty = np.mean(np.sqrt(variance))
 
@@ -144,7 +147,7 @@ class SpatialRiskReporter:
 
     def _classify_overall_risk(self, high_risk_percentage: float) -> str:
         """分类整体风险等级"""
-        if high_risk_percentage > 30:
+        if high_risk_percentage >= 30:
             return "高风险"
         elif high_risk_percentage > 15:
             return "中等风险"

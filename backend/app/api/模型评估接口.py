@@ -55,45 +55,39 @@ class ModelEvaluationRequest(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001",
+        examples=["task-20260314-001"],
         min_length=1
     )
     actual_values: List[float] = Field(
         ...,
         description="实际值列表，观测的真实值",
-        example=[10.3, 11.0, 10.9, 10.8, 10.6]
-    )
+        examples=[[10.3, 11.0, 10.9, 10.8, 10.6]])
     predicted_values: List[float] = Field(
         ...,
         description="预测值列表，模型预测的值",
-        example=[10.5, 11.2, 10.8, 11.0, 10.7]
-    )
+        examples=[[10.5, 11.2, 10.8, 11.0, 10.7]])
     variance: List[float] = Field(
         ...,
         description="方差列表，预测的不确定性度量",
-        example=[0.5, 0.8, 0.6, 0.7, 0.3]
-    )
+        examples=[[0.5, 0.8, 0.6, 0.7, 0.3]])
     model_params: Optional[Dict[str, Any]] = Field(
         default=None,
         description="模型参数，包含插值方法等配置信息",
-        example={
+        examples=[{
             "method": "kriging",
             "variogram_model": "spherical",
             "range": 100.0,
             "sill": 1.0,
             "nugget": 0.1
-        }
-    )
+        }])
     x_coords: Optional[List[float]] = Field(
         default=None,
         description="X坐标列表，用于空间分析",
-        example=[120.1, 120.2, 120.3, 120.4, 120.5]
-    )
+        examples=[[120.1, 120.2, 120.3, 120.4, 120.5]])
     y_coords: Optional[List[float]] = Field(
         default=None,
         description="Y坐标列表，用于空间分析",
-        example=[30.1, 30.2, 30.3, 30.4, 30.5]
-    )
+        examples=[[30.1, 30.2, 30.3, 30.4, 30.5]])
 
 class ModelEvaluationResponse(BaseModel):
     """模型评估响应
@@ -164,12 +158,11 @@ class ModelEvaluationResponse(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001"
-    )
+        examples=["task-20260314-001"])
     report: Dict[str, Any] = Field(
         ...,
         description="完整评估报告，包含详细的评估结果",
-        example={
+        examples=[{
             "task_id": "task-20260314-001",
             "evaluation_time": "2026-03-14T12:00:00Z",
             "sample_size": 5,
@@ -189,50 +182,43 @@ class ModelEvaluationResponse(BaseModel):
                 "homoscedasticity": True,
                 "outliers": []
             }
-        }
-    )
+        }])
     error_metrics: Dict[str, float] = Field(
         ...,
         description="误差指标，包括MAE（平均绝对误差）、RMSE（均方根误差）、MAPE（平均绝对百分比误差）等",
-        example={
+        examples=[{
             "mae": 0.12,
             "rmse": 0.15,
             "mape": 1.2,
             "max_error": 0.2,
             "mean_error": 0.1
-        }
-    )
+        }])
     correlation: float = Field(
         ...,
         description="相关系数，表示预测值和实际值的线性相关性（-1到1之间，越接近1越好）",
-        example=0.98
-    )
+        examples=[0.98])
     quality_score: float = Field(
         ...,
         description="综合质量分数，评估模型整体性能（0-1之间，越高越好）",
         ge=0.0,
         le=1.0,
-        example=0.92
-    )
+        examples=[0.92])
     sample_size: int = Field(
         ...,
         description="样本数量",
-        example=5
-    )
+        examples=[5])
     recommendations: List[str] = Field(
         ...,
         description="改进建议列表，基于评估结果提供",
-        example=[
+        examples=[[
             "模型性能良好，建议继续使用",
             "考虑增加采样点以提高精度",
             "检查高误差区域的异常情况"
-        ]
-    )
+        ]])
     message: str = Field(
         ...,
         description="操作状态消息",
-        example="模型评估完成"
-    )
+        examples=["模型评估完成"])
 
 @router.post(
     "/model/evaluation",

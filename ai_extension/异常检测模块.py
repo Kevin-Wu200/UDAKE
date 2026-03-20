@@ -58,9 +58,22 @@ class AnomalyDetector:
         mean = np.mean(values)
         std = np.std(values)
 
-        # Z-score方法
-        z_scores = np.abs((values - mean) / std)
-        anomaly_indices = np.where(z_scores > threshold)[0]
+        # 使用更鲁棒的 MAD z-score，避免离群值拉高标准差导致漏检
+        median = np.median(values)
+        mad = np.median(np.abs(values - median))
+
+        if mad > 1e-10:
+            robust_z_scores = np.abs(0.6745 * (values - median) / (mad + 1e-10))
+            anomaly_indices = np.where(robust_z_scores > threshold)[0]
+            # 小样本且分布对称时，MAD 可能过于保守；补充标准 z-score 检测
+            if len(anomaly_indices) == 0 and std > 1e-10:
+                z_scores = np.abs((values - mean) / (std + 1e-10))
+                anomaly_indices = np.where(z_scores > threshold)[0]
+        elif std > 1e-10:
+            z_scores = np.abs((values - mean) / (std + 1e-10))
+            anomaly_indices = np.where(z_scores > threshold)[0]
+        else:
+            anomaly_indices = np.array([], dtype=int)
 
         return {
             "anomaly_count": len(anomaly_indices),

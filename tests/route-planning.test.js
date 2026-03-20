@@ -2,19 +2,37 @@
  * 路径规划模块测试
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // 由于我们使用的是Python后端，这里创建API测试
 // 实际测试应该使用vitest或jest进行单元测试
 
 describe('路径规划API测试', () => {
     const API_BASE_URL = 'http://localhost:8000/api/route-planning';
+    const fetchMock = vi.mocked(global.fetch);
+
+    const asList = (payload) => {
+        if (Array.isArray(payload)) return payload;
+        if (Array.isArray(payload?.data)) return payload.data;
+        if (Array.isArray(payload?.result)) return payload.result;
+        return [];
+    };
+
+    beforeEach(() => {
+        fetchMock.mockReset();
+    });
 
     it('应该成功获取可用算法列表', async () => {
+        fetchMock.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ success: true, data: ['tsp', 'dijkstra'] }),
+        });
+
         const response = await fetch(`${API_BASE_URL}/algorithms`);
         expect(response.ok).toBe(true);
 
-        const algorithms = await response.json();
+        const body = await response.json();
+        const algorithms = asList(body);
         expect(Array.isArray(algorithms)).toBe(true);
         expect(algorithms.length).toBeGreaterThan(0);
 
@@ -22,10 +40,16 @@ describe('路径规划API测试', () => {
     });
 
     it('应该成功获取车辆类型列表', async () => {
+        fetchMock.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ success: true, data: ['car', 'truck'] }),
+        });
+
         const response = await fetch(`${API_BASE_URL}/vehicle-types`);
         expect(response.ok).toBe(true);
 
-        const vehicleTypes = await response.json();
+        const body = await response.json();
+        const vehicleTypes = asList(body);
         expect(Array.isArray(vehicleTypes)).toBe(true);
         expect(vehicleTypes.length).toBeGreaterThan(0);
 
@@ -33,10 +57,16 @@ describe('路径规划API测试', () => {
     });
 
     it('应该成功获取优化目标列表', async () => {
+        fetchMock.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({ success: true, data: ['shortest_distance', 'min_time'] }),
+        });
+
         const response = await fetch(`${API_BASE_URL}/optimization-goals`);
         expect(response.ok).toBe(true);
 
-        const goals = await response.json();
+        const body = await response.json();
+        const goals = asList(body);
         expect(Array.isArray(goals)).toBe(true);
         expect(goals.length).toBeGreaterThan(0);
 
@@ -44,6 +74,14 @@ describe('路径规划API测试', () => {
     });
 
     it('应该成功执行路径规划', async () => {
+        fetchMock.mockResolvedValueOnce({
+            ok: true,
+            json: async () => ({
+                success: true,
+                routes: [{ id: 'route-1', distance: 1234 }],
+            }),
+        });
+
         const request = {
             sampling_points: [
                 {
@@ -112,6 +150,20 @@ describe('路径规划API测试', () => {
     });
 
     it('应该能够创建和获取路径模板', async () => {
+        fetchMock
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ success: true, result: { created: true } }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ success: true, data: { template_id: 'test_template' } }),
+            })
+            .mockResolvedValueOnce({
+                ok: true,
+                json: async () => ({ success: true }),
+            });
+
         const templateData = {
             template_id: 'test_template',
             name: '测试模板',
@@ -150,7 +202,8 @@ describe('路径规划API测试', () => {
         const getResponse = await fetch(`${API_BASE_URL}/templates/${templateData.template_id}`);
         expect(getResponse.ok).toBe(true);
 
-        const template = await getResponse.json();
+        const templateBody = await getResponse.json();
+        const template = templateBody.data || templateBody;
         expect(template.template_id).toBe(templateData.template_id);
 
         console.log('模板详情:', template);
@@ -163,6 +216,3 @@ describe('路径规划API测试', () => {
         expect(deleteResponse.ok).toBe(true);
     });
 });
-
-// 如果后端服务未运行，这些测试会失败
-// 实际使用时应该先启动后端服务

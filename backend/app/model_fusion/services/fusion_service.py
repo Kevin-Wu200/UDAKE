@@ -159,6 +159,8 @@ class FusionService:
         if task is None or task.result is None:
             return None
 
+        if hasattr(task.result, 'model_dump'):
+            return task.result.model_dump()
         return task.result.dict()
 
     def compare_strategies(

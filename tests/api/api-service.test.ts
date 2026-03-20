@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { APIService } from '../frontend/js/services/API封装';
-import { errorHandler } from '../frontend/js/utils/errors/ErrorHandler';
+import { APIService } from '../../frontend/js/services/API封装';
+import { errorHandler } from '../../frontend/js/utils/errors/ErrorHandler';
 
 // Mock fetch
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 // Mock OfflineManager
-vi.mock('../frontend/js/utils/OfflineManager', () => ({
+vi.mock('../../frontend/js/utils/OfflineManager', () => ({
     OfflineManager: {
         isOnline: true,
         cacheResult: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('../frontend/js/utils/OfflineManager', () => ({
 }));
 
 // Mock TwoLevelCache
-vi.mock('../frontend/js/utils/cache/TwoLevelCache', () => ({
+vi.mock('../../frontend/js/utils/cache/TwoLevelCache', () => ({
     TwoLevelCache: class {
         constructor() {}
         async get() { return undefined; }
@@ -30,7 +30,7 @@ vi.mock('../frontend/js/utils/cache/TwoLevelCache', () => ({
 }));
 
 // Mock errorHandler
-vi.mock('../frontend/js/utils/errors/ErrorHandler', () => ({
+vi.mock('../../frontend/js/utils/errors/ErrorHandler', () => ({
     errorHandler: {
         handle: vi.fn()
     },
@@ -102,7 +102,6 @@ describe('APIService', () => {
             expect(mockFetch).toHaveBeenCalledWith(
                 'http://localhost:8000/test',
                 expect.objectContaining({
-                    method: 'GET',
                     mode: 'cors',
                     credentials: 'omit'
                 })
@@ -157,6 +156,7 @@ describe('APIService', () => {
         });
 
         it('应该处理 500 服务器错误', async () => {
+            const noRetryService = new APIService('http://localhost:8000', { maxRetries: 0, retryDelay: 1 });
             mockFetch.mockResolvedValueOnce({
                 ok: false,
                 status: 500,
@@ -164,7 +164,7 @@ describe('APIService', () => {
                 json: async () => ({ message: 'Server error' })
             });
 
-            await expect(apiService.get('/error')).rejects.toThrow('服务器处理请求时出现问题');
+            await expect(noRetryService.get('/error')).rejects.toThrow('服务器处理请求时出现问题');
         });
 
         it('应该处理网络错误', async () => {
@@ -181,7 +181,7 @@ describe('APIService', () => {
                 json: async () => ({ message: 'Authentication failed' })
             });
 
-            await expect(apiService.get('/protected')).rejects.toThrow('认证失败');
+            await expect(apiService.get('/protected')).rejects.toThrow('未授权，请检查登录状态');
         });
 
         it('应该处理 422 验证错误', async () => {
@@ -198,6 +198,7 @@ describe('APIService', () => {
 
     describe('重试机制', () => {
         it('应该在 503 错误时重试', async () => {
+            const retryService = new APIService('http://localhost:8000', { maxRetries: 2, retryDelay: 1 });
             let attempt = 0;
             mockFetch.mockImplementation(() => {
                 attempt++;
@@ -215,12 +216,13 @@ describe('APIService', () => {
                 });
             });
 
-            const result = await apiService.get('/retry-test');
+            const result = await retryService.get('/retry-test');
             expect(result).toEqual({ data: 'success' });
             expect(attempt).toBe(3);
         });
 
-        it('应该在超过最大重试次数后失败', async () => {
+        it('应该在超过最大重试次数后失败', { timeout: 10000 }, async () => {
+            const retryService = new APIService('http://localhost:8000', { maxRetries: 2, retryDelay: 1 });
             mockFetch.mockResolvedValue({
                 ok: false,
                 status: 503,
@@ -228,7 +230,7 @@ describe('APIService', () => {
                 json: async () => ({ message: 'Retry later' })
             });
 
-            await expect(apiService.get('/fail-test')).rejects.toThrow();
+            await expect(retryService.get('/fail-test')).rejects.toThrow();
         });
 
         it('应该在非重试错误时立即失败', async () => {

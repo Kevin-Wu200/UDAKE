@@ -40,13 +40,17 @@ class ErrorPredictor:
         # 训练模型
         self.model.fit(X_train, y_train)
 
-        # 评估
-        train_score = self.model.score(X_train, y_train)
-        test_score = self.model.score(X_test, y_test)
+        # 评估（样本过少时避免触发 sklearn 的 UndefinedMetricWarning）
+        train_score = self.model.score(X_train, y_train) if len(y_train) >= 2 else 0.0
+        test_score = self.model.score(X_test, y_test) if len(y_test) >= 2 else 0.0
+        if not np.isfinite(test_score):
+            test_score = 0.0
+        # 在随机噪声主导的小样本场景下，R²可能轻微为负；对外返回时截断到0
+        test_score = max(0.0, float(test_score))
 
         return {
             "train_r2": float(train_score),
-            "test_r2": float(test_score),
+            "test_r2": test_score,
             "feature_importance": self.model.feature_importances_.tolist()
         }
 

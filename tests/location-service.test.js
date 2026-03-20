@@ -44,6 +44,10 @@ describe('位置服务测试', () => {
     trackManager = tm;
     geofenceManager = gm;
     sensorManager = sm;
+
+    // 清理单例残留状态，避免测试间互相污染
+    const geofences = geofenceManager.getAllGeofences();
+    await Promise.all(geofences.map((geofence) => geofenceManager.deleteGeofence(geofence.id)));
   });
 
   afterEach(() => {
@@ -331,11 +335,20 @@ describe('位置服务测试', () => {
       expect(isOutside).toBe(false);
     });
 
-    it('应该能够触发地理围栏事件', (done) => {
+    it('应该能够触发地理围栏事件', async () => {
+      await new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => reject(new Error('地理围栏事件超时')), 1000);
+
       geofenceManager.addGeofenceListener((event) => {
-        expect(event.type).toBe('enter');
-        expect(event.geofenceId).toBeDefined();
-        done();
+          try {
+            expect(event.type).toBe('enter');
+            expect(event.geofenceId).toBeDefined();
+            clearTimeout(timeoutId);
+            resolve();
+          } catch (error) {
+            clearTimeout(timeoutId);
+            reject(error);
+          }
       });
 
       // 模拟触发事件
@@ -348,6 +361,7 @@ describe('位置服务测试', () => {
         heading: 90,
         speed: 1.5,
         timestamp: Date.now(),
+      });
       });
     });
   });

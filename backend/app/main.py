@@ -3,12 +3,20 @@ FastAPI主应用
 """
 import sys
 import os
+import warnings
 from pathlib import Path
 from datetime import datetime
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
+
+# 抑制 starlette 对 multipart 导入兼容层的待弃用提示
+warnings.filterwarnings(
+    "ignore",
+    message=".*import python_multipart.*",
+    category=PendingDeprecationWarning
+)
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware

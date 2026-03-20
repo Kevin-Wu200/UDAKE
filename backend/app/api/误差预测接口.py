@@ -33,37 +33,32 @@ class ErrorPredictRequest(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001",
+        examples=["task-20260314-001"],
         min_length=1
     )
     x_coords: List[float] = Field(
         ...,
         description="X坐标列表",
-        example=[120.1, 120.2, 120.3, 120.4, 120.5]
-    )
+        examples=[[120.1, 120.2, 120.3, 120.4, 120.5]])
     y_coords: List[float] = Field(
         ...,
         description="Y坐标列表",
-        example=[30.1, 30.2, 30.3, 30.4, 30.5]
-    )
+        examples=[[30.1, 30.2, 30.3, 30.4, 30.5]])
     predicted_values: List[float] = Field(
         ...,
         description="预测值列表，对应每个采样点的预测结果",
-        example=[10.5, 11.2, 10.8, 11.0, 10.7]
-    )
+        examples=[[10.5, 11.2, 10.8, 11.0, 10.7]])
     actual_values: Optional[List[float]] = Field(
         default=None,
         description="实际值列表，用于训练模型（如果train_model为True）",
-        example=[10.3, 11.0, 10.9, 10.8, 10.6]
-    )
+        examples=[[10.3, 11.0, 10.9, 10.8, 10.6]])
     train_model: bool = Field(
         default=False,
         description="是否训练模型，训练后可提高预测精度",
-        example=False
-    )
+        examples=[False])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "x_coords": [120.1, 120.2, 120.3, 120.4, 120.5],
@@ -73,6 +68,7 @@ class ErrorPredictRequest(BaseModel):
                 "train_model": True
             }
         }
+    }
 
 class ErrorPredictResponse(BaseModel):
     """误差预测响应
@@ -94,22 +90,19 @@ class ErrorPredictResponse(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001"
-    )
+        examples=["task-20260314-001"])
     predicted_errors: List[float] = Field(
         ...,
         description="预测误差列表，每个采样点的预测误差值",
-        example=[0.2, 0.1, -0.1, 0.2, 0.1]
-    )
+        examples=[[0.2, 0.1, -0.1, 0.2, 0.1]])
     confidence_scores: List[float] = Field(
         ...,
         description="置信度分数列表，每个预测的置信度（0-1之间，越高越可信）",
-        example=[0.85, 0.92, 0.88, 0.90, 0.87]
-    )
+        examples=[[0.85, 0.92, 0.88, 0.90, 0.87]])
     statistics: Dict[str, float] = Field(
         ...,
         description="统计信息，包含误差的均值、标准差、最小值、最大值、中位数和平均置信度",
-        example={
+        examples=[{
             "total_points": 5,
             "mean_error": 0.1,
             "std_error": 0.13,
@@ -117,12 +110,11 @@ class ErrorPredictResponse(BaseModel):
             "max_error": 0.2,
             "median_error": 0.1,
             "mean_confidence": 0.88
-        }
-    )
+        }])
     training_results: Optional[Dict[str, Any]] = Field(
         default=None,
         description="模型训练结果，包含训练指标和模型信息",
-        example={
+        examples=[{
             "model_type": "random_forest",
             "training_score": 0.92,
             "feature_importance": {
@@ -131,16 +123,14 @@ class ErrorPredictResponse(BaseModel):
                 "predicted_value": 0.20
             },
             "training_samples": 5
-        }
-    )
+        }])
     message: str = Field(
         ...,
         description="操作状态消息",
-        example="误差预测完成"
-    )
+        examples=["误差预测完成"])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "predicted_errors": [0.2, 0.1, -0.1, 0.2, 0.1],
@@ -167,6 +157,7 @@ class ErrorPredictResponse(BaseModel):
                 "message": "误差预测完成"
             }
         }
+    }
 
 @router.post(
     "/error/predict",

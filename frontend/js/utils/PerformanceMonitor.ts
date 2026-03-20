@@ -230,6 +230,10 @@ export class PerformanceMonitor {
 
         const durations = metrics.map(m => m.duration).sort((a, b) => a - b);
         const total = durations.reduce((sum, d) => sum + d, 0);
+        const percentile = (p: number): number => {
+            const index = Math.floor((durations.length - 1) * p);
+            return durations[index];
+        };
 
         return {
             count: durations.length,
@@ -237,9 +241,9 @@ export class PerformanceMonitor {
             average: total / durations.length,
             min: durations[0],
             max: durations[durations.length - 1],
-            p50: durations[Math.floor(durations.length * 0.5)],
-            p95: durations[Math.floor(durations.length * 0.95)],
-            p99: durations[Math.floor(durations.length * 0.99)]
+            p50: percentile(0.5),
+            p95: percentile(0.95),
+            p99: percentile(0.99)
         };
     }
 
@@ -279,7 +283,11 @@ export class PerformanceMonitor {
 
         // CLS (Cumulative Layout Shift)
         let clsValue = 0;
-        for (const entry of performance.getEntries() as any[]) {
+        const layoutShiftEntries = performance.getEntriesByType('layout-shift') as any[];
+        const clsEntries = layoutShiftEntries.length > 0
+            ? layoutShiftEntries
+            : (performance.getEntries() as any[]);
+        for (const entry of clsEntries) {
             if (entry.entryType === 'layout-shift' && !entry.hadRecentInput) {
                 clsValue += entry.value;
             }
@@ -287,7 +295,9 @@ export class PerformanceMonitor {
         vitals.cls = clsValue;
 
         // FCP (First Contentful Paint)
-        const fcpEntry = performance.getEntriesByName('first-contentful-paint', 'paint')[0] as any;
+        const paintEntries = performance.getEntriesByType('paint') as any[];
+        const fcpEntry = paintEntries.find((entry: any) => entry.name === 'first-contentful-paint')
+            || performance.getEntriesByName('first-contentful-paint', 'paint')[0] as any;
         if (fcpEntry) {
             vitals.fcp = fcpEntry.startTime;
         }
@@ -333,8 +343,8 @@ export class PerformanceMonitor {
         let cachedResources = 0;
 
         for (const resource of resources) {
-            const type = resource.initiatorType;
-            const size = resource.transferSize;
+            const type = resource.initiatorType || 'other';
+            const size = Number(resource.transferSize) || 0;
 
             if (!resourcesByType.has(type)) {
                 resourcesByType.set(type, { count: 0, size: 0 });
@@ -513,24 +523,104 @@ export class PerformanceMonitor {
     }
 
     // 静态方法委托给单例
-    private static instance: PerformanceMonitor;
+    private static instance: PerformanceMonitor | null = null;
+    public static _metrics: Record<string, any> = {};
+    public static _marks: Record<string, number> = {};
 
     public static init(): void {
         if (!PerformanceMonitor.instance) {
             PerformanceMonitor.instance = new PerformanceMonitor();
         }
+
+        const initializeLegacyMetrics = () => {
+            try {
+                PerformanceMonitor._collectNavigationMetrics();
+            } catch {
+                // ignore
+            }
+        };
+
+        if (typeof document !== 'undefined' && document.readyState === 'loading' && typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+            window.addEventListener('load', initializeLegacyMetrics);
+        } else {
+            initializeLegacyMetrics();
+        }
     }
 
     public static mark(name: string): void {
-        if (typeof performance !== 'undefined') {
+        const now = typeof performance !== 'undefined' && typeof performance.now === 'function'
+            ? performance.now()
+            : Date.now();
+        PerformanceMonitor._marks[name] = now;
+
+        if (typeof performance !== 'undefined' && typeof performance.mark === 'function') {
             performance.mark(name);
         }
     }
 
-    public static measure(name: string, startMark: string, endMark: string): void {
-        if (typeof performance !== 'undefined') {
-            performance.measure(name, startMark, endMark);
+    public static measure(name: string, startMark: string, endMark?: string): number | null {
+        const start = PerformanceMonitor._marks[startMark];
+        if (typeof start !== 'number') {
+            return null;
         }
+
+        const end = typeof endMark === 'string' && typeof PerformanceMonitor._marks[endMark] === 'number'
+            ? PerformanceMonitor._marks[endMark]
+            : (typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now());
+        const duration = end - start;
+        PerformanceMonitor._metrics[name] = duration;
+
+        if (typeof performance !== 'undefined' && typeof performance.measure === 'function') {
+            try {
+                if (endMark) {
+                    performance.measure(name, startMark, endMark);
+                } else {
+                    performance.measure(name, startMark);
+                }
+            } catch {
+                // ignore
+            }
+        }
+
+        return duration;
+    }
+
+    public static getMetrics(): Record<string, any> {
+        return { ...PerformanceMonitor._metrics };
+    }
+
+    public static report(): void {
+        console.group('Performance Report');
+        Object.entries(PerformanceMonitor._metrics).forEach(([key, value]) => {
+            if (typeof value === 'number' && Number.isFinite(value)) {
+                console.log(`${key}: ${value.toFixed(2)}ms`);
+            } else {
+                console.log(`${key}:`, value);
+            }
+        });
+        console.groupEnd();
+    }
+
+    public static _collectNavigationMetrics(): void {
+        if (typeof performance === 'undefined' || typeof performance.getEntriesByType !== 'function') {
+            return;
+        }
+
+        const navEntries = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[];
+        const nav = navEntries[0];
+        if (nav) {
+            PerformanceMonitor._metrics.domContentLoaded = nav.domContentLoadedEventEnd - nav.startTime;
+            PerformanceMonitor._metrics.loadComplete = nav.loadEventEnd - nav.startTime;
+            PerformanceMonitor._metrics.ttfb = nav.responseStart - nav.requestStart;
+            PerformanceMonitor._metrics.domInteractive = nav.domInteractive - nav.startTime;
+        }
+
+        const resources = performance.getEntriesByType('resource') as PerformanceResourceTiming[];
+        PerformanceMonitor._metrics.resourceCount = resources.length;
+        PerformanceMonitor._metrics.totalTransferSize = resources.reduce((sum, entry) => {
+            const size = Number((entry as any).transferSize);
+            return sum + (Number.isFinite(size) ? size : 0);
+        }, 0);
     }
 }
 

@@ -107,8 +107,8 @@ describe('WebSocketService', () => {
 });
 
 describe('WebSocket 单例导出', () => {
-  it('应该导出单例实例', () => {
-    const { webSocketService } = require('../frontend/js/services/WebSocketService');
+  it('应该导出单例实例', async () => {
+    const { webSocketService } = await import('../frontend/js/services/WebSocketService');
     expect(webSocketService).toBeDefined();
     expect(webSocketService).toBeInstanceOf(WebSocketService);
   });

@@ -34,45 +34,39 @@ class AnomalyDetectRequest(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001",
+        examples=["task-20260314-001"],
         min_length=1
     )
     x_coords: List[float] = Field(
         ...,
         description="X坐标列表",
-        example=[120.1, 120.2, 120.3, 120.4, 120.5]
-    )
+        examples=[[120.1, 120.2, 120.3, 120.4, 120.5]])
     y_coords: List[float] = Field(
         ...,
         description="Y坐标列表",
-        example=[30.1, 30.2, 30.3, 30.4, 30.5]
-    )
+        examples=[[30.1, 30.2, 30.3, 30.4, 30.5]])
     values: List[float] = Field(
         ...,
         description="数值列表，对应每个采样点的观测值",
-        example=[10.5, 11.2, 10.8, 11.0, 10.7]
-    )
+        examples=[[10.5, 11.2, 10.8, 11.0, 10.7]])
     detection_method: str = Field(
         default="spatial",
         description="检测方法: spatial（空间异常）、value（值异常）或both（两者都检测）",
-        example="spatial"
-    )
+        examples=["spatial"])
     threshold: float = Field(
         default=3.0,
         description="检测阈值（标准差倍数），用于值异常检测",
         ge=1.0,
-        example=3.0
-    )
+        examples=[3.0])
     contamination: float = Field(
         default=0.1,
         description="异常点比例（0-1之间），用于异常检测算法",
         ge=0.0,
         le=0.5,
-        example=0.1
-    )
+        examples=[0.1])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "x_coords": [120.1, 120.2, 120.3, 120.4, 120.5],
@@ -83,6 +77,7 @@ class AnomalyDetectRequest(BaseModel):
                 "contamination": 0.1
             }
         }
+    }
 
 class AnomalyDetectResponse(BaseModel):
     """异常检测响应
@@ -105,61 +100,54 @@ class AnomalyDetectResponse(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001"
-    )
+        examples=["task-20260314-001"])
     detection_method: str = Field(
         ...,
         description="使用的检测方法",
-        example="spatial"
-    )
+        examples=["spatial"])
     spatial_anomalies: Optional[Dict[str, Any]] = Field(
         default=None,
         description="空间异常检测结果，包含异常点坐标和异常类型",
-        example={
+        examples=[{
             "anomaly_count": 2,
             "anomalies": [
                 {"x": 120.2, "y": 30.2, "value": 11.2, "type": "isolation_forest"},
                 {"x": 120.4, "y": 30.4, "value": 11.0, "type": "elliptic_envelope"}
             ]
-        }
-    )
+        }])
     value_anomalies: Optional[Dict[str, Any]] = Field(
         default=None,
         description="值异常检测结果，包含异常值和阈值信息",
-        example={
+        examples=[{
             "upper_threshold": 12.5,
             "lower_threshold": 9.5,
             "anomalies": [
                 {"index": 1, "value": 11.2, "type": "high"},
                 {"index": 3, "value": 11.0, "type": "high"}
             ]
-        }
-    )
+        }])
     anomaly_scores: List[float] = Field(
         ...,
         description="异常分数列表，每个采样点的异常程度（越高越异常）",
-        example=[0.1, 0.8, 0.2, 0.7, 0.15]
-    )
+        examples=[[0.1, 0.8, 0.2, 0.7, 0.15]])
     statistics: Dict[str, Any] = Field(
         ...,
         description="统计信息，包含数据的均值、标准差、最小值、最大值、中位数",
-        example={
+        examples=[{
             "total_points": 5,
             "mean": 10.84,
             "std": 0.29,
             "min": 10.5,
             "max": 11.2,
             "median": 10.8
-        }
-    )
+        }])
     message: str = Field(
         ...,
         description="操作状态消息",
-        example="异常检测完成"
-    )
+        examples=["异常检测完成"])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "detection_method": "spatial",
@@ -183,6 +171,7 @@ class AnomalyDetectResponse(BaseModel):
                 "message": "异常检测完成"
             }
         }
+    }
 
 @router.post(
     "/anomaly/detect",

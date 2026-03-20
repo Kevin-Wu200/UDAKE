@@ -35,50 +35,45 @@ class UncertaintyClassifyRequest(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001",
+        examples=["task-20260314-001"],
         min_length=1
     )
     prediction: List[List[float]] = Field(
         ...,
         description="预测结果矩阵 (NxM 二维数组)",
-        example=[
+        examples=[[
             [10.5, 11.2, 10.8],
             [11.0, 10.9, 11.3],
             [10.7, 11.1, 10.6]
-        ]
-    )
+        ]])
     variance: List[List[float]] = Field(
         ...,
         description="方差数据矩阵 (NxM 二维数组，形状需与prediction一致)",
-        example=[
+        examples=[[
             [0.5, 0.8, 0.6],
             [0.7, 0.9, 0.4],
             [0.3, 0.6, 0.5]
-        ]
-    )
+        ]])
     x_coords: List[float] = Field(
         ...,
         description="X坐标列表 (长度为M)",
-        example=[120.1, 120.2, 120.3]
-    )
+        examples=[[120.1, 120.2, 120.3]])
     y_coords: List[float] = Field(
         ...,
         description="Y坐标列表 (长度为N)",
-        example=[30.1, 30.2, 30.3]
-    )
+        examples=[[30.1, 30.2, 30.3]])
     custom_thresholds: Optional[Dict[str, float]] = Field(
         default=None,
         description="自定义阈值，键为等级名称，值为阈值",
-        example={
+        examples=[{
             "low": 0.5,
             "medium": 1.0,
             "high": 1.5,
             "critical": 2.0
-        }
-    )
+        }])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "prediction": [
@@ -101,6 +96,7 @@ class UncertaintyClassifyRequest(BaseModel):
                 }
             }
         }
+    }
 
 class UncertaintyClassifyResponse(BaseModel):
     """不确定性分级响应
@@ -121,12 +117,11 @@ class UncertaintyClassifyResponse(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001"
-    )
+        examples=["task-20260314-001"])
     statistics: Dict[str, Dict[str, Any]] = Field(
         ...,
         description="各等级统计信息，包括count（数量）、percentage（百分比）、mean_variance（平均方差）等",
-        example={
+        examples=[{
             "level_1": {
                 "count": 5,
                 "percentage": 55.56,
@@ -145,22 +140,20 @@ class UncertaintyClassifyResponse(BaseModel):
                 "mean_variance": 0.90,
                 "description": "高不确定性"
             }
-        }
-    )
+        }])
     color_map: Dict[int, str] = Field(
         ...,
         description="不确定性等级到颜色的映射（十六进制颜色代码）",
-        example={
+        examples=[{
             1: "#4CAF50",  # 绿色 - 低不确定性
             2: "#FFC107",  # 黄色 - 中等不确定性
             3: "#FF5722",  # 橙色 - 高不确定性
             4: "#F44336"   # 红色 - 极高不确定性
-        }
-    )
+        }])
     critical_zones: List[Dict[str, Any]] = Field(
         ...,
         description="关键高风险区域列表，包含区域中心坐标、范围、不确定性等级等信息",
-        example=[
+        examples=[[
             {
                 "center": {"x": 120.2, "y": 30.2},
                 "level": 3,
@@ -168,16 +161,14 @@ class UncertaintyClassifyResponse(BaseModel):
                 "area": 100,
                 "description": "高不确定性区域"
             }
-        ]
-    )
+        ]])
     message: str = Field(
         ...,
         description="操作状态消息",
-        example="不确定性分级完成"
-    )
+        examples=["不确定性分级完成"])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "statistics": {
@@ -218,6 +209,7 @@ class UncertaintyClassifyResponse(BaseModel):
                 "message": "不确定性分级完成"
             }
         }
+    }
 
 @router.post(
     "/uncertainty/classify",

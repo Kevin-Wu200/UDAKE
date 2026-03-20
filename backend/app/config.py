@@ -2,7 +2,7 @@
 配置文件
 支持多环境配置：development（开发）、testing（测试）、production（生产）
 """
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field
 from typing import List, Optional, Union, Literal
 from pathlib import Path
@@ -10,6 +10,12 @@ import json
 import os
 
 class Settings(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=True
+    )
+
     # 环境配置
     ENVIRONMENT: Literal["development", "testing", "production"] = "development"
 
@@ -143,11 +149,6 @@ class Settings(BaseSettings):
             return ".env.production"
         return ".env"
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = True
-
 # 根据环境变量获取当前环境
 environment = os.getenv("ENVIRONMENT", "development").lower()
 
@@ -165,11 +166,12 @@ if not Path(current_env_file).exists():
 
 class EnvironmentSettings(Settings):
     """环境特定的配置类"""
-    class Config:
-        extra = 'ignore'  # 忽略额外的环境变量（如前端VITE_开头的变量）
-        env_file = current_env_file
-        env_file_encoding = "utf-8"
-        case_sensitive = True
+    model_config = SettingsConfigDict(
+        extra='ignore',  # 忽略额外的环境变量（如前端VITE_开头的变量）
+        env_file=current_env_file,
+        env_file_encoding="utf-8",
+        case_sensitive=True
+    )
 
 # 创建配置实例
 settings = EnvironmentSettings()

@@ -94,7 +94,7 @@ class SamplingOptimizer:
 
         # 聚类
         X = np.column_stack([high_var_x, high_var_y])
-        self.kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        self.kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
         labels = self.kmeans.fit_predict(X)
 
         # 聚类中心

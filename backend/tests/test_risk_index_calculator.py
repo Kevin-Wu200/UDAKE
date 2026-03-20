@@ -94,7 +94,7 @@ class TestRiskIndexCalculator:
 
             assert risk_index.shape == shape
 
-    def test_calculate_spatial_risk(self, calculator, sample_variance, sample_prediction):
+    def test_calculate_spatial_risk(self, calculator, sample_variance, sample_prediction, sample_coordinates):
         """测试计算空间风险"""
         x_coords, y_coords = sample_coordinates
         result = calculator.calculate_spatial_risk(
@@ -136,7 +136,7 @@ class TestRiskIndexCalculator:
         # 验证高风险区域范围
         assert 0 <= result["high_risk_percentage"] <= 100
 
-    def test_calculate_spatial_risk_statistics_validity(self, calculator, sample_variance, sample_prediction):
+    def test_calculate_spatial_risk_statistics_validity(self, calculator, sample_variance, sample_prediction, sample_coordinates):
         """测试空间风险统计的有效性"""
         x_coords, y_coords = sample_coordinates
         result = calculator.calculate_spatial_risk(
@@ -150,7 +150,7 @@ class TestRiskIndexCalculator:
         assert stats["min"] <= stats["median"] <= stats["max"]
         assert stats["std"] >= 0
 
-    def test_calculate_spatial_risk_levels_sum(self, calculator, sample_variance, sample_prediction):
+    def test_calculate_spatial_risk_levels_sum(self, calculator, sample_variance, sample_prediction, sample_coordinates):
         """测试风险等级总和"""
         x_coords, y_coords = sample_coordinates
         result = calculator.calculate_spatial_risk(
@@ -296,7 +296,7 @@ class TestRiskIndexCalculator:
         assert np.all(risk_index >= 0)
         assert np.all(risk_index <= 1)
 
-    def test_high_risk_percentage_calculation(self, calculator, sample_variance, sample_prediction):
+    def test_high_risk_percentage_calculation(self, calculator, sample_variance, sample_prediction, sample_coordinates):
         """测试高风险百分比计算"""
         x_coords, y_coords = sample_coordinates
         result = calculator.calculate_spatial_risk(

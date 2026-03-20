@@ -214,7 +214,8 @@ export class SkeletonLoader {
      * 隐藏骨架屏
      */
     static hide(wrapper: HTMLDivElement | null): void {
-        if (wrapper) {
+        if (wrapper && wrapper.style) {
+            wrapper.style.opacity = '0';
             wrapper.classList.remove('skeleton-visible');
             wrapper.classList.add('skeleton-hidden');
 
@@ -227,7 +228,7 @@ export class SkeletonLoader {
                     }
                 }
                 wrapper.remove();
-            }, 300);
+            }, 200);
         }
     }
 

@@ -287,6 +287,7 @@ class TouchGestureManager {
         // 创建或获取反馈元素
         if (!this.feedbackElement) {
             this.feedbackElement = document.createElement('div');
+            this.feedbackElement.className = 'feedback-element';
             this.feedbackElement.style.cssText = `
                 position: absolute;
                 pointer-events: none;
@@ -410,6 +411,10 @@ class TouchGestureManager {
 
             this.initialDistance = this.getDistance(touch1, touch2);
             this.initialAngle = this.getAngle(touch1, touch2);
+            if (this.options.enablePinch) {
+                this.activeGesture = 'pinch';
+                this.isGestureInProgress = true;
+            }
         }
         // 三指操作
         else if (e.touches.length === 3 && this.options.enableTripleFingerPinch) {
@@ -538,27 +543,33 @@ class TouchGestureManager {
 
                 this.lastTapTime = now;
             }
-            // 检测快速滑动（速度阈值检测）
-            else if (duration < 200 && velocity > 0.5 && this.options.enableQuickSwipe && this.checkGestureConflict('quickSwipe')) {
+            else {
                 const direction = this.getSwipeDirection(deltaX, deltaY);
+                const isLayerSwipe = this.options.enableLayerSwipe
+                    && (direction === 'left' || direction === 'right')
+                    && distance > 100;
+                const isQuickSwipe = duration < 200
+                    && velocity > 0.5
+                    && this.options.enableQuickSwipe;
+                const isNormalSwipe = distance >= this.options.swipeThreshold
+                    && this.options.enableSwipe;
 
-                this.triggerGesture('quickSwipe', {
-                    type: 'quickSwipe',
-                    center: { x: touch.clientX, y: touch.clientY },
-                    direction,
-                    delta: { x: deltaX, y: deltaY },
-                    velocity,
-                });
-                this.touchFeedback('gestureSuccess');
-            }
-            // 检测普通滑动
-            else if (distance >= this.options.swipeThreshold && this.options.enableSwipe && this.checkGestureConflict('swipe')) {
-                const direction = this.getSwipeDirection(deltaX, deltaY);
+                let handled = false;
 
-                // 检测是否是图层切换滑动（水平滑动且距离足够长）
-                if (this.options.enableLayerSwipe && (direction === 'left' || direction === 'right') && distance > 100) {
+                if (isQuickSwipe && this.checkGestureConflict('quickSwipe')) {
+                    this.triggerGesture('quickSwipe', {
+                        type: 'quickSwipe',
+                        center: { x: touch.clientX, y: touch.clientY },
+                        direction,
+                        delta: { x: deltaX, y: deltaY },
+                        velocity,
+                    });
+                    this.touchFeedback('gestureSuccess');
+                    handled = true;
+                }
+
+                if (isLayerSwipe && this.checkGestureConflict('layerSwipe')) {
                     const layerIndex = direction === 'right' ? 1 : -1;
-
                     this.triggerGesture('layerSwipe', {
                         type: 'layerSwipe',
                         center: { x: touch.clientX, y: touch.clientY },
@@ -567,7 +578,10 @@ class TouchGestureManager {
                         layerIndex,
                     });
                     this.touchFeedback('gestureSuccess');
-                } else {
+                    handled = true;
+                }
+
+                if (!handled && isNormalSwipe && this.checkGestureConflict('swipe')) {
                     this.triggerGesture('swipe', {
                         type: 'swipe',
                         center: { x: touch.clientX, y: touch.clientY },
@@ -715,7 +729,7 @@ class TouchGestureManager {
         const newGesturePriority = this.gesturePriority.get(newGesture) ?? 0;
         const activeGesturePriority = this.gesturePriority.get(this.activeGesture) ?? 0;
 
-        if (newGesturePriority > activeGesturePriority) {
+        if (newGesturePriority >= activeGesturePriority) {
             // 新手势优先级更高，取消活动手势
             return true;
         }

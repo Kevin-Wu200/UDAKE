@@ -38,81 +38,72 @@ class RiskReportRequest(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001",
+        examples=["task-20260314-001"],
         min_length=1
     )
     prediction: List[List[float]] = Field(
         ...,
         description="预测结果矩阵 (NxM 二维数组)",
-        example=[
+        examples=[[
             [10.5, 11.2, 10.8],
             [11.0, 10.9, 11.3],
             [10.7, 11.1, 10.6]
-        ]
-    )
+        ]])
     variance: List[List[float]] = Field(
         ...,
         description="方差数据矩阵 (NxM 二维数组，形状需与prediction一致)",
-        example=[
+        examples=[[
             [0.5, 0.8, 0.6],
             [0.7, 0.9, 0.4],
             [0.3, 0.6, 0.5]
-        ]
-    )
+        ]])
     risk_index: List[List[float]] = Field(
         ...,
         description="风险指数矩阵 (NxM 二维数组，形状需与prediction一致)",
-        example=[
+        examples=[[
             [0.5, 0.8, 0.6],
             [0.7, 0.9, 0.4],
             [0.3, 0.6, 0.5]
-        ]
-    )
+        ]])
     x_coords: List[float] = Field(
         ...,
         description="X坐标列表 (长度为M)",
-        example=[120.1, 120.2, 120.3]
-    )
+        examples=[[120.1, 120.2, 120.3]])
     y_coords: List[float] = Field(
         ...,
         description="Y坐标列表 (长度为N)",
-        example=[30.1, 30.2, 30.3]
-    )
+        examples=[[30.1, 30.2, 30.3]])
     uncertainty_levels: Optional[Dict[str, Any]] = Field(
         default=None,
         description="不确定性等级信息，包含各等级的统计和分布",
-        example={
+        examples=[{
             "level_1": {"count": 5, "percentage": 55.56},
             "level_2": {"count": 3, "percentage": 33.33},
             "level_3": {"count": 1, "percentage": 11.11}
-        }
-    )
+        }])
     threshold_analysis: Optional[Dict[str, Any]] = Field(
         default=None,
         description="阈值分析结果，包含推荐的阈值和风险评估",
-        example={
+        examples=[{
             "recommended_threshold": 10.8,
             "risk_level": "low",
             "coverage": 65.0
-        }
-    )
+        }])
     metadata: Optional[Dict[str, Any]] = Field(
         default=None,
         description="元数据，包含任务相关的额外信息",
-        example={
+        examples=[{
             "project_name": "环境监测项目",
             "location": "杭州市",
             "date": "2026-03-14"
-        }
-    )
+        }])
     save_to_file: bool = Field(
         default=True,
         description="是否将报告保存到文件",
-        example=True
-    )
+        examples=[True])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "prediction": [
@@ -150,6 +141,7 @@ class RiskReportRequest(BaseModel):
                 "save_to_file": True
             }
         }
+    }
 
 class RiskReportResponse(BaseModel):
     """风险报告生成响应
@@ -171,12 +163,11 @@ class RiskReportResponse(BaseModel):
     task_id: str = Field(
         ...,
         description="任务ID",
-        example="task-20260314-001"
-    )
+        examples=["task-20260314-001"])
     report: Dict[str, Any] = Field(
         ...,
         description="完整报告内容，包含执行摘要、风险评估、阈值分析、空间统计信息和建议",
-        example={
+        examples=[{
             "report_id": "report-20260314-001",
             "task_id": "task-20260314-001",
             "generated_at": "2026-03-14T12:00:00Z",
@@ -210,31 +201,26 @@ class RiskReportResponse(BaseModel):
                 "重点关注高风险区域",
                 "建议增加采样密度"
             ]
-        }
-    )
+        }])
     report_id: str = Field(
         ...,
         description="报告唯一标识符",
-        example="report-20260314-001"
-    )
+        examples=["report-20260314-001"])
     generated_at: str = Field(
         ...,
         description="报告生成时间（ISO 8601格式）",
-        example="2026-03-14T12:00:00Z"
-    )
+        examples=["2026-03-14T12:00:00Z"])
     file_path: Optional[str] = Field(
         default=None,
         description="报告文件保存路径（如果save_to_file为True）",
-        example="/Users/wuchenkai/UDAKE/backend/app/结果文件/risk_report_task-20260314-001.json"
-    )
+        examples=["/Users/wuchenkai/UDAKE/backend/app/结果文件/risk_report_task-20260314-001.json"])
     message: str = Field(
         ...,
         description="操作状态消息",
-        example="风险报告生成完成"
-    )
+        examples=["风险报告生成完成"])
 
-    class Config:
-        json_schema_extra = {
+    model_config = {
+        "json_schema_extra": {
             "example": {
                 "task_id": "task-20260314-001",
                 "report": {
@@ -278,6 +264,7 @@ class RiskReportResponse(BaseModel):
                 "message": "风险报告生成完成"
             }
         }
+    }
 
 @router.post(
     "/risk/report",
