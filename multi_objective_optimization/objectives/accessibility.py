@@ -112,19 +112,22 @@ class AccessibilityObjective(BaseObjective):
         Returns:
             float: 可达性得分（负值，因为我们要最大化）
         """
-        if len(individual.genes) == 0:
-            return 0.0
-
         total_accessibility = 0.0
+        point_count = 0
 
         # 假设individual.metadata中存储了采样点坐标
         if 'points' in individual.metadata:
             points = individual.metadata['points']
+            if len(points) == 0:
+                return 0.0
             for point in points:
                 point_array = np.array(point)
                 accessibility = self._evaluate_point(point_array)
                 total_accessibility += accessibility
+                point_count += 1
         else:
+            if len(individual.genes) == 0:
+                return 0.0
             # 如果没有坐标信息，使用简化的可达性计算
             if self.x_coords is not None and self.y_coords is not None:
                 for gene_idx in individual.genes:
@@ -137,12 +140,14 @@ class AccessibilityObjective(BaseObjective):
                     point_array = np.array([x, y])
                     accessibility = self._evaluate_point(point_array)
                     total_accessibility += accessibility
+                    point_count += 1
             else:
                 # 使用默认可达性
                 total_accessibility = len(individual.genes) * 0.5
+                point_count = len(individual.genes)
 
         # 返回平均可达性（负值，因为是最大化）
-        avg_accessibility = total_accessibility / len(individual.genes)
+        avg_accessibility = total_accessibility / max(point_count, 1)
         return -avg_accessibility  # 负值表示我们要最大化
 
     def _evaluate_point(self, point: np.ndarray) -> float:

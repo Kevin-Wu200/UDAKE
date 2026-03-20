@@ -6,8 +6,11 @@
 
 import requests
 import json
+import pytest
 from typing import Dict, Any, List
 from datetime import datetime
+
+pytestmark = pytest.mark.skip(reason="手工联调脚本，不纳入自动化 pytest")
 
 # 配置
 BASE_URL = "http://172.20.10.2:8000"

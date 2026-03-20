@@ -297,20 +297,25 @@ class NSGA2Optimizer(BaseOptimizer):
     def _merge_populations(
         self,
         pop1: Population,
-        pop2: Population
+        pop2
     ) -> Population:
         """
         合并两个种群
 
         Args:
             pop1: 种群1
-            pop2: 种群2
+            pop2: 种群2（Population 或 Individual 列表）
 
         Returns:
             Population: 合并后的种群
         """
         merged = Population()
-        merged.individuals = pop1.individuals + pop2.individuals
+        if isinstance(pop2, Population):
+            pop2_individuals = pop2.individuals
+        else:
+            pop2_individuals = list(pop2)
+
+        merged.individuals = pop1.individuals + pop2_individuals
         merged.size = len(merged.individuals)
         return merged
 
@@ -341,13 +346,13 @@ class NSGA2Optimizer(BaseOptimizer):
         next_pop = Population()
         current_rank = 0
 
-        while len(next_pop) + len(fronts[current_rank]) <= target_size:
+        while current_rank < len(fronts) and len(next_pop) + len(fronts[current_rank]) <= target_size:
             for idx in fronts[current_rank]:
                 next_pop.add_individual(population.individuals[idx])
             current_rank += 1
 
         # 如果最后一前沿个体超过剩余名额，按拥挤度选择
-        if len(next_pop) < target_size:
+        if len(next_pop) < target_size and current_rank < len(fronts):
             remaining = target_size - len(next_pop)
             sorted_front = sorted(
                 fronts[current_rank],
@@ -356,6 +361,11 @@ class NSGA2Optimizer(BaseOptimizer):
             )
             for idx in sorted_front[:remaining]:
                 next_pop.add_individual(population.individuals[idx])
+
+        # 兼容下游接口：保持 fronts/rank/crowding_distance 可用
+        next_pop.fronts = self._fast_non_dominated_sort(next_pop)
+        for front in next_pop.fronts:
+            self._calculate_crowding_distance(front, next_pop)
 
         return next_pop
 

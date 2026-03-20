@@ -7,9 +7,12 @@
 import requests
 import json
 import time
+import pytest
 from typing import Dict, Any, List
 from datetime import datetime
 import os
+
+pytestmark = pytest.mark.skip(reason="手工联调脚本，不纳入自动化 pytest")
 
 # 配置
 BACKEND_URL = "http://localhost:8000"

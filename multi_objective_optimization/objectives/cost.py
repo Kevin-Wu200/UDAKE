@@ -123,20 +123,21 @@ class CostObjective(BaseObjective):
         Returns:
             float: 总成本
         """
-        if len(individual.genes) == 0:
-            return 0.0
-
         total_cost = 0.0
 
         # 假设individual.metadata中存储了采样点坐标
         if 'points' in individual.metadata:
             points = individual.metadata['points']
+            if len(points) == 0:
+                return 0.0
             for point in points:
                 point_array = np.array(point)
                 distance_cost = self._calculate_distance_cost(point_array)
                 time_cost = self._calculate_time_cost(point_array)
                 total_cost += distance_cost + time_cost
         else:
+            if len(individual.genes) == 0:
+                return 0.0
             # 如果没有坐标信息，使用简化的成本计算
             # 假设genes是网格索引，需要转换为坐标
             if self.x_coords is not None and self.y_coords is not None:

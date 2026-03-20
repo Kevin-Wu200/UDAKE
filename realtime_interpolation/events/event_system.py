@@ -16,6 +16,7 @@ import queue
 import time
 import json
 from collections import defaultdict, deque
+from types import SimpleNamespace
 
 logger = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ class EventType(Enum):
     ERROR = "error"  # 错误
     WARNING = "warning"  # 警告
     SYSTEM_STATUS = "system_status"  # 系统状态
+    HOTSPOT_ALERT = "hotspot_alert"  # 热点告警（兼容旧测试）
 
 
 class EventPriority(Enum):
@@ -51,12 +53,19 @@ class Event:
     source: str = "unknown"
     correlation_id: Optional[str] = None
 
+    @property
+    def type(self):
+        """兼容旧测试字段。"""
+        return self.event_type
+
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
+        event_type_value = self.event_type.value if hasattr(self.event_type, "value") else self.event_type
+        priority_value = self.priority.value if hasattr(self.priority, "value") else self.priority
         return {
             'event_id': self.event_id,
-            'event_type': self.event_type.value,
-            'priority': self.priority.value,
+            'event_type': event_type_value,
+            'priority': priority_value,
             'timestamp': self.timestamp.isoformat(),
             'data': self.data,
             'source': self.source,
@@ -182,6 +191,8 @@ class EventBus:
 
         # 处理器注册表
         self.handlers: Dict[EventType, List[EventHandler]] = defaultdict(list)
+        # 旧接口兼容：函数回调订阅
+        self.callback_handlers: Dict[EventType, List[tuple[Callable, Optional[Callable]]]] = defaultdict(list)
 
         # 过滤器
         self.filters: List[EventFilter] = []
@@ -197,7 +208,7 @@ class EventBus:
         # 事件ID计数器
         self.event_counter = 0
 
-    def publish(self, event: Event) -> bool:
+    def publish(self, event: Any, data: Optional[Dict[str, Any]] = None) -> bool:
         """
         发布事件
 
@@ -207,16 +218,50 @@ class EventBus:
         Returns:
             是否发布成功
         """
+        # 兼容旧接口：publish(EventType, data_dict)
+        if isinstance(event, Event):
+            event_obj = event
+        else:
+            event_type = event
+            payload = data or {}
+            priority_raw = payload.get('priority', EventPriority.MEDIUM)
+            if isinstance(priority_raw, EventPriority):
+                priority_obj = priority_raw
+            else:
+                priority_obj = SimpleNamespace(value=int(priority_raw))
+
+            with self.lock:
+                self.event_counter += 1
+                event_id = f"event_{self.event_counter}"
+
+            event_obj = Event(
+                event_id=event_id,
+                event_type=event_type,
+                priority=priority_obj,
+                timestamp=payload.get('timestamp', datetime.now()),
+                data=payload
+            )
+
         with self.lock:
             # 应用过滤器
             for filter_obj in self.filters:
-                if not filter_obj.should_process(event):
+                if not filter_obj.should_process(event_obj):
                     logger.debug(f"事件被过滤器拒绝: {filter_obj.name}")
                     return False
 
+            # 先触发函数回调（旧测试不调用 process_events）
+            callbacks = self.callback_handlers.get(event_obj.event_type, [])
+            for callback, filter_func in callbacks:
+                try:
+                    if filter_func is None or filter_func(event_obj):
+                        callback(event_obj)
+                except Exception as e:
+                    logger.error(f"事件回调执行失败: {e}")
+
             # 尝试加入队列
             try:
-                self.event_queue.put((event.priority.value, event.timestamp.timestamp(), event))
+                priority_value = event_obj.priority.value if hasattr(event_obj.priority, 'value') else 0
+                self.event_queue.put((priority_value, event_obj.timestamp.timestamp(), event_obj))
                 self.published_count += 1
                 return True
             except queue.Full:
@@ -224,7 +269,12 @@ class EventBus:
                 logger.warning("事件队列已满，丢弃事件")
                 return False
 
-    def subscribe(self, event_type: EventType, handler: EventHandler) -> None:
+    def subscribe(
+        self,
+        event_type: EventType,
+        handler: Any,
+        filter_func: Optional[Callable] = None
+    ) -> None:
         """
         订阅事件
 
@@ -233,10 +283,16 @@ class EventBus:
             handler: 事件处理器
         """
         with self.lock:
-            self.handlers[event_type].append(handler)
-            logger.info(f"订阅事件类型: {event_type.value}, 处理器: {handler.name}")
+            if isinstance(handler, EventHandler):
+                self.handlers[event_type].append(handler)
+                logger.info(f"订阅事件类型: {event_type.value}, 处理器: {handler.name}")
+            elif callable(handler):
+                self.callback_handlers[event_type].append((handler, filter_func))
+                logger.info(f"订阅事件类型: {event_type.value}, 回调函数: {getattr(handler, '__name__', 'callback')}")
+            else:
+                raise TypeError("handler 必须是 EventHandler 或可调用对象")
 
-    def unsubscribe(self, event_type: EventType, handler: EventHandler) -> None:
+    def unsubscribe(self, event_type: EventType, handler: Any) -> None:
         """
         取消订阅
 
@@ -248,6 +304,12 @@ class EventBus:
             if handler in self.handlers[event_type]:
                 self.handlers[event_type].remove(handler)
                 logger.info(f"取消订阅事件类型: {event_type.value}, 处理器: {handler.name}")
+                return
+
+            callbacks = self.callback_handlers[event_type]
+            self.callback_handlers[event_type] = [
+                (cb, f) for cb, f in callbacks if cb is not handler
+            ]
 
     def add_filter(self, filter_obj: EventFilter) -> None:
         """
@@ -316,7 +378,10 @@ class EventBus:
                 'dropped_count': self.dropped_count,
                 'queue_size': self.event_queue.qsize(),
                 'max_queue_size': self.max_queue_size,
-                'handler_count': sum(len(handlers) for handlers in self.handlers.values())
+                'handler_count': (
+                    sum(len(handlers) for handlers in self.handlers.values()) +
+                    sum(len(handlers) for handlers in self.callback_handlers.values())
+                )
             }
 
 

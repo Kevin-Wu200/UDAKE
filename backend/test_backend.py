@@ -5,6 +5,9 @@ import requests
 import json
 import time
 import numpy as np
+import pytest
+
+pytestmark = pytest.mark.skip(reason="手工联调脚本，不纳入自动化 pytest")
 
 BASE_URL = "http://localhost:8000"
 

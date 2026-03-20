@@ -146,7 +146,8 @@ export class SmartCache<K = string, V = any> {
 
     // 如果缓存已满，执行淘汰
     if (this.cache.size >= this.config.maxSize && !this.cache.has(key)) {
-      this.evict();
+      // 在高频写入场景下避免每次全量扫描过期项，优先执行策略淘汰
+      this.evict({ checkExpired: false });
     }
 
     this.cache.set(key, entry);
@@ -293,20 +294,24 @@ export class SmartCache<K = string, V = any> {
   /**
    * 执行缓存淘汰
    */
-  evict(): void {
+  evict(options: { checkExpired?: boolean } = {}): void {
     if (this.isDestroyed) {
       return;
     }
 
-    // 检查过期项
-    const now = Date.now();
-    for (const [key, entry] of this.cache.entries()) {
-      if (now > entry.expiresAt) {
-        this.cache.delete(key);
-        if (this.config.enableStats) {
-          this.stats.evictionCount++;
+    const shouldCheckExpired = options.checkExpired !== false;
+
+    if (shouldCheckExpired) {
+      // 检查过期项
+      const now = Date.now();
+      for (const [key, entry] of this.cache.entries()) {
+        if (now > entry.expiresAt) {
+          this.cache.delete(key);
+          if (this.config.enableStats) {
+            this.stats.evictionCount++;
+          }
+          this._onEvent('expire', String(key), entry);
         }
-        this._onEvent('expire', String(key), entry);
       }
     }
 
@@ -477,7 +482,24 @@ export class SmartCache<K = string, V = any> {
    */
   private _calculateSize(value: any): number {
     try {
-      return new Blob([JSON.stringify(value)]).size;
+      if (value === null || value === undefined) {
+        return 0;
+      }
+
+      if (typeof value === 'string') {
+        return value.length * 2;
+      }
+
+      if (typeof value === 'number') {
+        return 8;
+      }
+
+      if (typeof value === 'boolean') {
+        return 4;
+      }
+
+      const serialized = JSON.stringify(value);
+      return serialized ? serialized.length * 2 : 0;
     } catch {
       // 如果无法序列化，使用估算值
       return 1024; // 1KB

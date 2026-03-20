@@ -12,6 +12,7 @@ from datetime import datetime
 import logging
 import asyncio
 import json
+import hashlib
 from concurrent.futures import ThreadPoolExecutor
 import traceback
 
@@ -31,6 +32,20 @@ from ..events import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# ==================== 兼容返回对象 ====================
+
+class CompatResult(dict):
+    """同时支持 dict 访问和属性访问的返回对象。"""
+
+    def __getattr__(self, item):
+        if item in self:
+            return self[item]
+        raise AttributeError(item)
+
+    def __setattr__(self, key, value):
+        self[key] = value
 
 
 # ==================== 数据接收和验证 ====================
@@ -200,7 +215,7 @@ class RealtimeInterpolationService:
 
         logger.info("实时插值服务已初始化")
 
-    def create_subscription(self, subscription_data: Dict[str, Any]) -> Dict[str, Any]:
+    def create_subscription(self, subscription_data: Any) -> Dict[str, Any]:
         """
         创建订阅
 
@@ -211,20 +226,23 @@ class RealtimeInterpolationService:
             响应字典
         """
         try:
-            # 验证订阅
-            valid, error_msg, subscription = DataValidator.validate_subscription(subscription_data)
-            if not valid:
-                return {
-                    'success': False,
-                    'error': error_msg
-                }
+            # 兼容旧接口：允许直接传 Subscription 对象
+            if isinstance(subscription_data, Subscription):
+                subscription = subscription_data
+            else:
+                valid, error_msg, subscription = DataValidator.validate_subscription(subscription_data)
+                if not valid:
+                    return CompatResult({
+                        'success': False,
+                        'error': error_msg
+                    })
 
             # 检查是否已存在
             if subscription.subscription_id in self.subscriptions:
-                return {
+                return CompatResult({
                     'success': False,
                     'error': f"订阅已存在: {subscription.subscription_id}"
-                }
+                })
 
             # 创建插值器
             kriging = IncrementalKriging(subscription)
@@ -248,18 +266,18 @@ class RealtimeInterpolationService:
 
             logger.info(f"创建订阅: {subscription.subscription_id}")
 
-            return {
+            return CompatResult({
                 'success': True,
                 'subscription_id': subscription.subscription_id,
                 'message': '订阅创建成功'
-            }
+            })
 
         except Exception as e:
             logger.error(f"创建订阅失败: {e}")
-            return {
+            return CompatResult({
                 'success': False,
                 'error': f"创建订阅失败: {str(e)}"
-            }
+            })
 
     def delete_subscription(self, subscription_id: str) -> Dict[str, Any]:
         """
@@ -273,10 +291,10 @@ class RealtimeInterpolationService:
         """
         try:
             if subscription_id not in self.subscriptions:
-                return {
+                return CompatResult({
                     'success': False,
                     'error': f"订阅不存在: {subscription_id}"
-                }
+                })
 
             # 删除订阅
             del self.subscriptions[subscription_id]
@@ -301,17 +319,148 @@ class RealtimeInterpolationService:
 
             logger.info(f"删除订阅: {subscription_id}")
 
-            return {
+            return CompatResult({
                 'success': True,
                 'message': '订阅删除成功'
-            }
+            })
 
         except Exception as e:
             logger.error(f"删除订阅失败: {e}")
-            return {
+            return CompatResult({
                 'success': False,
                 'error': f"删除订阅失败: {str(e)}"
+            })
+
+    # ==================== 旧接口兼容 ====================
+
+    def add_data_points(self, subscription_id: str, data_points: List[DataPoint]) -> CompatResult:
+        """
+        兼容旧接口：批量添加数据点。
+        """
+        try:
+            if subscription_id not in self.subscriptions:
+                return CompatResult({'success': False, 'error': f'订阅不存在: {subscription_id}'})
+
+            if not data_points:
+                return CompatResult({'success': True, 'added_points': 0, 'updated_points': 0})
+
+            kriging = self.subscriptions[subscription_id]
+            update_result = kriging.incremental_update(data_points)
+
+            self.stats['total_requests'] += 1
+            self.stats['successful_requests'] += 1
+            self.stats['total_updates'] += len(data_points)
+
+            if self.event_bus:
+                event = Event(
+                    event_id=f"batch_update_{subscription_id}_{kriging.version}",
+                    event_type=EventType.DATA_UPDATE,
+                    priority=EventPriority.MEDIUM,
+                    timestamp=datetime.now(),
+                    data={
+                        'subscription_id': subscription_id,
+                        'added_points': len(data_points),
+                        'version': kriging.version
+                    }
+                )
+                self.event_bus.publish(event)
+
+            return CompatResult({
+                'success': bool(getattr(update_result, 'success', True)),
+                'added_points': len(data_points),
+                'updated_points': len(data_points),
+                'total_points': len(kriging.data_points),
+                'version': kriging.version
+            })
+        except Exception as e:
+            logger.error(f"批量添加数据点失败: {e}")
+            self.stats['total_requests'] += 1
+            self.stats['failed_requests'] += 1
+            return CompatResult({'success': False, 'error': str(e)})
+
+    def query_predictions(
+        self,
+        subscription_id: str,
+        points: List[tuple[float, float]]
+    ) -> List[Any]:
+        """
+        兼容旧接口：批量查询预测结果。
+        """
+        if subscription_id not in self.subscriptions:
+            return []
+
+        kriging = self.subscriptions[subscription_id]
+        points_payload = [(float(x), float(y)) for x, y in points]
+
+        cache_key = None
+        if self.cache_manager:
+            digest = hashlib.md5(
+                json.dumps(points_payload, separators=(',', ':')).encode('utf-8')
+            ).hexdigest()
+            cache_key = f"pred_{subscription_id}_{kriging.version}_{digest}"
+            cached = self.cache_manager.get(cache_key)
+            if cached is not None:
+                return cached
+
+        predictions = kriging.predict(points_payload)
+
+        if self.cache_manager and cache_key is not None:
+            self.cache_manager.put(cache_key, predictions, ttl=120)
+
+        self.stats['total_requests'] += 1
+        self.stats['successful_requests'] += 1
+        return predictions
+
+    def execute_update(self, subscription_id: str) -> CompatResult:
+        """
+        兼容旧接口：显式执行更新。
+        """
+        if subscription_id not in self.subscriptions:
+            return CompatResult({'success': False, 'error': f'订阅不存在: {subscription_id}'})
+
+        kriging = self.subscriptions[subscription_id]
+        return CompatResult({
+            'success': True,
+            'updated_points': len(kriging.data_points),
+            'version': kriging.version
+        })
+
+    def cancel_subscription(self, subscription_id: str) -> CompatResult:
+        """兼容旧接口：取消订阅。"""
+        return self.delete_subscription(subscription_id)
+
+    def get_active_subscriptions(self) -> List[str]:
+        """兼容旧接口：获取激活订阅。"""
+        return list(self.subscriptions.keys())
+
+    def reset_subscription(self, subscription_id: str) -> CompatResult:
+        """兼容旧接口：重置订阅数据。"""
+        if subscription_id not in self.subscriptions:
+            return CompatResult({'success': False, 'error': f'订阅不存在: {subscription_id}'})
+
+        old_kriging = self.subscriptions[subscription_id]
+        self.subscriptions[subscription_id] = IncrementalKriging(old_kriging.subscription)
+        return CompatResult({'success': True, 'subscription_id': subscription_id})
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """兼容旧接口：获取缓存统计。"""
+        if not self.cache_manager:
+            return {
+                'total_requests': 0,
+                'hits': 0,
+                'misses': 0,
+                'size': 0,
+                'hit_rate': 0.0
             }
+
+        stats = self.cache_manager.get_stats()
+        return {
+            'total_requests': stats.get('total_requests', 0),
+            'hits': stats.get('total_hits', stats.get('hits', 0)),
+            'misses': stats.get('total_misses', stats.get('misses', 0)),
+            'size': stats.get('total_size', stats.get('size', 0)),
+            'hit_rate': stats.get('hit_rate', 0.0)
+        }
 
     def add_data_point(
         self,

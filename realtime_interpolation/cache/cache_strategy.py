@@ -16,11 +16,14 @@ import time
 logger = logging.getLogger(__name__)
 
 
-class CacheLevel(Enum):
-    """缓存级别"""
-    L1 = 1  # 一级缓存（内存，最快）
-    L2 = 2  # 二级缓存（内存，中等速度）
-    L3 = 3  # 三级缓存（磁盘，最慢）
+@dataclass
+class CacheLevel:
+    """缓存级别配置（兼容旧接口，可直接实例化）。"""
+    name: str
+    max_size: int = 0
+    ttl: int = 0
+    priority: int = 1
+    value: int = 1
 
 
 class ReplacementPolicy(Enum):
@@ -29,6 +32,12 @@ class ReplacementPolicy(Enum):
     LFU = "least_frequently_used"  # 最少使用频率
     FIFO = "first_in_first_out"  # 先进先出
     LFUDA = "least_frequently_used_with_dynamic_aging"  # 动态老化LFU
+
+
+# 预定义标准缓存级别（兼容历史代码中的 CacheLevel.L1/L2/L3）
+CacheLevel.L1 = CacheLevel(name="L1", priority=1, value=1)
+CacheLevel.L2 = CacheLevel(name="L2", priority=2, value=2)
+CacheLevel.L3 = CacheLevel(name="L3", priority=3, value=3)
 
 
 @dataclass
@@ -40,7 +49,11 @@ class CacheEntry:
     last_access_time: float = 0.0
     create_time: float = 0.0
     size: int = 0
-    level: CacheLevel = CacheLevel.L1
+    level: CacheLevel = None
+
+    def __post_init__(self):
+        if self.level is None:
+            self.level = CacheLevel.L1
 
 
 class CachePolicy:
@@ -129,6 +142,8 @@ class CachePolicy:
                 level=old_entry.level
             )
             self.current_size += entry_size
+            if self.replacement_policy in (ReplacementPolicy.LFU, ReplacementPolicy.LFUDA):
+                self.frequency_map[key] = self.cache[key].access_count
             return True
 
         # 检查是否需要驱逐
@@ -152,6 +167,8 @@ class CachePolicy:
         # FIFO队列
         if self.replacement_policy == ReplacementPolicy.FIFO:
             self.fifo_queue.append(key)
+        elif self.replacement_policy in (ReplacementPolicy.LFU, ReplacementPolicy.LFUDA):
+            self.frequency_map[key] = entry.access_count
 
         return True
 
@@ -232,6 +249,11 @@ class CachePolicy:
         # 清理相关数据
         if key in self.frequency_map:
             del self.frequency_map[key]
+        if key in self.fifo_queue:
+            try:
+                self.fifo_queue.remove(key)
+            except ValueError:
+                pass
 
         return True
 
@@ -270,7 +292,7 @@ class CachePolicy:
         return {
             'current_size': self.current_size,
             'max_size': self.max_size,
-            'usage_ratio': self.current_size / self.max_size,
+            'usage_ratio': self.current_size / self.max_size if self.max_size > 0 else 0.0,
             'entry_count': len(self.cache),
             'replacement_policy': self.replacement_policy.value
         }
@@ -298,6 +320,14 @@ class MultiLevelCacheStrategy:
         self.l1_cache = CachePolicy(l1_size, replacement_policy)
         self.l2_cache = CachePolicy(l2_size, replacement_policy)
         self.l3_cache = CachePolicy(l3_size, replacement_policy)
+        self.replacement_policy = replacement_policy
+
+        # 兼容旧接口：可枚举缓存层
+        self.levels: List[CacheLevel] = [
+            CacheLevel(name='L1', max_size=l1_size, priority=1, value=1),
+            CacheLevel(name='L2', max_size=l2_size, priority=2, value=2),
+            CacheLevel(name='L3', max_size=l3_size, priority=3, value=3),
+        ]
 
         # 统计信息
         self.l1_hits = 0
@@ -352,6 +382,51 @@ class MultiLevelCacheStrategy:
         """
         # 默认放入L1
         self.l1_cache.put(key, value, size)
+
+    # 兼容旧接口别名
+    def set(self, key: str, value: Any, size: int = 1) -> None:
+        self.put(key, value, size)
+
+    def delete(self, key: str) -> bool:
+        removed = False
+        removed = self.l1_cache.remove(key) or removed
+        removed = self.l2_cache.remove(key) or removed
+        removed = self.l3_cache.remove(key) or removed
+        return removed
+
+    def set_max_size(self, max_size: int) -> None:
+        self.l1_cache.max_size = int(max_size)
+        for level in self.levels:
+            if level.name == 'L1':
+                level.max_size = int(max_size)
+
+    def set_eviction_strategy(self, strategy: str) -> None:
+        strategy_lower = strategy.lower()
+        mapping = {
+            'lru': ReplacementPolicy.LRU,
+            'lfu': ReplacementPolicy.LFU,
+            'fifo': ReplacementPolicy.FIFO,
+            'lfuda': ReplacementPolicy.LFUDA,
+        }
+        policy = mapping.get(strategy_lower, ReplacementPolicy.LRU)
+        self.replacement_policy = policy
+        self.l1_cache.replacement_policy = policy
+        self.l2_cache.replacement_policy = policy
+        self.l3_cache.replacement_policy = policy
+
+    def add_level(self, level: CacheLevel) -> None:
+        # 兼容旧接口：仅记录层配置，不替换底层实现
+        self.levels.append(level)
+
+    def get_level(self, name: str) -> Optional[CacheLevel]:
+        for level in self.levels:
+            if level.name == name:
+                return level
+        return None
+
+    def prewarm(self, data: Dict[str, Any]) -> None:
+        for key, value in data.items():
+            self.put(key, value)
 
     def _promote_to_l1(self, key: str, value: Any) -> None:
         """提升到L1"""
