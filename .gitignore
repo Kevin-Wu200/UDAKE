@@ -1,107 +1,60 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# 前端库文件例外（不忽略）
-!apps/frontend/lib/
-
-# 虚拟环境
-venv/
-ENV/
-env/
-
-# Node.js 依赖
-node_modules/
-
-# 前端构建产物
-apps/frontend/dist/
-
-# IDE
+# OS / IDE
+.DS_Store
+Thumbs.db
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# 系统文件
-.DS_Store
-Thumbs.db
+# Dependencies and local caches
+node_modules/
+venv/
+.pytest_cache/
+coverage/
+htmlcov/
+dist/
+apps/frontend/dist/
+apps/android/.gradle/
+apps/android/build/
 
-# 日志
-*.log
-logs/
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.so
+.Python
 
-# 数据文件
+# Environment files
+configs/env/.env
+configs/env/.env.*
+!configs/.env.example
+
+# Logs and test outputs
+logs/tests/*.log
+logs/tests/*.json
+logs/*.log
+npm-debug.log*
+
+# Backend runtime artifacts
 services/backend/app/结果文件/
-data_samples/*.json
-!data_samples/示例数据.geojson
+services/backend/tasks/
 
-# 环境变量
-.env
-.env.local
-.env.development
-.env.testing
-.env.production
-
-# 前端环境变量
-apps/frontend/.env.local
-apps/frontend/.env.development
-apps/frontend/.env.testing
-apps/frontend/.env.production
-
-# 临时文件
+# Temporary files
+tmp/
+temp/*
+!temp/README.md
 *.tmp
 *.temp
-tmp/
-temp/
 
-# 测试
-.pytest_cache/
-.coverage
-htmlcov/
-
-# Docker
-docker-compose.override.yml
-
-# claude信息
-.claude/
-
-# Electron 构建产物
-dist/node_modules/
-dist/build/
-dist/release/
-dist/logs/
-dist/tmp/
-dist/UDAKE.icns
-dist/package-lock.json
-
-# Android APK
+# Local secret material
+.android_keystore/
 *.jks
 *.keystore
 密钥*.txt
 Key*.txt
-.android_keystore/
 
-# TODOList
-TODOList/
+# Local assistant metadata
+.claude/
 
-# 项目文档
-*.txt
-*.md
+# 开发竞赛相关文档
+竞赛文档/
