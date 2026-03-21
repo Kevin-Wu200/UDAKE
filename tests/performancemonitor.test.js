@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PerformanceMonitor } from '../frontend/js/utils/PerformanceMonitor.js';
+import { PerformanceMonitor } from '../apps/frontend/js/utils/PerformanceMonitor.js';
 
 describe('PerformanceMonitor', () => {
     beforeEach(() => {

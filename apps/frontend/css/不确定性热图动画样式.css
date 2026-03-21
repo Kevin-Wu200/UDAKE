@@ -1,0 +1,585 @@
+/**
+ * 不确定性热图动画组件样式
+ * Apple级设计，60fps流畅动画
+ */
+
+/* 遮罩层 */
+.uncertainty-heatmap-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    animation: fadeIn 240ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* 热图动画面板 */
+.uncertainty-heatmap-panel {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 16px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    width: 90vw;
+    max-width: 1100px;
+    max-height: 90vh;
+    overflow: hidden;
+    animation: scaleIn 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* 深色模式 */
+.dark .uncertainty-heatmap-panel {
+    background: rgba(30, 30, 30, 0.95);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+/* 热图内容 */
+.uncertainty-heatmap-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* 热图头部 */
+.heatmap-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+}
+
+.dark .heatmap-header {
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+}
+
+.heatmap-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin: 0;
+    color: #1d1d1f;
+}
+
+.dark .heatmap-title {
+    color: #f5f5f7;
+}
+
+.heatmap-close-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: transparent;
+    border: none;
+    color: #86868b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.heatmap-close-btn:hover {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1d1d1f;
+}
+
+.dark .heatmap-close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f5f5f7;
+}
+
+/* 热图主体 */
+.heatmap-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    padding: 20px 24px;
+    gap: 16px;
+    overflow-y: auto;
+}
+
+/* 热图画布容器 */
+.heatmap-canvas-container {
+    flex: 1;
+    min-height: 350px;
+    background: #f5f5f7;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+}
+
+.dark .heatmap-canvas-container {
+    background: #1d1d1f;
+}
+
+.heatmap-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: crosshair;
+}
+
+/* 热图图例 */
+.heatmap-legend {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    padding: 12px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.dark .heatmap-legend {
+    background: rgba(30, 30, 30, 0.95);
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.legend-color {
+    width: 20px;
+    height: 20px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+.legend-item[data-level="very-high"] .legend-color {
+    background: #991b1b;
+}
+
+.legend-item[data-level="high"] .legend-color {
+    background: #ef4444;
+}
+
+.legend-item[data-level="medium"] .legend-color {
+    background: #f59e0b;
+}
+
+.legend-item[data-level="low"] .legend-color {
+    background: #3b82f6;
+}
+
+.legend-item[data-level="very-low"] .legend-color {
+    background: #22c55e;
+}
+
+.legend-label {
+    font-size: 12px;
+    color: #86868b;
+    font-weight: 500;
+}
+
+.dark .legend-label {
+    color: #a1a1a6;
+}
+
+/* 策略选择器 */
+.strategy-selector {
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 12px;
+}
+
+.dark .strategy-selector {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.strategy-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+    color: #1d1d1f;
+}
+
+.dark .strategy-title {
+    color: #f5f5f7;
+}
+
+.strategy-buttons {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.strategy-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 500;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.8);
+    color: #1d1d1f;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.dark .strategy-btn {
+    border-color: rgba(255, 255, 255, 0.1);
+    background: rgba(30, 30, 30, 0.8);
+    color: #f5f5f7;
+}
+
+.strategy-btn:hover {
+    background: rgba(0, 113, 227, 0.1);
+    border-color: #0071e3;
+    transform: translateY(-1px);
+}
+
+.strategy-btn.active {
+    background: #0071e3;
+    color: white;
+    border-color: #0071e3;
+}
+
+/* 动画控制 */
+.animation-controls {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.animation-play-btn,
+.animation-pause-btn,
+.animation-reset-btn,
+.animation-compare-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    transition: all 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.animation-play-btn {
+    background: #0071e3;
+    color: white;
+}
+
+.animation-play-btn:hover {
+    background: #0077ed;
+    transform: scale(1.02);
+}
+
+.animation-pause-btn {
+    background: #ff9500;
+    color: white;
+}
+
+.animation-pause-btn:hover {
+    background: #ffa500;
+    transform: scale(1.02);
+}
+
+.animation-reset-btn {
+    background: rgba(0, 0, 0, 0.05);
+    color: #1d1d1f;
+}
+
+.dark .animation-reset-btn {
+    background: rgba(255, 255, 255, 0.1);
+    color: #f5f5f7;
+}
+
+.animation-reset-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+    transform: scale(1.02);
+}
+
+.dark .animation-reset-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.animation-compare-btn {
+    background: rgba(52, 199, 89, 0.1);
+    color: #34c759;
+    border: 1px solid #34c759;
+}
+
+.animation-compare-btn:hover {
+    background: rgba(52, 199, 89, 0.2);
+    transform: scale(1.02);
+}
+
+/* 采样进度 */
+.sampling-progress {
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 12px;
+}
+
+.dark .sampling-progress {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.progress-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.progress-label {
+    font-size: 13px;
+    color: #86868b;
+    font-weight: 500;
+}
+
+.progress-value {
+    font-size: 14px;
+    color: #1d1d1f;
+    font-weight: 600;
+}
+
+.dark .progress-value {
+    color: #f5f5f7;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(0, 0, 0, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.dark .progress-bar {
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0071e3, #0a84ff);
+    border-radius: 4px;
+    transition: width 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.uncertainty-reduction {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.reduction-label {
+    font-size: 12px;
+    color: #86868b;
+    font-weight: 500;
+}
+
+.reduction-value {
+    font-size: 16px;
+    color: #34c759;
+    font-weight: 700;
+}
+
+/* 采样点列表 */
+.sampling-points-list {
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 12px;
+}
+
+.dark .sampling-points-list {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.points-list-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin: 0 0 12px 0;
+    color: #1d1d1f;
+}
+
+.dark .points-list-title {
+    color: #f5f5f7;
+}
+
+.points-list-container {
+    max-height: 150px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+}
+
+.points-list-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.8);
+    border-radius: 6px;
+    font-size: 12px;
+    transition: all 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.dark .points-list-item {
+    background: rgba(30, 30, 30, 0.8);
+}
+
+.points-list-item:hover {
+    background: rgba(0, 113, 227, 0.1);
+    transform: translateY(-1px);
+}
+
+.point-order {
+    width: 20px;
+    height: 20px;
+    background: #0071e3;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+}
+
+.point-coords {
+    color: #86868b;
+    font-family: monospace;
+}
+
+.dark .point-coords {
+    color: #a1a1a6;
+}
+
+.point-uncertainty {
+    margin-left: auto;
+    font-weight: 600;
+}
+
+.point-uncertainty.level-very-low {
+    color: #22c55e;
+}
+
+.point-uncertainty.level-low {
+    color: #3b82f6;
+}
+
+.point-uncertainty.level-medium {
+    color: #f59e0b;
+}
+
+.point-uncertainty.level-high {
+    color: #ef4444;
+}
+
+.point-uncertainty.level-very-high {
+    color: #991b1b;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .uncertainty-heatmap-panel {
+        width: 95vw;
+        max-height: 95vh;
+    }
+
+    .heatmap-legend {
+        position: static;
+        flex-direction: row;
+        flex-wrap: wrap;
+        margin-top: 12px;
+    }
+
+    .animation-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .points-list-container {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes scaleIn {
+    from {
+        opacity: 0;
+        transform: scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+/* 硬件加速 */
+.heatmap-canvas,
+.progress-fill,
+.strategy-btn,
+.points-list-item {
+    will-change: transform, opacity;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* 滚动条样式 */
+.points-list-container::-webkit-scrollbar {
+    width: 6px;
+}
+
+.points-list-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 3px;
+}
+
+.points-list-container::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 3px;
+}
+
+.dark .points-list-container::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.dark .points-list-container::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+/* 深色模式颜色调整 */
+.dark .animation-play-btn {
+    background: #0a84ff;
+}
+
+.dark .animation-play-btn:hover {
+    background: #409cff;
+}
+
+.dark .animation-pause-btn {
+    background: #ff9f0a;
+}
+
+.dark .animation-pause-btn:hover {
+    background: #ffb340;
+}

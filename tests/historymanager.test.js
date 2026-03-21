@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { HistoryManager } from '../frontend/js/utils/HistoryManager.js';
+import { HistoryManager } from '../apps/frontend/js/utils/HistoryManager.js';
 
 describe('HistoryManager', () => {
     beforeEach(() => {

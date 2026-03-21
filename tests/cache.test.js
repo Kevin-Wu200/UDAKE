@@ -4,9 +4,9 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { SmartCache } from '../frontend/js/utils/cache/SmartCache';
-import { TwoLevelCache } from '../frontend/js/utils/cache/TwoLevelCache';
-import { LRUStrategy, LFUStrategy, TimeDecayStrategy, HybridStrategy } from '../frontend/js/utils/cache/CacheStrategy';
+import { SmartCache } from '../apps/frontend/js/utils/cache/SmartCache';
+import { TwoLevelCache } from '../apps/frontend/js/utils/cache/TwoLevelCache';
+import { LRUStrategy, LFUStrategy, TimeDecayStrategy, HybridStrategy } from '../apps/frontend/js/utils/cache/CacheStrategy';
 
 describe('SmartCache', () => {
   let cache;

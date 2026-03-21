@@ -128,7 +128,7 @@ import type {
   Plugin,
   PluginContext,
   PluginType
-} from '../../../frontend/js/types/plugin';
+} from '../../../apps/frontend/js/types/plugin';
 
 /**
  * ${answers.name} 插件配置
@@ -235,8 +235,8 @@ function createTestFile(pluginPath, answers) {
  */
 
 import ${className} from '../src/index';
-import { EventBus } from '../../../frontend/js/core/EventBus';
-import { ServiceRegistry } from '../../../frontend/js/core/ServiceRegistry';
+import { EventBus } from '../../../apps/frontend/js/core/EventBus';
+import { ServiceRegistry } from '../../../apps/frontend/js/core/ServiceRegistry';
 
 describe('${className}', () => {
   let plugin: ${className};

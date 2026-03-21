@@ -20,7 +20,7 @@ wheels/
 *.egg
 
 # 前端库文件例外（不忽略）
-!frontend/lib/
+!apps/frontend/lib/
 
 # 虚拟环境
 venv/
@@ -31,7 +31,7 @@ env/
 node_modules/
 
 # 前端构建产物
-frontend/dist/
+apps/frontend/dist/
 
 # IDE
 .vscode/
@@ -49,7 +49,7 @@ Thumbs.db
 logs/
 
 # 数据文件
-backend/app/结果文件/
+services/backend/app/结果文件/
 data_samples/*.json
 !data_samples/示例数据.geojson
 
@@ -61,10 +61,10 @@ data_samples/*.json
 .env.production
 
 # 前端环境变量
-frontend/.env.local
-frontend/.env.development
-frontend/.env.testing
-frontend/.env.production
+apps/frontend/.env.local
+apps/frontend/.env.development
+apps/frontend/.env.testing
+apps/frontend/.env.production
 
 # 临时文件
 *.tmp

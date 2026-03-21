@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { APIService } from '../frontend/js/services/API封装.js';
+import { APIService } from '../apps/frontend/js/services/API封装.js';
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -89,7 +89,7 @@ describe('风险报告接口测试', () => {
         },
         report_id: 'report-20260314-001',
         generated_at: '2026-03-14T12:00:00Z',
-        file_path: '/Users/wuchenkai/UDAKE/backend/app/结果文件/risk_report_task-20260314-001.json',
+        file_path: '/Users/wuchenkai/UDAKE/services/backend/app/结果文件/risk_report_task-20260314-001.json',
         message: '风险报告生成完成'
     };
 

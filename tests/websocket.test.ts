@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { WebSocketService, WebSocketMessage } from '../frontend/js/services/WebSocketService';
+import { WebSocketService, WebSocketMessage } from '../apps/frontend/js/services/WebSocketService';
 
 // Mock socket.io-client
 vi.mock('socket.io-client', () => ({
@@ -108,7 +108,7 @@ describe('WebSocketService', () => {
 
 describe('WebSocket 单例导出', () => {
   it('应该导出单例实例', async () => {
-    const { webSocketService } = await import('../frontend/js/services/WebSocketService');
+    const { webSocketService } = await import('../apps/frontend/js/services/WebSocketService');
     expect(webSocketService).toBeDefined();
     expect(webSocketService).toBeInstanceOf(WebSocketService);
   });

@@ -7,7 +7,7 @@ import type {
   Plugin,
   PluginContext,
   PluginType
-} from '../../../frontend/js/types/plugin';
+} from '../../../apps/frontend/js/types/plugin';
 
 /**
  * 导入配置

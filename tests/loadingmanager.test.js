@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { LoadingManager } from '../frontend/js/utils/LoadingManager.js';
-import { SkeletonLoader } from '../frontend/js/utils/SkeletonLoader.js';
+import { LoadingManager } from '../apps/frontend/js/utils/LoadingManager.js';
+import { SkeletonLoader } from '../apps/frontend/js/utils/SkeletonLoader.js';
 
 // Mock SkeletonLoader
-vi.mock('../frontend/js/utils/SkeletonLoader.js', () => ({
+vi.mock('../apps/frontend/js/utils/SkeletonLoader.js', () => ({
     SkeletonLoader: {
         show: vi.fn(() => document.createElement('div')),
         hide: vi.fn()

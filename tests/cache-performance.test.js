@@ -4,8 +4,8 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { SmartCache } from '../frontend/js/utils/cache/SmartCache';
-import { TwoLevelCache } from '../frontend/js/utils/cache/TwoLevelCache';
+import { SmartCache } from '../apps/frontend/js/utils/cache/SmartCache';
+import { TwoLevelCache } from '../apps/frontend/js/utils/cache/TwoLevelCache';
 
 describe('缓存性能测试', () => {
   describe('SmartCache性能', () => {

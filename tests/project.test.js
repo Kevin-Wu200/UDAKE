@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Project } from '../frontend/js/models/Project.js';
+import { Project } from '../apps/frontend/js/models/Project.js';
 
 describe('Project', () => {
     it('应该使用默认配置创建项目', () => {

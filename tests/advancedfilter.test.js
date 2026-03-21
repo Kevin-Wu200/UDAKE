@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { AdvancedFilter } from '../frontend/js/utils/AdvancedFilter.js';
+import { AdvancedFilter } from '../apps/frontend/js/utils/AdvancedFilter.js';
 
 describe('AdvancedFilter', () => {
     let filter;

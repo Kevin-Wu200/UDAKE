@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>路径规划测试</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            opacity: 0.9;
+            font-size: 14px;
+        }
+
+        .main-content {
+            display: flex;
+            min-height: 600px;
+        }
+
+        .map-section {
+            flex: 1;
+            position: relative;
+            background: #e8e8e8;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            min-height: 600px;
+        }
+
+        .sidebar {
+            width: 400px;
+            border-left: 1px solid #e0e0e0;
+            overflow-y: auto;
+            max-height: 800px;
+        }
+
+        .route-planning-panel {
+            padding: 20px;
+        }
+
+        .panel-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .panel-header h2 {
+            font-size: 20px;
+            color: #333;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section h3 {
+            font-size: 16px;
+            color: #555;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .sampling-points-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+
+        .sampling-point-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .sampling-point-item:last-child {
+            border-bottom: none;
+        }
+
+        .point-info strong {
+            display: block;
+            color: #333;
+        }
+
+        .point-coordinates {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .point-priority {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .point-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 12px;
+        }
+
+        .control-group label {
+            display: block;
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 5px;
+        }
+
+        .control-group select,
+        .control-group input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .control-group input[type="checkbox"] {
+            width: auto;
+            margin-right: 8px;
+        }
+
+        .planning-parameters,
+        .constraints {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-sm {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .btn-danger {
+            background: #ff4757;
+            color: white;
+        }
+
+        .empty-state {
+            padding: 20px;
+            text-align: center;
+            color: #999;
+            font-size: 14px;
+        }
+
+        .route-summary {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+        }
+
+        .summary-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .stat-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .segments-list {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .segment-item {
+            display: flex;
+            padding: 10px;
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .segment-index {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #667eea;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+
+        .segment-route {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .segment-stats {
+            font-size: 13px;
+            color: #666;
+        }
+
+        .segment-stats span {
+            margin-right: 15px;
+        }
+
+        .warnings {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 4px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .warnings h4 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+
+        .warnings ul {
+            margin-left: 20px;
+            color: #856404;
+        }
+
+        .error-message {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 15px;
+            border-radius: 4px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>路径规划系统</h1>
+            <p>智能采样路径规划，提高野外采样效率</p>
+        </div>
+
+        <div class="main-content">
+            <div class="map-section">
+                <div id="map"></div>
+            </div>
+
+            <div class="sidebar">
+                <div id="route-planning-panel" class="route-planning-panel"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 这里需要引入路径规划面板组件
+        // 在实际应用中，应该通过模块化方式加载
+        // 这里提供一个简单的示例
+
+        // 模拟数据
+        const samplePoints = [
+            { id: 'point1', name: '采样点1', latitude: 39.9042, longitude: 116.4074, priority: 5 },
+            { id: 'point2', name: '采样点2', latitude: 39.9142, longitude: 116.4174, priority: 3 },
+            { id: 'point3', name: '采样点3', latitude: 39.9242, longitude: 116.4274, priority: 7 },
+            { id: 'point4', name: '采样点4', latitude: 39.9342, longitude: 116.4374, priority: 2 },
+            { id: 'point5', name: '采样点5', latitude: 39.9442, longitude: 116.4474, priority: 6 }
+        ];
+
+        console.log('路径规划测试页面已加载');
+        console.log('示例采样点:', samplePoints);
+
+        // 提示信息
+        alert('这是一个路径规划测试页面。在实际应用中，需要：\n1. 集成地图引擎（如高德、百度地图）\n2. 加载路径规划面板组件\n3. 连接后端API服务');
+    </script>
+</body>
+</html>

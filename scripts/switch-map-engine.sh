@@ -3,7 +3,7 @@
 # 地图引擎切换脚本
 # 用于快速切换 UDAKE 的地图引擎
 
-CONFIG_FILE="frontend/js/config/map.config.js"
+CONFIG_FILE="apps/frontend/js/config/map.config.js"
 
 # 颜色定义
 RED='\033[0;31m'

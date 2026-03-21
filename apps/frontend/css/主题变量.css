@@ -1,0 +1,84 @@
+/**
+ * Apple级设计系统 - 主题变量
+ * 所有尺寸精确到px
+ */
+
+:root {
+    /* 主色调 */
+    --primary-color: #007aff;
+    --secondary-color: #5856d6;
+    --success-color: #34c759;
+    --warning-color: #ff9500;
+    --error-color: #ff3b30;
+
+    /* 浅色模式背景 */
+    --bg-primary: #ffffff;
+    --bg-secondary: #f5f5f7;
+    --bg-tertiary: #e5e5ea;
+    --bg-panel: rgba(255, 255, 255, 0.85);
+
+    /* 浅色模式文字 */
+    --text-primary: #000000;
+    --text-secondary: #6e6e73;
+    --text-tertiary: #8e8e93;
+
+    /* 边框和阴影 */
+    --border-color: rgba(0, 0, 0, 0.06);
+    --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.08);
+    --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.10);
+    --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.08);
+
+    /* 精确尺寸 */
+    --header-height: 56px;
+    --sidebar-width: 320px;
+    --panel-padding: 24px;
+    --panel-gap: 32px;
+    --panel-offset-left: 32px;
+    --panel-offset-top: 88px;
+
+    /* 圆角 */
+    --radius-sm: 10px;
+    --radius-md: 12px;
+    --radius-lg: 16px;
+    --radius-xl: 20px;
+
+    /* 间距 */
+    --spacing-xs: 4px;
+    --spacing-sm: 8px;
+    --spacing-md: 16px;
+    --spacing-lg: 24px;
+    --spacing-xl: 32px;
+
+    /* 字体大小 */
+    --font-size-sm: 12px;
+    --font-size-md: 14px;
+    --font-size-lg: 16px;
+    --font-size-xl: 20px;
+
+    /* 动画 - 60fps流畅 */
+    --transition-fast: 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+    --transition-normal: 240ms cubic-bezier(0.4, 0.0, 0.2, 1);
+    --transition-slow: 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+/* 深色模式 - 自动跟随系统 */
+@media (prefers-color-scheme: dark) {
+    :root {
+        /* 深色模式背景 */
+        --bg-primary: #1c1c1e;
+        --bg-secondary: #2c2c2e;
+        --bg-tertiary: #3a3a3c;
+        --bg-panel: rgba(44, 44, 46, 0.85);
+
+        /* 深色模式文字 - 优化对比度符合WCAG AA标准 */
+        --text-primary: #ffffff;
+        --text-secondary: #e5e5ea;
+        --text-tertiary: #aeaeb2;
+
+        /* 深色模式边框 */
+        --border-color: rgba(255, 255, 255, 0.08);
+        --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+        --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.4);
+        --shadow-lg: 0 20px 50px rgba(0, 0, 0, 0.5);
+    }
+}

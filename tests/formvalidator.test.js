@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { FormValidator } from '../frontend/js/utils/FormValidator.js';
+import { FormValidator } from '../apps/frontend/js/utils/FormValidator.js';
 
 describe('FormValidator', () => {
     let validator;

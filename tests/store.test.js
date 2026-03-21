@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Store, appStore } from '../frontend/js/store/Store.js';
+import { Store, appStore } from '../apps/frontend/js/store/Store.js';
 
 describe('Store', () => {
     let store;

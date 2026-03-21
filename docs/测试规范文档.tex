@@ -653,18 +653,18 @@ httpx==0.25.2
 \subsubsection{核心模块测试（12个文件）}
 
 \begin{itemize}
-    \item \texttt{backend/tests/test\_model\_fusion.py} - 模型融合系统测试
-    \item \texttt{backend/tests/test\_route\_planning.py} - 路径规划系统测试
-    \item \texttt{backend/tests/test\_anomaly\_detector.py} - 异常检测器测试
-    \item \texttt{backend/tests/test\_decision\_threshold\_analyzer.py} - 决策阈值分析器测试
-    \item \texttt{backend/tests/test\_error\_predictor.py} - 误差预测器测试
-    \item \texttt{backend/tests/test\_model\_evaluator.py} - 模型评估器测试
-    \item \texttt{backend/tests/test\_risk\_index\_calculator.py} - 风险指数计算器测试
-    \item \texttt{backend/tests/test\_sampling\_algorithms.py} - 采样算法测试
-    \item \texttt{backend/tests/test\_spatial\_risk\_reporter.py} - 空间风险报告器测试
-    \item \texttt{backend/tests/test\_uncertainty\_classifier.py} - 不确定性分类器测试
-    \item \texttt{backend/tests/test\_websocket.py} - WebSocket服务测试
-    \item \texttt{backend/test\_backend.py} - 后端集成测试
+    \item \texttt{services/backend/tests/test\_model\_fusion.py} - 模型融合系统测试
+    \item \texttt{services/backend/tests/test\_route\_planning.py} - 路径规划系统测试
+    \item \texttt{services/backend/tests/test\_anomaly\_detector.py} - 异常检测器测试
+    \item \texttt{services/backend/tests/test\_decision\_threshold\_analyzer.py} - 决策阈值分析器测试
+    \item \texttt{services/backend/tests/test\_error\_predictor.py} - 误差预测器测试
+    \item \texttt{services/backend/tests/test\_model\_evaluator.py} - 模型评估器测试
+    \item \texttt{services/backend/tests/test\_risk\_index\_calculator.py} - 风险指数计算器测试
+    \item \texttt{services/backend/tests/test\_sampling\_algorithms.py} - 采样算法测试
+    \item \texttt{services/backend/tests/test\_spatial\_risk\_reporter.py} - 空间风险报告器测试
+    \item \texttt{services/backend/tests/test\_uncertainty\_classifier.py} - 不确定性分类器测试
+    \item \texttt{services/backend/tests/test\_websocket.py} - WebSocket服务测试
+    \item \texttt{services/backend/test\_backend.py} - 后端集成测试
 \end{itemize}
 
 \subsubsection{实时插值系统测试（5个文件）}
@@ -875,10 +875,10 @@ def test_large_dataset_performance(benchmark):
 pytest
 
 # 运行特定测试文件
-pytest backend/tests/test_model_fusion.py
+pytest services/backend/tests/test_model_fusion.py
 
 # 运行特定测试函数
-pytest backend/tests/test_model_fusion.py::TestWeightCalculator::test_calculate_weights_rmse_based
+pytest services/backend/tests/test_model_fusion.py::TestWeightCalculator::test_calculate_weights_rmse_based
 
 # 运行标记的测试
 pytest -m integration
@@ -898,7 +898,7 @@ pytest -v
 pytest -m asyncio
 
 # 运行特定异步测试
-pytest backend/tests/test_websocket.py::test_websocket_connection
+pytest services/backend/tests/test_websocket.py::test_websocket_connection
 \end{lstlisting}
 
 % 第四章：通讯与集成测试
@@ -2117,18 +2117,18 @@ POST & \texttt{/api/route-planning/validate} & 验证路径是否满足约束条
 \hline
 \textbf{文件名} & \textbf{测试内容} & \textbf{测试用例数} \\
 \hline
-\texttt{backend/tests/test\_model\_fusion.py} & 模型融合系统 & 30 \\
-\texttt{backend/tests/test\_route\_planning.py} & 路径规划系统 & 25 \\
-\texttt{backend/tests/test\_anomaly\_detector.py} & 异常检测器 & 15 \\
-\texttt{backend/tests/test\_decision\_threshold\_analyzer.py} & 决策阈值分析器 & 12 \\
-\texttt{backend/tests/test\_error\_predictor.py} & 误差预测器 & 15 \\
-\texttt{backend/tests/test\_model\_evaluator.py} & 模型评估器 & 20 \\
-\texttt{backend/tests/test\_risk\_index\_calculator.py} & 风险指数计算器 & 12 \\
-\texttt{backend/tests/test\_sampling\_algorithms.py} & 采样算法 & 18 \\
-\texttt{backend/tests/test\_spatial\_risk\_reporter.py} & 空间风险报告器 & 10 \\
-\texttt{backend/tests/test\_uncertainty\_classifier.py} & 不确定性分类器 & 15 \\
-\texttt{backend/tests/test\_websocket.py} & WebSocket服务 & 20 \\
-\texttt{backend/test\_backend.py} & 后端集成测试 & 25 \\
+\texttt{services/backend/tests/test\_model\_fusion.py} & 模型融合系统 & 30 \\
+\texttt{services/backend/tests/test\_route\_planning.py} & 路径规划系统 & 25 \\
+\texttt{services/backend/tests/test\_anomaly\_detector.py} & 异常检测器 & 15 \\
+\texttt{services/backend/tests/test\_decision\_threshold\_analyzer.py} & 决策阈值分析器 & 12 \\
+\texttt{services/backend/tests/test\_error\_predictor.py} & 误差预测器 & 15 \\
+\texttt{services/backend/tests/test\_model\_evaluator.py} & 模型评估器 & 20 \\
+\texttt{services/backend/tests/test\_risk\_index\_calculator.py} & 风险指数计算器 & 12 \\
+\texttt{services/backend/tests/test\_sampling\_algorithms.py} & 采样算法 & 18 \\
+\texttt{services/backend/tests/test\_spatial\_risk\_reporter.py} & 空间风险报告器 & 10 \\
+\texttt{services/backend/tests/test\_uncertainty\_classifier.py} & 不确定性分类器 & 15 \\
+\texttt{services/backend/tests/test\_websocket.py} & WebSocket服务 & 20 \\
+\texttt{services/backend/test\_backend.py} & 后端集成测试 & 25 \\
 \hline
 \end{tabular}
 \end{table}
@@ -2227,7 +2227,7 @@ pip install -r requirements.txt
 pytest
 
 # 3. 运行特定模块测试
-pytest backend/tests/test_model_fusion.py
+pytest services/backend/tests/test_model_fusion.py
 
 # 4. 生成覆盖率报告
 pytest --cov=app --cov-report=html
@@ -2237,7 +2237,7 @@ pytest --cov=app --cov-report=html
 
 \begin{lstlisting}[language=bash, caption=运行API集成测试]
 # 1. 启动后端服务器
-python backend/run.py
+python services/backend/run.py
 
 # 2. 运行基础API测试
 python api_test.py

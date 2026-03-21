@@ -30,7 +30,7 @@ describe('TouchGestureManager Enhanced Features', () => {
         document.body.appendChild(container);
 
         // 动态导入TouchGestureManager
-        const module = await import('../frontend/js/components/TouchGestureManager');
+        const module = await import('../apps/frontend/js/components/TouchGestureManager');
         TouchGestureManager = module.default;
     });
 
@@ -469,7 +469,7 @@ describe('GestureTutorial', () => {
         container.style.height = '400px';
         document.body.appendChild(container);
 
-        const module = await import('../frontend/js/components/GestureTutorial');
+        const module = await import('../apps/frontend/js/components/GestureTutorial');
         GestureTutorial = module.default;
     });
 
@@ -581,8 +581,8 @@ describe('GestureSettingsPanel', () => {
         document.body.appendChild(container);
 
         const [settingsModule, gestureModule] = await Promise.all([
-            import('../frontend/js/components/GestureSettingsPanel'),
-            import('../frontend/js/components/TouchGestureManager'),
+            import('../apps/frontend/js/components/GestureSettingsPanel'),
+            import('../apps/frontend/js/components/TouchGestureManager'),
         ]);
 
         GestureSettingsPanel = settingsModule.default;

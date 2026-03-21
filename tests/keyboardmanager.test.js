@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { KeyboardManager } from '../frontend/js/utils/KeyboardManager.js';
+import { KeyboardManager } from '../apps/frontend/js/utils/KeyboardManager.js';
 
 describe('KeyboardManager', () => {
     beforeEach(() => {

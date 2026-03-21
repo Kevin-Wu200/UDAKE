@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { TemplateDownloader } from '../frontend/js/components/TemplateDownloader.js';
+import { TemplateDownloader } from '../apps/frontend/js/components/TemplateDownloader.js';
 
 describe('TemplateDownloader', () => {
     beforeEach(() => {

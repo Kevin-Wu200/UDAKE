@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { SkeletonLoader } from '../frontend/js/utils/SkeletonLoader.js';
+import { SkeletonLoader } from '../apps/frontend/js/utils/SkeletonLoader.js';
 
 describe('SkeletonLoader', () => {
     beforeEach(() => {

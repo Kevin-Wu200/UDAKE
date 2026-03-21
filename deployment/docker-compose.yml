@@ -13,7 +13,7 @@ services:
       - PORT=8000
     volumes:
       - ../data_samples:/app/data_samples
-      - ../backend/app/结果文件:/app/app/结果文件
+      - ../services/backend/app/结果文件:/app/app/结果文件
     restart: unless-stopped
 
   nginx:

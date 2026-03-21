@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PreferencesPanel } from '../frontend/js/components/PreferencesPanel.js';
+import { PreferencesPanel } from '../apps/frontend/js/components/PreferencesPanel.js';
 
 describe('PreferencesPanel', () => {
     let mockElements = {};

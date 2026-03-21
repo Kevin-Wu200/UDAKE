@@ -144,7 +144,7 @@ start_backend() {
     fi
     
     # 检查后端启动脚本
-    if [ -f "backend/run.py" ]; then
+    if [ -f "services/backend/run.py" ]; then
         cd backend
         
         # 激活虚拟环境并启动后端
@@ -249,13 +249,13 @@ start_electron() {
     log_info "启动 Electron 开发模式..."
     
     # 检查 Electron 主进程文件
-    if [ ! -f "electron/main.js" ]; then
-        log_error "未找到 Electron 主进程文件: electron/main.js"
+    if [ ! -f "apps/electron/main.js" ]; then
+        log_error "未找到 Electron 主进程文件: apps/electron/main.js"
         exit 1
     fi
     
     # 检查前端构建产物
-    if [ ! -d "frontend/dist" ]; then
+    if [ ! -d "apps/frontend/dist" ]; then
         log_warning "未找到前端构建产物，构建中..."
         npm run build:prod
     fi

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { OfflineManager } from '../frontend/js/utils/OfflineManager.js';
+import { OfflineManager } from '../apps/frontend/js/utils/OfflineManager.js';
 
 describe('OfflineManager', () => {
     beforeEach(() => {

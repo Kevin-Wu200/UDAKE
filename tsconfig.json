@@ -13,10 +13,10 @@
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": true,
-    "declarationDir": "./frontend/types/generated",
+    "declarationDir": "./apps/frontend/types/generated",
     "outDir": "./dist",
-    "rootDir": "./frontend",
-    "baseUrl": "./frontend",
+    "rootDir": "./apps/frontend",
+    "baseUrl": "./apps/frontend",
     "paths": {
       "@services/*": ["js/services/*"],
       "@components/*": ["js/components/*"],
@@ -41,19 +41,19 @@
     "downlevelIteration": true,
     "allowSyntheticDefaultImports": true,
     "allowUmdGlobalAccess": true,
-    "typeRoots": ["./frontend/types"],
+    "typeRoots": ["./apps/frontend/types"],
     "types": ["宽松类型声明"]
   },
   "include": [
-    "frontend/js/**/*",
-    "frontend/types/**/*",
-    "frontend/types/global.d.ts",
-    "frontend/vite-env.d.ts"
+    "apps/frontend/js/**/*",
+    "apps/frontend/types/**/*",
+    "apps/frontend/types/global.d.ts",
+    "apps/frontend/vite-env.d.ts"
   ],
   "exclude": [
     "node_modules",
     "dist",
     "venv",
-    "backend"
+    "services/backend"
   ]
 }

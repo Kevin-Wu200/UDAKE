@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { BatchOperations } from '../frontend/js/utils/BatchOperations.js';
+import { BatchOperations } from '../apps/frontend/js/utils/BatchOperations.js';
 
 describe('BatchOperations', () => {
     beforeEach(() => {
@@ -235,7 +235,7 @@ describe('BatchOperations', () => {
             ];
             
             // Mock ExportEnhancer
-            vi.doMock('../frontend/js/utils/ExportEnhancer.js', () => ({
+            vi.doMock('../apps/frontend/js/utils/ExportEnhancer.js', () => ({
                 ExportEnhancer: {
                     exportAsCSV: vi.fn()
                 }

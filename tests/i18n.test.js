@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { I18n } from '../frontend/js/utils/I18n.js';
+import { I18n } from '../apps/frontend/js/utils/I18n.js';
 
 describe('I18n', () => {
     beforeEach(() => {

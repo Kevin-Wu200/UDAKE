@@ -1,0 +1,442 @@
+/**
+ * 可拖拽面板样式
+ * 支持拖拽、调整大小、折叠和吸附功能
+ */
+
+/* ========== 面板基础样式 ========== */
+.draggable-panel {
+    position: relative;
+    background: var(--panel-bg, #ffffff);
+    border: 1px solid var(--panel-border, #e0e0e0);
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+    min-width: 200px;
+    min-height: 100px;
+}
+
+.draggable-panel.dragging {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+    z-index: 1000;
+}
+
+.draggable-panel.resizing {
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+.draggable-panel.collapsed .draggable-panel-content {
+    display: none;
+}
+
+/* ========== 面板头部 ========== */
+.draggable-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--panel-header-bg, #f5f5f5);
+    border-bottom: 1px solid var(--panel-border, #e0e0e0);
+    cursor: move;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.draggable-panel-header:hover {
+    background: var(--panel-header-hover-bg, #e8e8e8);
+}
+
+.panel-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--panel-title-color, #333);
+}
+
+.panel-controls {
+    display: flex;
+    gap: 4px;
+}
+
+.panel-btn {
+    width: 24px;
+    height: 24px;
+    border: none;
+    background: transparent;
+    color: var(--panel-btn-color, #666);
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.panel-btn:hover {
+    background: var(--panel-btn-hover-bg, rgba(0, 0, 0, 0.05));
+    color: var(--panel-btn-hover-color, #333);
+}
+
+.panel-btn:active {
+    background: var(--panel-btn-active-bg, rgba(0, 0, 0, 0.1));
+}
+
+/* ========== 面板内容 ========== */
+.draggable-panel-content {
+    padding: 16px;
+    overflow-y: auto;
+    max-height: calc(100vh - 200px);
+    transition: max-height 0.3s ease;
+}
+
+/* ========== 调整大小手柄 ========== */
+.resize-handle {
+    position: absolute;
+    background: transparent;
+    z-index: 10;
+}
+
+.resize-handle:hover {
+    background: rgba(0, 120, 212, 0.2);
+}
+
+/* 北边手柄 */
+.resize-n {
+    top: 0;
+    left: 8px;
+    right: 8px;
+    height: 4px;
+    cursor: n-resize;
+}
+
+/* 南边手柄 */
+.resize-s {
+    bottom: 0;
+    left: 8px;
+    right: 8px;
+    height: 4px;
+    cursor: s-resize;
+}
+
+/* 东边手柄 */
+.resize-e {
+    top: 8px;
+    bottom: 8px;
+    right: 0;
+    width: 4px;
+    cursor: e-resize;
+}
+
+/* 西边手柄 */
+.resize-w {
+    top: 8px;
+    bottom: 8px;
+    left: 0;
+    width: 4px;
+    cursor: w-resize;
+}
+
+/* 东北角手柄 */
+.resize-ne {
+    top: 0;
+    right: 0;
+    width: 8px;
+    height: 8px;
+    cursor: ne-resize;
+}
+
+/* 西北角手柄 */
+.resize-nw {
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    cursor: nw-resize;
+}
+
+/* 东南角手柄 */
+.resize-se {
+    bottom: 0;
+    right: 0;
+    width: 8px;
+    height: 8px;
+    cursor: se-resize;
+}
+
+/* 西南角手柄 */
+.resize-sw {
+    bottom: 0;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    cursor: sw-resize;
+}
+
+/* ========== 吸附指示器 ========== */
+.draggable-panel.snap-left {
+    border-left: 3px solid var(--accent-color, #0078d4);
+}
+
+.draggable-panel.snap-right {
+    border-right: 3px solid var(--accent-color, #0078d4);
+}
+
+.draggable-panel.snap-top {
+    border-top: 3px solid var(--accent-color, #0078d4);
+}
+
+.draggable-panel.snap-bottom {
+    border-bottom: 3px solid var(--accent-color, #0078d4);
+}
+
+/* ========== 尺寸提示 ========== */
+.resize-tooltip {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    z-index: 9999;
+    white-space: nowrap;
+}
+
+/* ========== 布局控制面板 ========== */
+.layout-controls {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--panel-bg, #ffffff);
+    border: 1px solid var(--panel-border, #e0e0e0);
+    border-radius: 8px;
+    padding: 16px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1001;
+    min-width: 200px;
+}
+
+.layout-btn {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--button-border, #d0d0d0);
+    background: var(--button-bg, #f5f5f5);
+    color: var(--button-color, #333);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+}
+
+.layout-btn:last-child {
+    margin-bottom: 0;
+}
+
+.layout-btn:hover {
+    background: var(--button-hover-bg, #e8e8e8);
+    border-color: var(--button-hover-border, #c0c0c0);
+}
+
+.layout-btn:active {
+    background: var(--button-active-bg, #d8d8d8);
+}
+
+/* ========== 已保存布局列表 ========== */
+.layout-saved-list {
+    margin-top: 12px;
+    border-top: 1px solid var(--panel-border, #e0e0e0);
+    padding-top: 12px;
+}
+
+.layout-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    margin-bottom: 4px;
+    background: var(--item-bg, #f9f9f9);
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.layout-item:hover {
+    background: var(--item-hover-bg, #f0f0f0);
+}
+
+.layout-item.active {
+    background: var(--accent-color, #0078d4);
+    color: white;
+}
+
+.layout-name {
+    flex: 1;
+    font-size: 13px;
+}
+
+.layout-delete {
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    line-height: 1;
+    transition: background-color 0.2s ease;
+}
+
+.layout-delete:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* ========== 面板快速切换按钮 ========== */
+.panel-quick-toggle {
+    position: fixed;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 1000;
+}
+
+.panel-toggle-btn {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--button-border, #d0d0d0);
+    background: var(--button-bg, #f5f5f5);
+    color: var(--button-color, #333);
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.panel-toggle-btn:hover {
+    background: var(--button-hover-bg, #e8e8e8);
+    transform: scale(1.05);
+}
+
+.panel-toggle-btn.active {
+    background: var(--accent-color, #0078d4);
+    color: white;
+    border-color: var(--accent-color, #0078d4);
+}
+
+.panel-toggle-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* ========== 响应式设计 ========== */
+@media (max-width: 768px) {
+    .draggable-panel {
+        position: relative !important;
+        width: 100% !important;
+        left: auto !important;
+        top: auto !important;
+    }
+    
+    .layout-controls {
+        top: auto;
+        bottom: 20px;
+        right: 20px;
+        left: 20px;
+        width: auto;
+    }
+    
+    .panel-quick-toggle {
+        left: 10px;
+        top: auto;
+        bottom: 20px;
+        transform: none;
+        flex-direction: row;
+    }
+    
+    .resize-handle {
+        display: none;
+    }
+}
+
+/* ========== 深色模式 ========== */
+@media (prefers-color-scheme: dark) {
+    :root {
+        --panel-bg: #1e1e1e;
+        --panel-border: #333333;
+        --panel-header-bg: #2d2d2d;
+        --panel-header-hover-bg: #3d3d3d;
+        --panel-title-color: #e0e0e0;
+        --panel-btn-color: #999;
+        --panel-btn-hover-bg: rgba(255, 255, 255, 0.1);
+        --panel-btn-hover-color: #e0e0e0;
+        --panel-btn-active-bg: rgba(255, 255, 255, 0.15);
+        --button-bg: #2d2d2d;
+        --button-color: #e0e0e0;
+        --button-border: #404040;
+        --button-hover-bg: #3d3d3d;
+        --button-hover-border: #505050;
+        --button-active-bg: #4d4d4d;
+        --item-bg: #2d2d2d;
+        --item-hover-bg: #3d3d3d;
+        --accent-color: #0078d4;
+    }
+}
+
+/* ========== 动画效果 ========== */
+@keyframes panelFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.draggable-panel {
+    animation: panelFadeIn 0.3s ease;
+}
+
+@keyframes panelSlideIn {
+    from {
+        opacity: 0;
+        transform: translateX(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.panel-toggle-btn {
+    animation: panelSlideIn 0.3s ease;
+}
+
+/* ========== 工具提示 ========== */
+.panel-tooltip {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    pointer-events: none;
+    white-space: nowrap;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.panel-tooltip.visible {
+    opacity: 1;
+}

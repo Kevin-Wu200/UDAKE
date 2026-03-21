@@ -44,8 +44,8 @@ export default [
             'node_modules/**',
             'dist/**',
             'venv/**',
-            'backend/**',
-            'frontend/lib/**',
+            'services/backend/**',
+            'apps/frontend/lib/**',
             '*.config.js'
         ]
     }

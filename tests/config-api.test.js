@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { APIService } from '../frontend/js/services/API封装.js';
+import { APIService } from '../apps/frontend/js/services/API封装.js';
 
 // Mock fetch
 const mockFetch = vi.fn();

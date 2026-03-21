@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { ConfirmDialog } from '../frontend/js/components/ConfirmDialog.js';
+import { ConfirmDialog } from '../apps/frontend/js/components/ConfirmDialog.js';
 
 describe('ConfirmDialog', () => {
     beforeEach(() => {

@@ -3,7 +3,7 @@
   "type": "commonjs",
   "version": "1.0.0",
   "description": "智能不确定性驱动空间决策平台",
-  "main": "electron/main.js",
+  "main": "apps/electron/main.js",
   "scripts": {
     "dev": "vite",
     "dev:test": "vite --mode testing",
@@ -13,10 +13,10 @@
     "build:prod": "tsc --noEmit && vite build --mode production",
     "preview": "vite preview",
     "preview:test": "vite preview --mode testing",
-    "lint": "eslint frontend/js/",
-    "lint:fix": "eslint frontend/js/ --fix",
-    "format": "prettier --write 'frontend/js/**/*.{js,ts,css}'",
-    "format:check": "prettier --check 'frontend/js/**/*.{js,ts,css}'",
+    "lint": "eslint apps/frontend/js/",
+    "lint:fix": "eslint apps/frontend/js/ --fix",
+    "format": "prettier --write 'apps/frontend/js/**/*.{js,ts,css}'",
+    "format:check": "prettier --check 'apps/frontend/js/**/*.{js,ts,css}'",
     "typecheck": "tsc --noEmit",
     "test": "vitest --run",
     "test:watch": "vitest",
@@ -67,8 +67,8 @@
       "buildResources": "logo"
     },
     "files": [
-      "electron/**/*",
-      "frontend/dist/**/*",
+      "apps/electron/**/*",
+      "apps/frontend/dist/**/*",
       "package.json"
     ],
     "mac": {

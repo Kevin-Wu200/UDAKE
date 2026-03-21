@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新建项目功能测试</title>
+
+    <!-- ArcGIS API for JavaScript -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.28/esri/themes/light/main.css">
+    <script src="https://js.arcgis.com/4.28/"></script>
+
+    <!-- 自定义样式 -->
+    <link rel="stylesheet" href="css/主题变量.css">
+    <link rel="stylesheet" href="css/布局样式.css">
+    <link rel="stylesheet" href="css/组件样式.css">
+    <link rel="stylesheet" href="css/动画规范.css">
+
+    <style>
+        body {
+            padding: 20px;
+            background-color: var(--bg-secondary);
+        }
+
+        .test-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: var(--bg-primary);
+            padding: 32px;
+            border-radius: 20px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .test-section {
+            margin-bottom: 32px;
+        }
+
+        .test-title {
+            font-size: 24px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: var(--text-primary);
+        }
+
+        .test-description {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 16px;
+            line-height: 1.6;
+        }
+
+        .test-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .test-result {
+            margin-top: 16px;
+            padding: 16px;
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            font-size: 14px;
+            color: var(--text-primary);
+            font-family: 'SF Mono', 'Monaco', monospace;
+            white-space: pre-wrap;
+            word-break: break-all;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        #viewDiv {
+            width: 100%;
+            height: 400px;
+            border-radius: 16px;
+            overflow: hidden;
+            margin-top: 16px;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1 class="test-title">新建项目功能测试</h1>
+
+        <div class="test-section">
+            <h2 class="test-title" style="font-size: 18px;">测试场景</h2>
+            <div class="test-buttons">
+                <button id="test-new-project" class="btn btn-primary">测试新建项目弹窗</button>
+                <button id="test-free-manual" class="btn btn-primary">自由采样 + 手动输入</button>
+                <button id="test-free-device" class="btn btn-primary">自由采样 + 自动定位</button>
+                <button id="test-region-manual" class="btn btn-primary">区域采样 + 手动输入</button>
+                <button id="test-region-device" class="btn btn-primary">区域采样 + 自动定位</button>
+                <button id="test-error-handler" class="btn btn-secondary">测试错误处理</button>
+                <button id="clear-result" class="btn btn-secondary">清空结果</button>
+            </div>
+            <div id="test-result" class="test-result" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2 class="test-title" style="font-size: 18px;">地图视图</h2>
+            <div id="viewDiv"></div>
+        </div>
+
+        <div class="test-section" id="project-info" style="display: none;">
+            <h2 class="test-title" style="font-size: 18px;">当前项目信息</h2>
+            <div id="project-details" class="test-result"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeMap } from './js/地图初始化.js';
+        import { NewProjectModal } from './js/components/NewProjectModal.js';
+        import { FreeSampling } from './js/sampling/FreeSampling.js';
+        import { RegionSampling } from './js/sampling/RegionSampling.js';
+        import { Project } from './js/models/Project.js';
+        import { ErrorHandler } from './js/utils/ErrorHandler.js';
+
+        let view = null;
+        let currentProject = null;
+        let samplingComponent = null;
+
+        // 初始化地图
+        async function init() {
+            view = await initializeMap('viewDiv');
+            log('地图初始化完成');
+        }
+
+        // 日志输出
+        function log(message, data = null) {
+            const resultDiv = document.getElementById('test-result');
+            resultDiv.style.display = 'block';
+            const timestamp = new Date().toLocaleTimeString();
+            let logMessage = `[${timestamp}] ${message}`;
+            if (data) {
+                logMessage += '\n' + JSON.stringify(data, null, 2);
+            }
+            resultDiv.textContent += logMessage + '\n\n';
+            resultDiv.scrollTop = resultDiv.scrollHeight;
+        }
+
+        // 更新项目信息
+        function updateProjectInfo() {
+            if (!currentProject) return;
+
+            const projectInfo = document.getElementById('project-info');
+            const projectDetails = document.getElementById('project-details');
+
+            projectInfo.style.display = 'block';
+            projectDetails.textContent = JSON.stringify(currentProject.toJSON(), null, 2);
+        }
+
+        // 测试新建项目弹窗
+        document.getElementById('test-new-project').addEventListener('click', () => {
+            log('打开新建项目弹窗');
+            const modal = new NewProjectModal((project, config) => {
+                currentProject = project;
+                log('项目创建成功', config);
+                updateProjectInfo();
+            }, view);
+            modal.show();
+        });
+
+        // 测试自由采样 + 手动输入
+        document.getElementById('test-free-manual').addEventListener('click', () => {
+            log('创建自由采样 + 手动输入项目');
+            currentProject = new Project({
+                sampling_mode: 'free',
+                coordinate_mode: 'manual'
+            });
+
+            if (samplingComponent) {
+                samplingComponent.destroy();
+            }
+
+            samplingComponent = new FreeSampling(view, (pointData) => {
+                log('添加采样点', pointData);
+                currentProject.addPoint(pointData);
+                updateProjectInfo();
+            });
+
+            const panel = samplingComponent.createPanel('manual');
+            document.body.appendChild(panel);
+            log('自由采样组件已创建');
+        });
+
+        // 测试自由采样 + 自动定位
+        document.getElementById('test-free-device').addEventListener('click', () => {
+            log('创建自由采样 + 自动定位项目');
+            currentProject = new Project({
+                sampling_mode: 'free',
+                coordinate_mode: 'device'
+            });
+
+            if (samplingComponent) {
+                samplingComponent.destroy();
+            }
+
+            samplingComponent = new FreeSampling(view, (pointData) => {
+                log('添加采样点', pointData);
+                currentProject.addPoint(pointData);
+                updateProjectInfo();
+            });
+
+            const panel = samplingComponent.createPanel('device');
+            document.body.appendChild(panel);
+            log('自由采样组件已创建（设备定位模式）');
+        });
+
+        // 测试区域采样 + 手动输入
+        document.getElementById('test-region-manual').addEventListener('click', () => {
+            log('创建区域采样 + 手动输入项目');
+            currentProject = new Project({
+                sampling_mode: 'region',
+                coordinate_mode: 'manual'
+            });
+
+            if (samplingComponent) {
+                samplingComponent.destroy();
+            }
+
+            samplingComponent = new RegionSampling(view, (pointData) => {
+                log('添加采样点', pointData);
+                const success = currentProject.addPoint(pointData);
+                if (!success) {
+                    log('错误：采样点超出区域边界');
+                }
+                updateProjectInfo();
+            });
+
+            const panel = samplingComponent.createPanel('manual');
+            document.body.appendChild(panel);
+            log('区域采样组件已创建');
+        });
+
+        // 测试区域采样 + 自动定位
+        document.getElementById('test-region-device').addEventListener('click', () => {
+            log('创建区域采样 + 自动定位项目');
+            currentProject = new Project({
+                sampling_mode: 'region',
+                coordinate_mode: 'device'
+            });
+
+            if (samplingComponent) {
+                samplingComponent.destroy();
+            }
+
+            samplingComponent = new RegionSampling(view, (pointData) => {
+                log('添加采样点', pointData);
+                const success = currentProject.addPoint(pointData);
+                if (!success) {
+                    log('错误：采样点超出区域边界');
+                }
+                updateProjectInfo();
+            });
+
+            const panel = samplingComponent.createPanel('device');
+            document.body.appendChild(panel);
+            log('区域采样组件已创建（设备定位模式）');
+        });
+
+        // 测试错误处理
+        document.getElementById('test-error-handler').addEventListener('click', () => {
+            log('测试错误处理系统');
+
+            // 测试各种错误类型
+            setTimeout(() => {
+                ErrorHandler.showError(ErrorHandler.ErrorTypes.GEOJSON_FORMAT);
+                log('显示 GeoJSON 格式错误');
+            }, 500);
+
+            setTimeout(() => {
+                ErrorHandler.showError(ErrorHandler.ErrorTypes.COORDINATE_FORMAT);
+                log('显示坐标格式错误');
+            }, 1500);
+
+            setTimeout(() => {
+                ErrorHandler.showError(ErrorHandler.ErrorTypes.POINT_OUT_OF_BOUNDS);
+                log('显示点超出边界错误');
+            }, 2500);
+
+            setTimeout(() => {
+                ErrorHandler.showSuccess('这是一条成功消息');
+                log('显示成功消息');
+            }, 3500);
+
+            setTimeout(() => {
+                ErrorHandler.showWarning('这是一条警告消息');
+                log('显示警告消息');
+            }, 4500);
+        });
+
+        // 清空结果
+        document.getElementById('clear-result').addEventListener('click', () => {
+            document.getElementById('test-result').textContent = '';
+            document.getElementById('test-result').style.display = 'none';
+        });
+
+        // 启动
+        init();
+    </script>
+</body>
+</html>

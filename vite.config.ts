@@ -15,7 +15,7 @@ export default defineConfig(({ mode }) => {
     base: './',
 
     // 根目录
-    root: 'frontend',
+    root: 'apps/frontend',
 
     // 开发服务器配置
     server: {
@@ -77,7 +77,7 @@ export default defineConfig(({ mode }) => {
             if (id.includes('TiandituEngine') || id.includes('tianditu')) {
               return 'map-tianditu';
             }
-            if (id.includes('/frontend/js/adapters/') || id.includes('/frontend/js/map/core/')) {
+            if (id.includes('/apps/frontend/js/adapters/') || id.includes('/apps/frontend/js/map/core/')) {
               return 'map-core';
             }
 
@@ -88,12 +88,12 @@ export default defineConfig(({ mode }) => {
             }
 
             // 将工具类分离为独立 chunk
-            if (id.includes('/frontend/js/utils/')) {
+            if (id.includes('/apps/frontend/js/utils/')) {
               return 'utils';
             }
 
             // 将采样相关组件分离为独立 chunk
-            if (id.includes('/frontend/js/sampling/')) {
+            if (id.includes('/apps/frontend/js/sampling/')) {
               return 'sampling';
             }
 
@@ -130,17 +130,17 @@ export default defineConfig(({ mode }) => {
             }
 
             // 其他组件
-            if (id.includes('/frontend/js/components/')) {
+            if (id.includes('/apps/frontend/js/components/')) {
               return 'components';
             }
 
             // API服务
-            if (id.includes('/frontend/js/services/')) {
+            if (id.includes('/apps/frontend/js/services/')) {
               return 'services';
             }
 
             // 模型层
-            if (id.includes('/frontend/js/models/')) {
+            if (id.includes('/apps/frontend/js/models/')) {
               return 'models';
             }
           },
@@ -170,15 +170,15 @@ export default defineConfig(({ mode }) => {
     // 别名配置
     resolve: {
       alias: {
-        '@services': resolve(__dirname, './frontend/js/services'),
-        '@components': resolve(__dirname, './frontend/js/components'),
-        '@utils': resolve(__dirname, './frontend/js/utils'),
-        '@models': resolve(__dirname, './frontend/js/models'),
-        '@map': resolve(__dirname, './frontend/js/map'),
-        '@adapters': resolve(__dirname, './frontend/js/adapters'),
-        '@sampling': resolve(__dirname, './frontend/js/sampling'),
-        '@config': resolve(__dirname, './frontend/js/config'),
-        '@types': resolve(__dirname, './frontend/types'),
+        '@services': resolve(__dirname, './apps/frontend/js/services'),
+        '@components': resolve(__dirname, './apps/frontend/js/components'),
+        '@utils': resolve(__dirname, './apps/frontend/js/utils'),
+        '@models': resolve(__dirname, './apps/frontend/js/models'),
+        '@map': resolve(__dirname, './apps/frontend/js/map'),
+        '@adapters': resolve(__dirname, './apps/frontend/js/adapters'),
+        '@sampling': resolve(__dirname, './apps/frontend/js/sampling'),
+        '@config': resolve(__dirname, './apps/frontend/js/config'),
+        '@types': resolve(__dirname, './apps/frontend/types'),
       },
     },
 

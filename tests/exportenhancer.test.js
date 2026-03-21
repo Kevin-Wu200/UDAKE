@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ExportEnhancer } from '../frontend/js/utils/ExportEnhancer.js';
+import { ExportEnhancer } from '../apps/frontend/js/utils/ExportEnhancer.js';
 
 describe('ExportEnhancer', () => {
     beforeEach(() => {

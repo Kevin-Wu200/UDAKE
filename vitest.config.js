@@ -12,27 +12,27 @@ export default defineConfig({
             reporter: ['text', 'json', 'html', 'lcov'],
             all: true,
             include: [
-                'frontend/js/**/*.{js,ts}',
-                'frontend/js/services/**/*.{js,ts}',
-                'frontend/js/components/**/*.{js,ts}',
-                'frontend/js/utils/**/*.{js,ts}',
-                'frontend/js/models/**/*.{js,ts}',
-                'frontend/js/config/**/*.{js,ts}',
-                'frontend/js/store/**/*.{js,ts}'
+                'apps/frontend/js/**/*.{js,ts}',
+                'apps/frontend/js/services/**/*.{js,ts}',
+                'apps/frontend/js/components/**/*.{js,ts}',
+                'apps/frontend/js/utils/**/*.{js,ts}',
+                'apps/frontend/js/models/**/*.{js,ts}',
+                'apps/frontend/js/config/**/*.{js,ts}',
+                'apps/frontend/js/store/**/*.{js,ts}'
             ],
             exclude: [
                 // 第三方库
-                'frontend/lib/**',
+                'apps/frontend/lib/**',
                 'node_modules/**',
 
                 // 第三方类型定义
-                'frontend/types/**',
+                'apps/frontend/types/**',
 
                 // 测试辅助工具
                 '**/MapEngineTestHelper.js',
 
                 // 构建产物
-                'frontend/dist/**',
+                'apps/frontend/dist/**',
 
                 // 测试文件
                 'tests/**',

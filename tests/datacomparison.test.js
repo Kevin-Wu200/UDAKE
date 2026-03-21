@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { DataComparison } from '../frontend/js/utils/DataComparison.js';
+import { DataComparison } from '../apps/frontend/js/utils/DataComparison.js';
 
 describe('DataComparison', () => {
     let comparison;

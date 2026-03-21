@@ -35,10 +35,10 @@ describe('位置服务测试', () => {
 
   beforeEach(async () => {
     // 动态导入服务
-    const { locationService: ls } = await import('../frontend/js/services/LocationService');
-    const { trackManager: tm } = await import('../frontend/js/services/TrackManager');
-    const { geofenceManager: gm } = await import('../frontend/js/services/GeofenceManager');
-    const { sensorManager: sm } = await import('../frontend/js/services/SensorManager');
+    const { locationService: ls } = await import('../apps/frontend/js/services/LocationService');
+    const { trackManager: tm } = await import('../apps/frontend/js/services/TrackManager');
+    const { geofenceManager: gm } = await import('../apps/frontend/js/services/GeofenceManager');
+    const { sensorManager: sm } = await import('../apps/frontend/js/services/SensorManager');
 
     locationService = ls;
     trackManager = tm;

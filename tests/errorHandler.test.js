@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { ErrorHandler } from '../frontend/js/utils/ErrorHandler.js';
+import { ErrorHandler } from '../apps/frontend/js/utils/ErrorHandler.js';
 
 describe('ErrorHandler', () => {
     beforeEach(() => {

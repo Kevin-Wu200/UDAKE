@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { FeedbackCollector } from '../frontend/js/components/FeedbackCollector.js';
+import { FeedbackCollector } from '../apps/frontend/js/components/FeedbackCollector.js';
 
 describe('FeedbackCollector', () => {
     let mockElements = {};

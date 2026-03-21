@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { APIService } from '../../frontend/js/services/API封装';
-import { errorHandler } from '../../frontend/js/utils/errors/ErrorHandler';
+import { APIService } from '../../apps/frontend/js/services/API封装';
+import { errorHandler } from '../../apps/frontend/js/utils/errors/ErrorHandler';
 
 // Mock fetch
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 // Mock OfflineManager
-vi.mock('../../frontend/js/utils/OfflineManager', () => ({
+vi.mock('../../apps/frontend/js/utils/OfflineManager', () => ({
     OfflineManager: {
         isOnline: true,
         cacheResult: vi.fn(),
@@ -17,7 +17,7 @@ vi.mock('../../frontend/js/utils/OfflineManager', () => ({
 }));
 
 // Mock TwoLevelCache
-vi.mock('../../frontend/js/utils/cache/TwoLevelCache', () => ({
+vi.mock('../../apps/frontend/js/utils/cache/TwoLevelCache', () => ({
     TwoLevelCache: class {
         constructor() {}
         async get() { return undefined; }
@@ -30,7 +30,7 @@ vi.mock('../../frontend/js/utils/cache/TwoLevelCache', () => ({
 }));
 
 // Mock errorHandler
-vi.mock('../../frontend/js/utils/errors/ErrorHandler', () => ({
+vi.mock('../../apps/frontend/js/utils/errors/ErrorHandler', () => ({
     errorHandler: {
         handle: vi.fn()
     },
