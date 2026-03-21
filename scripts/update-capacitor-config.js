@@ -5,8 +5,8 @@ const path = require('path');
  * 从环境变量加载配置并更新 capacitor.config.json
  */
 function updateCapacitorConfig() {
-  const configPath = path.join(__dirname, '..', 'capacitor.config.json');
-  const envPath = path.join(__dirname, '..', '.env');
+  const configPath = path.join(__dirname, '..', 'configs', 'capacitor.config.json');
+  const envPath = path.join(__dirname, '..', 'configs', 'env', '.env');
 
   // 读取环境变量
   const envContent = fs.readFileSync(envPath, 'utf-8');

@@ -1,10 +1,11 @@
 import { defineConfig } from 'vitest/config';
+import { resolve } from 'path';
 
 export default defineConfig({
     test: {
         globals: true,
         environment: 'jsdom',
-        setupFiles: ['./vitest.setup.js'],
+        setupFiles: [resolve(__dirname, 'vitest.setup.js')],
         include: ['tests/**/*.test.{js,ts}'],
         exclude: ['tests/e2e/**'],
         coverage: {

@@ -2,8 +2,9 @@ import { defineConfig, loadEnv } from 'vite';
 import { resolve } from 'path';
 
 export default defineConfig(({ mode }) => {
+  const envDir = resolve(__dirname, 'env');
   // 加载环境变量
-  const env = loadEnv(mode, process.cwd(), '');
+  const env = loadEnv(mode, envDir, '');
 
   // 获取当前环境
   const isDevelopment = mode === 'development';
@@ -11,11 +12,13 @@ export default defineConfig(({ mode }) => {
   const isProduction = mode === 'production';
 
   return {
+    envDir,
+
     // 基础路径：使用相对路径，确保 Electron 本地文件加载时资源引用正确
     base: './',
 
     // 根目录
-    root: 'apps/frontend',
+    root: resolve(__dirname, '../apps/frontend'),
 
     // 开发服务器配置
     server: {
@@ -170,15 +173,15 @@ export default defineConfig(({ mode }) => {
     // 别名配置
     resolve: {
       alias: {
-        '@services': resolve(__dirname, './apps/frontend/js/services'),
-        '@components': resolve(__dirname, './apps/frontend/js/components'),
-        '@utils': resolve(__dirname, './apps/frontend/js/utils'),
-        '@models': resolve(__dirname, './apps/frontend/js/models'),
-        '@map': resolve(__dirname, './apps/frontend/js/map'),
-        '@adapters': resolve(__dirname, './apps/frontend/js/adapters'),
-        '@sampling': resolve(__dirname, './apps/frontend/js/sampling'),
-        '@config': resolve(__dirname, './apps/frontend/js/config'),
-        '@types': resolve(__dirname, './apps/frontend/types'),
+        '@services': resolve(__dirname, '../apps/frontend/js/services'),
+        '@components': resolve(__dirname, '../apps/frontend/js/components'),
+        '@utils': resolve(__dirname, '../apps/frontend/js/utils'),
+        '@models': resolve(__dirname, '../apps/frontend/js/models'),
+        '@map': resolve(__dirname, '../apps/frontend/js/map'),
+        '@adapters': resolve(__dirname, '../apps/frontend/js/adapters'),
+        '@sampling': resolve(__dirname, '../apps/frontend/js/sampling'),
+        '@config': resolve(__dirname, '../apps/frontend/js/config'),
+        '@types': resolve(__dirname, '../apps/frontend/types'),
       },
     },
 

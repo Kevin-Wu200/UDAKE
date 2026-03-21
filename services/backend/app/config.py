@@ -9,9 +9,17 @@ from pathlib import Path
 import json
 import os
 
+BASE_DIR_PATH = Path(__file__).parent.parent
+PROJECT_ROOT_PATH = BASE_DIR_PATH.parent.parent
+ENV_DIR_PATH = PROJECT_ROOT_PATH / "configs" / "env"
+
 class Settings(BaseSettings):
+    BASE_DIR: Path = BASE_DIR_PATH
+    PROJECT_ROOT: Path = PROJECT_ROOT_PATH
+    ENV_DIR: Path = ENV_DIR_PATH
+
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(ENV_DIR_PATH / ".env"),
         env_file_encoding="utf-8",
         case_sensitive=True
     )
@@ -35,9 +43,8 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE_MB: int = 100
 
     # 文件路径配置
-    BASE_DIR: Path = Path(__file__).parent.parent
     RESULTS_DIR: Path = BASE_DIR / "app" / "结果文件"
-    DATA_DIR: Path = BASE_DIR.parent / "data_samples"
+    DATA_DIR: Path = PROJECT_ROOT / "data" / "samples"
 
     # 任务配置
     MAX_CONCURRENT_TASKS: int = 5
@@ -142,27 +149,27 @@ class Settings(BaseSettings):
     def get_env_file(self) -> str:
         """根据环境获取配置文件路径"""
         if self.ENVIRONMENT == "development":
-            return ".env.development"
+            return str(self.ENV_DIR / ".env.development")
         elif self.ENVIRONMENT == "testing":
-            return ".env.testing"
+            return str(self.ENV_DIR / ".env.testing")
         elif self.ENVIRONMENT == "production":
-            return ".env.production"
-        return ".env"
+            return str(self.ENV_DIR / ".env.production")
+        return str(self.ENV_DIR / ".env")
 
 # 根据环境变量获取当前环境
 environment = os.getenv("ENVIRONMENT", "development").lower()
 
 # 根据环境加载配置 - 优先使用后端专用配置文件
 backend_env_file_map = {
-    "development": ".env.backend.development",
-    "testing": ".env.backend.testing",
-    "production": ".env.backend.production"
+    "development": str(ENV_DIR_PATH / ".env.backend.development"),
+    "testing": str(ENV_DIR_PATH / ".env.backend.testing"),
+    "production": str(ENV_DIR_PATH / ".env.backend.production")
 }
 
 # 优先使用后端专用的环境配置文件，如果不存在则使用默认 .env
-current_env_file = backend_env_file_map.get(environment, ".env")
+current_env_file = backend_env_file_map.get(environment, str(ENV_DIR_PATH / ".env"))
 if not Path(current_env_file).exists():
-    current_env_file = ".env"
+    current_env_file = str(ENV_DIR_PATH / ".env")
 
 class EnvironmentSettings(Settings):
     """环境特定的配置类"""

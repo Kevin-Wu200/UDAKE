@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
  * Playwright 测试配置
  */
 export default defineConfig({
-    testDir: './tests/e2e',
+    testDir: '../tests/e2e',
 
     // 超时设置
     timeout: 30 * 1000,
@@ -20,8 +20,8 @@ export default defineConfig({
 
     // 报告配置
     reporter: [
-        ['html', { outputFolder: 'playwright-report' }],
-        ['json', { outputFile: 'test-results.json' }],
+        ['html', { outputFolder: '../playwright-report' }],
+        ['json', { outputFile: '../test-results.json' }],
         ['list']
     ],
 
