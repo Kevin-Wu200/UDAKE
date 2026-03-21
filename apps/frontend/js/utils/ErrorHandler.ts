@@ -3,6 +3,7 @@
  * 统一管理错误提示、用户反馈、重试建议、修复指引、错误日志
  */
 import type { ErrorType, ErrorDetail, ErrorLogEntry, ValidationResult } from '../../types/core';
+import { I18n } from './I18n';
 
 interface ToastOptions {
     message: string;
@@ -39,7 +40,7 @@ export class ErrorHandler {
         EXPORT_FAILED: 'export_failed'
     };
 
-    static ErrorDetails: Record<ErrorType, ErrorDetail> = {
+    private static _fallbackErrorDetails: Record<ErrorType, ErrorDetail> = {
         geojson_format: {
             message: 'GeoJSON 格式错误',
             suggestion: '请确保文件是标准的 GeoJSON 格式，包含 type 和 features 字段。',
@@ -108,6 +109,36 @@ export class ErrorHandler {
         }
     };
 
+    static get ErrorDetails(): Record<ErrorType, ErrorDetail> {
+        return Object.values(ErrorHandler.ErrorTypes).reduce((acc, type) => {
+            acc[type] = ErrorHandler.getErrorDetail(type);
+            return acc;
+        }, {} as Record<ErrorType, ErrorDetail>);
+    }
+
+    private static _t(key: string, fallback: string = ''): string {
+        const translated = I18n.t(key);
+        return translated === key ? fallback : translated;
+    }
+
+    static getErrorDetail(errorType: ErrorType): ErrorDetail {
+        const fallback = ErrorHandler._fallbackErrorDetails[errorType] || { message: '未知错误' };
+        const detail: ErrorDetail = {
+            message: ErrorHandler._t(`error.${errorType}.message`, fallback.message),
+            suggestion: ErrorHandler._t(`error.${errorType}.suggestion`, fallback.suggestion || ''),
+            retryable: fallback.retryable
+        };
+
+        const example = ErrorHandler._t(`error.${errorType}.example`, fallback.example || '');
+        if (example) {
+            detail.example = example;
+        }
+        if (!detail.suggestion) {
+            delete detail.suggestion;
+        }
+        return detail;
+    }
+
     static _errorLog: ErrorLogEntry[] = [];
     static _maxLogSize: number = 200;
 
@@ -135,8 +166,8 @@ export class ErrorHandler {
     }
 
     static showError(errorType: ErrorType, customMessage: string | null = null, options: ShowErrorOptions = {}): void {
-        const detail: ErrorDetail = ErrorHandler.ErrorDetails[errorType] || ({} as ErrorDetail);
-        const message: string = customMessage || detail.message || '未知错误';
+        const detail: ErrorDetail = ErrorHandler.getErrorDetail(errorType);
+        const message: string = customMessage || detail.message || ErrorHandler._t('error.common.unknown', '未知错误');
         const suggestion: string = detail.suggestion || '';
         const retryable: boolean = detail.retryable || false;
         const example: string = detail.example || '';
@@ -233,7 +264,8 @@ export class ErrorHandler {
         if (suggestion) html += `<div style="font-size:12px;opacity:0.9">${suggestion}</div>`;
         if (example) html += `<div style="font-size:11px;opacity:0.75;margin-top:4px;font-family:monospace">${example}</div>`;
         if (retryable && onRetry) {
-            html += `<button class="toast-retry-btn" style="margin-top:8px;padding:4px 12px;border:1px solid rgba(255,255,255,0.5);border-radius:6px;background:transparent;color:white;font-size:12px;cursor:pointer">重试</button>`;
+            const retryLabel = ErrorHandler._t('error.common.retryButton', '重试');
+            html += `<button class="toast-retry-btn" style="margin-top:8px;padding:4px 12px;border:1px solid rgba(255,255,255,0.5);border-radius:6px;background:transparent;color:white;font-size:12px;cursor:pointer">${retryLabel}</button>`;
         }
         toast.innerHTML = html;
 
@@ -260,19 +292,19 @@ export class ErrorHandler {
 
     static validateGeoJSON(geojson: unknown): ValidationResult {
         if (!geojson || typeof geojson !== 'object') {
-            return { valid: false, error: 'GeoJSON 必须是一个对象' };
+            return { valid: false, error: ErrorHandler._t('error.validation.geojson_object', 'GeoJSON 必须是一个对象') };
         }
         const obj = geojson as Record<string, unknown>;
         if (!obj.type) {
-            return { valid: false, error: 'GeoJSON 缺少 type 字段' };
+            return { valid: false, error: ErrorHandler._t('error.validation.geojson_missing_type', 'GeoJSON 缺少 type 字段') };
         }
         if (obj.type === 'FeatureCollection') {
             if (!Array.isArray((obj as any).features)) {
-                return { valid: false, error: 'FeatureCollection 缺少 features 数组' };
+                return { valid: false, error: ErrorHandler._t('error.validation.geojson_missing_features', 'FeatureCollection 缺少 features 数组') };
             }
         } else if (obj.type === 'Feature') {
             if (!(obj as any).geometry) {
-                return { valid: false, error: 'Feature 缺少 geometry 字段' };
+                return { valid: false, error: ErrorHandler._t('error.validation.geojson_missing_geometry', 'Feature 缺少 geometry 字段') };
             }
         }
         return { valid: true };
@@ -280,33 +312,36 @@ export class ErrorHandler {
 
     static validatePolygon(geometry: unknown): ValidationResult {
         if (!geometry || typeof geometry !== 'object') {
-            return { valid: false, error: '缺少几何类型' };
+            return { valid: false, error: ErrorHandler._t('error.validation.geometry_missing_type', '缺少几何类型') };
         }
         const geo = geometry as Record<string, unknown>;
         if (!geo.type) {
-            return { valid: false, error: '缺少几何类型' };
+            return { valid: false, error: ErrorHandler._t('error.validation.geometry_missing_type', '缺少几何类型') };
         }
         if (!['Polygon', 'MultiPolygon'].includes(geo.type as string)) {
-            return { valid: false, error: `不支持的几何类型: ${geo.type}，仅支持 Polygon 或 MultiPolygon` };
+            return {
+                valid: false,
+                error: I18n.t('error.validation.geometry_unsupported', { type: String(geo.type) })
+            };
         }
         if (!geo.coordinates || !Array.isArray(geo.coordinates)) {
-            return { valid: false, error: '缺少坐标数组' };
+            return { valid: false, error: ErrorHandler._t('error.validation.geometry_missing_coordinates', '缺少坐标数组') };
         }
         return { valid: true };
     }
 
     static validateCoordinates(longitude: number, latitude: number): ValidationResult {
         if (typeof longitude !== 'number' || typeof latitude !== 'number') {
-            return { valid: false, error: '经纬度必须是数字' };
+            return { valid: false, error: ErrorHandler._t('error.validation.coordinates_not_number', '经纬度必须是数字') };
         }
         if (isNaN(longitude) || isNaN(latitude)) {
-            return { valid: false, error: '经纬度不能是 NaN' };
+            return { valid: false, error: ErrorHandler._t('error.validation.coordinates_nan', '经纬度不能是 NaN') };
         }
         if (longitude < -180 || longitude > 180) {
-            return { valid: false, error: '经度必须在 -180 到 180 之间' };
+            return { valid: false, error: ErrorHandler._t('error.validation.coordinates_longitude_range', '经度必须在 -180 到 180 之间') };
         }
         if (latitude < -90 || latitude > 90) {
-            return { valid: false, error: '纬度必须在 -90 到 90 之间' };
+            return { valid: false, error: ErrorHandler._t('error.validation.coordinates_latitude_range', '纬度必须在 -90 到 90 之间') };
         }
         return { valid: true };
     }
@@ -317,19 +352,19 @@ export class ErrorHandler {
         switch (error.code) {
             case error.PERMISSION_DENIED:
                 errorType = 'permission_denied';
-                message = '用户拒绝了定位请求';
+                message = ErrorHandler._t('error.geolocation.user_denied', '用户拒绝了定位请求');
                 break;
             case error.POSITION_UNAVAILABLE:
                 errorType = 'geolocation_failed';
-                message = '位置信息不可用';
+                message = ErrorHandler._t('error.geolocation.position_unavailable', '位置信息不可用');
                 break;
             case error.TIMEOUT:
                 errorType = 'geolocation_failed';
-                message = '定位请求超时';
+                message = ErrorHandler._t('error.geolocation.timeout', '定位请求超时');
                 break;
             default:
                 errorType = 'geolocation_failed';
-                message = '未知的定位错误';
+                message = ErrorHandler._t('error.geolocation.unknown', '未知的定位错误');
         }
         ErrorHandler.showError(errorType, message);
         return { errorType, message };

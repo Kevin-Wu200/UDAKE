@@ -285,6 +285,25 @@ describe('I18n', () => {
                 expect(translation).toBeTruthy();
             });
         });
+
+        it('错误命名空间应支持中英文', () => {
+            const errorKeys = [
+                'error.network_error.message',
+                'error.network_error.suggestion',
+                'error.validation.geojson_missing_type',
+                'error.common.retryButton'
+            ];
+
+            I18n.init('zh-CN');
+            errorKeys.forEach(key => {
+                expect(I18n.t(key)).not.toBe(key);
+            });
+
+            I18n.setLocale('en-US');
+            errorKeys.forEach(key => {
+                expect(I18n.t(key)).not.toBe(key);
+            });
+        });
     });
 
     describe('边界情况', () => {

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { ErrorHandler } from '../apps/frontend/js/utils/ErrorHandler.js';
+import { I18n } from '../apps/frontend/js/utils/I18n.js';
 
 describe('ErrorHandler', () => {
     beforeEach(() => {
@@ -8,6 +9,9 @@ describe('ErrorHandler', () => {
             body: {
                 appendChild: vi.fn(),
                 removeChild: vi.fn()
+            },
+            documentElement: {
+                lang: 'zh-CN'
             },
             createElement: vi.fn((tag) => {
                 const element = {
@@ -41,6 +45,7 @@ describe('ErrorHandler', () => {
 
         // 清空错误日志
         ErrorHandler.clearErrorLog();
+        I18n.init('zh-CN');
     });
 
     afterEach(() => {
@@ -211,6 +216,13 @@ describe('ErrorHandler', () => {
             const log = ErrorHandler.getErrorLog();
             expect(log.length).toBeGreaterThan(0);
         });
+
+        it('应支持英文错误消息', () => {
+            I18n.setLocale('en-US');
+            ErrorHandler.showError('network_error');
+            const log = ErrorHandler.getErrorLog();
+            expect(log[0].message).toBe('Network connection failed');
+        });
     });
 
     describe('showSuccess', () => {
@@ -341,6 +353,12 @@ describe('ErrorHandler', () => {
             expect(ErrorHandler.validateCoordinates(-180.1, -90).valid).toBe(false);
             expect(ErrorHandler.validateCoordinates(180.1, 90).valid).toBe(false);
         });
+
+        it('英文环境下校验错误应返回英文', () => {
+            I18n.setLocale('en-US');
+            const result = ErrorHandler.validateGeoJSON({});
+            expect(result.error).toBe('GeoJSON is missing type field');
+        });
     });
 
     describe('fromHttpStatus更多场景', () => {
@@ -409,6 +427,14 @@ describe('ErrorHandler', () => {
             expect(ErrorHandler.ErrorDetails.server_error.retryable).toBe(true);
             expect(ErrorHandler.ErrorDetails.timeout_error.retryable).toBe(true);
             expect(ErrorHandler.ErrorDetails.export_failed.retryable).toBe(true);
+        });
+
+        it('语言切换后 ErrorDetails 应返回对应语言', () => {
+            I18n.setLocale('en-US');
+            expect(ErrorHandler.ErrorDetails.network_error.message).toBe('Network connection failed');
+
+            I18n.setLocale('zh-CN');
+            expect(ErrorHandler.ErrorDetails.network_error.message).toBe('网络连接失败');
         });
     });
 });

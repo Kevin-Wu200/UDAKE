@@ -33,6 +33,7 @@ describe('OfflineManager', () => {
         OfflineManager.db = null;
         // Reset _online state
         Object.assign(OfflineManager, { _online: global.window.navigator.onLine });
+        OfflineManager.clearConflictHistory();
     });
 
     afterEach(() => {
@@ -162,6 +163,92 @@ describe('OfflineManager', () => {
                 const result = await OfflineManager.sync(strategy);
                 expect(result).toBeDefined();
             }
+        });
+
+        it('latest-wins 策略应生成合并预览并记录历史', async () => {
+            OfflineManager['_setOnline'](true);
+
+            const action = {
+                id: 'action-1',
+                type: 'upload',
+                payload: { id: 'p1', value: 10, note: 'client' },
+                timestamp: 200,
+                retries: 0
+            };
+
+            let callCount = 0;
+            let secondPayload = null;
+            OfflineManager.registerHandler('upload', async (payload) => {
+                callCount++;
+                if (callCount === 1) {
+                    const conflictError = new Error('conflict detected');
+                    conflictError.code = 'conflict';
+                    conflictError.conflictData = {
+                        clientData: { id: 'p1', value: 10, note: 'client' },
+                        serverData: { id: 'p1', value: 8, note: 'server' },
+                        serverUpdatedAt: 100
+                    };
+                    throw conflictError;
+                }
+                secondPayload = payload;
+            });
+
+            OfflineManager.getPendingActions = vi.fn().mockResolvedValue([action]);
+            OfflineManager['_removeAction'] = vi.fn().mockResolvedValue(undefined);
+
+            const result = await OfflineManager.sync('latest-wins');
+
+            expect(result.conflicts).toBe(1);
+            expect(result.success).toBe(1);
+            expect(result.failed).toBe(0);
+            expect(callCount).toBe(2);
+            expect(secondPayload.value).toBe(10);
+
+            const history = OfflineManager.getConflictHistory();
+            expect(history.length).toBe(1);
+            expect(history[0].actionId).toBe('action-1');
+            expect(history[0].mergedPreview.value).toBe(10);
+        });
+    });
+
+    describe('冲突合并能力', () => {
+        it('应该生成字段级 diff', () => {
+            const diff = OfflineManager.getConflictDiff(
+                { meta: { status: 'draft', score: 10 }, points: 3 },
+                { meta: { status: 'published', score: 10 }, points: 5 }
+            );
+
+            const paths = diff.map(item => item.path);
+            expect(paths).toContain('meta.status');
+            expect(paths).toContain('points');
+            expect(paths).not.toContain('meta.score');
+        });
+
+        it('应该支持逐字段合并预览', () => {
+            const preview = OfflineManager.getMergePreview(
+                { meta: { status: 'draft' }, points: 3 },
+                { meta: { status: 'published' }, points: 5 },
+                {
+                    'meta.status': 'client',
+                    points: 'server'
+                }
+            );
+
+            expect(preview.meta.status).toBe('draft');
+            expect(preview.points).toBe(5);
+        });
+
+        it('应该提供智能合并建议', () => {
+            const suggestion = OfflineManager.getSmartMergeSuggestion(
+                { updatedAt: 200, name: 'client-name', description: '' },
+                { updatedAt: 100, name: 'server', description: 'server-desc' },
+                200,
+                100
+            );
+
+            expect(suggestion.updatedAt).toBe('client');
+            expect(suggestion.name).toBe('client');
+            expect(suggestion.description).toBe('server');
         });
     });
 
