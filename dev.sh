@@ -143,9 +143,16 @@ start_backend() {
         return
     fi
     
-    # 检查后端启动脚本
+    # 检查后端启动脚本（优先新目录，兼容旧目录）
+    local backend_dir=""
     if [ -f "services/backend/run.py" ]; then
-        cd backend
+        backend_dir="services/backend"
+    elif [ -f "backend/run.py" ]; then
+        backend_dir="backend"
+    fi
+
+    if [ -n "$backend_dir" ]; then
+        cd "$backend_dir"
         
         # 激活虚拟环境并启动后端
         if [ -f "../venv/bin/activate" ]; then
@@ -154,7 +161,7 @@ start_backend() {
         
         python3 run.py > /tmp/udake_backend.log 2>&1 &
         BACKEND_PID=$!
-        cd ..
+        cd "$PROJECT_ROOT"
         
         log_success "后端服务已启动 (PID: $BACKEND_PID)"
         
@@ -201,7 +208,7 @@ start_backend() {
         exit 1
         
     else
-        log_warning "未找到后端启动脚本，跳过后端启动"
+        log_warning "未找到后端启动脚本（services/backend/run.py 或 backend/run.py），跳过后端启动"
     fi
 }
 

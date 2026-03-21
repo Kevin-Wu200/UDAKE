@@ -8,7 +8,8 @@ from pathlib import Path
 from datetime import datetime
 
 # 添加项目根目录到Python路径
-project_root = Path(__file__).parent.parent.parent
+# 当前文件位于 services/backend/app/main.py，需要回退4层到仓库根目录
+project_root = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(project_root))
 
 # 抑制 starlette 对 multipart 导入兼容层的待弃用提示
