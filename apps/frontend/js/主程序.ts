@@ -33,6 +33,7 @@ import { PreferencesPanel } from './components/PreferencesPanel.js';
 import { StartupManager } from './utils/StartupManager.js';
 import { ResourceOptimizationManager } from './config/ResourceOptimizationConfig.js';
 import { Kriging3DPanel } from './components/Kriging3DPanel.js';
+import { CSSFeatureDetector } from './utils/CSSFeatureDetector.js';
 
 // 导入管理器
 import { ComponentInitializer } from './managers/ComponentInitializer.js';
@@ -62,6 +63,7 @@ ThemeManager.init();
 PerformanceMonitor.init();
 HistoryManager.init();
 I18n.init();
+CSSFeatureDetector.init();
 PerformanceMonitor.mark('appStart');
 
 class App {
@@ -1557,13 +1559,40 @@ function initKeyboardShortcuts(app: App): void {
 initRippleEffect();
 
 // 注册 Service Worker
-if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').catch(() => {
-            // SW 注册失败，静默忽略
-        });
+window.addEventListener('load', () => {
+    const protocol = window.location.protocol;
+    const hostname = window.location.hostname;
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+    const isSupportedProtocol = protocol === 'https:' || isLocalhost;
+    const canRegisterSW =
+        'serviceWorker' in navigator &&
+        window.isSecureContext &&
+        isSupportedProtocol;
+
+    if (!canRegisterSW) {
+        try {
+            localStorage.setItem('udake-offline-fallback-enabled', 'true');
+            localStorage.setItem(
+                'udake-offline-fallback-reason',
+                `SW 不可用，协议: ${protocol}, 安全上下文: ${String(window.isSecureContext)}`
+            );
+        } catch {
+            // localStorage 不可用时静默降级
+        }
+        console.warn('Service Worker 不可用，已启用 localStorage 离线降级');
+        return;
+    }
+
+    navigator.serviceWorker.register('/sw.js').catch((error) => {
+        try {
+            localStorage.setItem('udake-offline-fallback-enabled', 'true');
+            localStorage.setItem('udake-offline-fallback-reason', 'SW 注册失败');
+        } catch {
+            // localStorage 不可用时静默降级
+        }
+        console.warn('Service Worker 注册失败，已启用 localStorage 离线降级:', error);
     });
-}
+});
 
 // 启动应用
 const app = new App();

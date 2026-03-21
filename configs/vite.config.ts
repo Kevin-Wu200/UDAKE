@@ -27,6 +27,9 @@ export default defineConfig(({ mode }) => {
       host: true,
       open: true,
       cors: true,
+      headers: {
+        'Cache-Control': 'no-store',
+      },
       proxy: {
         // 代理后端 API 请求
         '/api': {
@@ -48,7 +51,7 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: true,
       sourcemap: isDevelopment || isTesting,
       minify: isProduction ? 'esbuild' : false,
-      target: 'es2020',
+      target: 'es2018',
       // CSS 代码分割
       cssCodeSplit: true,
       // 启用压缩
@@ -172,6 +175,7 @@ export default defineConfig(({ mode }) => {
 
     // 别名配置
     resolve: {
+      extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
       alias: {
         '@services': resolve(__dirname, '../apps/frontend/js/services'),
         '@components': resolve(__dirname, '../apps/frontend/js/components'),

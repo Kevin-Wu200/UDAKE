@@ -12,6 +12,7 @@
     bottom: 0;
     background: rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -23,6 +24,7 @@
 .uncertainty-heatmap-panel {
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border-radius: 16px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
     width: 90vw;
@@ -101,6 +103,8 @@
     padding: 20px 24px;
     gap: 16px;
     overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 }
 
 /* 热图画布容器 */
@@ -131,6 +135,7 @@
     right: 16px;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
     padding: 12px;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -212,6 +217,15 @@
     display: flex;
     gap: 8px;
     flex-wrap: wrap;
+}
+
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+    .uncertainty-heatmap-overlay,
+    .uncertainty-heatmap-panel,
+    .heatmap-legend {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
 }
 
 .strategy-btn {

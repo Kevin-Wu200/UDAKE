@@ -78,13 +78,14 @@ export const defaultResourceOptimizationConfig: ResourceOptimizationConfig = {
             'css/skeleton-loader.css',
             'css/layout-styles.css',
             'css/component-styles.css',
-            'css/animation-styles.css'
+            'css/animation-styles.css',
+            'css/safari-compat.css'
         ],
         criticalJS: [
-            'js/utils/LoadingManager.js',
-            'js/components/SplashScreen.js',
-            'js/utils/LaunchProgressManager.js',
-            'js/utils/StartupManager.js'
+            'js/utils/LoadingManager.ts',
+            'js/components/SplashScreen.ts',
+            'js/utils/LaunchProgressManager.ts',
+            'js/utils/StartupManager.ts'
         ],
         fonts: [],
         images: []
@@ -178,7 +179,7 @@ export class ResourceOptimizationManager {
         }
 
         // 注册 Service Worker（如果支持）
-        if (this.config.cache.enableOffline && 'serviceWorker' in navigator) {
+        if (this.config.cache.enableOffline) {
             this.registerServiceWorker();
         }
     }
@@ -294,6 +295,21 @@ export class ResourceOptimizationManager {
      * 注册 Service Worker
      */
     private async registerServiceWorker(): Promise<void> {
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+        const isSupportedProtocol = protocol === 'https:' || isLocalhost;
+
+        if (!('serviceWorker' in navigator)) {
+            this.enableLocalOfflineFallback('当前浏览器不支持 Service Worker');
+            return;
+        }
+
+        if (!isSupportedProtocol || !window.isSecureContext) {
+            this.enableLocalOfflineFallback(`当前协议 ${protocol} 不支持 Service Worker`);
+            return;
+        }
+
         try {
             const registration = await navigator.serviceWorker.register('/sw.js');
             console.log('[ResourceOptimizationManager] Service Worker 注册成功:', registration);
@@ -302,7 +318,22 @@ export class ResourceOptimizationManager {
             await registration.update();
         } catch (error) {
             console.warn('[ResourceOptimizationManager] Service Worker 注册失败:', error);
+            this.enableLocalOfflineFallback('Service Worker 注册失败，已启用本地缓存降级');
         }
+    }
+
+    /**
+     * Service Worker 不可用时启用本地缓存降级方案
+     */
+    private enableLocalOfflineFallback(reason: string): void {
+        try {
+            localStorage.setItem('udake-offline-fallback-enabled', 'true');
+            localStorage.setItem('udake-offline-fallback-reason', reason);
+            localStorage.setItem('udake-offline-fallback-updated-at', String(Date.now()));
+        } catch (error) {
+            console.warn('[ResourceOptimizationManager] localStorage 降级写入失败:', error);
+        }
+        console.warn(`[ResourceOptimizationManager] ${reason}`);
     }
 
     /**

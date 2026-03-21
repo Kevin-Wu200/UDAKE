@@ -161,10 +161,14 @@ export class MapEngineSwitcher {
             // 切换中状态
             this.button.style.opacity = '0.6';
             this.button.style.cursor = 'not-allowed';
+            this.button.style.pointerEvents = 'none';
+            this.button.setAttribute('aria-disabled', 'true');
         } else {
             // 正常状态
             this.button.style.opacity = '1';
             this.button.style.cursor = 'pointer';
+            this.button.style.pointerEvents = 'auto';
+            this.button.removeAttribute('aria-disabled');
         }
     }
 

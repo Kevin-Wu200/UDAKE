@@ -1876,3 +1876,24 @@ input[type="number"] {
 .tab-content.active {
     display: block;
 }
+
+@supports not (gap: 1rem) {
+    .form-group > * + *,
+    .layer-control > * + *,
+    .coordinate-info > * + * {
+        margin-top: 8px;
+    }
+
+    .checkbox-label > * + * {
+        margin-left: 10px;
+    }
+}
+
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+    .status-message,
+    .recommendation-item,
+    .history-item {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+}

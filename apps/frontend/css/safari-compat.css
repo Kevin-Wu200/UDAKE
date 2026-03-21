@@ -1,0 +1,72 @@
+/**
+ * Safari 兼容性降级样式
+ * 基于 JS 特性检测给 html 注入类名后生效
+ */
+
+.no-backdrop-filter .header,
+.no-backdrop-filter .panel,
+.no-backdrop-filter .info-panel,
+.no-backdrop-filter .cache-management-panel,
+.no-backdrop-filter .uncertainty-heatmap-panel,
+.no-backdrop-filter .heatmap-legend,
+.no-backdrop-filter .map-engine-switcher {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: rgba(255, 255, 255, 0.96) !important;
+}
+
+.no-backdrop-filter .cache-panel-backdrop,
+.no-backdrop-filter .uncertainty-heatmap-overlay {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+.no-backdrop-filter.dark .header,
+.no-backdrop-filter.dark .panel,
+.no-backdrop-filter.dark .info-panel,
+.no-backdrop-filter.dark .uncertainty-heatmap-panel {
+    background-color: rgba(30, 30, 30, 0.96) !important;
+}
+
+.no-scrollbar-style .sidebar,
+.no-scrollbar-style .cache-panel-content,
+.no-scrollbar-style .custom-select-dropdown,
+.no-scrollbar-style .task-list,
+.no-scrollbar-style .task-details,
+.no-scrollbar-style .points-list-container {
+    scrollbar-width: auto;
+}
+
+@supports not (gap: 1rem) {
+    .header-right > * + *,
+    .header-actions > * + * {
+        margin-left: 12px;
+    }
+
+    .panel-content > * + *,
+    .form-group > * + *,
+    .layer-control > * + * {
+        margin-top: 8px;
+    }
+
+    .checkbox-label > * + * {
+        margin-left: 10px;
+    }
+
+    .task-panel-header > * + * {
+        margin-left: 16px;
+    }
+
+    .task-tabs > * + *,
+    .task-item-header > * + * {
+        margin-left: 8px;
+    }
+
+    .heatmap-body > * + * {
+        margin-top: 16px;
+    }
+
+    .strategy-buttons > * + * {
+        margin-left: 8px;
+    }
+}

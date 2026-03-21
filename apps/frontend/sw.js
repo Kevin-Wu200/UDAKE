@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
     '/css/component-styles.css',
     '/css/animation-styles.css',
     '/css/dark-mode.css',
+    '/css/safari-compat.css',
     '/js/主程序.ts',
 ];
 

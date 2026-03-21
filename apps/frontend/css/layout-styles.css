@@ -154,6 +154,8 @@ body {
     overflow-x: hidden;
     z-index: 100;
     pointer-events: none;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
 }
 
 .sidebar > * {
@@ -221,6 +223,33 @@ body {
 
 .sidebar::-webkit-scrollbar-thumb:hover {
     background: rgba(0, 0, 0, 0.3);
+}
+
+@supports not ((backdrop-filter: blur(2px)) or (-webkit-backdrop-filter: blur(2px))) {
+    .header,
+    .panel,
+    .info-panel {
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+        background: rgba(255, 255, 255, 0.96);
+    }
+
+    .dark .header,
+    .dark .panel,
+    .dark .info-panel {
+        background: rgba(30, 30, 30, 0.96);
+    }
+}
+
+@supports not (gap: 1rem) {
+    .header-right > * + *,
+    .header-actions > * + * {
+        margin-left: 12px;
+    }
+
+    .panel-content > * + * {
+        margin-top: 12px;
+    }
 }
 
 @media (prefers-color-scheme: dark) {
