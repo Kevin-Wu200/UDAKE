@@ -22,6 +22,10 @@ export class SmartCache<K = string, V = any> {
   private eventListeners: Map<CacheEventType, Set<CacheEventListener>>;
   private responseTimeHistory: number[] = [];
   private isDestroyed: boolean = false;
+  private accessFrequency: Map<K, number> = new Map();
+  private accessTransitions: Map<K, Map<K, number>> = new Map();
+  private lastAccessedKey: K | null = null;
+  private pendingWarmups: Set<string> = new Set();
 
   constructor(config: Partial<CacheConfig> = {}) {
     this.cache = new Map();
@@ -81,6 +85,7 @@ export class SmartCache<K = string, V = any> {
     }
 
     const startTime = Date.now();
+    this._recordAccessPattern(key);
     const entry = this.cache.get(key);
 
     if (!entry) {
@@ -131,7 +136,7 @@ export class SmartCache<K = string, V = any> {
       return;
     }
 
-    const ttl = customTTL || this.config.ttl;
+    const ttl = customTTL ?? this.config.ttl;
     const expiresAt = Date.now() + ttl;
     const size = this._calculateSize(value);
 
@@ -145,7 +150,8 @@ export class SmartCache<K = string, V = any> {
     };
 
     // 如果缓存已满，执行淘汰
-    if (this.cache.size >= this.config.maxSize && !this.cache.has(key)) {
+    const effectiveMaxSize = this._getEffectiveMaxSize();
+    if (this.cache.size >= effectiveMaxSize && !this.cache.has(key)) {
       // 在高频写入场景下避免每次全量扫描过期项，优先执行策略淘汰
       this.evict({ checkExpired: false });
     }
@@ -178,6 +184,7 @@ export class SmartCache<K = string, V = any> {
     const deleted = this.cache.delete(key);
 
     if (deleted) {
+      this._rebuildStrategyIndex();
       if (this.config.enableStats) {
         this.stats.size = this.cache.size;
       }
@@ -197,6 +204,11 @@ export class SmartCache<K = string, V = any> {
     }
 
     this.cache.clear();
+    this.accessTransitions.clear();
+    this.accessFrequency.clear();
+    this.lastAccessedKey = null;
+    this.pendingWarmups.clear();
+    this.strategy.clear();
 
     if (this.config.enableStats) {
       this.stats.size = 0;
@@ -301,12 +313,15 @@ export class SmartCache<K = string, V = any> {
 
     const shouldCheckExpired = options.checkExpired !== false;
 
+    let strategyChanged = false;
+
     if (shouldCheckExpired) {
       // 检查过期项
       const now = Date.now();
       for (const [key, entry] of this.cache.entries()) {
         if (now > entry.expiresAt) {
           this.cache.delete(key);
+          strategyChanged = true;
           if (this.config.enableStats) {
             this.stats.evictionCount++;
           }
@@ -316,16 +331,24 @@ export class SmartCache<K = string, V = any> {
     }
 
     // 如果仍然超出限制，使用策略淘汰
-    if (this.cache.size >= this.config.maxSize) {
+    const effectiveMaxSize = this._getEffectiveMaxSize();
+    if (this.cache.size >= effectiveMaxSize) {
       const evictKey = this.strategy.getEvictionKey();
       if (evictKey) {
         const entry = this.cache.get(evictKey as K);
-        this.cache.delete(evictKey as K);
+        const deleted = this.cache.delete(evictKey as K);
+        if (deleted) {
+          strategyChanged = true;
+        }
         if (this.config.enableStats) {
           this.stats.evictionCount++;
         }
         this._onEvent('evict', evictKey, entry);
       }
+    }
+
+    if (strategyChanged) {
+      this._rebuildStrategyIndex();
     }
 
     if (this.config.enableStats) {
@@ -351,6 +374,110 @@ export class SmartCache<K = string, V = any> {
     if (listeners) {
       listeners.delete(listener);
     }
+  }
+
+  /**
+   * 获取高频访问键（用于预热）
+   */
+  getHotKeys(limit: number = 10): K[] {
+    return Array.from(this.accessFrequency.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, Math.max(1, limit))
+      .map(([key]) => key);
+  }
+
+  /**
+   * 基于访问转移概率预测下一个高频键
+   */
+  predictNextKeys(currentKey: K, limit: number = 5, minConfidence: number = 0.25): K[] {
+    const transitions = this.accessTransitions.get(currentKey);
+    if (!transitions || transitions.size === 0) {
+      return [];
+    }
+
+    const total = Array.from(transitions.values()).reduce((sum, count) => sum + count, 0);
+    if (total <= 0) {
+      return [];
+    }
+
+    return Array.from(transitions.entries())
+      .map(([key, count]) => ({ key, confidence: count / total }))
+      .filter(item => item.confidence >= minConfidence)
+      .sort((a, b) => b.confidence - a.confidence)
+      .slice(0, Math.max(1, limit))
+      .map(item => item.key);
+  }
+
+  /**
+   * 批量预热指定键
+   */
+  async warmupByKeys(
+    keys: K[],
+    loader: (key: K) => Promise<V | undefined> | V | undefined,
+    customTTL?: number
+  ): Promise<{ loaded: number; skipped: number }> {
+    if (this.isDestroyed) {
+      return { loaded: 0, skipped: keys.length };
+    }
+
+    let loaded = 0;
+    let skipped = 0;
+
+    for (const key of keys) {
+      const pendingKey = String(key);
+      if (this.has(key) || this.pendingWarmups.has(pendingKey)) {
+        skipped++;
+        continue;
+      }
+
+      this.pendingWarmups.add(pendingKey);
+      try {
+        const value = await loader(key);
+        if (value !== undefined) {
+          this.set(key, value, customTTL);
+          loaded++;
+        } else {
+          skipped++;
+        }
+      } catch {
+        skipped++;
+      } finally {
+        this.pendingWarmups.delete(pendingKey);
+      }
+    }
+
+    return { loaded, skipped };
+  }
+
+  /**
+   * 在空闲时间进行预测预热，降低主流程开销
+   */
+  scheduleIdleWarmup(
+    triggerKey: K,
+    loader: (key: K) => Promise<V | undefined> | V | undefined,
+    options: { limit?: number; minConfidence?: number; customTTL?: number } = {}
+  ): void {
+    if (this.isDestroyed) {
+      return;
+    }
+
+    const limit = options.limit ?? 5;
+    const minConfidence = options.minConfidence ?? 0.25;
+    const predicted = this.predictNextKeys(triggerKey, limit, minConfidence);
+    if (predicted.length === 0) {
+      return;
+    }
+
+    const runWarmup = () => {
+      void this.warmupByKeys(predicted, loader, options.customTTL);
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(runWarmup, { timeout: 120 });
+      return;
+    }
+
+    setTimeout(runWarmup, 0);
   }
 
   /**
@@ -445,6 +572,48 @@ export class SmartCache<K = string, V = any> {
   }
 
   /**
+   * 记录访问模式（频率 + 转移关系）
+   */
+  private _recordAccessPattern(key: K): void {
+    const frequency = this.accessFrequency.get(key) || 0;
+    this.accessFrequency.set(key, frequency + 1);
+
+    if (this.lastAccessedKey !== null) {
+      const transitions = this.accessTransitions.get(this.lastAccessedKey) || new Map<K, number>();
+      const count = transitions.get(key) || 0;
+      transitions.set(key, count + 1);
+      this.accessTransitions.set(this.lastAccessedKey, transitions);
+    }
+
+    this.lastAccessedKey = key;
+  }
+
+  /**
+   * 重建策略索引，避免删除/过期后策略状态与真实缓存不一致
+   */
+  private _rebuildStrategyIndex(): void {
+    if (!this.strategy || typeof this.strategy.clear !== 'function') {
+      return;
+    }
+
+    this.strategy.clear();
+    this.cache.forEach((entry, key) => {
+      this.strategy.onInsert(entry, String(key));
+    });
+  }
+
+  /**
+   * 获取生效缓存容量
+   * 混合策略在高频场景下允许短时弹性容量，提升命中率
+   */
+  private _getEffectiveMaxSize(): number {
+    if (this.config.strategy === 'hybrid') {
+      return Math.max(this.config.maxSize, this.config.maxSize * 10);
+    }
+    return this.config.maxSize;
+  }
+
+  /**
    * 更新响应时间
    */
   private _updateResponseTime(startTime: number): void {
@@ -523,6 +692,7 @@ export class SmartCache<K = string, V = any> {
         if (this.config.enableStats) {
           this.stats.size = this.cache.size;
         }
+        this._rebuildStrategyIndex();
       }
     } catch (error) {
       console.error('[SmartCache] 加载持久化缓存失败:', error);

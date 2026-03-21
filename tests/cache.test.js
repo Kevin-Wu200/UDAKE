@@ -277,6 +277,45 @@ describe('TwoLevelCache', () => {
     });
   });
 
+  describe('命中率优化', () => {
+    it('应该通过行为预测预取将命中率提升到85%以上', async () => {
+      const dataSource = new Map([
+        ['next:1', 'value-next-1']
+      ]);
+      let loaderCalls = 0;
+
+      cache.configurePrefetch(async (key) => {
+        loaderCalls++;
+        await new Promise(resolve => setTimeout(resolve, 1));
+        return dataSource.get(key);
+      }, {
+        prefetchBatchSize: 1,
+        prefetchMinConfidence: 0.6
+      });
+
+      await cache.set('start:1', 'value-start-1');
+
+      // 建立访问模式：start:1 -> next:1
+      for (let i = 0; i < 6; i++) {
+        await cache.get('start:1');
+        await cache.get('next:1');
+      }
+
+      await cache.delete('next:1');
+      cache.resetStats();
+
+      for (let i = 0; i < 20; i++) {
+        await cache.get('start:1');
+        await new Promise(resolve => setTimeout(resolve, 5)); // 等待空闲预取调度
+        await cache.get('next:1');
+      }
+
+      const stats = cache.getStats();
+      expect(loaderCalls).toBeGreaterThan(0);
+      expect(stats.total.hitRate).toBeGreaterThan(0.85);
+    });
+  });
+
   describe('批量操作', () => {
     it('应该支持批量预热', async () => {
       const entries = new Map([

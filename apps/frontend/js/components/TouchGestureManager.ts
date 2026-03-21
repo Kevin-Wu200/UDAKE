@@ -45,6 +45,17 @@ interface TouchGestureManagerOptions {
     maxUndoSteps?: number;
     enableGestureConflictDetection?: boolean;
     enableVisualFeedback?: boolean;
+    enablePredictiveGesture?: boolean;
+    predictiveConfidenceThreshold?: number;
+    predictiveMinMoveDistance?: number;
+    conflictLockMs?: number;
+}
+
+interface GesturePredictionMetrics {
+    totalPredictions: number;
+    highConfidencePredictions: number;
+    avgPredictionLatency: number;
+    under20msRate: number;
 }
 
 class TouchGestureManager {
@@ -76,6 +87,15 @@ class TouchGestureManager {
     private gesturePriority: Map<GestureType, number> = new Map();
     private activeGesture: GestureType | null = null;
     private conflictingGestures: Set<GestureType> = new Set();
+    private gestureConflictLockUntil: number = 0;
+    private predictedGestureForCurrentTouch: GestureType | null = null;
+    private predictionLatencyHistory: number[] = [];
+    private predictionMetrics: GesturePredictionMetrics = {
+        totalPredictions: 0,
+        highConfidencePredictions: 0,
+        avgPredictionLatency: 0,
+        under20msRate: 0,
+    };
 
     // 音频上下文
     private audioContext: AudioContext | null = null;
@@ -105,6 +125,10 @@ class TouchGestureManager {
             maxUndoSteps: options.maxUndoSteps ?? 10,
             enableGestureConflictDetection: options.enableGestureConflictDetection ?? true,
             enableVisualFeedback: options.enableVisualFeedback ?? true,
+            enablePredictiveGesture: options.enablePredictiveGesture ?? true,
+            predictiveConfidenceThreshold: options.predictiveConfidenceThreshold ?? 0.9,
+            predictiveMinMoveDistance: options.predictiveMinMoveDistance ?? 24,
+            conflictLockMs: options.conflictLockMs ?? 80,
         };
 
         // 初始化手势优先级（数值越高优先级越高）
@@ -384,6 +408,7 @@ class TouchGestureManager {
 
         // 单指操作
         if (e.touches.length === 1) {
+            this.resetPredictionState();
             const touch = e.touches[0];
             this.startTime = Date.now();
             this.startX = touch.clientX;
@@ -404,6 +429,7 @@ class TouchGestureManager {
         }
         // 双指操作
         else if (e.touches.length === 2) {
+            this.resetPredictionState();
             this.clearLongPress();
 
             const touch1 = e.touches[0];
@@ -418,6 +444,7 @@ class TouchGestureManager {
         }
         // 三指操作
         else if (e.touches.length === 3 && this.options.enableTripleFingerPinch) {
+            this.resetPredictionState();
             this.clearLongPress();
             this.activeGesture = 'tripleFingerPinch';
             this.initialTripleDistance = this.getTripleFingerDistance(e.touches);
@@ -439,7 +466,30 @@ class TouchGestureManager {
 
         // 单指操作 - 可能是拖拽
         if (e.touches.length === 1 && this.options.enableSwipe) {
-            // 在这里可以添加拖拽逻辑
+            const touch = e.touches[0];
+            const prediction = this.options.enablePredictiveGesture
+                ? this.predictSingleFingerGesture(touch)
+                : null;
+
+            if (
+                prediction
+                && this.predictedGestureForCurrentTouch !== prediction.type
+                && this.checkGestureConflict(prediction.type)
+            ) {
+                this.predictedGestureForCurrentTouch = prediction.type;
+                this.recordPredictionMetrics(Date.now() - this.startTime, prediction.confidence);
+                this.triggerGesture(prediction.type, prediction.event);
+                this.gestureConflictLockUntil = Date.now() + this.options.conflictLockMs;
+
+                if (prediction.type === 'swipe') {
+                    this.touchFeedback('swipe');
+                } else {
+                    this.touchFeedback('gestureSuccess');
+                }
+
+                // 预测命中后尽量避免页面滚动抢占触摸链路
+                e.preventDefault();
+            }
         }
         // 双指操作 - 缩放和旋转
         else if (e.touches.length === 2) {
@@ -508,6 +558,13 @@ class TouchGestureManager {
 
         // 所有触摸点都结束了
         if (this.touches.size === 0 && e.touches.length === 0) {
+            const predictedSwipeHandled = this.isSwipeFamilyGesture(this.predictedGestureForCurrentTouch);
+            if (predictedSwipeHandled) {
+                this.resetPredictionState();
+                this.activeGesture = null;
+                return;
+            }
+
             const duration = Date.now() - this.startTime;
             const touch = e.changedTouches[0];
             const deltaX = touch.clientX - this.startX;
@@ -595,6 +652,7 @@ class TouchGestureManager {
 
         // 重置活动手势
         this.activeGesture = null;
+        this.resetPredictionState();
     };
 
     /**
@@ -604,6 +662,7 @@ class TouchGestureManager {
         this.clearLongPress();
         this.touches.clear();
         this.activeGesture = null;
+        this.resetPredictionState();
     };
 
     /**
@@ -693,6 +752,144 @@ class TouchGestureManager {
     }
 
     /**
+     * 预测单指手势（touchmove阶段）
+     */
+    private predictSingleFingerGesture(
+        touch: Touch
+    ): { type: GestureType; confidence: number; event: GestureEvent } | null {
+        const duration = Math.max(1, Date.now() - this.startTime);
+        const deltaX = touch.clientX - this.startX;
+        const deltaY = touch.clientY - this.startY;
+        const distance = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+
+        if (distance < this.options.predictiveMinMoveDistance) {
+            return null;
+        }
+
+        const absX = Math.abs(deltaX);
+        const absY = Math.abs(deltaY);
+        const dominantAxisRatio = Math.max(absX, absY) / Math.max(1, absX + absY);
+        const velocity = distance / duration;
+        const direction = this.getSwipeDirection(deltaX, deltaY);
+        const center = { x: touch.clientX, y: touch.clientY };
+        const candidates: Array<{ type: GestureType; confidence: number; event: GestureEvent }> = [];
+
+        if (this.options.enableSwipe) {
+            const swipeDistanceScore = Math.min(1, distance / Math.max(1, this.options.swipeThreshold));
+            const swipeVelocityScore = Math.min(1, velocity / 0.9);
+            const swipeConfidence = Math.min(
+                1,
+                dominantAxisRatio * 0.45 + swipeDistanceScore * 0.4 + swipeVelocityScore * 0.15
+            );
+            candidates.push({
+                type: 'swipe',
+                confidence: swipeConfidence,
+                event: {
+                    type: 'swipe',
+                    center,
+                    direction,
+                    delta: { x: deltaX, y: deltaY },
+                    velocity,
+                },
+            });
+        }
+
+        if (this.options.enableQuickSwipe && duration <= 320) {
+            const quickDistanceScore = Math.min(1, distance / Math.max(1, this.options.quickSwipeThreshold));
+            const quickVelocityScore = Math.min(1, velocity / 1.2);
+            const quickDurationScore = duration <= 220 ? 1 : Math.max(0, 1 - (duration - 220) / 100);
+            const quickConfidence = Math.min(
+                1,
+                dominantAxisRatio * 0.35 + quickDistanceScore * 0.25 + quickVelocityScore * 0.25 + quickDurationScore * 0.15
+            );
+
+            if (distance >= this.options.quickSwipeThreshold * 0.7) {
+                candidates.push({
+                    type: 'quickSwipe',
+                    confidence: quickConfidence,
+                    event: {
+                        type: 'quickSwipe',
+                        center,
+                        direction,
+                        delta: { x: deltaX, y: deltaY },
+                        velocity,
+                    },
+                });
+            }
+        }
+
+        if (
+            this.options.enableLayerSwipe
+            && (direction === 'left' || direction === 'right')
+            && absX >= 80
+        ) {
+            const horizontalDominance = absX / Math.max(1, absX + absY);
+            const layerDistanceScore = Math.min(1, absX / 160);
+            const layerConfidence = Math.min(1, horizontalDominance * 0.55 + layerDistanceScore * 0.45);
+            candidates.push({
+                type: 'layerSwipe',
+                confidence: layerConfidence,
+                event: {
+                    type: 'layerSwipe',
+                    center,
+                    direction,
+                    delta: { x: deltaX, y: deltaY },
+                    layerIndex: direction === 'right' ? 1 : -1,
+                    velocity,
+                },
+            });
+        }
+
+        if (candidates.length === 0) {
+            return null;
+        }
+
+        candidates.sort((a, b) => b.confidence - a.confidence);
+        const top = candidates[0];
+        if (top.confidence < this.options.predictiveConfidenceThreshold) {
+            return null;
+        }
+
+        return top;
+    }
+
+    /**
+     * 记录预测性能指标
+     */
+    private recordPredictionMetrics(latency: number, confidence: number): void {
+        this.predictionMetrics.totalPredictions++;
+        if (confidence >= this.options.predictiveConfidenceThreshold) {
+            this.predictionMetrics.highConfidencePredictions++;
+        }
+
+        this.predictionLatencyHistory.push(latency);
+        if (this.predictionLatencyHistory.length > 100) {
+            this.predictionLatencyHistory.shift();
+        }
+
+        const totalLatency = this.predictionLatencyHistory.reduce((sum, value) => sum + value, 0);
+        this.predictionMetrics.avgPredictionLatency = totalLatency / this.predictionLatencyHistory.length;
+        const under20msCount = this.predictionLatencyHistory.filter((value) => value < 20).length;
+        this.predictionMetrics.under20msRate = under20msCount / this.predictionLatencyHistory.length;
+    }
+
+    /**
+     * 判断是否为单指滑动家族手势
+     */
+    private isSwipeFamilyGesture(type: GestureType | null): boolean {
+        return type === 'swipe' || type === 'quickSwipe' || type === 'layerSwipe';
+    }
+
+    /**
+     * 重置预测状态
+     */
+    private resetPredictionState(): void {
+        this.predictedGestureForCurrentTouch = null;
+        this.conflictingGestures.clear();
+        this.gestureConflictLockUntil = 0;
+    }
+
+    /**
      * 触发手势回调
      */
     private triggerGesture(type: GestureType, event: GestureEvent): void {
@@ -721,6 +918,12 @@ class TouchGestureManager {
      */
     private checkGestureConflict(newGesture: GestureType): boolean {
         if (!this.options.enableGestureConflictDetection) return true;
+        const now = Date.now();
+
+        // 短时冲突锁：避免同一触摸链路中重复或低优先级抖动触发
+        if (this.conflictingGestures.has(newGesture) && now < this.gestureConflictLockUntil) {
+            return false;
+        }
 
         // 如果没有活动手势，允许新手势
         if (!this.activeGesture || !this.isGestureInProgress) return true;
@@ -731,10 +934,14 @@ class TouchGestureManager {
 
         if (newGesturePriority >= activeGesturePriority) {
             // 新手势优先级更高，取消活动手势
+            this.conflictingGestures.add(this.activeGesture);
+            this.gestureConflictLockUntil = now + this.options.conflictLockMs;
             return true;
         }
 
         // 优先级相同或更低，阻止新手势
+        this.conflictingGestures.add(newGesture);
+        this.gestureConflictLockUntil = now + this.options.conflictLockMs;
         return false;
     }
 
@@ -792,6 +999,13 @@ class TouchGestureManager {
      */
     public getHistory(): GestureEvent[] {
         return [...this.gestureHistory];
+    }
+
+    /**
+     * 获取预测手势性能指标
+     */
+    public getPredictionMetrics(): GesturePredictionMetrics {
+        return { ...this.predictionMetrics };
     }
 
     /**
@@ -927,6 +1141,14 @@ class TouchGestureManager {
         this.gesturePriority.clear();
         this.activeGesture = null;
         this.isGestureInProgress = false;
+        this.resetPredictionState();
+        this.predictionLatencyHistory = [];
+        this.predictionMetrics = {
+            totalPredictions: 0,
+            highConfidencePredictions: 0,
+            avgPredictionLatency: 0,
+            under20msRate: 0,
+        };
 
         // 移除反馈元素
         if (this.feedbackElement && this.feedbackElement.parentNode) {

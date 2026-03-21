@@ -110,6 +110,53 @@ describe('TouchGestureManager Enhanced Features', () => {
         });
     });
 
+    describe('Predictive Gesture Recognition', () => {
+        it('应该在touchmove阶段高置信度提前触发滑动手势', async () => {
+            const manager = new TouchGestureManager({
+                enablePredictiveGesture: true,
+                predictiveConfidenceThreshold: 0.9,
+                predictiveMinMoveDistance: 20,
+                enableQuickSwipe: false,
+                enableLayerSwipe: false,
+            });
+
+            const swipeEvents = [];
+            manager.on('swipe', (event) => {
+                swipeEvents.push(event);
+            });
+
+            manager.bind(container);
+
+            const touchStartEvent = new TouchEvent('touchstart', {
+                touches: [{ clientX: 40, clientY: 200, identifier: 1 }],
+            });
+            container.dispatchEvent(touchStartEvent);
+
+            const touchMoveEvent = new TouchEvent('touchmove', {
+                touches: [{ clientX: 180, clientY: 210, identifier: 1 }],
+                changedTouches: [{ clientX: 180, clientY: 210, identifier: 1 }],
+            });
+            container.dispatchEvent(touchMoveEvent);
+
+            expect(swipeEvents.length).toBe(1);
+            expect(swipeEvents[0].direction).toBe('right');
+
+            const touchEndEvent = new TouchEvent('touchend', {
+                changedTouches: [{ clientX: 190, clientY: 210, identifier: 1 }],
+            });
+            container.dispatchEvent(touchEndEvent);
+
+            // 预测触发后不应在touchend重复触发同一滑动
+            expect(swipeEvents.length).toBe(1);
+
+            const metrics = manager.getPredictionMetrics();
+            expect(metrics.totalPredictions).toBeGreaterThan(0);
+            expect(metrics.highConfidencePredictions).toBeGreaterThan(0);
+
+            manager.destroy();
+        });
+    });
+
     describe('Quick Swipe Gesture', () => {
         it('应该正确识别快速滑动手势', async () => {
             const manager = new TouchGestureManager({

@@ -150,6 +150,14 @@ export interface TwoLevelCacheConfig {
   enableAutoPromote?: boolean;
   /** 提升阈值（访问次数） */
   promoteThreshold?: number;
+  /** 是否启用行为预测预取 */
+  enableBehaviorPrefetch?: boolean;
+  /** 预取批次大小 */
+  prefetchBatchSize?: number;
+  /** 预取最小置信度 */
+  prefetchMinConfidence?: number;
+  /** 预取TTL系数 */
+  prefetchTTLFactor?: number;
 }
 
 /**

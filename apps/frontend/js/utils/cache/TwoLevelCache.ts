@@ -15,6 +15,12 @@ export class TwoLevelCache<K = string, V = any> {
   private promoteThreshold: number;
   private isDestroyed: boolean = false;
   private ttlStore: Map<K, number> = new Map();
+  private prefetchLoader: ((key: K) => Promise<V | undefined> | V | undefined) | null = null;
+  private enableBehaviorPrefetch: boolean;
+  private prefetchBatchSize: number;
+  private prefetchMinConfidence: number;
+  private prefetchTTLFactor: number;
+  private prefetchInFlight: boolean = false;
 
   constructor(
     memoryConfig: Partial<CacheConfig> = {},
@@ -44,6 +50,10 @@ export class TwoLevelCache<K = string, V = any> {
     this.memoryToDiskPromoter = new Map();
     this.enableAutoPromote = options?.enableAutoPromote !== false;
     this.promoteThreshold = options?.promoteThreshold || 3;
+    this.enableBehaviorPrefetch = (options as any)?.enableBehaviorPrefetch !== false;
+    this.prefetchBatchSize = (options as any)?.prefetchBatchSize || 5;
+    this.prefetchMinConfidence = (options as any)?.prefetchMinConfidence || 0.35;
+    this.prefetchTTLFactor = (options as any)?.prefetchTTLFactor || 0.8;
 
     // 监听内存缓存的访问事件
     this.memoryCache.on('hit', (_event, key) => {
@@ -60,10 +70,17 @@ export class TwoLevelCache<K = string, V = any> {
       return undefined;
     }
 
+    if (this._isCustomTTLExpired(key)) {
+      await this.delete(key);
+      return undefined;
+    }
+
     // 先查内存缓存
     let value = this.memoryCache.get(key);
 
     if (value !== undefined) {
+      this._refreshHotKeyTTL(key, value);
+      this._scheduleBehaviorPrefetch(key);
       return value;
     }
 
@@ -75,6 +92,8 @@ export class TwoLevelCache<K = string, V = any> {
       if (this.enableAutoPromote) {
         await this.promoteToMemory(key, value);
       }
+      this._refreshHotKeyTTL(key, value);
+      this._scheduleBehaviorPrefetch(key);
       return value;
     }
 
@@ -91,12 +110,14 @@ export class TwoLevelCache<K = string, V = any> {
     }
 
     // 同时写入两层缓存
-    this.memoryCache.set(key, value);
-    this.diskCache.set(key, value);
+    this.memoryCache.set(key, value, ttl);
+    this.diskCache.set(key, value, ttl);
 
     // 如果指定了 TTL，设置过期时间
-    if (ttl) {
+    if (ttl !== undefined) {
       this.ttlStore.set(key, Date.now() + ttl);
+    } else {
+      this.ttlStore.delete(key);
     }
 
     // 重置访问计数
@@ -115,6 +136,7 @@ export class TwoLevelCache<K = string, V = any> {
     this.memoryCache.delete(key);
     this.diskCache.delete(key);
     this.memoryToDiskPromoter.delete(key);
+    this.ttlStore.delete(key);
   }
 
   /**
@@ -129,6 +151,7 @@ export class TwoLevelCache<K = string, V = any> {
     this.memoryCache.clear();
     this.diskCache.clear();
     this.memoryToDiskPromoter.clear();
+    this.ttlStore.clear();
     this.promotionCount = 0;
   }
 
@@ -137,6 +160,11 @@ export class TwoLevelCache<K = string, V = any> {
    */
   async has(key: K): Promise<boolean> {
     if (this.isDestroyed) {
+      return false;
+    }
+
+    if (this._isCustomTTLExpired(key)) {
+      await this.delete(key);
       return false;
     }
 
@@ -188,7 +216,8 @@ export class TwoLevelCache<K = string, V = any> {
     }
 
     if (value !== undefined) {
-      this.memoryCache.set(key, value);
+      const customTTL = this._getRemainingTTL(key);
+      this.memoryCache.set(key, value, customTTL);
       this.promotionCount++;
     }
   }
@@ -255,8 +284,11 @@ export class TwoLevelCache<K = string, V = any> {
 
     console.log(`[TwoLevelCache] 开始预热 ${entries.size} 条数据...`);
 
-    for (const [key, value] of entries.entries()) {
-      await this.set(key, value);
+    const batchSize = 50;
+    const entryArray = Array.from(entries.entries());
+    for (let i = 0; i < entryArray.length; i += batchSize) {
+      const batch = entryArray.slice(i, i + batchSize);
+      await Promise.all(batch.map(([key, value]) => this.set(key, value)));
     }
 
     console.log('[TwoLevelCache] 预热完成');
@@ -315,6 +347,29 @@ export class TwoLevelCache<K = string, V = any> {
   }
 
   /**
+   * 配置行为预测预加载
+   */
+  configurePrefetch(
+    loader: (key: K) => Promise<V | undefined> | V | undefined,
+    options: {
+      prefetchBatchSize?: number;
+      prefetchMinConfidence?: number;
+      prefetchTTLFactor?: number;
+    } = {}
+  ): void {
+    this.prefetchLoader = loader;
+    if (options.prefetchBatchSize !== undefined) {
+      this.prefetchBatchSize = options.prefetchBatchSize;
+    }
+    if (options.prefetchMinConfidence !== undefined) {
+      this.prefetchMinConfidence = options.prefetchMinConfidence;
+    }
+    if (options.prefetchTTLFactor !== undefined) {
+      this.prefetchTTLFactor = options.prefetchTTLFactor;
+    }
+  }
+
+  /**
    * 销毁缓存
    */
   destroy(): void {
@@ -326,6 +381,135 @@ export class TwoLevelCache<K = string, V = any> {
     this.memoryCache.destroy();
     this.diskCache.destroy();
     this.memoryToDiskPromoter.clear();
+    this.ttlStore.clear();
+    this.prefetchLoader = null;
+    this.prefetchInFlight = false;
+  }
+
+  /**
+   * 判断是否已超过自定义TTL
+   */
+  private _isCustomTTLExpired(key: K): boolean {
+    const expiresAt = this.ttlStore.get(key);
+    if (expiresAt === undefined) {
+      return false;
+    }
+    return Date.now() > expiresAt;
+  }
+
+  /**
+   * 获取剩余TTL（毫秒）
+   */
+  private _getRemainingTTL(key: K): number | undefined {
+    const expiresAt = this.ttlStore.get(key);
+    if (expiresAt === undefined) {
+      return undefined;
+    }
+    const remaining = expiresAt - Date.now();
+    return remaining > 0 ? remaining : undefined;
+  }
+
+  /**
+   * 热点键访问时刷新TTL，提升驻留概率
+   */
+  private _refreshHotKeyTTL(key: K, value: V): void {
+    const accessCount = this.memoryToDiskPromoter.get(key) || 0;
+    const expiresAt = this.ttlStore.get(key);
+    if (accessCount < this.promoteThreshold * 2 || expiresAt === undefined) {
+      return;
+    }
+
+    const remaining = expiresAt - Date.now();
+    if (remaining <= 0) {
+      return;
+    }
+
+    const boostedTTL = Math.min(Math.max(Math.floor(remaining * 1.5), 30_000), 10 * 60 * 1000);
+    this.ttlStore.set(key, Date.now() + boostedTTL);
+    this.memoryCache.set(key, value, boostedTTL);
+    this.diskCache.set(key, value, boostedTTL);
+  }
+
+  /**
+   * 根据访问行为预测并在空闲时预加载
+   */
+  private _scheduleBehaviorPrefetch(triggerKey: K): void {
+    if (
+      this.isDestroyed
+      || !this.enableBehaviorPrefetch
+      || !this.prefetchLoader
+      || this.prefetchInFlight
+    ) {
+      return;
+    }
+
+    const predicted = this.memoryCache.predictNextKeys(
+      triggerKey,
+      this.prefetchBatchSize,
+      this.prefetchMinConfidence
+    );
+    const fallbackHotKeys = this.diskCache
+      .getHotKeys(this.prefetchBatchSize * 2)
+      .filter(key => !predicted.includes(key) && !this.memoryCache.has(key));
+    const candidates = [...predicted, ...fallbackHotKeys].slice(0, this.prefetchBatchSize);
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    const runWarmup = async () => {
+      if (!this.prefetchLoader) {
+        return;
+      }
+
+      this.prefetchInFlight = true;
+      const prefetchTTL = this._getPrefetchTTL();
+      try {
+        await this.memoryCache.warmupByKeys(
+          candidates,
+          async (key) => {
+            if (!this.prefetchLoader) {
+              return undefined;
+            }
+            const value = await this.prefetchLoader(key);
+            if (value !== undefined) {
+              this.diskCache.set(key, value, prefetchTTL);
+            }
+            return value;
+          },
+          prefetchTTL
+        );
+      } finally {
+        this.prefetchInFlight = false;
+      }
+    };
+
+    if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(() => {
+        void runWarmup();
+      }, { timeout: 150 });
+      return;
+    }
+
+    setTimeout(() => {
+      void runWarmup();
+    }, 0);
+  }
+
+  /**
+   * 计算预取TTL
+   */
+  private _getPrefetchTTL(): number | undefined {
+    const remains = Array.from(this.ttlStore.values())
+      .map(expiresAt => expiresAt - Date.now())
+      .filter(remaining => remaining > 0);
+
+    if (remains.length === 0) {
+      return undefined;
+    }
+
+    const averageRemain = remains.reduce((sum, value) => sum + value, 0) / remains.length;
+    return Math.max(10_000, Math.floor(averageRemain * this.prefetchTTLFactor));
   }
 
   /**
