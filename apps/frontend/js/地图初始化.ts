@@ -18,6 +18,16 @@ async function importAdapters() {
  * 地图引擎提供商类型
  */
 export type MapProvider = 'arcgis' | 'amap';
+const MAP_INIT_TIMEOUT_MS = 20000;
+
+function withTimeout<T>(promise: Promise<T>, provider: MapProvider): Promise<T> {
+    return Promise.race([
+        promise,
+        new Promise<never>((_, reject) => {
+            setTimeout(() => reject(new Error(`地图引擎初始化超时: ${provider}`)), MAP_INIT_TIMEOUT_MS);
+        })
+    ]);
+}
 
 /**
  * 初始化地图
@@ -46,7 +56,7 @@ export async function initializeMap(containerId: string): Promise<IMapAdapter> {
             throw new Error(`不支持的地图引擎: ${provider}`);
     }
 
-    await adapter.initMap(containerId);
+    await withTimeout(adapter.initMap(containerId), provider);
 
     return adapter;
 }
@@ -91,7 +101,7 @@ export async function reinitializeMap(
             throw new Error(`不支持的地图引擎: ${provider}`);
     }
 
-    await adapter.initMap(containerId);
+    await withTimeout(adapter.initMap(containerId), provider);
 
     return adapter;
 }

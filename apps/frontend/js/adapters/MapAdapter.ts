@@ -108,4 +108,9 @@ export abstract class MapAdapter {
      * @returns 采样点数组
      */
     abstract getSamplingPoints(): SamplingPoint[];
+
+    /**
+     * 销毁适配器及底层地图资源
+     */
+    abstract destroy(): void;
 }

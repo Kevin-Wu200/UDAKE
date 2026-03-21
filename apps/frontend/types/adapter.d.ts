@@ -69,6 +69,9 @@ export abstract class MapAdapter {
 
     /** 获取采样点数据 */
     abstract getSamplingPoints(): SamplingPoint[];
+
+    /** 销毁适配器 */
+    abstract destroy(): void;
 }
 
 // ========== ArcGIS 适配器特定类型 ==========
@@ -124,4 +127,5 @@ export class ArcGISAdapter extends MapAdapter {
     zoomToLayer(layerName: string): void;
     setClickHandler(handler: ClickHandler): void;
     getSamplingPoints(): SamplingPoint[];
+    destroy(): void;
 }

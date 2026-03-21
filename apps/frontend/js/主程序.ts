@@ -4,6 +4,7 @@
  */
 
 import { initializeMap, getMapProvider, reinitializeMap } from './地图初始化.js';
+import { abortAllAMapLoads } from './config/amap.config.js';
 import { LayerManager } from './图层管理.js';
 import { TaskPoller } from './任务轮询.js';
 import { APIService } from './services/API封装.js';
@@ -78,6 +79,8 @@ class App {
 
     // 切换状态
     private isSwitchingMap: boolean = false;
+    private mapSwitchAbortController: AbortController | null = null;
+    private mapSwitchSessionId: number = 0;
     private kriging3DPanel: Kriging3DPanel | null = null;
 
     // 管理器
@@ -1059,18 +1062,36 @@ class App {
         }
 
         this.isSwitchingMap = true;
+        this.mapSwitchAbortController?.abort();
+        this.mapSwitchAbortController = new AbortController();
+        const currentSwitchController = this.mapSwitchAbortController;
+        const currentSwitchSession = ++this.mapSwitchSessionId;
+        const ensureSwitchAlive = () => {
+            if (
+                currentSwitchController.signal.aborted ||
+                currentSwitchSession !== this.mapSwitchSessionId
+            ) {
+                throw new DOMException('地图切换已取消', 'AbortError');
+            }
+        };
 
         try {
             LoadingManager.show('正在切换地图引擎...');
+            ensureSwitchAlive();
 
             const currentCenter = this.view ? (this.view as any).getCenter?.() : null;
             const currentZoom = this.view ? (this.view as any).getZoom?.() : null;
             const samplingPoints = this.layerManager?.getSamplingPoints() || [];
             const projectPoints = this.currentProject?.points || [];
+            const previousAdapter = this.layerManager?.adapter;
 
             if (this.layerManager) {
                 this.layerManager.clearAllLayers();
             }
+
+            // 先销毁旧地图引擎，避免旧 iframe / 事件监听残留导致竞态
+            previousAdapter?.destroy?.();
+            abortAllAMapLoads();
 
             // 清理旧的iframe，确保完全移除
             const iframes = document.querySelectorAll('iframe[id^="amap-loader-iframe"]');
@@ -1081,14 +1102,27 @@ class App {
             });
 
             // 等待DOM完全更新，确保iframe完全清理（增加延迟以确保所有异步操作完成）
-            await new Promise(resolve => setTimeout(resolve, 300));
+            await new Promise<void>((resolve, reject) => {
+                const timeoutId = window.setTimeout(resolve, 300);
+                currentSwitchController.signal.addEventListener('abort', () => {
+                    clearTimeout(timeoutId);
+                    reject(new DOMException('地图切换已取消', 'AbortError'));
+                }, { once: true });
+            });
+            ensureSwitchAlive();
 
             const mapContainer = document.getElementById('viewDiv');
             if (mapContainer) {
                 mapContainer.style.visibility = 'visible';
             }
 
-            const mapAdapter = await reinitializeMap('viewDiv', newProvider);
+            const mapAdapter = await Promise.race([
+                reinitializeMap('viewDiv', newProvider),
+                new Promise<never>((_, reject) => {
+                    setTimeout(() => reject(new Error('地图引擎切换超时（20秒）')), 20000);
+                })
+            ]);
+            ensureSwitchAlive();
             this.view = mapAdapter.getView();
             this.layerManager = new LayerManager(mapAdapter);
 
@@ -1121,6 +1155,10 @@ class App {
 
         } catch (error) {
             LoadingManager.hide();
+            if (error instanceof DOMException && error.name === 'AbortError') {
+                console.warn('⚠️ 地图切换被取消');
+                return;
+            }
             console.error('地图引擎切换失败:', error);
             const errorMessage = error instanceof Error ? error.message : '未知错误';
             this.showStatus(`切换失败: ${errorMessage}`, 'error');
@@ -1128,6 +1166,9 @@ class App {
         } finally {
             // 重置切换状态标志
             this.isSwitchingMap = false;
+            if (this.mapSwitchAbortController === currentSwitchController) {
+                this.mapSwitchAbortController = null;
+            }
         }
     }
 

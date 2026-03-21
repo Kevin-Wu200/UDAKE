@@ -72,6 +72,20 @@ export const AmapConfig = {
  * 网络状态监听器
  */
 let networkStatusListener = null;
+let currentLoadAbortController = null;
+let amapLoadVersion = 0;
+
+/**
+ * 取消所有正在进行中的高德地图加载流程
+ * 用于地图引擎切换时中断旧 iframe 的异步消息
+ */
+export function abortAllAMapLoads() {
+    amapLoadVersion += 1;
+    if (currentLoadAbortController && !currentLoadAbortController.signal.aborted) {
+        currentLoadAbortController.abort();
+    }
+    currentLoadAbortController = null;
+}
 
 /**
  * 设置网络状态监听器
@@ -134,8 +148,13 @@ export function loadAMapScript(containerId) {
         console.log('🔄 开始加载高德地图 API（iframe 方式）...');
         console.log('📦 地图容器 ID:', containerId);
 
+        // 取消上一次未完成的加载，避免快速切换导致竞态
+        abortAllAMapLoads();
+
         // 创建 AbortController 用于控制异步操作
         const abortController = new AbortController();
+        currentLoadAbortController = abortController;
+        const loadVersion = ++amapLoadVersion;
 
         // 检查 AMap 是否已加载
         if (window.AMap && window.AMap.Map) {
@@ -158,11 +177,29 @@ export function loadAMapScript(containerId) {
         iframe.style.height = '0';
         iframe.id = 'amap-loader-iframe';
         
-        document.body.appendChild(iframe);
-        console.log('📤 创建 iframe 用于加载高德地图 API');
-
         // 标记 iframe 是否已被销毁
         let isDestroyed = false;
+        const proxyMessageHandlers = new Set();
+        const isCurrentLoad = () =>
+            !isDestroyed &&
+            !abortController.signal.aborted &&
+            loadVersion === amapLoadVersion;
+        const postToIframe = (payload, actionName) => {
+            if (!isCurrentLoad() || !iframe.contentWindow) {
+                console.warn(`⚠️ iframe 不可用，跳过 ${actionName} 调用`);
+                return false;
+            }
+            try {
+                iframe.contentWindow.postMessage(payload, '*');
+                return true;
+            } catch (error) {
+                console.error(`❌ ${actionName} postMessage 失败:`, error);
+                return false;
+            }
+        };
+
+        document.body.appendChild(iframe);
+        console.log('📤 创建 iframe 用于加载高德地图 API');
 
         // 设置 iframe 的内容
         const iframeContent = `
@@ -267,6 +304,14 @@ export function loadAMapScript(containerId) {
                                     }, '*');
                                 });
                             }
+                        } else if (e.data.type === 'MAP_DESTROY') {
+                            if (mapInstance) {
+                                mapInstance.destroy();
+                                mapInstance = null;
+                            }
+                            window.parent.postMessage({
+                                type: 'MAP_DESTROYED'
+                            }, '*');
                         }
                     });
                     
@@ -315,8 +360,14 @@ export function loadAMapScript(containerId) {
 
         // 监听来自 iframe 的消息
         const messageHandler = (event) => {
+            if (!isCurrentLoad()) {
+                return;
+            }
             if (event.origin !== window.location.origin && event.origin !== 'null') {
                 return; // 安全检查
+            }
+            if (event.source !== iframe.contentWindow) {
+                return;
             }
 
             if (event.data && event.data.type === 'AMAP_LOADED') {
@@ -345,18 +396,16 @@ export function loadAMapScript(containerId) {
                 };
                 
                 // 发送消息到 iframe（检查 iframe 是否有效）
-                if (iframe.contentWindow && !isDestroyed) {
-                    iframe.contentWindow.postMessage({
-                        type: 'INIT_MAP',
-                        containerInfo: {
-                            width: rect.width,
-                            height: rect.height,
-                            top: rect.top,
-                            left: rect.left
-                        },
-                        mapOptions: defaultMapOptions
-                    }, '*');
-                } else {
+                if (!postToIframe({
+                    type: 'INIT_MAP',
+                    containerInfo: {
+                        width: rect.width,
+                        height: rect.height,
+                        top: rect.top,
+                        left: rect.left
+                    },
+                    mapOptions: defaultMapOptions
+                }, 'INIT_MAP')) {
                     console.warn('⚠️ iframe 已失效，无法发送 INIT_MAP 消息');
                     cleanup();
                     reject(new Error('iframe 已失效'));
@@ -365,8 +414,12 @@ export function loadAMapScript(containerId) {
                 
                 // 监听地图创建成功的消息
                 const mapReadyHandler = (e) => {
+                    if (!isCurrentLoad() || e.source !== iframe.contentWindow) {
+                        return;
+                    }
                     if (e.data && e.data.type === 'MAP_READY') {
                         console.log('✅ 地图在 iframe 中创建成功');
+                        window.removeEventListener('message', mapReadyHandler);
                         
                         // 清除超时定时器
                         if (timeoutId) {
@@ -413,10 +466,10 @@ export function loadAMapScript(containerId) {
                                     return;
                                 }
                                 cachedCenter = center;
-                                iframe.contentWindow.postMessage({
+                                postToIframe({
                                     type: 'MAP_SET_CENTER',
                                     center: center
-                                }, '*');
+                                }, 'MAP_SET_CENTER');
                             },
 
                             setZoom: (zoom) => {
@@ -425,10 +478,10 @@ export function loadAMapScript(containerId) {
                                     return;
                                 }
                                 cachedZoom = zoom;
-                                iframe.contentWindow.postMessage({
+                                postToIframe({
                                     type: 'MAP_SET_ZOOM',
                                     zoom: zoom
-                                }, '*');
+                                }, 'MAP_SET_ZOOM');
                             },
 
                             setStatus: (status) => {
@@ -436,10 +489,10 @@ export function loadAMapScript(containerId) {
                                     console.warn('⚠️ iframe 已失效，跳过 setStatus 调用');
                                     return;
                                 }
-                                iframe.contentWindow.postMessage({
+                                postToIframe({
                                     type: 'MAP_SET_STATUS',
                                     status: status
-                                }, '*');
+                                }, 'MAP_SET_STATUS');
                             },
 
                             setZooms: (zooms) => {
@@ -447,10 +500,10 @@ export function loadAMapScript(containerId) {
                                     console.warn('⚠️ iframe 已失效，跳过 setZooms 调用');
                                     return;
                                 }
-                                iframe.contentWindow.postMessage({
+                                postToIframe({
                                     type: 'MAP_SET_ZOOMS',
                                     zooms: zooms
-                                }, '*');
+                                }, 'MAP_SET_ZOOMS');
                             },
                             
                             on: (event, callback) => {
@@ -460,7 +513,10 @@ export function loadAMapScript(containerId) {
                                 }
                                 // 监听事件
                                 const eventHandler = (e) => {
-                                    if (e.data.type === `MAP_EVENT_${event.toUpperCase()}`) {
+                                    if (
+                                        e.source === iframe.contentWindow &&
+                                        e.data.type === `MAP_EVENT_${event.toUpperCase()}`
+                                    ) {
                                         // 更新缓存
                                         if (event === 'moveend') {
                                             cachedCenter = e.data.data;
@@ -471,14 +527,13 @@ export function loadAMapScript(containerId) {
                                     }
                                 };
                                 window.addEventListener('message', eventHandler);
+                                proxyMessageHandlers.add(eventHandler);
 
                                 // 通知 iframe 监听事件
-                                if (!isDestroyed && iframe.contentWindow) {
-                                    iframe.contentWindow.postMessage({
-                                        type: 'MAP_ON',
-                                        event: event
-                                    }, '*');
-                                }
+                                postToIframe({
+                                    type: 'MAP_ON',
+                                    event: event
+                                }, 'MAP_ON');
                             },
 
                             add: (layer) => {
@@ -486,10 +541,10 @@ export function loadAMapScript(containerId) {
                                     console.warn('⚠️ iframe 已失效，跳过 add 调用');
                                     return;
                                 }
-                                iframe.contentWindow.postMessage({
+                                postToIframe({
                                     type: 'MAP_ADD_LAYER',
                                     layer: layer
-                                }, '*');
+                                }, 'MAP_ADD_LAYER');
                             },
 
                             remove: (layer) => {
@@ -497,10 +552,10 @@ export function loadAMapScript(containerId) {
                                     console.warn('⚠️ iframe 已失效，跳过 remove 调用');
                                     return;
                                 }
-                                iframe.contentWindow.postMessage({
+                                postToIframe({
                                     type: 'MAP_REMOVE_LAYER',
                                     layer: layer
-                                }, '*');
+                                }, 'MAP_REMOVE_LAYER');
                             },
 
                             setFitView: (layers) => {
@@ -508,10 +563,10 @@ export function loadAMapScript(containerId) {
                                     console.warn('⚠️ iframe 已失效，跳过 setFitView 调用');
                                     return;
                                 }
-                                iframe.contentWindow.postMessage({
+                                postToIframe({
                                     type: 'MAP_SET_FIT_VIEW',
                                     layers: layers
-                                }, '*');
+                                }, 'MAP_SET_FIT_VIEW');
                             },
 
                             setBounds: (bounds) => {
@@ -519,10 +574,10 @@ export function loadAMapScript(containerId) {
                                     console.warn('⚠️ iframe 已失效，跳过 setBounds 调用');
                                     return;
                                 }
-                                iframe.contentWindow.postMessage({
+                                postToIframe({
                                     type: 'MAP_SET_BOUNDS',
                                     bounds: bounds
-                                }, '*');
+                                }, 'MAP_SET_BOUNDS');
                             },
 
                             addMarker: (marker) => {
@@ -530,10 +585,10 @@ export function loadAMapScript(containerId) {
                                     console.warn('⚠️ iframe 已失效，跳过 addMarker 调用');
                                     return;
                                 }
-                                iframe.contentWindow.postMessage({
+                                postToIframe({
                                     type: 'MAP_ADD_MARKER',
                                     marker: marker
-                                }, '*');
+                                }, 'MAP_ADD_MARKER');
                             },
 
                             removeMarker: (marker) => {
@@ -541,13 +596,16 @@ export function loadAMapScript(containerId) {
                                     console.warn('⚠️ iframe 已失效，跳过 removeMarker 调用');
                                     return;
                                 }
-                                iframe.contentWindow.postMessage({
+                                postToIframe({
                                     type: 'MAP_REMOVE_MARKER',
                                     marker: marker
-                                }, '*');
+                                }, 'MAP_REMOVE_MARKER');
                             },
                             
                             destroy: () => {
+                                // 通知 iframe 内部地图先销毁，降低切换竞态
+                                postToIframe({ type: 'MAP_DESTROY' }, 'MAP_DESTROY');
+
                                 // 标记为已销毁
                                 isDestroyed = true;
 
@@ -557,6 +615,10 @@ export function loadAMapScript(containerId) {
                                 // 清理事件监听器
                                 window.removeEventListener('message', messageHandler);
                                 window.removeEventListener('message', mapReadyHandler);
+                                proxyMessageHandlers.forEach((handler) => {
+                                    window.removeEventListener('message', handler);
+                                });
+                                proxyMessageHandlers.clear();
 
                                 // 移除 iframe
                                 if (document.body.contains(iframe)) {
@@ -565,11 +627,18 @@ export function loadAMapScript(containerId) {
 
                                 // 恢复容器可见性
                                 mapContainer.style.visibility = 'visible';
+
+                                if (currentLoadAbortController === abortController) {
+                                    currentLoadAbortController = null;
+                                }
                             }
                         };
                         
                         // 获取初始值
                         const initHandler = (e) => {
+                            if (e.source !== iframe.contentWindow) {
+                                return;
+                            }
                             if (e.data.type === 'MAP_GET_CENTER_RESPONSE') {
                                 cachedCenter = e.data.center;
                                 window.removeEventListener('message', initHandler);
@@ -581,10 +650,8 @@ export function loadAMapScript(containerId) {
                         window.addEventListener('message', initHandler);
                         
                         // 请求初始值（检查 iframe 是否有效）
-                        if (!isDestroyed && iframe.contentWindow) {
-                            iframe.contentWindow.postMessage({ type: 'MAP_GET_CENTER' }, '*');
-                            iframe.contentWindow.postMessage({ type: 'MAP_GET_ZOOM' }, '*');
-                        }
+                        postToIframe({ type: 'MAP_GET_CENTER' }, 'MAP_GET_CENTER');
+                        postToIframe({ type: 'MAP_GET_ZOOM' }, 'MAP_GET_ZOOM');
                         
                         resolve(mapProxy);
                     }
@@ -610,13 +677,21 @@ export function loadAMapScript(containerId) {
         window.addEventListener('message', messageHandler);
 
         let timeoutId = null; // 超时定时器 ID
+        abortController.signal.addEventListener('abort', () => {
+            if (!isDestroyed) {
+                cleanup();
+                reject(new Error('高德地图加载已取消'));
+            }
+        }, { once: true });
 
         function cleanup() {
             // 标记为已销毁
             isDestroyed = true;
 
             // 取消所有异步操作
-            abortController.abort();
+            if (!abortController.signal.aborted) {
+                abortController.abort();
+            }
 
             // 清理事件监听器
             window.removeEventListener('message', messageHandler);
@@ -626,6 +701,10 @@ export function loadAMapScript(containerId) {
             }
             if (document.body.contains(iframe)) {
                 document.body.removeChild(iframe);
+            }
+
+            if (currentLoadAbortController === abortController) {
+                currentLoadAbortController = null;
             }
         }
 

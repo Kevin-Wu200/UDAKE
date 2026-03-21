@@ -28,6 +28,7 @@ export interface IMapAdapter {
     zoomToLayer(layerName: string): void;
     setClickHandler(handler: (graphic: any, mapPoint: any) => void): void;
     getSamplingPoints(): SamplingPoint[];
+    destroy(): void;
 }
 
 /** 地图引擎基类接口 */

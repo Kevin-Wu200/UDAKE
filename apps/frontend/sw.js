@@ -9,12 +9,12 @@ const API_CACHE = 'udake-api-v1';
 const STATIC_ASSETS = [
     '/',
     '/index.html',
-    '/css/主题变量.css',
-    '/css/布局样式.css',
-    '/css/组件样式.css',
-    '/css/动画规范.css',
-    '/css/深色模式.css',
-    '/js/主程序.js',
+    '/css/theme-variables.css',
+    '/css/layout-styles.css',
+    '/css/component-styles.css',
+    '/css/animation-styles.css',
+    '/css/dark-mode.css',
+    '/js/主程序.ts',
 ];
 
 // 可缓存的 GET API 路径（只读查询）

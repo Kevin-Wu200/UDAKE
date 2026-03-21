@@ -166,6 +166,13 @@ export class AMapAdapter extends MapAdapter {
     }
 
     /**
+     * 设置图层Z轴索引
+     */
+    setLayerZIndex(_layerName, _zIndex) {
+        console.warn('高德地图暂不支持通过适配器设置图层Z轴索引');
+    }
+
+    /**
      * 移除图层
      */
     removeLayer(layerName) {
@@ -188,8 +195,10 @@ export class AMapAdapter extends MapAdapter {
             }
         }
         this.layers = {};
-        this.engine.clearMarkers();
-        this.engine.clearPolygons();
+        if (this.engine) {
+            this.engine.clearMarkers();
+            this.engine.clearPolygons();
+        }
         this.samplingPoints = [];
         console.log('✅ 所有图层已清除');
     }
@@ -221,5 +230,25 @@ export class AMapAdapter extends MapAdapter {
      */
     getSamplingPoints() {
         return this.samplingPoints;
+    }
+
+    /**
+     * 销毁适配器资源
+     */
+    destroy() {
+        try {
+            this.clearAllLayers();
+            if (this.engine && typeof this.engine.destroy === 'function') {
+                this.engine.destroy();
+            }
+        } catch (error) {
+            console.warn('清理高德适配器资源时出现警告:', error);
+        } finally {
+            this.engine = null;
+            this.view = null;
+            this.map = null;
+            this.layers = {};
+            this.samplingPoints = [];
+        }
     }
 }

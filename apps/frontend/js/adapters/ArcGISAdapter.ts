@@ -432,4 +432,18 @@ export class ArcGISAdapter extends MapAdapter {
     getSamplingPoints(): SamplingPoint[] {
         return this.samplingPoints;
     }
+
+    destroy(): void {
+        try {
+            this.clearAllLayers();
+            this.engine?.destroy();
+        } catch (error) {
+            console.warn('清理 ArcGIS 适配器资源时出现警告:', error);
+        } finally {
+            this.graphicsLayer = null;
+            this.view = null;
+            this.map = null;
+            this.engine = null;
+        }
+    }
 }

@@ -73,12 +73,12 @@ export interface ResourceOptimizationConfig {
 export const defaultResourceOptimizationConfig: ResourceOptimizationConfig = {
     preload: {
         criticalCSS: [
-            'css/主题变量.css',
-            'css/启动画面样式.css',
-            'css/骨架屏样式.css',
-            'css/布局样式.css',
-            'css/组件样式.css',
-            'css/动画规范.css'
+            'css/theme-variables.css',
+            'css/splash-screen.css',
+            'css/skeleton-loader.css',
+            'css/layout-styles.css',
+            'css/component-styles.css',
+            'css/animation-styles.css'
         ],
         criticalJS: [
             'js/utils/LoadingManager.js',
