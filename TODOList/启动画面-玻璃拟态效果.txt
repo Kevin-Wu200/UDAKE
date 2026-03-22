@@ -1,0 +1,55 @@
+启动画面玻璃拟态效果
+
+任务描述：
+在启动画面中添加玻璃拟态（Glassmorphism）效果，使其与应用主界面的视觉风格保持一致。
+
+具体修改：
+1. 添加背景模糊效果
+   - 在 .splash-content 容器上添加：
+     backdrop-filter: blur(30px);
+     -webkit-backdrop-filter: blur(30px);
+     background: rgba(255, 255, 255, 0.1);
+   - 原因：与应用中面板的玻璃效果保持一致
+
+2. 优化边框效果
+   - 添加半透明边框：
+     border: 1px solid rgba(255, 255, 255, 0.2);
+   - 添加微妙的阴影：
+     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+   - 原因：增强玻璃质感
+
+3. 深色模式适配
+   - 深色模式下使用：
+     background: rgba(0, 0, 0, 0.2);
+     border: 1px solid rgba(255, 255, 255, 0.1);
+     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+   - 原因：深色模式下需要调整透明度和阴影
+
+4. 进度条容器优化
+   - 添加玻璃效果到进度条容器
+   - 使用半透明背景和模糊效果
+   - 原因：整体视觉一致性
+
+5. Logo区域优化
+   - 在Logo周围添加微妙的玻璃光环效果
+   - 使用径向渐变增强视觉层次
+   - 原因：突出品牌标识
+
+影响范围：
+- apps/frontend/css/splash-screen.css
+- 可能需要调整 .splash-content, .splash-progress-container 等选择器
+
+测试要点：
+- 不同浏览器下的兼容性（特别是 Safari 和 Chrome）
+- 性能测试（blur效果可能影响性能）
+- 深色模式下的显示效果
+- 移动设备上的渲染性能
+
+完成状态：已完成（2026-03-22）
+
+完成记录：
+- [x] `.splash-content` 已增加玻璃拟态背景、模糊、边框与阴影。
+- [x] 已优化边框与阴影层次，提升玻璃质感。
+- [x] 深色模式已适配对应背景、边框与阴影参数。
+- [x] `.splash-progress-container` 已增加半透明背景与模糊效果。
+- [x] `.splash-logo` 周围已增加径向渐变光环效果。
