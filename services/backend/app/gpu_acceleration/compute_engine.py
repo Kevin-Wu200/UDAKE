@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Dict, Tuple
+from typing import Any, Callable, Dict, Tuple
 
 import numpy as np
 
@@ -44,11 +45,13 @@ class GPUComputeEngine:
         memory_manager: GPUMemoryManager | None = None,
         performance_monitor: PerformanceMonitor | None = None,
         min_size_for_gpu: int = 25_000,
+        max_workers: int = 4,
     ) -> None:
         self.device_manager = device_manager or DeviceManager()
         self.memory_manager = memory_manager or GPUMemoryManager()
         self.performance_monitor = performance_monitor or PerformanceMonitor()
         self.min_size_for_gpu = min_size_for_gpu
+        self._executor = ThreadPoolExecutor(max_workers=max(1, int(max_workers)))
 
     def _select_backend(self, prefer_gpu: bool, problem_size: int) -> ComputeBackend:
         if not prefer_gpu:
@@ -244,6 +247,125 @@ class GPUComputeEngine:
         elapsed_ms = (perf_counter() - start) * 1000
         self.performance_monitor.record("vector_sort", backend, elapsed_ms, int(a.size))
         return ComputeResult(backend=backend, elapsed_ms=elapsed_ms, payload={"result": host})
+
+    def run_kernel(
+        self,
+        kernel_name: str,
+        array: np.ndarray,
+        *,
+        alpha: float = 1.0,
+        beta: float = 0.0,
+        prefer_gpu: bool = True,
+    ) -> ComputeResult:
+        """执行通用Kernel函数（element-wise）。"""
+        arr = np.asarray(array, dtype=float)
+        backend = self._select_backend(prefer_gpu, int(arr.size))
+        start = perf_counter()
+        d_arr, _ = self.memory_manager.to_device(arr, backend)
+
+        if backend == ComputeBackend.GPU and cp is not None:
+            output = self._run_kernel_gpu(kernel_name, d_arr, alpha=alpha, beta=beta)
+        else:
+            output = self._run_kernel_cpu(kernel_name, d_arr, alpha=alpha, beta=beta)
+
+        host, _ = self.memory_manager.to_host(output, backend)
+        elapsed_ms = (perf_counter() - start) * 1000
+        self.performance_monitor.record(f"kernel_{kernel_name}", backend, elapsed_ms, int(arr.size))
+        return ComputeResult(backend=backend, elapsed_ms=elapsed_ms, payload={"result": host})
+
+    def _run_kernel_gpu(self, kernel_name: str, arr: Any, *, alpha: float, beta: float) -> Any:
+        # CuPy环境下优先使用GPU向量化内核。
+        if kernel_name == "square":
+            return arr * arr
+        if kernel_name == "affine":
+            return arr * alpha + beta
+        if kernel_name == "relu":
+            return cp.maximum(arr, 0)
+        if kernel_name == "sigmoid":
+            return 1.0 / (1.0 + cp.exp(-arr))
+        raise ValueError(f"不支持的kernel: {kernel_name}")
+
+    def _run_kernel_cpu(self, kernel_name: str, arr: np.ndarray, *, alpha: float, beta: float) -> np.ndarray:
+        if kernel_name == "square":
+            return arr * arr
+        if kernel_name == "affine":
+            return arr * alpha + beta
+        if kernel_name == "relu":
+            return np.maximum(arr, 0.0)
+        if kernel_name == "sigmoid":
+            return 1.0 / (1.0 + np.exp(-arr))
+        raise ValueError(f"不支持的kernel: {kernel_name}")
+
+    def sparse_matrix_multiply(
+        self,
+        values: np.ndarray,
+        col_indices: np.ndarray,
+        row_ptr: np.ndarray,
+        dense_b: np.ndarray,
+        shape: tuple[int, int],
+        prefer_gpu: bool = True,
+    ) -> ComputeResult:
+        """CSR稀疏矩阵与稠密矩阵乘法。"""
+        rows, cols = shape
+        if row_ptr.shape[0] != rows + 1:
+            raise ValueError("CSR row_ptr 长度与矩阵行数不匹配")
+        if dense_b.ndim != 2 or dense_b.shape[0] != cols:
+            raise ValueError("稠密矩阵维度不匹配")
+
+        backend = self._select_backend(prefer_gpu, int(values.size + dense_b.size))
+        start = perf_counter()
+        out = np.zeros((rows, dense_b.shape[1]), dtype=float)
+
+        for row in range(rows):
+            begin = int(row_ptr[row])
+            end = int(row_ptr[row + 1])
+            if begin >= end:
+                continue
+            cids = col_indices[begin:end].astype(int)
+            coeff = values[begin:end].reshape(-1, 1)
+            out[row] = np.sum(coeff * dense_b[cids], axis=0)
+
+        elapsed_ms = (perf_counter() - start) * 1000
+        self.performance_monitor.record("sparse_matrix_multiply", backend, elapsed_ms, int(values.size + dense_b.size))
+        return ComputeResult(backend=backend, elapsed_ms=elapsed_ms, payload={"result": out})
+
+    def sparse_linear_solve(
+        self,
+        values: np.ndarray,
+        col_indices: np.ndarray,
+        row_ptr: np.ndarray,
+        rhs: np.ndarray,
+        shape: tuple[int, int],
+        prefer_gpu: bool = True,
+    ) -> ComputeResult:
+        """CSR稀疏矩阵线性求解（转稠密回退实现）。"""
+        rows, cols = shape
+        if rows != cols:
+            raise ValueError("稀疏求解仅支持方阵")
+        dense = np.zeros((rows, cols), dtype=float)
+        for row in range(rows):
+            begin = int(row_ptr[row])
+            end = int(row_ptr[row + 1])
+            if begin >= end:
+                continue
+            dense[row, col_indices[begin:end].astype(int)] = values[begin:end]
+        return self.solve_linear_system(dense, rhs, prefer_gpu=prefer_gpu)
+
+    def split_workload(self, total_size: int, chunk_size: int) -> list[tuple[int, int]]:
+        """按块切分任务范围。"""
+        total = max(0, int(total_size))
+        chunk = max(1, int(chunk_size))
+        segments: list[tuple[int, int]] = []
+        start = 0
+        while start < total:
+            end = min(start + chunk, total)
+            segments.append((start, end))
+            start = end
+        return segments
+
+    def submit_async(self, func: Callable[..., ComputeResult], *args: Any, **kwargs: Any) -> Future[ComputeResult]:
+        """异步提交计算任务。"""
+        return self._executor.submit(func, *args, **kwargs)
 
     def get_runtime_metrics(self) -> dict:
         """返回性能与内存统计。"""

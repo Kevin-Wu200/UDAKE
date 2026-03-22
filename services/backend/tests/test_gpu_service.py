@@ -87,3 +87,48 @@ def test_task_tracking(service: GPUService) -> None:
 
     tasks = service.list_tasks(limit=10)
     assert any(item["task_id"] == task_id for item in tasks)
+
+
+def test_kernel_sparse_and_variogram_fit(service: GPUService) -> None:
+    kernel = service.run_kernel("affine", [1, 2, 3], alpha=2.0, beta=1.0, prefer_gpu=True)
+    assert kernel["result"]["result"] == [3.0, 5.0, 7.0]
+
+    values = [10.0, 20.0, 30.0, 40.0]
+    col_indices = [0, 2, 1, 2]
+    row_ptr = [0, 2, 3, 4]
+    dense_b = [[1.0], [2.0], [3.0]]
+    sparse_mul = service.sparse_matrix_multiply(values, col_indices, row_ptr, dense_b, (3, 3), prefer_gpu=True)
+    result = np.asarray(sparse_mul["result"]["result"]).reshape(-1)
+    np.testing.assert_allclose(result, np.array([70.0, 60.0, 120.0]))
+
+    fit = service.fit_variogram([[0, 0], [1, 0], [0, 1], [1, 1]], [1.0, 2.0, 2.0, 3.0], bins=5, prefer_gpu=True)
+    assert fit["result"]["sill"] >= 0.0
+    assert fit["result"]["range"] > 0.0
+
+
+def test_block_predict_and_parallel_stats(service: GPUService) -> None:
+    sample_points = [[0, 0], [1, 0], [0, 1], [1, 1]]
+    sample_values = [1.0, 2.0, 2.0, 3.0]
+    targets = [[0.2, 0.2], [0.8, 0.2], [0.2, 0.8], [0.8, 0.8], [0.5, 0.5]]
+
+    pred = service.kriging_predict(
+        sample_points=sample_points,
+        sample_values=sample_values,
+        target_points=targets,
+        sill=1.0,
+        range_=1.0,
+        nugget=0.05,
+        prefer_gpu=True,
+    )
+    assert len(pred["result"]["prediction"]) == len(targets)
+    assert pred["result"]["block_count"] >= 1
+
+    stats = service.parallel_sampling(sample_values, sample_count=64)
+    assert stats["result"]["sample_count"] == 64
+    assert "mean" in stats["result"]
+
+    metrics = service.parallel_validation([1, 2, 3], [1.1, 2.2, 2.8])
+    assert metrics["result"]["rmse"] >= 0.0
+
+    preload = service.preload_cache(["identity_4", "demo_variogram"])
+    assert preload["warmed_items"] == 2
