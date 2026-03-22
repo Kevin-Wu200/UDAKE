@@ -41,6 +41,15 @@ interface StoredNotification extends NotificationOptions {
     id: string;
     timestamp: number;
     read: boolean;
+    mergeCount?: number;
+}
+
+interface QueuedNotification extends NotificationOptions {
+    queueId: string;
+    priority: NotificationPriority;
+    enqueueOrder: number;
+    dedupeKey: string;
+    mergeCount: number;
 }
 
 export class NotificationManager {
@@ -48,7 +57,16 @@ export class NotificationManager {
     private notifications: Map<string, StoredNotification> = new Map();
     private notificationHistory: StoredNotification[] = [];
     private permission: NotificationPermission = 'default';
-    private pendingNotifications: NotificationOptions[] = [];
+    private pendingNotifications: QueuedNotification[] = [];
+    private isQueueProcessing: boolean = false;
+    private queueSequence: number = 0;
+    private readonly mergeWindowMs: number = 30_000;
+    private readonly priorityWeights: Record<NotificationPriority, number> = {
+        urgent: 4,
+        high: 3,
+        normal: 2,
+        low: 1,
+    };
 
     constructor() {
         this.settings = this.loadSettings();
@@ -222,36 +240,173 @@ export class NotificationManager {
             return;
         }
 
+        const normalized = this.normalizeNotificationOptions(options);
+        const dedupeKey = this.getNotificationDedupeKey(normalized);
+
+        if (this.mergeQueuedNotification(dedupeKey)) {
+            return;
+        }
+
+        if (this.mergeRecentHistory(normalized, dedupeKey)) {
+            return;
+        }
+
+        if (normalized.priority === 'urgent') {
+            this.emitNotification(normalized);
+            return;
+        }
+
+        this.enqueueNotification(normalized, dedupeKey);
+    }
+
+    private normalizeNotificationOptions(options: NotificationOptions): NotificationOptions & { priority: NotificationPriority } {
+        return {
+            ...options,
+            priority: options.priority || 'normal',
+        };
+    }
+
+    private getNotificationDedupeKey(notification: NotificationOptions): string {
+        const tag = notification.tag || '';
+        const normalizedBody = notification.body.replace(/（合并 \d+ 条）$/, '');
+        return `${notification.type}_${notification.title}_${normalizedBody}_${tag}`;
+    }
+
+    private mergeQueuedNotification(dedupeKey: string): boolean {
+        const existing = this.pendingNotifications.find(item => item.dedupeKey === dedupeKey);
+        if (!existing) {
+            return false;
+        }
+
+        existing.mergeCount += 1;
+        return true;
+    }
+
+    private mergeRecentHistory(
+        options: NotificationOptions & { priority: NotificationPriority },
+        dedupeKey: string
+    ): boolean {
+        const latest = this.notificationHistory[this.notificationHistory.length - 1];
+        if (!latest) {
+            return false;
+        }
+
+        const now = Date.now();
+        const isSameNotification = this.getNotificationDedupeKey(latest) === dedupeKey;
+        const isWithinWindow = now - latest.timestamp <= this.mergeWindowMs;
+
+        if (!isSameNotification || !isWithinWindow) {
+            return false;
+        }
+
+        const mergeCount = (latest.mergeCount || 1) + 1;
+        latest.mergeCount = mergeCount;
+        latest.body = this.formatMergedBody(options.body, mergeCount);
+        latest.priority = this.getHigherPriority(latest.priority || 'normal', options.priority);
+        latest.timestamp = now;
+        this.saveNotificationHistory();
+        this.dispatchEvent('notificationMerged', latest);
+        return true;
+    }
+
+    private enqueueNotification(options: NotificationOptions & { priority: NotificationPriority }, dedupeKey: string): void {
+        this.pendingNotifications.push({
+            ...options,
+            queueId: `queue_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+            priority: options.priority,
+            enqueueOrder: this.queueSequence++,
+            dedupeKey,
+            mergeCount: 1,
+        });
+        this.pendingNotifications.sort((a, b) => {
+            const priorityDiff = this.priorityWeights[b.priority] - this.priorityWeights[a.priority];
+            if (priorityDiff !== 0) {
+                return priorityDiff;
+            }
+            return a.enqueueOrder - b.enqueueOrder;
+        });
+        this.processQueue();
+    }
+
+    private processQueue(): void {
+        if (this.isQueueProcessing) {
+            return;
+        }
+        this.isQueueProcessing = true;
+        this.scheduleQueueTick(0);
+    }
+
+    private scheduleQueueTick(delay: number): void {
+        setTimeout(() => {
+            this.processQueueTick();
+        }, delay);
+    }
+
+    private processQueueTick(): void {
+        const next = this.pendingNotifications.shift();
+        if (!next) {
+            this.isQueueProcessing = false;
+            return;
+        }
+
+        this.emitNotification(next, next.mergeCount);
+        this.scheduleQueueTick(this.getDispatchDelay(next.priority));
+    }
+
+    private getDispatchDelay(priority: NotificationPriority): number {
+        switch (priority) {
+            case 'high':
+                return 120;
+            case 'normal':
+                return 220;
+            case 'low':
+                return 320;
+            case 'urgent':
+            default:
+                return 0;
+        }
+    }
+
+    private getHigherPriority(current: NotificationPriority, incoming: NotificationPriority): NotificationPriority {
+        return this.priorityWeights[incoming] > this.priorityWeights[current] ? incoming : current;
+    }
+
+    private formatMergedBody(body: string, mergeCount: number): string {
+        if (mergeCount <= 1) {
+            return body;
+        }
+        return `${body}（合并 ${mergeCount} 条）`;
+    }
+
+    private emitNotification(options: NotificationOptions, mergeCount: number = 1): void {
         const notification: StoredNotification = {
             ...options,
-            id: `notif_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            body: this.formatMergedBody(options.body, mergeCount),
+            id: `notif_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
             timestamp: Date.now(),
             read: false,
+            mergeCount,
         };
 
-        // 添加到历史记录
+        this.notifications.set(notification.id, notification);
         this.notificationHistory.push(notification);
         if (this.notificationHistory.length > 100) {
             this.notificationHistory.shift();
         }
         this.saveNotificationHistory();
 
-        // 显示浏览器通知
         if ('Notification' in window && this.permission === 'granted') {
             this.showBrowserNotification(notification);
         }
 
-        // 播放声音
         if (this.settings.sound && options.sound) {
             this.playSound(options.sound);
         }
 
-        // 震动反馈
         if (this.settings.vibration) {
             this.vibrate();
         }
 
-        // 触发自定义事件
         this.dispatchEvent('notification', notification);
     }
 
@@ -497,26 +652,9 @@ export class NotificationManager {
      * 批量合并通知
      */
     public showBatchedNotifications(notifications: NotificationOptions[]): void {
-        // 按优先级分组
-        const grouped = notifications.reduce((acc, notif) => {
-            const priority = notif.priority || 'normal';
-            if (!acc[priority]) {
-                acc[priority] = [];
-            }
-            acc[priority].push(notif);
-            return acc;
-        }, {} as Record<string, NotificationOptions[]>);
-
-        // 按优先级顺序发送
-        const priorities: NotificationPriority[] = ['urgent', 'high', 'normal', 'low'];
-        for (const priority of priorities) {
-            if (grouped[priority]) {
-                // 去重
-                const deduped = this.deduplicateNotifications(grouped[priority]);
-                for (const notif of deduped) {
-                    this.show(notif);
-                }
-            }
+        const deduped = this.deduplicateNotifications(notifications);
+        for (const notif of deduped) {
+            this.show(notif);
         }
     }
 
@@ -691,6 +829,8 @@ export class NotificationManager {
     public destroy(): void {
         this.notifications.clear();
         this.notificationHistory = [];
+        this.pendingNotifications = [];
+        this.isQueueProcessing = false;
         this.listeners.clear();
     }
 }

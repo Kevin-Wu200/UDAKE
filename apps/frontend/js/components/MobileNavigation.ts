@@ -4,6 +4,7 @@
  */
 
 import './config/主题变量';
+import VirtualList, { type VirtualListOptions } from './VirtualList';
 
 interface NavItem {
     id: string;
@@ -16,15 +17,32 @@ interface MobileNavigationOptions {
     navItems: NavItem[];
     enableSwipe: boolean;
     enableHaptic: boolean;
+    enableVirtualScroll?: boolean;
+}
+
+interface VirtualScrollMountOptions<T> {
+    container: HTMLElement;
+    items: T[];
+    itemHeight?: number;
+    overscan?: number;
+    estimateHeight?: (item: T, index: number) => number;
+    renderItem: (item: T, index: number) => HTMLElement;
+    keyExtractor?: (item: T, index: number) => string;
+    initialScrollTop?: number;
+    scrollMemoryKey?: string;
+    onEndReached?: () => void;
 }
 
 class MobileNavigation {
     private navItems: NavItem[];
     private enableSwipe: boolean;
     private enableHaptic: boolean;
+    private enableVirtualScroll: boolean;
     private isSidebarOpen: boolean = false;
     private currentNavIndex: number = 0;
     private swipeThreshold: number = 50;
+    private navScrollMemory: Map<string, number> = new Map();
+    private activeVirtualLists: Map<string, VirtualList<unknown>> = new Map();
 
     private elements: {
         hamburgerMenu: HTMLElement | null;
@@ -44,6 +62,7 @@ class MobileNavigation {
         this.navItems = options.navItems;
         this.enableSwipe = options.enableSwipe;
         this.enableHaptic = options.enableHaptic;
+        this.enableVirtualScroll = options.enableVirtualScroll ?? true;
         this.init();
     }
 
@@ -203,6 +222,8 @@ class MobileNavigation {
      * 选择底部导航项
      */
     private selectNavItem(index: number): void {
+        this.saveCurrentScrollPosition();
+
         const navItems = this.elements.bottomNav?.querySelectorAll('.bottom-nav-item');
         if (!navItems) return;
 
@@ -217,6 +238,7 @@ class MobileNavigation {
         });
 
         this.currentNavIndex = index;
+        this.restoreCurrentScrollPosition();
     }
 
     /**
@@ -287,6 +309,60 @@ class MobileNavigation {
         }
     }
 
+    private saveCurrentScrollPosition(): void {
+        const currentNav = this.navItems[this.currentNavIndex];
+        const mapContainer = this.elements.mapContainer;
+        if (!currentNav || !mapContainer) {
+            return;
+        }
+        this.navScrollMemory.set(currentNav.id, mapContainer.scrollTop);
+    }
+
+    private restoreCurrentScrollPosition(): void {
+        const currentNav = this.navItems[this.currentNavIndex];
+        const mapContainer = this.elements.mapContainer;
+        if (!currentNav || !mapContainer) {
+            return;
+        }
+        mapContainer.scrollTop = this.navScrollMemory.get(currentNav.id) || 0;
+    }
+
+    private isMobileViewport(): boolean {
+        return typeof window !== 'undefined' && window.matchMedia('(max-width: 1024px)').matches;
+    }
+
+    public mountVirtualList<T>(options: VirtualScrollMountOptions<T>): VirtualList<T> | null {
+        if (!this.enableVirtualScroll || !this.isMobileViewport()) {
+            return null;
+        }
+
+        const memoryKey = options.scrollMemoryKey || 'default';
+        const initialScrollTop = options.initialScrollTop ?? this.navScrollMemory.get(memoryKey) ?? 0;
+        const virtualOptions: VirtualListOptions<T> = {
+            container: options.container,
+            items: options.items,
+            itemHeight: options.itemHeight,
+            overscan: options.overscan,
+            estimateHeight: options.estimateHeight,
+            renderItem: options.renderItem,
+            keyExtractor: options.keyExtractor,
+            initialScrollTop,
+            onEndReached: options.onEndReached,
+        };
+
+        const list = new VirtualList(virtualOptions);
+        this.activeVirtualLists.set(memoryKey, list as VirtualList<unknown>);
+        return list;
+    }
+
+    public rememberVirtualListScroll(key: string): void {
+        const list = this.activeVirtualLists.get(key);
+        if (!list) {
+            return;
+        }
+        this.navScrollMemory.set(key, list.getScrollTop());
+    }
+
     /**
      * 更新导航项
      */
@@ -303,6 +379,9 @@ class MobileNavigation {
      * 销毁导航
      */
     public destroy(): void {
+        this.activeVirtualLists.forEach(list => list.destroy());
+        this.activeVirtualLists.clear();
+
         if (this.elements.hamburgerMenu) {
             this.elements.hamburgerMenu.remove();
         }
