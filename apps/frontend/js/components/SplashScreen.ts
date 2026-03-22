@@ -28,8 +28,32 @@ export class SplashScreen {
 
     private constructor(options: SplashScreenOptions = {}) {
         this.showProgress = options.showProgress ?? true;
-        this.minDisplayTime = options.minDisplayTime ?? 2000;
+        this.minDisplayTime = options.minDisplayTime ?? this.getCssDurationMs('--splash-min-display-time', 2000);
         this.create();
+    }
+
+    private getCssDurationMs(variableName: string, fallback: number): number {
+        if (typeof window === 'undefined' || typeof document === 'undefined') {
+            return fallback;
+        }
+
+        const rawValue = getComputedStyle(document.documentElement).getPropertyValue(variableName).trim();
+        if (!rawValue) {
+            return fallback;
+        }
+
+        if (rawValue.endsWith('ms')) {
+            const value = Number.parseFloat(rawValue.slice(0, -2));
+            return Number.isFinite(value) ? value : fallback;
+        }
+
+        if (rawValue.endsWith('s')) {
+            const value = Number.parseFloat(rawValue.slice(0, -1));
+            return Number.isFinite(value) ? value * 1000 : fallback;
+        }
+
+        const numericValue = Number.parseFloat(rawValue);
+        return Number.isFinite(numericValue) ? numericValue : fallback;
     }
 
     /**

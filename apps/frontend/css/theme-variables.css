@@ -40,6 +40,7 @@
 
     /* 圆角 */
     --radius-sm: 10px;
+    --radius-xs: 6px;
     --radius-md: 12px;
     --radius-lg: 16px;
     --radius-xl: 20px;
@@ -50,19 +51,41 @@
     --spacing-md: 16px;
     --spacing-lg: 24px;
     --spacing-xl: 32px;
+    --spacing-xxl: 48px;
 
     /* 字体大小 */
     --font-size-sm: 12px;
     --font-size-md: 14px;
     --font-size-lg: 16px;
     --font-size-xl: 20px;
+    --font-size-xxxl: 56px;
+    --text-secondary-opacity: 0.9;
 
     /* 动画 - 60fps流畅 */
     --easing-standard: cubic-bezier(0.4, 0.0, 0.2, 1);
+    --transition-curve: var(--easing-standard);
     --transition-fast: 200ms var(--easing-standard);
     --transition-normal: 240ms var(--easing-standard);
     --transition-slow: 300ms var(--easing-standard);
     --splash-progress-fill-duration: 240ms;
+
+    /* 启动画面颜色 */
+    --splash-bg-light: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+    --splash-bg-dark: linear-gradient(135deg, #0044cc 0%, #3a3a8a 100%);
+    --splash-bg: var(--splash-bg-light);
+
+    /* 启动画面尺寸 */
+    --splash-logo-size: 3.5rem;
+    --splash-title-size: 1.8rem;
+    --splash-slogan-size: var(--font-size-lg);
+    --splash-spinner-size: 50px;
+
+    /* 启动画面动画 */
+    --splash-fade-duration: var(--transition-normal);
+    --splash-bounce-duration: var(--transition-slow);
+
+    /* 启动画面最小显示时间 */
+    --splash-min-display-time: 2500ms;
 }
 
 /* 深色模式 - 自动跟随系统 */
@@ -70,6 +93,7 @@
     :root {
         --splash-bg-start: #0044cc;
         --splash-bg-end: #3a3a8a;
+        --splash-bg: var(--splash-bg-dark);
 
         /* 深色模式背景 */
         --bg-primary: #1c1c1e;
