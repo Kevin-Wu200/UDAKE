@@ -573,20 +573,282 @@ export class EnhancedSamplingRecommendationPanel {
         alert(message);
     }
 
+    private openDialog(options: {
+        title: string;
+        contentHtml: string;
+        confirmText?: string;
+        cancelText?: string;
+        onConfirm?: (modal: HTMLElement) => Promise<boolean | void> | boolean | void;
+    }): void {
+        const overlay = document.createElement('div');
+        overlay.className = 'enhanced-dialog-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.45);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            padding: 16px;
+        `;
+
+        const modal = document.createElement('div');
+        modal.className = 'enhanced-dialog-modal';
+        modal.style.cssText = `
+            width: min(680px, 100%);
+            max-height: 85vh;
+            overflow: auto;
+            background: #ffffff;
+            border-radius: 10px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
+            padding: 16px;
+        `;
+
+        modal.innerHTML = `
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <h4 style="margin:0;font-size:18px;">${options.title}</h4>
+                <button type="button" data-action="close" style="border:none;background:transparent;font-size:20px;cursor:pointer;">&times;</button>
+            </div>
+            <div class="enhanced-dialog-content">${options.contentHtml}</div>
+            <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px;">
+                <button type="button" data-action="cancel" style="padding:6px 12px;">${options.cancelText || '取消'}</button>
+                ${options.onConfirm ? `<button type="button" data-action="confirm" style="padding:6px 12px;">${options.confirmText || '确认'}</button>` : ''}
+            </div>
+        `;
+
+        overlay.appendChild(modal);
+        document.body.appendChild(overlay);
+
+        const close = (): void => {
+            overlay.remove();
+        };
+
+        overlay.addEventListener('click', (event) => {
+            if (event.target === overlay) {
+                close();
+            }
+        });
+
+        modal.querySelector('[data-action="close"]')?.addEventListener('click', close);
+        modal.querySelector('[data-action="cancel"]')?.addEventListener('click', close);
+
+        const confirmButton = modal.querySelector('[data-action="confirm"]') as HTMLButtonElement | null;
+        if (confirmButton && options.onConfirm) {
+            confirmButton.addEventListener('click', async () => {
+                confirmButton.disabled = true;
+                try {
+                    const result = await options.onConfirm!(modal);
+                    if (result !== false) {
+                        close();
+                    }
+                } finally {
+                    confirmButton.disabled = false;
+                }
+            });
+        }
+    }
+
+    private parseCandidatePoints(rawText: string): CandidatePoint[] {
+        const parsed = JSON.parse(rawText) as unknown;
+        if (!Array.isArray(parsed)) {
+            throw new Error('候选点必须是数组');
+        }
+
+        const candidates: CandidatePoint[] = [];
+        parsed.forEach((item, index) => {
+            if (!item || typeof item !== 'object') {
+                throw new Error(`第 ${index + 1} 个候选点格式无效`);
+            }
+
+            const point = item as Partial<CandidatePoint>;
+            if (typeof point.x !== 'number' || typeof point.y !== 'number') {
+                throw new Error(`第 ${index + 1} 个候选点缺少有效的 x/y`);
+            }
+
+            candidates.push({
+                x: point.x,
+                y: point.y,
+                value: typeof point.value === 'number' ? point.value : undefined
+            });
+        });
+
+        return candidates;
+    }
+
+    private parseSamplingPlans(rawText: string): SamplingPlan[] {
+        const parsed = JSON.parse(rawText) as unknown;
+        if (!Array.isArray(parsed)) {
+            throw new Error('方案必须是数组');
+        }
+
+        const plans: SamplingPlan[] = [];
+        parsed.forEach((item, index) => {
+            if (!item || typeof item !== 'object') {
+                throw new Error(`第 ${index + 1} 个方案格式无效`);
+            }
+
+            const plan = item as Partial<SamplingPlan>;
+            if (!plan.plan_id || !plan.name || !Array.isArray(plan.points)) {
+                throw new Error(`第 ${index + 1} 个方案缺少必要字段`);
+            }
+
+            plans.push({
+                plan_id: String(plan.plan_id),
+                name: String(plan.name),
+                points: this.parseCandidatePoints(JSON.stringify(plan.points))
+            });
+        });
+
+        return plans;
+    }
+
+    private showEvaluationResults(results: EvaluationResult[]): void {
+        const rows = results
+            .map((result) => {
+                if (result.error) {
+                    return `<tr>
+                        <td>${result.candidate_index}</td>
+                        <td colspan="4" style="color:#d32f2f;">${result.error}</td>
+                    </tr>`;
+                }
+
+                return `<tr>
+                    <td>${result.candidate_index}</td>
+                    <td>${result.x.toFixed(4)}, ${result.y.toFixed(4)}</td>
+                    <td>${(result.variance_reduction_ratio * 100).toFixed(2)}%</td>
+                    <td>${result.local_improvement.toFixed(4)}</td>
+                    <td>${result.comprehensive_score.toFixed(4)}</td>
+                </tr>`;
+            })
+            .join('');
+
+        this.openDialog({
+            title: '候选点评估结果',
+            contentHtml: `
+                <div style="font-size:13px;color:#666;margin-bottom:8px;">共 ${results.length} 个候选点</div>
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;border-bottom:1px solid #e5e5e5;padding:6px 4px;">索引</th>
+                            <th style="text-align:left;border-bottom:1px solid #e5e5e5;padding:6px 4px;">坐标</th>
+                            <th style="text-align:left;border-bottom:1px solid #e5e5e5;padding:6px 4px;">方差降低</th>
+                            <th style="text-align:left;border-bottom:1px solid #e5e5e5;padding:6px 4px;">局部改进</th>
+                            <th style="text-align:left;border-bottom:1px solid #e5e5e5;padding:6px 4px;">综合得分</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `
+        });
+    }
+
+    private showComparisonResults(results: SimulationResult[]): void {
+        const rows = results.map((result) => `
+            <tr>
+                <td>${result.name}</td>
+                <td>${result.n_points}</td>
+                <td>${result.total_variance_reduction.toFixed(4)}</td>
+                <td>${result.rmse_improvement.toFixed(4)}</td>
+                <td>${result.mean_variance.toFixed(4)}</td>
+            </tr>
+        `).join('');
+
+        this.openDialog({
+            title: '采样方案对比结果',
+            contentHtml: `
+                <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                    <thead>
+                        <tr>
+                            <th style="text-align:left;border-bottom:1px solid #e5e5e5;padding:6px 4px;">方案</th>
+                            <th style="text-align:left;border-bottom:1px solid #e5e5e5;padding:6px 4px;">点数</th>
+                            <th style="text-align:left;border-bottom:1px solid #e5e5e5;padding:6px 4px;">总方差降低</th>
+                            <th style="text-align:left;border-bottom:1px solid #e5e5e5;padding:6px 4px;">RMSE 改进</th>
+                            <th style="text-align:left;border-bottom:1px solid #e5e5e5;padding:6px 4px;">平均方差</th>
+                        </tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            `
+        });
+    }
+
     /**
      * 打开候选点评估器
      */
     private openCandidateEvaluator(): void {
-        // TODO: 实现候选点评估器对话框
-        console.log('打开候选点评估器');
+        this.openDialog({
+            title: '候选点评估器',
+            contentHtml: `
+                <p style="font-size:13px;color:#666;">请输入候选点 JSON 数组，例如：[{"x":116.39,"y":39.90},{"x":116.41,"y":39.91}]</p>
+                <textarea id="candidate-evaluator-input" style="width:100%;min-height:180px;padding:8px;font-family:monospace;">[
+  {"x": 116.39, "y": 39.90},
+  {"x": 116.41, "y": 39.91}
+]</textarea>
+            `,
+            confirmText: '开始评估',
+            onConfirm: async (modal) => {
+                try {
+                    const input = modal.querySelector('#candidate-evaluator-input') as HTMLTextAreaElement | null;
+                    const candidates = this.parseCandidatePoints(input?.value || '[]');
+                    if (candidates.length === 0) {
+                        this.showError('请至少输入一个候选点');
+                        return false;
+                    }
+
+                    const results = await this.evaluateCustomCandidates(candidates);
+                    this.showEvaluationResults(results);
+                    return true;
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : '候选点格式无效';
+                    this.showError(message);
+                    return false;
+                }
+            }
+        });
     }
 
     /**
      * 打开方案对比器
      */
     private openPlanComparator(): void {
-        // TODO: 实现方案对比器对话框
-        console.log('打开方案对比器');
+        this.openDialog({
+            title: '方案对比器',
+            contentHtml: `
+                <p style="font-size:13px;color:#666;">请输入方案 JSON 数组，每个方案包含 plan_id、name、points</p>
+                <textarea id="plan-comparator-input" style="width:100%;min-height:220px;padding:8px;font-family:monospace;">[
+  {
+    "plan_id": "plan-a",
+    "name": "方案A",
+    "points": [{"x": 116.39, "y": 39.90}]
+  },
+  {
+    "plan_id": "plan-b",
+    "name": "方案B",
+    "points": [{"x": 116.41, "y": 39.91}, {"x": 116.42, "y": 39.92}]
+  }
+]</textarea>
+            `,
+            confirmText: '开始对比',
+            onConfirm: async (modal) => {
+                try {
+                    const input = modal.querySelector('#plan-comparator-input') as HTMLTextAreaElement | null;
+                    const plans = this.parseSamplingPlans(input?.value || '[]');
+                    if (plans.length === 0) {
+                        this.showError('请至少输入一个采样方案');
+                        return false;
+                    }
+
+                    const results = await this.compareSamplingPlans(plans);
+                    this.showComparisonResults(results);
+                    return true;
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : '方案格式无效';
+                    this.showError(message);
+                    return false;
+                }
+            }
+        });
     }
 
     /**

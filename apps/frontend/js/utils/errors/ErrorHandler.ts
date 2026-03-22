@@ -13,6 +13,26 @@ export interface ErrorHandlerConfig {
   enableReporting: boolean;
   enableUserNotification: boolean;
   logLevel: ErrorSeverity;
+  reporter?: (error: AppError, payload: SerializedAppError) => void;
+  notifier?: (message: string, error: AppError) => void;
+}
+
+interface SerializedAppError {
+  type: ErrorType;
+  code: string;
+  message: string;
+  severity: ErrorSeverity;
+  details?: unknown;
+  context?: unknown;
+  stack?: string;
+}
+
+declare global {
+  interface Window {
+    Sentry?: {
+      captureException?: (error: Error, context?: Record<string, unknown>) => void;
+    };
+  }
 }
 
 export class ErrorHandler {
@@ -188,14 +208,59 @@ export class ErrorHandler {
   }
 
   private reportError(error: AppError): void {
-    // TODO: 集成错误报告服务（如 Sentry）
-    console.log('报告错误:', (error as any).toJSON ? (error as any).toJSON() : error);
+    const payload = this.serializeError(error);
+
+    if (this.config.reporter) {
+      this.config.reporter(error, payload);
+      return;
+    }
+
+    if (window.Sentry?.captureException) {
+      window.Sentry.captureException(error, { extra: payload });
+      return;
+    }
+
+    window.dispatchEvent(new CustomEvent('app:error:reported', { detail: payload }));
   }
 
   private notifyUser(error: AppError): void {
-    // TODO: 实现用户通知
     const message = this.getUserFriendlyMessage(error);
-    console.log('通知用户:', message);
+    if (this.config.notifier) {
+      this.config.notifier(message, error);
+      return;
+    }
+
+    const payload = this.serializeError(error);
+    window.dispatchEvent(
+      new CustomEvent('app:error:notify', {
+        detail: {
+          message,
+          error: payload
+        }
+      })
+    );
+
+    // 在未接入统一通知中心时，回退为基础提示，避免静默失败。
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+      alert(message);
+    }
+  }
+
+  private serializeError(error: AppError): SerializedAppError {
+    const serializableError = error as AppError & { toJSON?: () => SerializedAppError };
+    if (typeof serializableError.toJSON === 'function') {
+      return serializableError.toJSON();
+    }
+
+    return {
+      type: error.type,
+      code: error.code,
+      message: error.message,
+      severity: error.severity,
+      details: error.details,
+      context: error.context,
+      stack: error.stack
+    };
   }
 
   private getUserFriendlyMessage(error: AppError): string {
