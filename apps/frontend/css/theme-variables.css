@@ -56,9 +56,11 @@
     --font-size-xl: 20px;
 
     /* 动画 - 60fps流畅 */
-    --transition-fast: 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
-    --transition-normal: 240ms cubic-bezier(0.4, 0.0, 0.2, 1);
-    --transition-slow: 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
+    --easing-standard: cubic-bezier(0.4, 0.0, 0.2, 1);
+    --transition-fast: 200ms var(--easing-standard);
+    --transition-normal: 240ms var(--easing-standard);
+    --transition-slow: 300ms var(--easing-standard);
+    --splash-progress-fill-duration: 240ms;
 }
 
 /* 深色模式 - 自动跟随系统 */
