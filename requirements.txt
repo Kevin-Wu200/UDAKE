@@ -38,3 +38,14 @@ pytest-asyncio==0.21.1
 # WebSocket 支持
 websockets>=11.0
 python-socketio>=5.8.0
+
+# 深度学习基础架构
+torch>=2.0.0
+torch-geometric>=2.3.0
+lightning>=2.0.0
+tensorboard>=2.13.0
+stable-baselines3>=2.1.0
+gymnasium>=0.28.0
+torch-scatter>=2.1.2
+torch-sparse>=0.6.18
+PyYAML>=6.0.1

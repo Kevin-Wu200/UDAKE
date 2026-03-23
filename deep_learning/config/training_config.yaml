@@ -1,0 +1,12 @@
+_base: model_config.yaml
+training:
+  max_epochs: 100
+  early_stopping_patience: 10
+  lr_scheduler:
+    type: step
+    step_size: 20
+    gamma: 0.8
+  gradient_clipping:
+    max_norm: 1.0
+  mixed_precision: true
+  distributed: false

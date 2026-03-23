@@ -1,0 +1,7 @@
+_base: model_config.yaml
+inference:
+  mode: batch
+  async_enabled: true
+  postprocess:
+    decimals: 4
+    min_value: 0.0
