@@ -2,6 +2,7 @@
  * 性能监控模块
  * 用于监控应用性能指标，包括 Core Web Vitals、自定义指标、内存使用等
  */
+import { AppConfig } from '../config/AppConfig';
 
 export interface PerformanceMetric {
     name: string;
@@ -36,11 +37,21 @@ export interface MemoryUsage {
     usagePercent: number;
 }
 
+export interface BaselineComparison {
+    hasBaseline: boolean;
+    baseline?: number;
+    current?: number;
+    deltaPercent?: number;
+    regression: boolean;
+}
+
 export class PerformanceMonitor {
     private metrics: Map<string, PerformanceMetric[]> = new Map();
     private observers: PerformanceObserver[] = [];
     private maxMetricsPerName: number = 1000;
     private initialized: boolean = false;
+    private baseline: Map<string, number> = new Map();
+    private behaviorHandlersBound = false;
 
     constructor() {
         this.initialize();
@@ -61,6 +72,9 @@ export class PerformanceMonitor {
 
         try {
             this.initializeObservers();
+            if (AppConfig.features.enableBehaviorTracking) {
+                this.setupBehaviorTracking();
+            }
             this.initialized = true;
             console.log('[PerformanceMonitor] Initialized successfully');
         } catch (error) {
@@ -146,6 +160,42 @@ export class PerformanceMonitor {
         } catch (error) {
             console.warn('[PerformanceMonitor] Navigation observer not supported');
         }
+    }
+
+    /**
+     * 追踪基础用户行为（点击、输入、页面可见性）
+     */
+    private setupBehaviorTracking(): void {
+        if (this.behaviorHandlersBound || typeof window === 'undefined' || typeof document === 'undefined') {
+            return;
+        }
+
+        this.behaviorHandlersBound = true;
+
+        const clickHandler = (event: Event) => {
+            const target = event.target as HTMLElement | null;
+            const tagName = target?.tagName || 'unknown';
+            const id = target?.id || '';
+            this.recordMetric('user-click', 1, { tagName, id });
+        };
+
+        const inputHandler = (event: Event) => {
+            const target = event.target as HTMLElement | null;
+            this.recordMetric('user-input', 1, {
+                tagName: target?.tagName || 'unknown',
+                id: target?.id || ''
+            });
+        };
+
+        const visibilityHandler = () => {
+            this.recordMetric('visibility-change', 1, {
+                state: document.visibilityState
+            });
+        };
+
+        window.addEventListener('click', clickHandler, { passive: true });
+        window.addEventListener('input', inputHandler, { passive: true });
+        document.addEventListener('visibilitychange', visibilityHandler, { passive: true });
     }
 
     /**
@@ -244,6 +294,50 @@ export class PerformanceMonitor {
             p50: percentile(0.5),
             p95: percentile(0.95),
             p99: percentile(0.99)
+        };
+    }
+
+    /**
+     * 记录一次用户行为（业务层可主动调用）
+     */
+    public trackUserAction(action: string, metadata?: Record<string, unknown>): void {
+        this.recordMetric(`user-action:${action}`, 1, metadata);
+    }
+
+    /**
+     * 设置性能基线（用于回归比较）
+     */
+    public setBaseline(metricName: string, expectedDuration: number): void {
+        if (!Number.isFinite(expectedDuration) || expectedDuration <= 0) {
+            return;
+        }
+        this.baseline.set(metricName, expectedDuration);
+    }
+
+    /**
+     * 对比当前指标与基线
+     */
+    public compareWithBaseline(metricName: string): BaselineComparison {
+        const baseline = this.baseline.get(metricName);
+        const stats = this.getStats(metricName);
+
+        if (baseline === undefined || !stats) {
+            return {
+                hasBaseline: false,
+                regression: false
+            };
+        }
+
+        const current = stats.average;
+        const deltaPercent = ((current - baseline) / baseline) * 100;
+        const regression = deltaPercent > 15;
+
+        return {
+            hasBaseline: true,
+            baseline,
+            current,
+            deltaPercent,
+            regression
         };
     }
 
@@ -389,6 +483,7 @@ export class PerformanceMonitor {
         this.observers.forEach(observer => observer.disconnect());
         this.observers = [];
         this.clear();
+        this.baseline.clear();
         this.initialized = false;
     }
 
@@ -453,12 +548,18 @@ export class PerformanceMonitor {
      * 生成 JSON 格式的报告
      */
     public generateJSONReport(): object {
+        const baselineComparisons = Array.from(this.baseline.keys()).reduce((acc, metricName) => {
+            acc[metricName] = this.compareWithBaseline(metricName);
+            return acc;
+        }, {} as Record<string, BaselineComparison>);
+
         return {
             timestamp: new Date().toISOString(),
             webVitals: this.getWebVitals(),
             memory: this.getMemoryUsage(),
             resources: this.getResourceStats(),
-            metrics: Object.fromEntries(this.getAllStats())
+            metrics: Object.fromEntries(this.getAllStats()),
+            baselineComparisons
         };
     }
 

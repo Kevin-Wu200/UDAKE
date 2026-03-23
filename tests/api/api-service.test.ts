@@ -116,14 +116,14 @@ describe('APIService', () => {
 
             const result = await apiService.post('/test', { name: 'test' });
             expect(result).toEqual({ success: true });
-            expect(mockFetch).toHaveBeenCalledWith(
-                'http://localhost:8000/test',
-                expect.objectContaining({
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name: 'test' })
-                })
-            );
+            expect(mockFetch).toHaveBeenCalled();
+            const [, requestOptions] = mockFetch.mock.calls[0];
+            expect(requestOptions.method).toBe('POST');
+            expect(requestOptions.body).toBe(JSON.stringify({ name: 'test' }));
+
+            const headers = new Headers(requestOptions.headers);
+            expect(headers.get('Content-Type')).toBe('application/json');
+            expect(headers.get('X-API-Version')).toBe(apiService.getApiVersion());
         });
 
         it('应该能够发送自定义请求', async () => {

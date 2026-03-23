@@ -378,6 +378,26 @@ describe('PerformanceMonitor', () => {
         });
     });
 
+    describe('行为追踪与基线', () => {
+        it('应支持记录用户行为', () => {
+            monitor.trackUserAction('switch-map', { provider: 'amap' });
+            const stats = monitor.getStats('user-action:switch-map');
+            expect(stats).toBeTruthy();
+            expect(stats!.count).toBe(1);
+        });
+
+        it('应支持基线对比并识别回归', () => {
+            monitor.setBaseline('api-request', 100);
+            monitor.recordMetric('api-request', 150);
+            monitor.recordMetric('api-request', 170);
+
+            const comparison = monitor.compareWithBaseline('api-request');
+            expect(comparison.hasBaseline).toBe(true);
+            expect(comparison.regression).toBe(true);
+            expect(comparison.deltaPercent).toBeGreaterThan(15);
+        });
+    });
+
     describe('清理功能', () => {
         it('应该能够清除所有指标', () => {
             monitor.recordMetric('metric-1', 100);

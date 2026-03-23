@@ -7,6 +7,7 @@ import type { AppError } from '../../types/errors';
 import { ErrorType, ErrorSeverity } from '../../types/errors';
 import { ApplicationError, NetworkError, ValidationError, AuthenticationError, AuthorizationError, NotFoundError, ServerError, PluginError, CacheError } from './AppError';
 import i18n from '../../i18n/config';
+import { Logger } from '../Logger';
 
 export interface ErrorHandlerConfig {
   enableLogging: boolean;
@@ -192,7 +193,7 @@ export class ErrorHandler {
     );
   }
 
-  private getLogMethod(severity: ErrorSeverity): (...args: any[]) => void {
+  private getLogMethod(severity: ErrorSeverity): (...args: unknown[]) => void {
     switch (severity) {
       case ErrorSeverity.LOW:
         return console.debug;
@@ -209,6 +210,7 @@ export class ErrorHandler {
 
   private reportError(error: AppError): void {
     const payload = this.serializeError(error);
+    Logger.error('ErrorHandler', '捕获到高优先级错误', payload);
 
     if (this.config.reporter) {
       this.config.reporter(error, payload);
@@ -281,42 +283,42 @@ export class ErrorHandler {
 
   // 特定类型的错误处理器
   private handleNetworkError(error: AppError): void {
-    console.log('处理网络错误:', error);
+    Logger.info('ErrorHandler', '处理网络错误', error);
     // 可以在这里实现特定的处理逻辑，如重试
   }
 
   private handleValidationError(error: AppError): void {
-    console.log('处理验证错误:', error);
+    Logger.info('ErrorHandler', '处理验证错误', error);
     // 可以在这里实现表单验证错误的特殊处理
   }
 
   private handleAuthenticationError(error: AppError): void {
-    console.log('处理认证错误:', error);
+    Logger.info('ErrorHandler', '处理认证错误', error);
     // 可以在这里实现重定向到登录页面
   }
 
   private handleAuthorizationError(error: AppError): void {
-    console.log('处理授权错误:', error);
+    Logger.info('ErrorHandler', '处理授权错误', error);
     // 可以在这里实现权限提示
   }
 
   private handleNotFoundError(error: AppError): void {
-    console.log('处理未找到错误:', error);
+    Logger.info('ErrorHandler', '处理未找到错误', error);
     // 可以在这里实现404页面
   }
 
   private handleServerError(error: AppError): void {
-    console.log('处理服务器错误:', error);
+    Logger.info('ErrorHandler', '处理服务器错误', error);
     // 可以在这里实现错误页面
   }
 
   private handlePluginError(error: AppError): void {
-    console.log('处理插件错误:', error);
+    Logger.info('ErrorHandler', '处理插件错误', error);
     // 可以在这里实现插件错误处理
   }
 
   private handleCacheError(error: AppError): void {
-    console.log('处理缓存错误:', error);
+    Logger.info('ErrorHandler', '处理缓存错误', error);
     // 可以在这里实现缓存清理
   }
 

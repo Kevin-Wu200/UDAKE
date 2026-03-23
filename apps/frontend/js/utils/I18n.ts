@@ -528,6 +528,7 @@ const LOCALES: Record<string, LocaleMessages> = {
 export class I18n {
     private static _locale: string = 'zh-CN';
     private static _listeners: Set<(locale: string) => void> = new Set();
+    private static _missingKeyUsage: Map<string, number> = new Map();
 
     static init(locale?: string): void {
         const saved = localStorage.getItem('udake_locale');
@@ -552,12 +553,52 @@ export class I18n {
     static t(key: string, params?: Record<string, string | number>): string {
         const messages = LOCALES[this._locale] || LOCALES['zh-CN'];
         let text = messages[key] || LOCALES['zh-CN'][key] || key;
+        if (text === key) {
+            const count = this._missingKeyUsage.get(key) || 0;
+            this._missingKeyUsage.set(key, count + 1);
+        }
         if (params) {
             Object.entries(params).forEach(([k, v]) => {
                 text = text.replace(`{${k}}`, String(v));
             });
         }
         return text;
+    }
+
+    static getMissingKeys(baseLocale: string = 'zh-CN'): Record<string, string[]> {
+        const baseMessages = LOCALES[baseLocale] || {};
+        const baseKeys = Object.keys(baseMessages);
+        const result: Record<string, string[]> = {};
+
+        Object.entries(LOCALES).forEach(([locale, messages]) => {
+            if (locale === baseLocale) {
+                return;
+            }
+            result[locale] = baseKeys.filter(key => !(key in messages));
+        });
+
+        return result;
+    }
+
+    static getLocaleCoverage(locale: string, baseLocale: string = 'zh-CN'): number {
+        const baseMessages = LOCALES[baseLocale] || {};
+        const targetMessages = LOCALES[locale] || {};
+        const total = Object.keys(baseMessages).length;
+        if (total === 0) {
+            return 1;
+        }
+        const available = Object.keys(baseMessages).filter(key => key in targetMessages).length;
+        return available / total;
+    }
+
+    static getMissingKeyUsage(): Array<{ key: string; count: number }> {
+        return Array.from(this._missingKeyUsage.entries())
+            .map(([key, count]) => ({ key, count }))
+            .sort((a, b) => b.count - a.count);
+    }
+
+    static clearMissingKeyUsage(): void {
+        this._missingKeyUsage.clear();
     }
 
     /** 获取可用语言列表 */

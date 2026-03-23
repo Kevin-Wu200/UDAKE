@@ -5,6 +5,8 @@
 
 import './config/主题变量';
 import VirtualList, { type VirtualListOptions } from './VirtualList';
+import { RuntimeLifecycle, type LifecycleScope } from '../utils/RuntimeLifecycle';
+import { Logger } from '../utils/Logger';
 
 interface NavItem {
     id: string;
@@ -41,8 +43,11 @@ class MobileNavigation {
     private isSidebarOpen: boolean = false;
     private currentNavIndex: number = 0;
     private swipeThreshold: number = 50;
+    private touchStartX: number = 0;
+    private touchStartY: number = 0;
     private navScrollMemory: Map<string, number> = new Map();
     private activeVirtualLists: Map<string, VirtualList<unknown>> = new Map();
+    private lifecycleScope: LifecycleScope;
 
     private elements: {
         hamburgerMenu: HTMLElement | null;
@@ -63,6 +68,7 @@ class MobileNavigation {
         this.enableSwipe = options.enableSwipe;
         this.enableHaptic = options.enableHaptic;
         this.enableVirtualScroll = options.enableVirtualScroll ?? true;
+        this.lifecycleScope = RuntimeLifecycle.createScope('MobileNavigation');
         this.init();
     }
 
@@ -70,11 +76,14 @@ class MobileNavigation {
      * 初始化移动端导航
      */
     private init(): void {
+        this.updateSwipeThreshold();
         this.createHamburgerMenu();
         this.createBottomNav();
         this.createOverlay();
         this.bindEvents();
         this.setupSwipeNavigation();
+        this.lifecycleScope.addEventListener(window, 'resize', () => this.updateSwipeThreshold(), { passive: true });
+        this.lifecycleScope.addEventListener(window, 'orientationchange', () => this.updateSwipeThreshold(), { passive: true });
     }
 
     /**
@@ -110,6 +119,7 @@ class MobileNavigation {
 
         const bottomNav = document.createElement('nav');
         bottomNav.className = 'bottom-nav mobile-only';
+        bottomNav.style.paddingBottom = 'env(safe-area-inset-bottom, 0px)';
 
         this.navItems.forEach((item, index) => {
             const navItem = document.createElement('button');
@@ -123,7 +133,7 @@ class MobileNavigation {
             navItem.setAttribute('aria-label', item.label);
             navItem.setAttribute('aria-current', index === 0 ? 'page' : 'false');
 
-            navItem.addEventListener('click', () => {
+            this.lifecycleScope.addEventListener(navItem, 'click', () => {
                 this.selectNavItem(index);
                 item.action();
                 this.hapticFeedback();
@@ -157,7 +167,7 @@ class MobileNavigation {
         overlay.className = 'overlay';
         overlay.setAttribute('aria-hidden', 'true');
 
-        overlay.addEventListener('click', () => {
+        this.lifecycleScope.addEventListener(overlay, 'click', () => {
             this.closeSidebar();
         });
 
@@ -170,7 +180,7 @@ class MobileNavigation {
      */
     private bindEvents(): void {
         if (this.elements.hamburgerMenu) {
-            this.elements.hamburgerMenu.addEventListener('click', () => {
+            this.lifecycleScope.addEventListener(this.elements.hamburgerMenu, 'click', () => {
                 this.toggleSidebar();
                 this.hapticFeedback();
             });
@@ -250,20 +260,18 @@ class MobileNavigation {
         const mapContainer = document.querySelector('.map-container');
         if (!mapContainer) return;
 
-        let touchStartX = 0;
-        let touchStartY = 0;
-
-        mapContainer.addEventListener('touchstart', (e: Event) => {
-            touchStartX = (e as TouchEvent).touches[0].clientX;
-            touchStartY = (e as TouchEvent).touches[0].clientY;
+        this.lifecycleScope.addEventListener(mapContainer, 'touchstart', (e: Event) => {
+            const touch = (e as TouchEvent).touches[0];
+            this.touchStartX = touch.clientX;
+            this.touchStartY = touch.clientY;
         }, { passive: true });
 
-        mapContainer.addEventListener('touchend', (e: Event) => {
+        this.lifecycleScope.addEventListener(mapContainer, 'touchend', (e: Event) => {
             const touchEndX = (e as TouchEvent).changedTouches[0].clientX;
             const touchEndY = (e as TouchEvent).changedTouches[0].clientY;
 
-            const deltaX = touchEndX - touchStartX;
-            const deltaY = touchEndY - touchStartY;
+            const deltaX = touchEndX - this.touchStartX;
+            const deltaY = touchEndY - this.touchStartY;
 
             // 水平滑动
             if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > this.swipeThreshold) {
@@ -276,6 +284,15 @@ class MobileNavigation {
                 }
             }
         }, { passive: true });
+    }
+
+    private updateSwipeThreshold(): void {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        const viewportWidth = window.innerWidth;
+        this.swipeThreshold = Math.max(28, Math.floor(viewportWidth * 0.08));
+        Logger.debug('MobileNavigation', `滑动阈值更新为 ${this.swipeThreshold}px`);
     }
 
     /**
@@ -381,6 +398,7 @@ class MobileNavigation {
     public destroy(): void {
         this.activeVirtualLists.forEach(list => list.destroy());
         this.activeVirtualLists.clear();
+        this.lifecycleScope.cleanup();
 
         if (this.elements.hamburgerMenu) {
             this.elements.hamburgerMenu.remove();

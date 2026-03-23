@@ -50,10 +50,10 @@ export class TwoLevelCache<K = string, V = any> {
     this.memoryToDiskPromoter = new Map();
     this.enableAutoPromote = options?.enableAutoPromote !== false;
     this.promoteThreshold = options?.promoteThreshold || 3;
-    this.enableBehaviorPrefetch = (options as any)?.enableBehaviorPrefetch !== false;
-    this.prefetchBatchSize = (options as any)?.prefetchBatchSize || 5;
-    this.prefetchMinConfidence = (options as any)?.prefetchMinConfidence || 0.35;
-    this.prefetchTTLFactor = (options as any)?.prefetchTTLFactor || 0.8;
+    this.enableBehaviorPrefetch = options?.enableBehaviorPrefetch !== false;
+    this.prefetchBatchSize = options?.prefetchBatchSize || 5;
+    this.prefetchMinConfidence = options?.prefetchMinConfidence || 0.35;
+    this.prefetchTTLFactor = options?.prefetchTTLFactor || 0.8;
 
     // 监听内存缓存的访问事件
     this.memoryCache.on('hit', (_event, key) => {
@@ -524,8 +524,8 @@ export class TwoLevelCache<K = string, V = any> {
    * 计算平均响应时间
    */
   private _calculateAvgResponseTime(
-    memoryStats: any,
-    diskStats: any
+    memoryStats: { avgResponseTime: number; totalRequests: number },
+    diskStats: { avgResponseTime: number; totalRequests: number }
   ): number {
     const totalRequests = memoryStats.totalRequests + diskStats.totalRequests;
     if (totalRequests === 0) return 0;

@@ -8,6 +8,7 @@
     "dev": "vite --config configs/vite.config.ts",
     "dev:test": "vite --config configs/vite.config.ts --mode testing",
     "build": "tsc --noEmit -p configs/tsconfig.json && vite build --config configs/vite.config.ts",
+    "build:incremental": "tsc --incremental --tsBuildInfoFile .tsbuildinfo/frontend.tsbuildinfo --noEmit -p configs/tsconfig.json && vite build --config configs/vite.config.ts",
     "build:dev": "tsc --noEmit -p configs/tsconfig.json && vite build --config configs/vite.config.ts --mode development",
     "build:test": "tsc --noEmit -p configs/tsconfig.json && vite build --config configs/vite.config.ts --mode testing",
     "build:prod": "tsc --noEmit -p configs/tsconfig.json && vite build --config configs/vite.config.ts --mode production",
@@ -25,6 +26,8 @@
     "test:e2e": "playwright test --config configs/playwright.config.ts",
     "test:e2e:ui": "playwright test --config configs/playwright.config.ts --ui",
     "test:performance": "vitest --config configs/vitest.config.js --run tests/performance-monitor.test.ts",
+    "deps:check": "npm ls --depth=0",
+    "deps:audit": "npm audit --omit=dev --audit-level=high",
     "build:electron": "npm run build:prod && electron-builder --mac",
     "build:android": "npm run build:prod && node scripts/update-capacitor-config.js && npx cap sync android && cd android && ./gradlew assembleRelease && cd ..",
     "build:all": "npm run build:prod && npm run build:android && npm run build:electron"

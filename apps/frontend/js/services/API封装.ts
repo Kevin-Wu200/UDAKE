@@ -1,5 +1,4 @@
 import type {
-    CacheEntry,
     IAPIService
 } from '../../types/api';
 
@@ -15,7 +14,10 @@ import { OfflineManager } from '../utils/OfflineManager';
 import { TwoLevelCache } from '../utils/cache/TwoLevelCache';
 import { errorHandler } from '../utils/errors/ErrorHandler';
 import { ApplicationError, NetworkError, ValidationError, AuthenticationError, NotFoundError, ServerError } from '../utils/errors/AppError';
-import type { AppError, ErrorContext } from '../types/errors';
+import { ErrorSeverity, ErrorType, type AppError, type ErrorContext } from '../types/errors';
+import { Logger } from '../utils/Logger';
+import { buildCacheKey, getApiCacheTTL, shouldUseApiCache } from '../utils/cache/CachePolicy';
+import { AppConfig } from '../config/AppConfig';
 
 interface RequestConfig {
     url: string;
@@ -24,11 +26,21 @@ interface RequestConfig {
     headers?: HeadersInit;
 }
 
+interface HttpLikeError {
+    response?: {
+        status?: number;
+        data?: Record<string, unknown>;
+    };
+    request?: unknown;
+    message?: string;
+}
+
 export class APIService implements IAPIService {
     public baseURL: string;
     private pendingRequests: Map<string, Promise<unknown>>;
-    private cache: TwoLevelCache<string, any>;
-    private cacheConfig: Map<string, number>; // 不同端点的TTL配置
+    private cache: TwoLevelCache<string, unknown>;
+    private readonly apiVersion: string;
+    private readonly apiVersionHeader: string;
 
     // 重试配置
     private readonly maxRetries: number;
@@ -41,6 +53,8 @@ export class APIService implements IAPIService {
         this.retryableStatusCodes = new Set([408, 429, 500, 502, 503, 504]);
         this.baseURL = baseURL;
         this.pendingRequests = new Map();
+        this.apiVersion = AppConfig.api.version;
+        this.apiVersionHeader = AppConfig.api.versionHeader;
         this.cache = new TwoLevelCache(
             {
                 maxSize: 100,
@@ -58,14 +72,6 @@ export class APIService implements IAPIService {
                 promoteThreshold: 3
             }
         );
-
-        // 配置不同端点的缓存TTL
-        this.cacheConfig = new Map([
-            ['/api/data/list', 60 * 1000], // 1分钟
-            ['/api/config', 10 * 60 * 1000], // 10分钟
-            ['/api/results', 5 * 60 * 1000], // 5分钟
-            ['/config', 10 * 60 * 1000] // 10分钟
-        ]);
     }
 
     /**
@@ -76,27 +82,19 @@ export class APIService implements IAPIService {
     }
 
     private _getCacheKey(url: string, options: RequestInit = {}): string {
-        const method = options.method || 'GET';
-        const body = options.body || '';
-        const data = JSON.stringify({
-            method,
+        return buildCacheKey({
+            namespace: 'api',
+            method: options.method || 'GET',
             url,
-            body: typeof body === 'string' ? body : JSON.stringify(body)
+            body: options.body,
+            version: this.apiVersion
         });
-        // 使用简单的哈希生成键
-        let hash = 0;
-        for (let i = 0; i < data.length; i++) {
-            const char = data.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // Convert to 32bit integer
-        }
-        return `${method}_${Math.abs(hash)}`;
     }
 
     private async _getFromCache<T>(key: string): Promise<T | null> {
         const value = await this.cache.get(key);
         if (value !== undefined) {
-            console.log(`[缓存] 命中: ${key}`);
+            Logger.debug('APIService', `缓存命中: ${key}`);
             return value as T;
         }
         return null;
@@ -108,7 +106,7 @@ export class APIService implements IAPIService {
 
     public async clearCache(): Promise<void> {
         await this.cache.clear();
-        console.log('[缓存] 已清除所有缓存');
+        Logger.info('APIService', '已清除所有缓存');
     }
 
     public async clearCacheFor(url: string): Promise<void> {
@@ -123,29 +121,24 @@ export class APIService implements IAPIService {
         this.cache.resetStats();
     }
 
+    public getApiVersion(): string {
+        return this.apiVersion;
+    }
+
+    private _buildRequestHeaders(headers?: HeadersInit): Headers {
+        const merged = new Headers(headers || {});
+        if (!merged.has(this.apiVersionHeader)) {
+            merged.set(this.apiVersionHeader, this.apiVersion);
+        }
+        return merged;
+    }
+
     private _shouldUseCache(method: string, url: string): boolean {
-        // 只缓存GET请求
-        if (method !== 'GET') {
-            return false;
-        }
-
-        // 检查是否在缓存配置中
-        for (const [endpoint] of this.cacheConfig) {
-            if (url.includes(endpoint)) {
-                return true;
-            }
-        }
-
-        return false;
+        return shouldUseApiCache(method, url);
     }
 
     private _getCacheTTL(url: string): number {
-        for (const [endpoint, ttl] of this.cacheConfig) {
-            if (url.includes(endpoint)) {
-                return ttl;
-            }
-        }
-        return 5 * 60 * 1000; // 默认5分钟
+        return getApiCacheTTL(url, 5 * 60 * 1000);
     }
 
     /**
@@ -183,12 +176,14 @@ export class APIService implements IAPIService {
     /**
      * 将错误转换为 AppError
      */
-    private convertToAppError(error: any, config: RequestConfig): AppError {
+    private convertToAppError(error: unknown, config: RequestConfig): AppError {
+        const normalizedError = (error || {}) as HttpLikeError;
+
         // Axios 或 Fetch 错误
-        if (error.response) {
+        if (normalizedError.response) {
             // 服务器响应了错误状态码
-            const status = error.response.status;
-            const data = error.response.data;
+            const status = normalizedError.response.status ?? 500;
+            const data = normalizedError.response.data;
 
             const context: ErrorContext = {
                 url: config.url,
@@ -199,51 +194,51 @@ export class APIService implements IAPIService {
 
             if (status === 401) {
                 return new AuthenticationError(
-                    data?.message || '认证失败',
+                    String(data?.message || '认证失败'),
                     data,
                     context
                 );
             } else if (status === 403) {
                 return new AuthenticationError(
-                    data?.message || '权限不足',
+                    String(data?.message || '权限不足'),
                     data,
                     context
                 );
             } else if (status === 404) {
                 return new NotFoundError(
-                    data?.message || '资源不存在',
+                    String(data?.message || '资源不存在'),
                     data,
                     context
                 );
             } else if (status >= 500) {
                 return new ServerError(
-                    data?.message || '服务器错误',
+                    String(data?.message || '服务器错误'),
                     data,
                     context
                 );
             } else if (status === 422) {
                 return new ValidationError(
-                    data?.message || '数据验证失败',
+                    String(data?.message || '数据验证失败'),
                     data,
                     context
                 );
             } else {
                 return new ApplicationError(
-                    'validation' as any,
+                    ErrorType.VALIDATION,
                     'REQUEST_ERROR',
-                    data?.message || `请求错误 (${status})`,
-                    'medium' as any,
+                    String(data?.message || `请求错误 (${status})`),
+                    ErrorSeverity.MEDIUM,
                     data,
                     context,
-                    error
+                    error instanceof Error ? error : undefined
                 );
             }
-        } else if (error.request) {
+        } else if (normalizedError.request) {
             // 请求已发出但没有收到响应
             return new NetworkError(
                 '网络连接失败',
                 {
-                    message: error.message
+                    message: normalizedError.message
                 },
                 {
                     url: config.url,
@@ -254,23 +249,24 @@ export class APIService implements IAPIService {
         } else {
             // 其他错误
             return new ApplicationError(
-                'unknown' as any,
+                ErrorType.UNKNOWN,
                 'UNKNOWN_ERROR',
-                error.message,
-                'high' as any,
+                error instanceof Error ? error.message : String(error),
+                ErrorSeverity.HIGH,
                 {
                     url: config.url,
                     method: config.method || 'GET'
                 },
                 undefined,
-                error
+                error instanceof Error ? error : undefined
             );
         }
     }
 
     public async request<T = unknown>(url: string, options: RequestInit = {}): Promise<T> {
-        const method = options.method || 'GET';
+        const method = (options.method || 'GET').toUpperCase();
         const requestKey = `${method}_${url}`;
+        const headers = this._buildRequestHeaders(options.headers);
 
         // 检查网络状态
         const isOnline = OfflineManager.isOnline;
@@ -280,9 +276,9 @@ export class APIService implements IAPIService {
             if (method === 'GET') {
                 // GET 请求：尝试从缓存返回
                 const cacheKey = this._getCacheKey(url, options);
-                const cached = this._getFromCache<T>(cacheKey);
+                const cached = await this._getFromCache<T>(cacheKey);
                 if (cached !== null) {
-                    console.log(`[离线模式] 从缓存返回数据: ${url}`);
+                    Logger.info('APIService', `离线模式缓存返回: ${url}`);
                     return cached as T;
                 }
 
@@ -293,7 +289,7 @@ export class APIService implements IAPIService {
                     try {
                         const cachedResult = await OfflineManager.getCachedResult(taskId);
                         if (cachedResult) {
-                            console.log(`[离线模式] 从 IndexedDB 返回结果: ${taskId}`);
+                            Logger.info('APIService', `离线模式 IndexedDB 返回: ${taskId}`);
                             return cachedResult as T;
                         }
                     } catch { /* IndexedDB 不可用时忽略 */ }
@@ -302,7 +298,7 @@ export class APIService implements IAPIService {
                 throw new Error('离线模式：无缓存数据可用');
             } else {
                 // POST/PUT/DELETE 请求：加入离线队列
-                console.log(`[离线模式] 请求已加入队列: ${method} ${url}`);
+                Logger.info('APIService', `离线模式入队: ${method} ${url}`);
 
                 // 根据URL判断操作类型
                 if (url.includes('upload-data')) {
@@ -325,7 +321,7 @@ export class APIService implements IAPIService {
         }
 
         if (this.pendingRequests.has(requestKey)) {
-            console.warn(`请求已在进行中: ${requestKey}`);
+            Logger.warn('APIService', `请求已在进行中: ${requestKey}`);
             return this.pendingRequests.get(requestKey) as Promise<T>;
         }
 
@@ -337,6 +333,8 @@ export class APIService implements IAPIService {
                 try {
                     const response = await fetch(url, {
                         ...options,
+                        method,
+                        headers,
                         mode: 'cors',
                         credentials: 'omit'
                     });
@@ -349,17 +347,17 @@ export class APIService implements IAPIService {
                     }
 
                     if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({}));
+                        const errorData = await response.json().catch(() => ({} as { detail?: string }));
                         const userMessage = this._getErrorMessage(response.status, response.statusText, errorData.detail);
 
                         // 检查是否需要重试
                         if (this.retryableStatusCodes.has(response.status) && attempt < this.maxRetries) {
-                            console.warn(`请求失败 [${response.status}]，${this.retryDelay}ms 后重试 (${attempt + 1}/${this.maxRetries})`);
+                            Logger.warn('APIService', `请求失败 [${response.status}]，${this.retryDelay}ms 后重试 (${attempt + 1}/${this.maxRetries})`);
                             await this._delay(this.retryDelay * (attempt + 1)); // 指数退避
                             continue;
                         }
 
-                        console.error(`API请求失败 [${response.status}]:`, errorData);
+                        Logger.error('APIService', `API请求失败 [${response.status}]`, errorData);
                         const error = new Error(userMessage);
                         const appError = this.convertToAppError(error, { url, method });
                         errorHandler.handle(appError);
@@ -393,7 +391,7 @@ export class APIService implements IAPIService {
 
                     // 网络错误也重试
                     if (error instanceof TypeError && error.message.includes('fetch') && attempt < this.maxRetries) {
-                        console.warn(`网络连接失败，${this.retryDelay}ms 后重试 (${attempt + 1}/${this.maxRetries})`);
+                        Logger.warn('APIService', `网络失败，${this.retryDelay}ms 后重试 (${attempt + 1}/${this.maxRetries})`);
                         await this._delay(this.retryDelay * (attempt + 1));
                         continue;
                     }

@@ -26,8 +26,8 @@ export interface ErrorContext {
   url?: string;
   method?: string;
   status?: number;
-  params?: any;
-  data?: any;
+  params?: unknown;
+  data?: unknown;
   stack?: string;
   userAgent?: string;
   timestamp?: Date;
@@ -39,7 +39,7 @@ export interface AppError extends Error {
   severity: ErrorSeverity;
   code: string;
   message: string;
-  details?: any;
+  details?: unknown;
   context?: ErrorContext;
   originalError?: Error;
   isOperational: boolean;
@@ -51,7 +51,7 @@ export interface ErrorResponse {
     type: ErrorType;
     code: string;
     message: string;
-    details?: any;
+    details?: unknown;
     timestamp: string;
   };
 }

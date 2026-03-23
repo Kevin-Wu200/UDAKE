@@ -7,6 +7,8 @@
     "allowJs": true,
     "checkJs": false,
     "noEmit": true,
+    "incremental": true,
+    "tsBuildInfoFile": "../.tsbuildinfo/frontend.tsbuildinfo",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

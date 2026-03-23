@@ -336,5 +336,21 @@ describe('I18n', () => {
             I18n.setLocale('en-US');
             expect(I18n.locale).toBe('en-US');
         });
+
+        it('应能够计算语言覆盖率', () => {
+            const coverage = I18n.getLocaleCoverage('en-US');
+            expect(coverage).toBeGreaterThan(0.8);
+            expect(coverage).toBeLessThanOrEqual(1);
+        });
+
+        it('应统计缺失翻译键的访问情况', () => {
+            I18n.clearMissingKeyUsage();
+            I18n.t('nonexistent.translation.key');
+            I18n.t('nonexistent.translation.key');
+            const usage = I18n.getMissingKeyUsage();
+            expect(usage.length).toBeGreaterThan(0);
+            expect(usage[0].key).toBe('nonexistent.translation.key');
+            expect(usage[0].count).toBe(2);
+        });
     });
 });

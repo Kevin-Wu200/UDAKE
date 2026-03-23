@@ -4,6 +4,9 @@
  */
 import { APIService } from './API封装';
 import { environmentService } from './EnvironmentService';
+import { RuntimeLifecycle, type LifecycleScope } from '../utils/RuntimeLifecycle';
+import { Logger } from '../utils/Logger';
+import { DEFAULT_AI_CONFIG, DEFAULT_APP_LIMITS, DEFAULT_MAP_CONFIG } from '../config/AppConfig';
 
 export interface MapConfig {
     arcgis: {
@@ -76,6 +79,7 @@ export class ConfigService {
     private listeners: Set<ConfigListener> = new Set();
     private autoRefreshInterval: number | null = null;
     private isSyncing: boolean = false;
+    private lifecycleScope: LifecycleScope | null = null;
 
     // 配置缓存过期时间（毫秒）
     private readonly CACHE_TTL = 5 * 60 * 1000; // 5分钟
@@ -85,6 +89,7 @@ export class ConfigService {
 
     constructor(apiService: APIService) {
         this.apiService = apiService;
+        this.lifecycleScope = RuntimeLifecycle.createScope('ConfigService');
         this.initAutoRefresh();
     }
 
@@ -94,9 +99,14 @@ export class ConfigService {
     private initAutoRefresh(): void {
         // 只在开发环境启用自动刷新
         if (environmentService.isDevelopment()) {
-            this.autoRefreshInterval = window.setInterval(() => {
+            const intervalId = this.lifecycleScope
+                ? this.lifecycleScope.setInterval(() => {
+                    this.refreshConfigSilently();
+                }, this.AUTO_REFRESH_INTERVAL)
+                : window.setInterval(() => {
                 this.refreshConfigSilently();
             }, this.AUTO_REFRESH_INTERVAL);
+            this.autoRefreshInterval = intervalId;
 
             environmentService.debug('配置自动刷新已启用');
         }
@@ -158,29 +168,9 @@ export class ConfigService {
             }
             throw new Error('获取地图配置失败');
         } catch (error) {
-            console.error('获取地图配置失败:', error);
+            Logger.warn('ConfigService', '获取地图配置失败，使用默认配置', error);
             // 返回默认配置
-            return {
-                arcgis: {
-                    apiKey: 'YOUR_ARCGIS_API_KEY_HERE',
-                    portalUrl: 'https://www.arcgis.com',
-                    env: 'development',
-                    defaultBasemap: 'arcgis-topographic',
-                    defaultCenter: [139.767125, 35.681236],
-                    defaultZoom: 10,
-                    isMock: true
-                },
-                amap: {
-                    apiKey: 'YOUR_AMAP_API_KEY_HERE',
-                    securityCode: null,
-                    defaultCenter: [119.72170376, 30.26262781],
-                    defaultZoom: 18
-                },
-                tianditu: {
-                    apiKey: 'YOUR_TIANDITU_API_KEY_HERE',
-                    token: null
-                }
-            };
+            return { ...DEFAULT_MAP_CONFIG };
         }
     }
 
@@ -200,17 +190,9 @@ export class ConfigService {
             }
             throw new Error('获取应用配置失败');
         } catch (error) {
-            console.error('获取应用配置失败:', error);
+            Logger.warn('ConfigService', '获取应用配置失败，使用默认配置', error);
             // 返回默认配置
-            return {
-                appName: '智能不确定性驱动空间决策平台',
-                version: '1.0.0',
-                debug: true,
-                corsOrigins: ['http://localhost:5173'],
-                maxFileSize: 100,
-                maxConcurrentTasks: 5,
-                taskTimeout: 3600
-            };
+            return { ...DEFAULT_APP_LIMITS };
         }
     }
 
@@ -230,13 +212,9 @@ export class ConfigService {
             }
             throw new Error('获取AI配置失败');
         } catch (error) {
-            console.error('获取AI配置失败:', error);
+            Logger.warn('ConfigService', '获取AI配置失败，使用默认配置', error);
             // 返回默认配置
-            return {
-                cacheEnabled: true,
-                maxBatchSize: 100,
-                modelPath: null
-            };
+            return { ...DEFAULT_AI_CONFIG };
         }
     }
 
@@ -261,44 +239,20 @@ export class ConfigService {
             environmentService.debug('从后端获取配置成功');
             return config;
         } catch (error) {
-            console.error('获取所有配置失败:', error);
+            Logger.warn('ConfigService', '获取所有配置失败，使用默认配置', error);
             // 返回默认配置
             return {
                 app: {
-                    appName: '智能不确定性驱动空间决策平台',
-                    version: '1.0.0',
-                    debug: true
+                    appName: DEFAULT_APP_LIMITS.appName,
+                    version: DEFAULT_APP_LIMITS.version,
+                    debug: DEFAULT_APP_LIMITS.debug
                 },
-                map: {
-                    arcgis: {
-                        apiKey: 'YOUR_ARCGIS_API_KEY_HERE',
-                        portalUrl: 'https://www.arcgis.com',
-                        env: 'development',
-                        defaultBasemap: 'arcgis-topographic',
-                        defaultCenter: [139.767125, 35.681236],
-                        defaultZoom: 10,
-                        isMock: true
-                    },
-                    amap: {
-                        apiKey: 'YOUR_AMAP_API_KEY_HERE',
-                        securityCode: null,
-                        defaultCenter: [119.72170376, 30.26262781],
-                        defaultZoom: 18
-                    },
-                    tianditu: {
-                        apiKey: 'YOUR_TIANDITU_API_KEY_HERE',
-                        token: null
-                    }
-                },
-                ai: {
-                    cacheEnabled: true,
-                    maxBatchSize: 100,
-                    modelPath: null
-                },
+                map: { ...DEFAULT_MAP_CONFIG },
+                ai: { ...DEFAULT_AI_CONFIG },
                 limits: {
-                    maxFileSize: 100,
-                    maxConcurrentTasks: 5,
-                    taskTimeout: 3600
+                    maxFileSize: DEFAULT_APP_LIMITS.maxFileSize,
+                    maxConcurrentTasks: DEFAULT_APP_LIMITS.maxConcurrentTasks,
+                    taskTimeout: DEFAULT_APP_LIMITS.taskTimeout
                 }
             };
         }
@@ -394,10 +348,12 @@ export class ConfigService {
      * 销毁服务
      */
     destroy(): void {
-        if (this.autoRefreshInterval !== null) {
-            clearInterval(this.autoRefreshInterval);
+        if (this.autoRefreshInterval !== null && this.lifecycleScope) {
+            this.lifecycleScope.clearInterval(this.autoRefreshInterval);
             this.autoRefreshInterval = null;
         }
+        this.lifecycleScope?.cleanup();
+        this.lifecycleScope = null;
         this.listeners.clear();
         this.clearCache();
         environmentService.debug('配置服务已销毁');

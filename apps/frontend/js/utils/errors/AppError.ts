@@ -10,7 +10,7 @@ export class ApplicationError extends Error implements AppError {
   public readonly type: ErrorType;
   public readonly severity: ErrorSeverity;
   public readonly code: string;
-  public readonly details?: any;
+  public readonly details?: unknown;
   public readonly context?: ErrorContext;
   public readonly originalError?: Error;
   public readonly isOperational: boolean;
@@ -20,7 +20,7 @@ export class ApplicationError extends Error implements AppError {
     code: string,
     message: string,
     severity: ErrorSeverity = ErrorSeverity.MEDIUM,
-    details?: any,
+    details?: unknown,
     context?: ErrorContext,
     originalError?: Error
   ) {
@@ -39,12 +39,12 @@ export class ApplicationError extends Error implements AppError {
     this.isOperational = true;
 
     // 维护正确的堆栈跟踪（仅在 Node.js 环境中可用）
-    if (typeof (Error as any).captureStackTrace === 'function') {
-      (Error as any).captureStackTrace(this, this.constructor);
+    if (typeof (Error as { captureStackTrace?: (targetObject: object, constructorOpt?: Function) => void }).captureStackTrace === 'function') {
+      (Error as { captureStackTrace?: (targetObject: object, constructorOpt?: Function) => void }).captureStackTrace?.(this, this.constructor);
     }
   }
 
-  toJSON(): any {
+  toJSON(): Record<string, unknown> {
     return {
       type: this.type,
       code: this.code,
@@ -60,7 +60,7 @@ export class ApplicationError extends Error implements AppError {
 
 // 具体错误类
 export class NetworkError extends ApplicationError {
-  constructor(message: string, details?: any, context?: ErrorContext) {
+  constructor(message: string, details?: unknown, context?: ErrorContext) {
     super(
       ErrorType.NETWORK,
       'NETWORK_ERROR',
@@ -73,7 +73,7 @@ export class NetworkError extends ApplicationError {
 }
 
 export class ValidationError extends ApplicationError {
-  constructor(message: string, details?: any, context?: ErrorContext) {
+  constructor(message: string, details?: unknown, context?: ErrorContext) {
     super(
       ErrorType.VALIDATION,
       'VALIDATION_ERROR',
@@ -86,7 +86,7 @@ export class ValidationError extends ApplicationError {
 }
 
 export class AuthenticationError extends ApplicationError {
-  constructor(message: string, details?: any, context?: ErrorContext) {
+  constructor(message: string, details?: unknown, context?: ErrorContext) {
     super(
       ErrorType.AUTHENTICATION,
       'AUTHENTICATION_ERROR',
@@ -99,7 +99,7 @@ export class AuthenticationError extends ApplicationError {
 }
 
 export class AuthorizationError extends ApplicationError {
-  constructor(message: string, details?: any, context?: ErrorContext) {
+  constructor(message: string, details?: unknown, context?: ErrorContext) {
     super(
       ErrorType.AUTHORIZATION,
       'AUTHORIZATION_ERROR',
@@ -112,7 +112,7 @@ export class AuthorizationError extends ApplicationError {
 }
 
 export class NotFoundError extends ApplicationError {
-  constructor(message: string, details?: any, context?: ErrorContext) {
+  constructor(message: string, details?: unknown, context?: ErrorContext) {
     super(
       ErrorType.NOT_FOUND,
       'NOT_FOUND',
@@ -125,7 +125,7 @@ export class NotFoundError extends ApplicationError {
 }
 
 export class ServerError extends ApplicationError {
-  constructor(message: string, details?: any, context?: ErrorContext) {
+  constructor(message: string, details?: unknown, context?: ErrorContext) {
     super(
       ErrorType.SERVER,
       'SERVER_ERROR',
@@ -138,7 +138,7 @@ export class ServerError extends ApplicationError {
 }
 
 export class PluginError extends ApplicationError {
-  constructor(message: string, details?: any, context?: ErrorContext) {
+  constructor(message: string, details?: unknown, context?: ErrorContext) {
     super(
       ErrorType.PLUGIN,
       'PLUGIN_ERROR',
@@ -151,7 +151,7 @@ export class PluginError extends ApplicationError {
 }
 
 export class CacheError extends ApplicationError {
-  constructor(message: string, details?: any, context?: ErrorContext) {
+  constructor(message: string, details?: unknown, context?: ErrorContext) {
     super(
       ErrorType.CACHE,
       'CACHE_ERROR',

@@ -3,7 +3,7 @@
  * 应用程序入口和核心逻辑
  */
 
-import { initializeMap, getMapProvider, reinitializeMap } from './地图初始化.js';
+import { initializeMap, reinitializeMap } from './地图初始化.js';
 import { abortAllAMapLoads } from './config/amap.config.js';
 import { LayerManager } from './图层管理.js';
 import { TaskPoller } from './任务轮询.js';
@@ -34,11 +34,15 @@ import { StartupManager } from './utils/StartupManager.js';
 import { ResourceOptimizationManager } from './config/ResourceOptimizationConfig.js';
 import { Kriging3DPanel } from './components/Kriging3DPanel.js';
 import { CSSFeatureDetector } from './utils/CSSFeatureDetector.js';
+import { Logger } from './utils/Logger.js';
+import { RuntimeLifecycle } from './utils/RuntimeLifecycle.js';
+import { AppConfig } from './config/AppConfig.js';
 
 // 导入管理器
 import { ComponentInitializer } from './managers/ComponentInitializer.js';
 import { EventBinder } from './managers/EventBinder.js';
 import { StateManager } from './managers/StateManager.js';
+import { createStateBridge, type StateBridge } from './store/StateBridge.js';
 
 // 导入类型
 import {
@@ -58,7 +62,9 @@ import {
 import { TaskStatus } from '../types/core';
 
 // 初始化全局工具
-console.log('主程序已执行');
+Logger.bootstrap();
+RuntimeLifecycle.installGlobalTracking();
+Logger.info('主程序', '主程序已执行');
 ThemeManager.init();
 PerformanceMonitor.init();
 HistoryManager.init();
@@ -89,6 +95,7 @@ class App {
     private componentInitializer: ComponentInitializer;
     private eventBinder: EventBinder;
     private stateManager: StateManager;
+    private stateBridge: StateBridge | null = null;
 
     // 启动相关
     private splashScreen: SplashScreen | null = null;
@@ -98,15 +105,21 @@ class App {
 
     // 工具
     private formValidator: FormValidator | null = null;
-    private locationServiceIntegration: any = null;
+    private locationServiceIntegration: { initialize: () => Promise<void> } | null = null;
 
     constructor() {
-        console.log('App 构造函数执行');
+        Logger.debug('主程序', 'App 构造函数执行');
 
         // 初始化管理器
         this.componentInitializer = new ComponentInitializer();
         this.eventBinder = EventBinder.getInstance();
         this.stateManager = StateManager.getInstance();
+        this.stateBridge = createStateBridge(this.stateManager);
+        this.stateBridge.start();
+
+        window.addEventListener('beforeunload', () => {
+            this.stateBridge?.stop();
+        }, { once: true });
 
         // 初始化状态
         this.initializeAppState();
@@ -132,11 +145,11 @@ class App {
      * 初始化应用
      */
     async init(): Promise<void> {
-        console.log('init 被执行');
+        Logger.debug('主程序', 'init 被执行');
 
         try {
             // 阶段0：初始化核心管理器
-            console.log('初始化启动管理器');
+            Logger.debug('主程序', '初始化启动管理器');
             this.startupManager = StartupManager.getInstance({
                 enablePerformanceMonitoring: true,
                 enableResourcePreload: true,
@@ -1059,9 +1072,15 @@ class App {
     private async handleMapEngineSwitch(newProvider: 'arcgis' | 'amap'): Promise<void> {
         // 检查是否正在切换，防止重复切换
         if (this.isSwitchingMap) {
-            console.warn('⚠️ 地图引擎正在切换中，请稍候');
+            Logger.warn('主程序', '地图引擎正在切换中，请稍候');
             return;
         }
+
+        const previousProvider: 'arcgis' | 'amap' = newProvider === 'arcgis' ? 'amap' : 'arcgis';
+        let samplingPoints: SamplingPoint[] = [];
+        let projectPoints: SamplingPoint[] = [];
+        let currentCenter: [number, number] | { lng: number; lat: number } | null = null;
+        let currentZoom: number | null = null;
 
         this.isSwitchingMap = true;
         this.mapSwitchAbortController?.abort();
@@ -1081,10 +1100,10 @@ class App {
             LoadingManager.show('正在切换地图引擎...');
             ensureSwitchAlive();
 
-            const currentCenter = this.view ? (this.view as any).getCenter?.() : null;
-            const currentZoom = this.view ? (this.view as any).getZoom?.() : null;
-            const samplingPoints = this.layerManager?.getSamplingPoints() || [];
-            const projectPoints = this.currentProject?.points || [];
+            currentCenter = this.view ? (this.view as { getCenter?: () => [number, number] | { lng: number; lat: number } }).getCenter?.() || null : null;
+            currentZoom = this.view ? (this.view as { getZoom?: () => number }).getZoom?.() || null : null;
+            samplingPoints = this.layerManager?.getSamplingPoints() || [];
+            projectPoints = this.currentProject?.points || [];
             const previousAdapter = this.layerManager?.adapter;
 
             if (this.layerManager) {
@@ -1121,7 +1140,8 @@ class App {
             const mapAdapter = await Promise.race([
                 reinitializeMap('viewDiv', newProvider),
                 new Promise<never>((_, reject) => {
-                    setTimeout(() => reject(new Error('地图引擎切换超时（20秒）')), 20000);
+                    const timeoutMs = AppConfig.map.switchTimeoutMs;
+                    setTimeout(() => reject(new Error(`地图引擎切换超时（${Math.floor(timeoutMs / 1000)}秒）`)), timeoutMs);
                 })
             ]);
             ensureSwitchAlive();
@@ -1158,10 +1178,34 @@ class App {
         } catch (error) {
             LoadingManager.hide();
             if (error instanceof DOMException && error.name === 'AbortError') {
-                console.warn('⚠️ 地图切换被取消');
+                Logger.warn('主程序', '地图切换被取消');
                 return;
             }
-            console.error('地图引擎切换失败:', error);
+            Logger.error('主程序', '地图引擎切换失败，尝试回滚', error);
+            try {
+                const rollbackAdapter = await Promise.race([
+                    reinitializeMap('viewDiv', previousProvider),
+                    new Promise<never>((_, reject) => {
+                        const timeoutMs = AppConfig.map.switchTimeoutMs;
+                        setTimeout(() => reject(new Error(`地图引擎回滚超时（${Math.floor(timeoutMs / 1000)}秒）`)), timeoutMs);
+                    })
+                ]);
+                this.view = rollbackAdapter.getView();
+                this.layerManager = new LayerManager(rollbackAdapter);
+
+                if (currentCenter && currentZoom !== null) {
+                    const center = Array.isArray(currentCenter) ? currentCenter : [currentCenter.lng, currentCenter.lat];
+                    (this.view as { setCenter?: (center: [number, number]) => void }).setCenter?.(center as [number, number]);
+                    (this.view as { setZoom?: (zoom: number) => void }).setZoom?.(currentZoom);
+                }
+
+                const pointsToRestore = projectPoints.length > 0 ? projectPoints : samplingPoints;
+                for (const point of pointsToRestore) {
+                    await this.layerManager.addSamplingPoint(point);
+                }
+            } catch (rollbackError) {
+                Logger.error('主程序', '地图引擎回滚失败', rollbackError);
+            }
             const errorMessage = error instanceof Error ? error.message : '未知错误';
             this.showStatus(`切换失败: ${errorMessage}`, 'error');
             throw error;
