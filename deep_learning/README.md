@@ -49,3 +49,10 @@ python3 deep_learning/examples/sampling_rl_demo.py
 python3 deep_learning/examples/uncertainty_training_demo.py
 python3 deep_learning/examples/uncertainty_inference_demo.py
 ```
+
+## 阶段6快速命令
+
+```bash
+python3 deep_learning/training/train_spatiotemporal.py --model st_transformer --epochs 20 --seq-len 24 --horizon 6
+python3 deep_learning/inference/run_spatiotemporal_inference.py --model gcn_lstm --seq-len 24 --horizon 6
+```

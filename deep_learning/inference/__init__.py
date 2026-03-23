@@ -2,6 +2,7 @@
 
 from .predictors import BasePredictor, BatchPredictor, StreamPredictor, AsyncInferenceEngine
 from .spatial_interpolation_inference import InferenceResult, SpatialInterpolationInference
+from .spatiotemporal_inference import SpatioTemporalInference, SpatioTemporalInferenceResult
 
 __all__ = [
     "BasePredictor",
@@ -10,4 +11,6 @@ __all__ = [
     "AsyncInferenceEngine",
     "InferenceResult",
     "SpatialInterpolationInference",
+    "SpatioTemporalInference",
+    "SpatioTemporalInferenceResult",
 ]

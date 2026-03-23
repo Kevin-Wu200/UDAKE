@@ -10,6 +10,14 @@ from .spatial_interpolation_trainer import (
     TrainingMonitor,
     train_spatial_model,
 )
+from deep_learning.models.spatiotemporal.training import (
+    SpatioTemporalHyperparameterOptimizer,
+    SpatioTemporalModelManager,
+    SpatioTemporalTrainingConfig,
+    SpatioTemporalTrainingMonitor,
+    cosine_with_warmup,
+    train_spatiotemporal_model,
+)
 
 __all__ = [
     "BaseTrainer",
@@ -21,4 +29,10 @@ __all__ = [
     "SpatialTrainingConfig",
     "TrainingMonitor",
     "train_spatial_model",
+    "SpatioTemporalHyperparameterOptimizer",
+    "SpatioTemporalModelManager",
+    "SpatioTemporalTrainingConfig",
+    "SpatioTemporalTrainingMonitor",
+    "cosine_with_warmup",
+    "train_spatiotemporal_model",
 ]

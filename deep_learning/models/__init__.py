@@ -18,6 +18,13 @@ from .uncertainty import (
     UncertaintySystemIntegrator,
 )
 from .sampling_rl import ActorCriticAgent, DQNAgent, PPOAgent, SamplingRLIntegrator
+from .spatiotemporal import (
+    ConvLSTMModel,
+    GCNLSTMModel,
+    STGCNModel,
+    SpatioTemporalSystemIntegrator,
+    SpatioTemporalTransformer,
+)
 
 __all__ = [
     "ModelRegistry",
@@ -43,4 +50,9 @@ __all__ = [
     "DQNAgent",
     "ActorCriticAgent",
     "SamplingRLIntegrator",
+    "SpatioTemporalTransformer",
+    "GCNLSTMModel",
+    "ConvLSTMModel",
+    "STGCNModel",
+    "SpatioTemporalSystemIntegrator",
 ]
