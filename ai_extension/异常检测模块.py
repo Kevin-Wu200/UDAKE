@@ -4,7 +4,15 @@
 from sklearn.ensemble import IsolationForest
 from sklearn.covariance import EllipticEnvelope
 import numpy as np
-from typing import Dict, List
+from typing import Any, Dict
+
+from deep_learning.models.anomaly_detection import (
+    AnomalyEnsembleIntegrator,
+    ContrastiveAnomalyDetector,
+    GANAnomalyDetector,
+    GCAEAnomalyDetector,
+    VAEAnomalyDetector,
+)
 
 class AnomalyDetector:
     """异常检测器"""
@@ -95,3 +103,65 @@ class AnomalyDetector:
         X = np.column_stack([x, y, values])
         scores = self.isolation_forest.fit(X).score_samples(X)
         return scores
+
+
+class DeepAnomalyFusionDetector:
+    """深度异常检测融合器，保留传统方法并融合四类深度模型。"""
+
+    def __init__(self) -> None:
+        self.baseline = AnomalyDetector()
+        self.detectors = {
+            "vae": VAEAnomalyDetector(),
+            "gcae": GCAEAnomalyDetector(),
+            "gan": GANAnomalyDetector(),
+            "contrastive": ContrastiveAnomalyDetector(),
+        }
+        self.ensemble = AnomalyEnsembleIntegrator(self.detectors)
+        self._fitted = False
+
+    def fit(self, x: np.ndarray, y: np.ndarray, values: np.ndarray) -> Dict[str, Any]:
+        coords = np.column_stack([x, y])
+        summary: Dict[str, Any] = {}
+        for name, detector in self.detectors.items():
+            if name == "contrastive":
+                summary[name] = detector.fit(coords, values, epochs=25)
+            else:
+                summary[name] = detector.fit(coords, values)
+        self._fitted = True
+        return summary
+
+    def detect(
+        self,
+        x: np.ndarray,
+        y: np.ndarray,
+        values: np.ndarray,
+        threshold_method: str = "percentile",
+        percentile: float = 95.0,
+    ) -> Dict[str, Any]:
+        if not self._fitted:
+            self.fit(x, y, values)
+
+        coords = np.column_stack([x, y])
+        deep_result = self.ensemble.detect(
+            coords,
+            values,
+            threshold_method=threshold_method,  # type: ignore[arg-type]
+            percentile=percentile,
+        )
+        baseline_scores = -self.baseline.get_anomaly_scores(x, y, values)
+        baseline_scores = (baseline_scores - baseline_scores.min()) / (baseline_scores.max() - baseline_scores.min() + 1e-9)
+
+        fused = 0.75 * np.asarray(deep_result["fused_scores"], dtype=float) + 0.25 * baseline_scores
+        threshold = float(np.percentile(fused, percentile))
+        anomaly_idx = np.where(fused >= threshold)[0]
+
+        return {
+            "anomaly_count": int(len(anomaly_idx)),
+            "anomaly_indices": anomaly_idx.tolist(),
+            "fused_scores": fused.tolist(),
+            "threshold": threshold,
+            "deep_component": deep_result,
+            "baseline_component": {
+                "scores": baseline_scores.tolist(),
+            },
+        }
