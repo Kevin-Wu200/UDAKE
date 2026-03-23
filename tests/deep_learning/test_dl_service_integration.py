@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import numpy as np
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -16,6 +17,14 @@ def _spatial_samples() -> list[list[float]]:
         [0.75, 0.20, 1.60],
         [0.80, 0.75, 0.50],
     ]
+
+
+def _uncertainty_map(size: int = 12) -> list[list[float]]:
+    x = np.linspace(0.0, 1.0, size)
+    y = np.linspace(0.0, 1.0, size)
+    xx, yy = np.meshgrid(x, y)
+    arr = np.clip(0.45 + 0.25 * np.sin(xx * 3.0) + 0.2 * np.cos(yy * 4.0), 0.01, 1.0)
+    return arr.tolist()
 
 
 def test_service_core() -> None:
@@ -94,3 +103,67 @@ def test_api_spatial_routes() -> None:
     payload = pred_resp.json()
     assert len(payload["prediction"]) == 3
     assert len(payload["variance"]) == 3
+
+
+def test_service_sampling_rl_train_and_recommend() -> None:
+    service = DeepLearningService()
+    uncertainty = _uncertainty_map(size=10)
+
+    train = service.train_sampling_rl(
+        model_name="ppo",
+        uncertainty_map=uncertainty,
+        existing_points=[[0.1, 0.1], [0.8, 0.7]],
+        episodes=8,
+        budget=12,
+    )
+    assert train["model_name"] == "ppo"
+    assert train["training"]["summary"]["episodes"] >= 1
+
+    rec = service.recommend_sampling_rl(
+        model_name="ppo",
+        uncertainty_map=uncertainty,
+        existing_points=[[0.1, 0.1], [0.8, 0.7]],
+        n_recommendations=6,
+        fusion_strategy="hybrid",
+        realtime=True,
+    )
+    assert rec["model_name"] == "ppo"
+    assert len(rec["recommendation"]["recommendations"]) >= 1
+    assert "optimization" in rec
+
+
+def test_api_sampling_rl_routes() -> None:
+    app = FastAPI()
+    app.include_router(router, prefix="/api")
+    client = TestClient(app)
+
+    uncertainty = _uncertainty_map(size=10)
+
+    train_resp = client.post(
+        "/api/dl/sampling-rl/train",
+        json={
+            "model_name": "dqn",
+            "uncertainty_map": uncertainty,
+            "existing_points": [[0.2, 0.2], [0.7, 0.6]],
+            "episodes": 8,
+            "budget": 12,
+        },
+    )
+    assert train_resp.status_code == 200
+    assert train_resp.json()["model_name"] == "dqn"
+
+    rec_resp = client.post(
+        "/api/dl/sampling-rl/recommend",
+        json={
+            "model_name": "dqn",
+            "uncertainty_map": uncertainty,
+            "existing_points": [[0.2, 0.2], [0.7, 0.6]],
+            "n_recommendations": 5,
+            "fusion_strategy": "hybrid",
+            "realtime": True,
+        },
+    )
+    assert rec_resp.status_code == 200
+    payload = rec_resp.json()
+    assert payload["model_name"] == "dqn"
+    assert len(payload["recommendation"]["recommendations"]) >= 1

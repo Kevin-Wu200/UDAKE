@@ -11,6 +11,7 @@
 - 空间插值模型（GNN-Kriging、Attention-Kriging、Residual-Kriging）
 - 异常检测模型（VAE、GCAE、GAN、Contrastive）
 - 异常数据与评估工具（合成异常、标注、评估报告、实时告警）
+- 强化学习采样优化（SamplingEnv、PPO/DQN/A2C、多智能体协作、在线学习）
 - 不确定性量化模型（BNN、MC Dropout、Deep Ensemble、EDL）
 - 不确定性聚合/校准/评估与系统集成工具
 
@@ -32,6 +33,14 @@ python3 deep_learning/inference/run_spatial_interpolation_inference.py --model r
 ```bash
 python3 deep_learning/examples/anomaly_training_demo.py
 python3 deep_learning/examples/anomaly_inference_demo.py
+```
+
+## 阶段5快速命令
+
+```bash
+python3 deep_learning/training/train_sampling_rl.py --model ppo --episodes 30 --size 24
+python3 deep_learning/inference/run_sampling_rl_inference.py --model ppo --n 12 --strategy hybrid
+python3 deep_learning/examples/sampling_rl_demo.py
 ```
 
 ## 阶段4快速命令

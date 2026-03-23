@@ -11,6 +11,7 @@ from ai_extension.异常检测模块 import DeepAnomalyFusionDetector
 from deep_learning.inference import BatchPredictor
 from deep_learning.models.anomaly_detection import AnomalyTrainingConfig, AnomalyTrainingManager
 from deep_learning.models import AttentionKrigingModel, GNNKrigingModel, ModelRegistry, ResidualKrigingModel
+from deep_learning.models.sampling_rl import SamplingRLIntegrator
 from deep_learning.models.spatial_interpolation import SpatialInterpolationIntegrator
 from deep_learning.training import LightningTrainer, SpatialTrainingConfig, TrainingConfig, train_spatial_model
 from deep_learning.utils.device import DeviceManager
@@ -67,6 +68,7 @@ class DeepLearningService:
         self.anomaly_training = AnomalyTrainingManager()
         self.anomaly_models: dict[str, Any] = {}
         self.deep_fusion = DeepAnomalyFusionDetector()
+        self.sampling_rl_integrators: dict[str, SamplingRLIntegrator] = {}
 
     def health(self) -> dict[str, Any]:
         profile = self.device_manager.configure()
@@ -77,6 +79,7 @@ class DeepLearningService:
             "mps_available": profile.mps_available,
             "registered_models": self.registry.list_models(),
             "trained_anomaly_models": sorted(self.anomaly_models.keys()),
+            "trained_sampling_rl_models": sorted(self.sampling_rl_integrators.keys()),
         }
 
     def train_demo_model(self, samples: list[list[float]]) -> dict[str, Any]:
@@ -126,6 +129,84 @@ class DeepLearningService:
         if len(c) < 5:
             raise ValueError("at least 5 points are required")
         return c, v
+
+    def _validate_uncertainty_map(self, uncertainty_map: list[list[float]]) -> np.ndarray:
+        arr = np.asarray(uncertainty_map, dtype=float)
+        if arr.ndim != 2:
+            raise ValueError("uncertainty_map must be 2D matrix")
+        if arr.shape[0] < 4 or arr.shape[1] < 4:
+            raise ValueError("uncertainty_map size must be >= 4x4")
+        return np.clip(arr, 1e-6, 1.0)
+
+    def _get_sampling_rl_integrator(self, model_name: str) -> SamplingRLIntegrator:
+        if model_name not in {"ppo", "dqn", "a2c", "a3c"}:
+            raise ValueError("model_name must be one of ppo/dqn/a2c/a3c")
+        if model_name not in self.sampling_rl_integrators:
+            self.sampling_rl_integrators[model_name] = SamplingRLIntegrator(model_name=model_name)  # type: ignore[arg-type]
+        return self.sampling_rl_integrators[model_name]
+
+    def train_sampling_rl(
+        self,
+        model_name: str,
+        uncertainty_map: list[list[float]],
+        existing_points: list[list[float]] | None = None,
+        episodes: int = 30,
+        budget: int = 20,
+    ) -> dict[str, Any]:
+        arr = self._validate_uncertainty_map(uncertainty_map)
+        points = np.asarray(existing_points, dtype=float) if existing_points else None
+
+        integrator = self._get_sampling_rl_integrator(model_name)
+        result = integrator.train(
+            uncertainty_map=arr,
+            existing_points=points,
+            episodes=max(5, int(episodes)),
+            budget=max(8, int(budget)),
+        )
+
+        summary = result.get("summary", {})
+        self.metric_monitor.log(f"{model_name}_sampling_rl_reward", float(summary.get("final_reward", 0.0)))
+        return {
+            "model_name": model_name,
+            "training": result,
+            "resource": self.resource_monitor.collect(),
+        }
+
+    def recommend_sampling_rl(
+        self,
+        model_name: str,
+        uncertainty_map: list[list[float]],
+        existing_points: list[list[float]] | None = None,
+        n_recommendations: int = 10,
+        fusion_strategy: str = "hybrid",
+        realtime: bool = True,
+    ) -> dict[str, Any]:
+        arr = self._validate_uncertainty_map(uncertainty_map)
+        points = np.asarray(existing_points, dtype=float) if existing_points else None
+
+        if fusion_strategy not in {"rl_only", "rule_only", "hybrid"}:
+            raise ValueError("fusion_strategy must be one of rl_only/rule_only/hybrid")
+
+        integrator = self._get_sampling_rl_integrator(model_name)
+        if not integrator.latest_training:
+            integrator.train(arr, existing_points=points, episodes=15, budget=max(10, n_recommendations * 2))
+
+        result = integrator.recommend(
+            uncertainty_map=arr,
+            existing_points=points,
+            n_recommendations=max(1, int(n_recommendations)),
+            fusion_strategy=fusion_strategy,  # type: ignore[arg-type]
+            realtime=bool(realtime),
+        )
+        optimize = integrator.optimize_strategy(arr)
+        self.metric_monitor.log(f"{model_name}_sampling_rl_recommend_count", float(len(result.get("recommendations", []))))
+
+        return {
+            "model_name": model_name,
+            "recommendation": result,
+            "optimization": optimize,
+            "resource": self.resource_monitor.collect(),
+        }
 
     def train_anomaly_model(
         self,

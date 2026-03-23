@@ -1,12 +1,18 @@
 """
 采样点推荐生成
 """
+from __future__ import annotations
+
 import numpy as np
 from typing import List, Dict
 import json
+from .强化学习采样优化 import RLSamplingOptimizer
 
 class SamplingRecommender:
     """采样点推荐生成器"""
+
+    def __init__(self) -> None:
+        self.rl_optimizer = RLSamplingOptimizer(model_name="ppo")
 
     def generate_recommendations(
         self,
@@ -26,6 +32,10 @@ class SamplingRecommender:
             )
         elif strategy == "spatial_coverage":
             recommendations = self._spatial_coverage_sampling(
+                variance, x_coords, y_coords, existing_points, n_recommendations
+            )
+        elif strategy == "reinforcement_learning":
+            recommendations = self._reinforcement_learning_sampling(
                 variance, x_coords, y_coords, existing_points, n_recommendations
             )
         else:
@@ -127,6 +137,24 @@ class SamplingRecommender:
         )
 
         return variance_samples + spatial_samples
+
+    def _reinforcement_learning_sampling(
+        self,
+        variance: np.ndarray,
+        x_coords: np.ndarray,
+        y_coords: np.ndarray,
+        existing_points: np.ndarray | None,
+        n: int,
+    ) -> List[Dict[str, float]]:
+        """基于强化学习的采样推荐。"""
+        del x_coords, y_coords  # RL环境直接使用方差栅格和边界归一化坐标
+        payload = self.rl_optimizer.optimize(
+            variance=variance,
+            existing_points=existing_points,
+            n_recommendations=n,
+            realtime=True,
+        )
+        return payload.get("recommendations", [])
 
     def export_to_geojson(
         self,

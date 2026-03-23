@@ -62,6 +62,23 @@ class AnomalyRealtimeRequest(BaseModel):
     k: float = Field(default=2.5, ge=1.0, le=6.0)
 
 
+class SamplingRLTrainRequest(BaseModel):
+    model_name: str = Field(default="ppo", description="ppo/dqn/a2c/a3c")
+    uncertainty_map: list[list[float]] = Field(default_factory=list, description="二维不确定性矩阵")
+    existing_points: list[list[float]] = Field(default_factory=list, description="已有采样点 [[x, y], ...]")
+    episodes: int = Field(default=30, ge=5, le=500)
+    budget: int = Field(default=20, ge=8, le=200)
+
+
+class SamplingRLPredictRequest(BaseModel):
+    model_name: str = Field(default="ppo", description="ppo/dqn/a2c/a3c")
+    uncertainty_map: list[list[float]] = Field(default_factory=list, description="二维不确定性矩阵")
+    existing_points: list[list[float]] = Field(default_factory=list, description="已有采样点 [[x, y], ...]")
+    n_recommendations: int = Field(default=10, ge=1, le=100)
+    fusion_strategy: str = Field(default="hybrid", description="rl_only/rule_only/hybrid")
+    realtime: bool = Field(default=True, description="是否使用实时推荐模式")
+
+
 @router.get("/health")
 def dl_health() -> dict:
     return service.health()
@@ -122,4 +139,27 @@ def anomaly_realtime(payload: AnomalyRealtimeRequest) -> dict:
         threshold_method=payload.threshold_method,
         percentile=payload.percentile,
         k=payload.k,
+    )
+
+
+@router.post("/sampling-rl/train")
+def train_sampling_rl(payload: SamplingRLTrainRequest) -> dict:
+    return service.train_sampling_rl(
+        model_name=payload.model_name,
+        uncertainty_map=payload.uncertainty_map,
+        existing_points=payload.existing_points,
+        episodes=payload.episodes,
+        budget=payload.budget,
+    )
+
+
+@router.post("/sampling-rl/recommend")
+def recommend_sampling_rl(payload: SamplingRLPredictRequest) -> dict:
+    return service.recommend_sampling_rl(
+        model_name=payload.model_name,
+        uncertainty_map=payload.uncertainty_map,
+        existing_points=payload.existing_points,
+        n_recommendations=payload.n_recommendations,
+        fusion_strategy=payload.fusion_strategy,
+        realtime=payload.realtime,
     )
