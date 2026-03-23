@@ -8,6 +8,16 @@ from .anomaly_detection import (
     GCAEAnomalyDetector,
     VAEAnomalyDetector,
 )
+from .uncertainty import (
+    BayesianNeuralRegressor,
+    DeepEnsembleRegressor,
+    EDLClassifier,
+    MCDropoutRegressor,
+    UQTrainingManager,
+    UncertaintyEvaluator,
+    UncertaintySystemIntegrator,
+)
+from .sampling_rl import ActorCriticAgent, DQNAgent, PPOAgent, SamplingRLIntegrator
 
 __all__ = [
     "ModelRegistry",
@@ -22,4 +32,15 @@ __all__ = [
     "GCAEAnomalyDetector",
     "GANAnomalyDetector",
     "ContrastiveAnomalyDetector",
+    "BayesianNeuralRegressor",
+    "MCDropoutRegressor",
+    "DeepEnsembleRegressor",
+    "EDLClassifier",
+    "UncertaintyEvaluator",
+    "UQTrainingManager",
+    "UncertaintySystemIntegrator",
+    "PPOAgent",
+    "DQNAgent",
+    "ActorCriticAgent",
+    "SamplingRLIntegrator",
 ]
