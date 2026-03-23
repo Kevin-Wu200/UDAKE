@@ -20,6 +20,48 @@ class PredictRequest(BaseModel):
     bias: float = Field(default=0.0, description="示例模型偏置项")
 
 
+class SpatialTrainRequest(BaseModel):
+    model_type: str = Field(default="gnn", description="gnn/attention/residual")
+    samples: list[list[float]] = Field(default_factory=list, description="[[x, y, value], ...]")
+    epochs: int = Field(default=30, ge=1, le=200)
+
+
+class SpatialPredictRequest(BaseModel):
+    model_type: str = Field(default="gnn", description="gnn/attention/residual")
+    samples: list[list[float]] = Field(default_factory=list, description="[[x, y, value], ...]")
+    queries: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
+    blend_ratio: float = Field(default=0.6, ge=0.0, le=1.0)
+
+
+class AnomalyTrainRequest(BaseModel):
+    model_name: str = Field(default="vae", description="vae/gcae/gan/contrastive")
+    coords: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
+    values: list[float] = Field(default_factory=list, description="[value, ...]")
+    epochs: int = Field(default=30, ge=1, le=300)
+
+
+class AnomalyPredictRequest(BaseModel):
+    model_name: str = Field(default="vae", description="vae/gcae/gan/contrastive/fusion")
+    coords: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
+    values: list[float] = Field(default_factory=list, description="[value, ...]")
+    threshold_method: str = Field(default="percentile", description="statistical/percentile/adaptive")
+    percentile: float = Field(default=95.0, ge=50.0, le=99.9)
+    k: float = Field(default=2.5, ge=1.0, le=6.0)
+
+
+class RealtimeBatch(BaseModel):
+    coords: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
+    values: list[float] = Field(default_factory=list, description="[value, ...]")
+
+
+class AnomalyRealtimeRequest(BaseModel):
+    model_name: str = Field(default="vae", description="vae/gcae/gan/contrastive/fusion")
+    stream_batches: list[RealtimeBatch] = Field(default_factory=list)
+    threshold_method: str = Field(default="adaptive", description="statistical/percentile/adaptive")
+    percentile: float = Field(default=95.0, ge=50.0, le=99.9)
+    k: float = Field(default=2.5, ge=1.0, le=6.0)
+
+
 @router.get("/health")
 def dl_health() -> dict:
     return service.health()
@@ -33,3 +75,51 @@ def train_demo(payload: TrainRequest) -> dict:
 @router.post("/predict")
 def predict(payload: PredictRequest) -> dict:
     return service.predict(payload.samples, bias=payload.bias)
+
+
+@router.post("/spatial/train")
+def train_spatial(payload: SpatialTrainRequest) -> dict:
+    return service.train_spatial_model(model_type=payload.model_type, samples=payload.samples, epochs=payload.epochs)
+
+
+@router.post("/spatial/predict")
+def predict_spatial(payload: SpatialPredictRequest) -> dict:
+    return service.predict_spatial(
+        model_type=payload.model_type,
+        samples=payload.samples,
+        queries=payload.queries,
+        blend_ratio=payload.blend_ratio,
+    )
+
+
+@router.post("/anomaly/train")
+def train_anomaly(payload: AnomalyTrainRequest) -> dict:
+    return service.train_anomaly_model(
+        model_name=payload.model_name,
+        coords=payload.coords,
+        values=payload.values,
+        epochs=payload.epochs,
+    )
+
+
+@router.post("/anomaly/predict")
+def predict_anomaly(payload: AnomalyPredictRequest) -> dict:
+    return service.predict_anomaly(
+        model_name=payload.model_name,
+        coords=payload.coords,
+        values=payload.values,
+        threshold_method=payload.threshold_method,
+        percentile=payload.percentile,
+        k=payload.k,
+    )
+
+
+@router.post("/anomaly/realtime")
+def anomaly_realtime(payload: AnomalyRealtimeRequest) -> dict:
+    return service.detect_realtime_anomaly(
+        model_name=payload.model_name,
+        stream_batches=[item.model_dump() for item in payload.stream_batches],
+        threshold_method=payload.threshold_method,
+        percentile=payload.percentile,
+        k=payload.k,
+    )

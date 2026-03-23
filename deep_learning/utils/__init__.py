@@ -1,9 +1,21 @@
-"""工具模块。"""
+"""Utilities module."""
 
 from .device import DeviceManager
 from .cache import CacheManager
 from .monitoring import MetricMonitor, SystemResourceMonitor, AlertManager
 from .testing import BaseTestCase, PerformanceTestRunner, TestReportGenerator
+from .spatial_interpolation_data import (
+    CoordNormalizer,
+    FeatureExtractionTools,
+    GraphConstructionTools,
+    RealSpatialDataLoader,
+    SpatialDataAugmentation,
+    SpatialInterpolationDataLoader,
+    SyntheticSpatialDataset,
+    ValueNormalizer,
+    VarianceNormalizer,
+    build_spatial_dataset,
+)
 
 __all__ = [
     "DeviceManager",
@@ -14,4 +26,14 @@ __all__ = [
     "BaseTestCase",
     "PerformanceTestRunner",
     "TestReportGenerator",
+    "CoordNormalizer",
+    "FeatureExtractionTools",
+    "GraphConstructionTools",
+    "RealSpatialDataLoader",
+    "SpatialDataAugmentation",
+    "SpatialInterpolationDataLoader",
+    "SyntheticSpatialDataset",
+    "ValueNormalizer",
+    "VarianceNormalizer",
+    "build_spatial_dataset",
 ]
