@@ -13,10 +13,12 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
 from .realtime_service import RealtimeInterpolationService, ServiceManager
+from ..services import RealtimeSpatioTemporalService
 
 # 创建服务管理器
 service_manager = ServiceManager()
 realtime_service = service_manager.create_service("default")
+realtime_spatiotemporal_service = RealtimeSpatioTemporalService()
 
 router = APIRouter()
 
@@ -44,6 +46,31 @@ class PredictionRequest(BaseModel):
     subscription_id: str
     x: float
     y: float
+
+
+class RealtimeSpatioTemporalTrainRequest(BaseModel):
+    """realtime_interpolation 时空模型训练请求"""
+    model_type: str = Field(default="st_transformer", description="st_transformer/gcn_lstm/convlstm/stgcn")
+    coords: List[List[float]] = Field(default_factory=list, description="[[x, y], ...]")
+    series: List[List[List[float]]] = Field(default_factory=list, description="[n_nodes, seq_len, n_features]")
+    targets: Optional[List[List[float]]] = Field(default=None, description="[n_nodes, pred_horizon], 可选")
+    epochs: int = Field(default=20, ge=5, le=300)
+    pred_horizon: int = Field(default=6, ge=1, le=48)
+
+
+class RealtimeSpatioTemporalPredictRequest(BaseModel):
+    """realtime_interpolation 时空模型推理请求"""
+    model_type: str = Field(default="st_transformer", description="st_transformer/gcn_lstm/convlstm/stgcn")
+    coords: List[List[float]] = Field(default_factory=list, description="[[x, y], ...]")
+    series: List[List[List[float]]] = Field(default_factory=list, description="[n_nodes, seq_len, n_features]")
+    pred_horizon: int = Field(default=6, ge=1, le=48)
+    fusion_strategy: str = Field(default="gating", description="concat/add/gating")
+    uncertainty_method: Optional[str] = Field(default=None, description="mc_dropout/deep_ensemble/bayesian")
+    enable_memory_optimization: bool = Field(default=True)
+    enable_gpu_acceleration: bool = Field(default=False)
+    enable_inference_acceleration: bool = Field(default=True)
+    enable_long_sequence_optimization: bool = Field(default=False)
+    long_sequence_chunk: int = Field(default=48, ge=8, le=512)
 
 
 # ==================== 订阅管理接口 ====================
@@ -287,6 +314,53 @@ async def get_prediction_alias(subscription_id: str, x: float, y: float):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"获取预测失败: {str(e)}")
+
+
+# ==================== 时空预测集成接口 ====================
+
+@router.post("/realtime/spatiotemporal/train")
+async def train_spatiotemporal(request: RealtimeSpatioTemporalTrainRequest):
+    """
+    在 realtime_interpolation 模块中训练时空预测模型。
+    """
+    try:
+        return realtime_spatiotemporal_service.train(
+            model_type=request.model_type,
+            coords=request.coords,
+            series=request.series,
+            targets=request.targets,
+            epochs=request.epochs,
+            pred_horizon=request.pred_horizon,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"时空训练失败: {str(e)}")
+
+
+@router.post("/realtime/spatiotemporal/predict")
+async def predict_spatiotemporal(request: RealtimeSpatioTemporalPredictRequest):
+    """
+    在 realtime_interpolation 模块中执行时空预测。
+    """
+    try:
+        return realtime_spatiotemporal_service.predict(
+            model_type=request.model_type,
+            coords=request.coords,
+            series=request.series,
+            pred_horizon=request.pred_horizon,
+            fusion_strategy=request.fusion_strategy,
+            uncertainty_method=request.uncertainty_method,
+            enable_memory_optimization=request.enable_memory_optimization,
+            enable_gpu_acceleration=request.enable_gpu_acceleration,
+            enable_inference_acceleration=request.enable_inference_acceleration,
+            enable_long_sequence_optimization=request.enable_long_sequence_optimization,
+            long_sequence_chunk=request.long_sequence_chunk,
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"时空预测失败: {str(e)}")
 
 
 # ==================== 缓存管理接口 ====================

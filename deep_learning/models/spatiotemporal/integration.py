@@ -8,6 +8,7 @@ from typing import Any, Literal
 
 import numpy as np
 
+from deep_learning.models.uncertainty import UncertaintySystemIntegrator
 from deep_learning.utils.cache import CacheManager
 
 from .analysis_tools import (
@@ -32,9 +33,11 @@ from .evaluation import (
 from .graph import build_knn_graph
 from .models import ConvLSTMModel, GCNLSTMModel, STGCNModel, SpatioTemporalOutput, SpatioTemporalTransformer
 from .online import OnlineModelUpdater, OnlineSpatioTemporalPredictor
+from .optimization import SpatioTemporalPerformanceOptimizer
 from .training import SpatioTemporalTrainingConfig, train_spatiotemporal_model
 
 ModelType = Literal["st_transformer", "gcn_lstm", "convlstm", "stgcn"]
+UQMethod = Literal["mc_dropout", "deep_ensemble", "bayesian", "bnn"]
 
 
 @dataclass
@@ -43,6 +46,8 @@ class IntegratedSpatioTemporalResult:
     variance: np.ndarray
     model_type: str
     source: str
+    uncertainty_method: str = "model_variance"
+    optimization: dict[str, Any] | None = None
 
 
 class SpatioTemporalSystemIntegrator:
@@ -55,6 +60,8 @@ class SpatioTemporalSystemIntegrator:
         self.training_records: dict[str, dict[str, Any]] = {}
         self.online_predictor = OnlineSpatioTemporalPredictor()
         self.online_updater = OnlineModelUpdater()
+        self.uq_integrator = UncertaintySystemIntegrator(cache_ttl_seconds=cache_ttl_seconds)
+        self.optimizer = SpatioTemporalPerformanceOptimizer(seed=seed)
 
     def _build_model(self, model_type: ModelType, pred_horizon: int) -> Any:
         if model_type == "st_transformer":
@@ -95,6 +102,34 @@ class SpatioTemporalSystemIntegrator:
         self.training_records[model_type] = result
         return result
 
+    def _resolve_uq_method(self, method: str) -> str:
+        m = method.strip().lower()
+        if m == "bayesian":
+            return "bnn"
+        if m in {"bnn", "mc_dropout", "deep_ensemble"}:
+            return m
+        raise ValueError("uncertainty_method must be one of mc_dropout/deep_ensemble/bayesian")
+
+    def _apply_uncertainty_fusion(
+        self,
+        uncertainty_method: str,
+        coords: np.ndarray,
+        series: np.ndarray,
+        base_variance: np.ndarray,
+    ) -> tuple[np.ndarray, str]:
+        method = self._resolve_uq_method(uncertainty_method)
+        horizon = int(base_variance.shape[1])
+        sample_values = np.asarray(series[:, -1, 0], dtype=float)
+        uq = self.uq_integrator.predict(
+            sample_coords=np.asarray(coords, dtype=float),
+            sample_values=sample_values,
+            query_coords=np.asarray(coords, dtype=float),
+            method=method,  # type: ignore[arg-type]
+        )
+        uq_var = np.repeat(uq.variance.reshape(-1, 1), horizon, axis=1)
+        fused = 0.65 * np.asarray(base_variance, dtype=float) + 0.35 * uq_var
+        return np.maximum(fused, 1e-6), uncertainty_method
+
     def predict(
         self,
         model_type: ModelType,
@@ -104,22 +139,87 @@ class SpatioTemporalSystemIntegrator:
         fusion_strategy: str = "gating",
         legacy_prediction: np.ndarray | None = None,
         blend_ratio: float = 0.7,
+        uncertainty_method: UQMethod | str | None = None,
+        enable_memory_optimization: bool = False,
+        enable_gpu_acceleration: bool = False,
+        enable_inference_acceleration: bool = True,
+        enable_long_sequence_optimization: bool = False,
+        long_sequence_chunk: int = 48,
     ) -> IntegratedSpatioTemporalResult:
         c, s = self._validate(coords, series)
         model = self._get_model(model_type=model_type, pred_horizon=pred_horizon)
 
-        cache_key = f"st:{model_type}:{pred_horizon}:{hash(c.tobytes())}:{hash(s.tobytes())}:{fusion_strategy}"
+        optimization: dict[str, Any] = {
+            "memory": {"enabled": False},
+            "gpu": {"enabled": False, "backend": "cpu", "device_name": "cpu"},
+            "inference": {"enabled": False},
+            "long_sequence": {"enabled": False},
+        }
+        if enable_memory_optimization:
+            c, s, mem_stats = self.optimizer.optimize_memory(c, s)
+            optimization["memory"] = {"enabled": True, **mem_stats}
+        if enable_gpu_acceleration:
+            optimization["gpu"] = self.optimizer.detect_gpu()
+
+        cache_key = (
+            f"st:{model_type}:{pred_horizon}:{hash(c.tobytes())}:{hash(s.tobytes())}:{fusion_strategy}"
+            f":uq={uncertainty_method or 'none'}:mem={int(enable_memory_optimization)}:gpu={int(enable_gpu_acceleration)}"
+            f":acc={int(enable_inference_acceleration)}:long={int(enable_long_sequence_optimization)}:{int(long_sequence_chunk)}"
+        )
         cached = self.cache.get(cache_key)
         if cached is not None:
             return cached
 
-        if model_type == "st_transformer":
-            out: SpatioTemporalOutput = model.forward(c, s, fusion_strategy=fusion_strategy)
+        if enable_long_sequence_optimization and int(s.shape[1]) > max(int(long_sequence_chunk), int(pred_horizon + 4)):
+            long_out = self.optimizer.long_sequence_predict(
+                model=model,
+                coords=c,
+                long_series=s,
+                pred_horizon=pred_horizon,
+                chunk_size=long_sequence_chunk,
+                overlap=max(2, int(long_sequence_chunk // 4)),
+                fusion_strategy=fusion_strategy,
+            )
+            mean = long_out.mean
+            var = long_out.variance
+            optimization["long_sequence"] = {
+                "enabled": True,
+                "windows": int(long_out.windows),
+                "chunk_size": int(long_out.chunk_size),
+                "overlap": int(long_out.overlap),
+            }
+            optimization["inference"] = {"enabled": bool(enable_inference_acceleration), "cached": False, "latency_ms": None}
         else:
-            out = model.forward(c, s)
+            if enable_inference_acceleration:
+                mean, var, infer_stats = self.optimizer.accelerated_forward(
+                    model=model,
+                    coords=c,
+                    series=s,
+                    fusion_strategy=fusion_strategy,
+                )
+                optimization["inference"] = {"enabled": True, **infer_stats}
+            else:
+                if model_type == "st_transformer":
+                    out: SpatioTemporalOutput = model.forward(c, s, fusion_strategy=fusion_strategy)
+                else:
+                    out = model.forward(c, s)
+                mean = out.mean
+                var = out.variance
+                optimization["inference"] = {"enabled": False}
 
-        mean = out.mean
-        var = out.variance
+        method_label = "model_variance"
+        if uncertainty_method is not None:
+            try:
+                var, method_label = self._apply_uncertainty_fusion(
+                    uncertainty_method=str(uncertainty_method),
+                    coords=c,
+                    series=s,
+                    base_variance=np.asarray(var, dtype=float),
+                )
+            except Exception:
+                var = np.maximum(np.asarray(var, dtype=float), 1e-6)
+                method_label = f"{str(uncertainty_method)}(fallback)"
+
         source = model_type
 
         if legacy_prediction is not None:
@@ -129,7 +229,14 @@ class SpatioTemporalSystemIntegrator:
                 mean = r * mean + (1.0 - r) * legacy
                 source = f"{model_type}+legacy"
 
-        result = IntegratedSpatioTemporalResult(mean=mean, variance=np.maximum(var, 1e-6), model_type=model_type, source=source)
+        result = IntegratedSpatioTemporalResult(
+            mean=mean,
+            variance=np.maximum(var, 1e-6),
+            model_type=model_type,
+            source=source,
+            uncertainty_method=method_label,
+            optimization=optimization,
+        )
         self.cache.set(cache_key, result)
         return result
 
@@ -304,6 +411,12 @@ class SpatioTemporalSystemIntegrator:
             if payload.get("legacy_prediction") is not None
             else None,
             blend_ratio=float(payload.get("blend_ratio", 0.7)),
+            uncertainty_method=str(payload["uncertainty_method"]) if payload.get("uncertainty_method") is not None else None,
+            enable_memory_optimization=bool(payload.get("enable_memory_optimization", False)),
+            enable_gpu_acceleration=bool(payload.get("enable_gpu_acceleration", False)),
+            enable_inference_acceleration=bool(payload.get("enable_inference_acceleration", True)),
+            enable_long_sequence_optimization=bool(payload.get("enable_long_sequence_optimization", False)),
+            long_sequence_chunk=int(payload.get("long_sequence_chunk", 48)),
         )
 
         baselines = self.baseline_predictions(series=series, pred_horizon=pred_horizon)
@@ -329,6 +442,8 @@ class SpatioTemporalSystemIntegrator:
             "variance": pred.variance.tolist(),
             "model_type": pred.model_type,
             "source": pred.source,
+            "uncertainty_method": pred.uncertainty_method,
+            "optimization": pred.optimization,
             "evaluation": eval_payload,
             "analysis": {
                 "adf": analysis["adf"],

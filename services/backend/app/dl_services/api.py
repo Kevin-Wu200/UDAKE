@@ -98,6 +98,12 @@ class SpatioTemporalPredictRequest(BaseModel):
     fusion_strategy: str = Field(default="gating", description="concat/add/gating")
     targets: Optional[list[list[float]]] = Field(default=None, description="[n_nodes, pred_horizon], 可选")
     blend_ratio: float = Field(default=0.7, ge=0.0, le=1.0)
+    uncertainty_method: Optional[str] = Field(default=None, description="mc_dropout/deep_ensemble/bayesian")
+    enable_memory_optimization: bool = Field(default=False)
+    enable_gpu_acceleration: bool = Field(default=False)
+    enable_inference_acceleration: bool = Field(default=True)
+    enable_long_sequence_optimization: bool = Field(default=False)
+    long_sequence_chunk: int = Field(default=48, ge=8, le=512)
 
 
 class SpatioTemporalOnlineRequest(BaseModel):
@@ -218,6 +224,12 @@ def predict_spatiotemporal(payload: SpatioTemporalPredictRequest) -> dict:
         fusion_strategy=payload.fusion_strategy,
         targets=payload.targets,
         blend_ratio=payload.blend_ratio,
+        uncertainty_method=payload.uncertainty_method,
+        enable_memory_optimization=payload.enable_memory_optimization,
+        enable_gpu_acceleration=payload.enable_gpu_acceleration,
+        enable_inference_acceleration=payload.enable_inference_acceleration,
+        enable_long_sequence_optimization=payload.enable_long_sequence_optimization,
+        long_sequence_chunk=payload.long_sequence_chunk,
     )
 
 

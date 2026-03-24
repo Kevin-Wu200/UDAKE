@@ -465,6 +465,12 @@ class DeepLearningService:
         fusion_strategy: str = "gating",
         targets: list[list[float]] | None = None,
         blend_ratio: float = 0.7,
+        uncertainty_method: str | None = None,
+        enable_memory_optimization: bool = False,
+        enable_gpu_acceleration: bool = False,
+        enable_inference_acceleration: bool = True,
+        enable_long_sequence_optimization: bool = False,
+        long_sequence_chunk: int = 48,
     ) -> dict[str, Any]:
         if model_type not in {"st_transformer", "gcn_lstm", "convlstm", "stgcn"}:
             raise ValueError("model_type must be one of st_transformer/gcn_lstm/convlstm/stgcn")
@@ -477,6 +483,12 @@ class DeepLearningService:
             pred_horizon=horizon,
             fusion_strategy=fusion_strategy,
             blend_ratio=float(blend_ratio),
+            uncertainty_method=uncertainty_method,
+            enable_memory_optimization=bool(enable_memory_optimization),
+            enable_gpu_acceleration=bool(enable_gpu_acceleration),
+            enable_inference_acceleration=bool(enable_inference_acceleration),
+            enable_long_sequence_optimization=bool(enable_long_sequence_optimization),
+            long_sequence_chunk=max(8, int(long_sequence_chunk)),
         )
 
         baseline = self.spatiotemporal_integrator.baseline_predictions(s, pred_horizon=horizon)
@@ -499,6 +511,8 @@ class DeepLearningService:
             "prediction": pred.mean.tolist(),
             "variance": pred.variance.tolist(),
             "source": pred.source,
+            "uncertainty_method": pred.uncertainty_method,
+            "optimization": pred.optimization,
             "evaluation": evaluation,
             "analysis": {
                 "adf": analysis["adf"],

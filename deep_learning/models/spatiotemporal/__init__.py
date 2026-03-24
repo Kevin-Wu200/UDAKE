@@ -57,6 +57,7 @@ from .models import (
     SpatioTemporalTransformer,
 )
 from .online import OnlineModelUpdater, OnlineSpatioTemporalPredictor, OnlineUpdateResult
+from .optimization import LongSequenceOutput, SpatioTemporalPerformanceOptimizer
 from .position_encoding import (
     normalize_spatial_positions,
     normalize_temporal_positions,
@@ -126,6 +127,8 @@ __all__ = [
     "OnlineUpdateResult",
     "OnlineSpatioTemporalPredictor",
     "OnlineModelUpdater",
+    "LongSequenceOutput",
+    "SpatioTemporalPerformanceOptimizer",
     "IntegratedSpatioTemporalResult",
     "SpatioTemporalSystemIntegrator",
     "seasonal_decompose",

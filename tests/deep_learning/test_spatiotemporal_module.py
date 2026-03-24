@@ -210,3 +210,43 @@ def test_inference_wrapper() -> None:
     assert out.mean.shape == sample.targets.shape
     assert out.variance.shape == sample.targets.shape
     assert rt["sliding_count"] >= 1
+
+
+def test_uncertainty_methods_and_performance_optimizations() -> None:
+    sample = _sample(seed=9, nodes=10, seq_len=30, horizon=4)
+    integrator = SpatioTemporalSystemIntegrator(cache_ttl_seconds=30)
+
+    for method in ["mc_dropout", "deep_ensemble", "bayesian"]:
+        out = integrator.predict(
+            model_type="st_transformer",
+            coords=sample.coords,
+            series=sample.series,
+            pred_horizon=4,
+            fusion_strategy="gating",
+            uncertainty_method=method,
+            enable_memory_optimization=True,
+            enable_gpu_acceleration=True,
+            enable_inference_acceleration=True,
+        )
+        assert out.mean.shape == sample.targets.shape
+        assert out.variance.shape == sample.targets.shape
+        assert out.uncertainty_method.startswith(method)
+        assert out.optimization is not None
+        assert out.optimization["memory"]["enabled"] is True
+        assert out.optimization["memory"]["series_dtype"] == "float32"
+        assert "backend" in out.optimization["gpu"]
+
+    target_feat = np.repeat(sample.targets[:, :, None], sample.series.shape[2], axis=2)
+    long_series = np.concatenate([sample.series, target_feat, target_feat], axis=1)
+    long_out = integrator.predict(
+        model_type="st_transformer",
+        coords=sample.coords,
+        series=long_series,
+        pred_horizon=4,
+        enable_long_sequence_optimization=True,
+        long_sequence_chunk=16,
+    )
+    assert long_out.mean.shape == sample.targets.shape
+    assert long_out.variance.shape == sample.targets.shape
+    assert long_out.optimization is not None
+    assert long_out.optimization["long_sequence"]["enabled"] is True

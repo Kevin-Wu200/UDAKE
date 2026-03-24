@@ -15,6 +15,8 @@ class SpatioTemporalInferenceResult:
     mean: np.ndarray
     variance: np.ndarray
     source: str
+    uncertainty_method: str = "model_variance"
+    optimization: dict | None = None
 
 
 class SpatioTemporalInference:
@@ -28,6 +30,12 @@ class SpatioTemporalInference:
         model_type: Literal["st_transformer", "gcn_lstm", "convlstm", "stgcn"] = "st_transformer",
         pred_horizon: int = 6,
         fusion_strategy: str = "gating",
+        uncertainty_method: str | None = None,
+        enable_memory_optimization: bool = False,
+        enable_gpu_acceleration: bool = False,
+        enable_inference_acceleration: bool = True,
+        enable_long_sequence_optimization: bool = False,
+        long_sequence_chunk: int = 48,
     ) -> SpatioTemporalInferenceResult:
         out = self.integrator.predict(
             model_type=model_type,
@@ -35,8 +43,20 @@ class SpatioTemporalInference:
             series=np.asarray(series, dtype=float),
             pred_horizon=pred_horizon,
             fusion_strategy=fusion_strategy,
+            uncertainty_method=uncertainty_method,
+            enable_memory_optimization=enable_memory_optimization,
+            enable_gpu_acceleration=enable_gpu_acceleration,
+            enable_inference_acceleration=enable_inference_acceleration,
+            enable_long_sequence_optimization=enable_long_sequence_optimization,
+            long_sequence_chunk=long_sequence_chunk,
         )
-        return SpatioTemporalInferenceResult(mean=out.mean, variance=out.variance, source=out.source)
+        return SpatioTemporalInferenceResult(
+            mean=out.mean,
+            variance=out.variance,
+            source=out.source,
+            uncertainty_method=out.uncertainty_method,
+            optimization=out.optimization,
+        )
 
     def predict_realtime(
         self,

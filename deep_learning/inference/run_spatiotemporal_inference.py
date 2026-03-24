@@ -19,6 +19,12 @@ def main() -> None:
     parser.add_argument("--horizon", type=int, default=6)
     parser.add_argument("--features", type=int, default=2)
     parser.add_argument("--fusion", type=str, default="gating", choices=["concat", "add", "gating"])
+    parser.add_argument("--uncertainty", type=str, default="none", choices=["none", "mc_dropout", "deep_ensemble", "bayesian"])
+    parser.add_argument("--enable-memory-optimization", action="store_true")
+    parser.add_argument("--enable-gpu-acceleration", action="store_true")
+    parser.add_argument("--disable-inference-acceleration", action="store_true")
+    parser.add_argument("--enable-long-sequence-optimization", action="store_true")
+    parser.add_argument("--long-sequence-chunk", type=int, default=48)
     args = parser.parse_args()
 
     sample = SyntheticSpatioTemporalDataset(seed=7).generate(
@@ -35,6 +41,12 @@ def main() -> None:
         model_type=args.model,  # type: ignore[arg-type]
         pred_horizon=args.horizon,
         fusion_strategy=args.fusion,
+        uncertainty_method=None if args.uncertainty == "none" else args.uncertainty,
+        enable_memory_optimization=bool(args.enable_memory_optimization),
+        enable_gpu_acceleration=bool(args.enable_gpu_acceleration),
+        enable_inference_acceleration=not bool(args.disable_inference_acceleration),
+        enable_long_sequence_optimization=bool(args.enable_long_sequence_optimization),
+        long_sequence_chunk=max(8, int(args.long_sequence_chunk)),
     )
 
     baseline = np.repeat(sample.series[:, -1, 0:1], args.horizon, axis=1)
@@ -46,6 +58,8 @@ def main() -> None:
         "prediction": pred.mean.tolist(),
         "variance": pred.variance.tolist(),
         "source": pred.source,
+        "uncertainty_method": pred.uncertainty_method,
+        "optimization": pred.optimization,
         "mae": mae,
         "baseline_mae": baseline_mae,
     }
