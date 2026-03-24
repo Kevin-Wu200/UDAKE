@@ -60,3 +60,23 @@
   - `prediction`: 预测值
   - `variance`: 不确定性
   - `source`: `neural_only` 或 `neural+incremental_kriging`
+
+## 阶段11：用户验证与模型自评估 API
+
+基础路径：`/api`
+
+- `POST /evaluation/realtime`：实时评估
+- `GET /evaluation/performance`：性能指标
+- `GET /evaluation/errors`：误差分析
+- `GET /evaluation/uncertainty`：不确定性评估
+- `POST /model-selection/select`：选择最佳模型
+- `GET /model-selection/status`：模型状态
+- `POST /model-selection/switch`：模型切换
+- `POST /model-selection/rollback`：模型回滚
+- `POST /optimization/trigger`：触发优化
+- `GET /optimization/status`：优化状态
+- `POST /optimization/cancel`：取消优化
+- `GET /reports/performance`：性能报告
+- `GET /reports/evaluation`：评估报告
+- `GET /reports/optimization`：优化报告
+- `POST /reports/generate`：生成报告
