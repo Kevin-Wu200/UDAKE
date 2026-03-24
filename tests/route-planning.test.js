@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 // 实际测试应该使用vitest或jest进行单元测试
 
 describe('路径规划API测试', () => {
-    const API_BASE_URL = 'http://localhost:8000/api/route-planning';
+    const API_BASE_URL = 'http://172.20.10.2:8000/api/route-planning';
     const fetchMock = vi.mocked(global.fetch);
 
     const asList = (payload) => {

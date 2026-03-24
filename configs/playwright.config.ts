@@ -28,7 +28,7 @@ export default defineConfig({
     // 共享配置
     use: {
         // 基础 URL
-        baseURL: process.env.BASE_URL || 'http://localhost:5173',
+        baseURL: process.env.BASE_URL || 'http://172.20.10.2:5173',
 
         // 追踪
         trace: 'on-first-retry',
@@ -71,7 +71,7 @@ export default defineConfig({
     // 本地开发服务器
     webServer: {
         command: 'npm run dev',
-        url: 'http://localhost:5173',
+        url: 'http://172.20.10.2:5173',
         reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,
     },

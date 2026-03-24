@@ -83,7 +83,7 @@ export const DEFAULT_APP_LIMITS = {
     appName: '智能不确定性驱动空间决策平台',
     version: '1.0.0',
     debug: true,
-    corsOrigins: ['http://localhost:5173'],
+    corsOrigins: ['http://172.20.10.2:5173'],
     maxFileSize: 100,
     maxConcurrentTasks: 5,
     taskTimeout: 3600

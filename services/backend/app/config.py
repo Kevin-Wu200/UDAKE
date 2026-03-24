@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # CORS配置
-    BACKEND_CORS_ORIGINS: Union[str, List[str]] = '["http://localhost:5173","http://localhost:3000","http://127.0.0.1:5173"]'
+    BACKEND_CORS_ORIGINS: Union[str, List[str]] = '["http://172.20.10.2:5173","http://172.20.10.2:3000"]'
 
     # 文件上传配置
     MAX_FILE_SIZE_MB: int = 100
@@ -90,7 +90,7 @@ class Settings(BaseSettings):
             try:
                 return json.loads(v)
             except json.JSONDecodeError:
-                return ["http://localhost:5173"]
+                return ["http://172.20.10.2:5173"]
         return v
 
     @field_validator('ARCGIS_DEFAULT_CENTER', mode='before')

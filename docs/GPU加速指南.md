@@ -176,7 +176,7 @@ python run.py
 ### 2. 健康检查
 
 ```bash
-curl http://localhost:8000/api/gpu/health
+curl http://172.20.10.2:8000/api/gpu/health
 ```
 
 预期响应：
@@ -191,7 +191,7 @@ curl http://localhost:8000/api/gpu/health
 ### 3. 配置策略
 
 ```bash
-curl -X PUT http://localhost:8000/api/gpu/config \
+curl -X PUT http://172.20.10.2:8000/api/gpu/config \
   -H "Content-Type: application/json" \
   -d '{
     "enable_gpu": true,
@@ -205,7 +205,7 @@ curl -X PUT http://localhost:8000/api/gpu/config \
 #### 矩阵乘法
 
 ```bash
-curl -X POST http://localhost:8000/api/gpu/compute/matrix/multiply \
+curl -X POST http://172.20.10.2:8000/api/gpu/compute/matrix/multiply \
   -H "Content-Type: application/json" \
   -d '{
     "matrix_a": [[1, 2], [3, 4]],
@@ -216,7 +216,7 @@ curl -X POST http://localhost:8000/api/gpu/compute/matrix/multiply \
 #### 向量范数
 
 ```bash
-curl -X POST http://localhost:8000/api/gpu/compute/vector/norm \
+curl -X POST http://172.20.10.2:8000/api/gpu/compute/vector/norm \
   -H "Content-Type: application/json" \
   -d '{
     "vector": [1, 2, 3, 4],
@@ -227,7 +227,7 @@ curl -X POST http://localhost:8000/api/gpu/compute/vector/norm \
 #### 变异函数
 
 ```bash
-curl -X POST http://localhost:8000/api/gpu/kriging/semivariogram \
+curl -X POST http://172.20.10.2:8000/api/gpu/kriging/semivariogram \
   -H "Content-Type: application/json" \
   -d '{
     "points": [[0, 0], [1, 0], [0, 1]],
@@ -239,10 +239,10 @@ curl -X POST http://localhost:8000/api/gpu/kriging/semivariogram \
 
 ```bash
 # 查看性能指标
-curl http://localhost:8000/api/gpu/metrics
+curl http://172.20.10.2:8000/api/gpu/metrics
 
 # 查看任务列表
-curl http://localhost:8000/api/gpu/tasks
+curl http://172.20.10.2:8000/api/gpu/tasks
 ```
 
 ---
@@ -314,11 +314,11 @@ curl http://localhost:8000/api/gpu/tasks
 1. 系统自动回退 CPU
 2. 检查设备状态：
    ```bash
-   curl http://localhost:8000/api/gpu/status
+   curl http://172.20.10.2:8000/api/gpu/status
    ```
 3. 查看详细错误：
    ```bash
-   curl http://localhost:8000/api/gpu/devices
+   curl http://172.20.10.2:8000/api/gpu/devices
    ```
 
 #### 内存不足

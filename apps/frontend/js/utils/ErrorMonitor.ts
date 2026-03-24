@@ -127,7 +127,7 @@ export class ErrorMonitor {
                 new Sentry.BrowserTracing({
                     // 性能追踪配置
                     tracePropagationTargets: [
-                        /^https:\/\/localhost:\d+/,
+                        /^https:\/\/172\.20\.10\.2:\d+/,
                         /^https:\/\/udake\./,
                         window.location.origin
                     ]

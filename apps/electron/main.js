@@ -66,7 +66,7 @@ function createWindow() {
           "style-src 'self' 'unsafe-inline' blob: https://js.arcgis.com https://webapi.amap.com;",
           "img-src 'self' data: blob: https: https://*.arcgis.com https://*.autonavi.com https://*.amap.com;",
           "font-src 'self' data: blob:;",
-          "connect-src 'self' http://localhost:8000 ws://localhost:8000 https: wss: blob: https://*.amap.com;",
+          "connect-src 'self' http://172.20.10.2:8000 ws://172.20.10.2:8000 https: wss: blob: https://*.amap.com;",
           "media-src 'self' data: blob:;",
           "object-src 'none';",
           "base-uri 'self';",

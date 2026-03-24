@@ -183,7 +183,7 @@ start_backend() {
             # 检查端口是否开始监听
             if check_port 8000; then
                 # 检查API是否真的可用（测试/industries接口）
-                if curl -s http://localhost:8000/api/industries > /dev/null 2>&1; then
+                if curl -s http://172.20.10.2:8000/api/industries > /dev/null 2>&1; then
                     echo ""
                     log_success "后端服务就绪，API接口正常响应"
                     return 0
@@ -237,7 +237,7 @@ start_frontend() {
         fi
         
         # 检查前端服务是否可以访问
-        if curl -s http://localhost:5173 > /dev/null 2>&1; then
+        if curl -s http://172.20.10.2:5173 > /dev/null 2>&1; then
             log_success "前端服务就绪"
             return 0
         fi
@@ -316,7 +316,7 @@ health_check() {
     if [ ! -z "$BACKEND_PID" ]; then
         if ps -p $BACKEND_PID > /dev/null; then
             # 检查后端进程和API可用性
-            if check_port 8000 && curl -s http://localhost:8000/api/industries > /dev/null 2>&1; then
+            if check_port 8000 && curl -s http://172.20.10.2:8000/api/industries > /dev/null 2>&1; then
                 echo -e "${GREEN}✓${NC} 后端服务 (PID: $BACKEND_PID, API正常)"
             else
                 echo -e "${YELLOW}⚠${NC} 后端服务运行中但API异常 (PID: $BACKEND_PID)"

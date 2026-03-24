@@ -212,7 +212,7 @@ class App {
                 return port;
             });
 
-            const apiURL = `http://localhost:${backendPort}/api`;
+            const apiURL = `http://172.20.10.2:${backendPort}/api`;
 
             // 阶段3：初始化API
             await this.launchProgressManager.executeStage('api-init', async (updateProgress) => {

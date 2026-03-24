@@ -9,7 +9,7 @@ describe('风险报告接口测试', () => {
     let api;
 
     beforeEach(() => {
-        api = new APIService('http://localhost:8000/api', { maxRetries: 0 });
+        api = new APIService('http://172.20.10.2:8000/api', { maxRetries: 0 });
         mockFetch.mockReset();
     });
 
@@ -101,7 +101,7 @@ describe('风险报告接口测试', () => {
             });
 
             const result = await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -134,7 +134,7 @@ describe('风险报告接口测试', () => {
             });
 
             const result = await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -157,7 +157,7 @@ describe('风险报告接口测试', () => {
             });
 
             const result = await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -180,7 +180,7 @@ describe('风险报告接口测试', () => {
             });
 
             const result = await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -203,7 +203,7 @@ describe('风险报告接口测试', () => {
             });
 
             const result = await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -226,7 +226,7 @@ describe('风险报告接口测试', () => {
             });
 
             const result = await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -254,7 +254,7 @@ describe('风险报告接口测试', () => {
             });
 
             await expect(api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -280,7 +280,7 @@ describe('风险报告接口测试', () => {
             });
 
             await expect(api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -303,7 +303,7 @@ describe('风险报告接口测试', () => {
             });
 
             await expect(api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -321,7 +321,7 @@ describe('风险报告接口测试', () => {
             });
 
             await expect(api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -334,7 +334,7 @@ describe('风险报告接口测试', () => {
             mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
             await expect(api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -398,7 +398,7 @@ describe('风险报告接口测试', () => {
             });
 
             const result = await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -427,7 +427,7 @@ describe('风险报告接口测试', () => {
             });
 
             const result = await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -450,7 +450,7 @@ describe('风险报告接口测试', () => {
             });
 
             const result = await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -471,7 +471,7 @@ describe('风险报告接口测试', () => {
             });
 
             const result = await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -495,7 +495,7 @@ describe('风险报告接口测试', () => {
             });
 
             const result = await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -516,7 +516,7 @@ describe('风险报告接口测试', () => {
             });
 
             await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -524,7 +524,7 @@ describe('风险报告接口测试', () => {
                 }
             );
             await api.request(
-                'http://localhost:8000/api/risk/report',
+                'http://172.20.10.2:8000/api/risk/report',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

@@ -312,7 +312,7 @@ describe('ExportEnhancer', () => {
 
     describe('批量导出', () => {
         it('应该成功批量导出单个任务', async () => {
-            const enhancer = new ExportEnhancer('http://localhost:8000');
+            const enhancer = new ExportEnhancer('http://172.20.10.2:8000');
             const mockBlob = new Blob(['test data']);
 
             global.fetch = vi.fn().mockResolvedValue({
@@ -323,13 +323,13 @@ describe('ExportEnhancer', () => {
             await enhancer.batchExport(['task-1'], 'geojson');
 
             expect(fetch).toHaveBeenCalledWith(
-                'http://localhost:8000/result/download/task-1/task-1_prediction.geojson',
+                'http://172.20.10.2:8000/result/download/task-1/task-1_prediction.geojson',
                 { mode: 'cors', credentials: 'omit' }
             );
         });
 
         it('应该成功批量导出多个任务', async () => {
-            const enhancer = new ExportEnhancer('http://localhost:8000');
+            const enhancer = new ExportEnhancer('http://172.20.10.2:8000');
             const mockBlob = new Blob(['test data']);
 
             global.fetch = vi.fn().mockResolvedValue({
@@ -343,7 +343,7 @@ describe('ExportEnhancer', () => {
         });
 
         it('应该处理导出失败的任务', async () => {
-            const enhancer = new ExportEnhancer('http://localhost:8000');
+            const enhancer = new ExportEnhancer('http://172.20.10.2:8000');
 
             global.fetch = vi.fn()
                 .mockResolvedValueOnce({ ok: true, blob: async () => new Blob([]) })
@@ -353,7 +353,7 @@ describe('ExportEnhancer', () => {
         });
 
         it('应该处理网络错误', async () => {
-            const enhancer = new ExportEnhancer('http://localhost:8000');
+            const enhancer = new ExportEnhancer('http://172.20.10.2:8000');
 
             global.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
 
@@ -361,7 +361,7 @@ describe('ExportEnhancer', () => {
         });
 
         it('应该在任务之间添加延迟', async () => {
-            const enhancer = new ExportEnhancer('http://localhost:8000');
+            const enhancer = new ExportEnhancer('http://172.20.10.2:8000');
             let delayCount = 0;
 
             global.setTimeout = vi.fn((cb, delay) => {
@@ -398,7 +398,7 @@ describe('ExportEnhancer', () => {
         });
 
         it('应该支持不同的文件格式', async () => {
-            const enhancer = new ExportEnhancer('http://localhost:8000');
+            const enhancer = new ExportEnhancer('http://172.20.10.2:8000');
 
             global.fetch = vi.fn().mockResolvedValue({
                 ok: true,
@@ -414,7 +414,7 @@ describe('ExportEnhancer', () => {
         });
 
         it('空任务列表应该正常处理', async () => {
-            const enhancer = new ExportEnhancer('http://localhost:8000');
+            const enhancer = new ExportEnhancer('http://172.20.10.2:8000');
 
             await expect(enhancer.batchExport([], 'geojson')).resolves.not.toThrow();
             expect(fetch).not.toHaveBeenCalled();

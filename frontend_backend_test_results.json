@@ -1,6 +1,6 @@
 {
   "test_time": "2026-03-17T10:39:42.607376",
-  "backend_url": "http://localhost:8000",
+  "backend_url": "http://172.20.10.2:8000",
   "frontend_url": "http://10.200.3.71:5173",
   "summary": {
     "total": 21,

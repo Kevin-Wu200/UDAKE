@@ -258,5 +258,5 @@ export class WebSocketService {
 
 // 导出单例
 export const webSocketService = new WebSocketService(
-  (import.meta.env.VITE_WS_URL as string) || 'ws://localhost:8000'
+  (import.meta.env.VITE_WS_URL as string) || 'ws://172.20.10.2:8000'
 );

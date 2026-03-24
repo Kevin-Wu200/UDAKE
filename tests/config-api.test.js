@@ -9,7 +9,7 @@ describe('配置接口测试', () => {
     let api;
 
     beforeEach(() => {
-        api = new APIService('http://localhost:8000/api', { maxRetries: 0 });
+        api = new APIService('http://172.20.10.2:8000/api', { maxRetries: 0 });
         mockFetch.mockReset();
     });
 
@@ -45,7 +45,7 @@ describe('配置接口测试', () => {
                 json: () => Promise.resolve(mockConfig)
             });
 
-            const result = await api.request('http://localhost:8000/api/config/map');
+            const result = await api.request('http://172.20.10.2:8000/api/config/map');
 
             expect(result).toEqual(mockConfig);
             expect(result.success).toBe(true);
@@ -62,7 +62,7 @@ describe('配置接口测试', () => {
                 json: () => Promise.resolve({ detail: '获取地图配置失败' })
             });
 
-            await expect(api.request('http://localhost:8000/api/config/map'))
+            await expect(api.request('http://172.20.10.2:8000/api/config/map'))
                 .rejects.toThrow('获取地图配置失败');
         });
     });
@@ -75,7 +75,7 @@ describe('配置接口测试', () => {
                     appName: 'UDAKE',
                     version: '1.0.0',
                     debug: false,
-                    corsOrigins: ['http://localhost:5173'],
+                    corsOrigins: ['http://172.20.10.2:5173'],
                     maxFileSize: 100,
                     maxConcurrentTasks: 5,
                     taskTimeout: 300
@@ -87,7 +87,7 @@ describe('配置接口测试', () => {
                 json: () => Promise.resolve(mockConfig)
             });
 
-            const result = await api.request('http://localhost:8000/api/config/app');
+            const result = await api.request('http://172.20.10.2:8000/api/config/app');
 
             expect(result).toEqual(mockConfig);
             expect(result.config.appName).toBe('UDAKE');
@@ -97,7 +97,7 @@ describe('配置接口测试', () => {
         it('网络错误时抛出友好消息', async () => {
             mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
-            await expect(api.request('http://localhost:8000/api/config/app'))
+            await expect(api.request('http://172.20.10.2:8000/api/config/app'))
                 .rejects.toThrow('网络连接失败，请检查后端服务是否启动');
         });
     });
@@ -118,7 +118,7 @@ describe('配置接口测试', () => {
                 json: () => Promise.resolve(mockConfig)
             });
 
-            const result = await api.request('http://localhost:8000/api/config/ai');
+            const result = await api.request('http://172.20.10.2:8000/api/config/ai');
 
             expect(result).toEqual(mockConfig);
             expect(result.config.cacheEnabled).toBe(true);
@@ -174,7 +174,7 @@ describe('配置接口测试', () => {
                 json: () => Promise.resolve(mockConfig)
             });
 
-            const result = await api.request('http://localhost:8000/api/config/all');
+            const result = await api.request('http://172.20.10.2:8000/api/config/all');
 
             expect(result).toEqual(mockConfig);
             expect(result.config.app).toBeDefined();
@@ -205,7 +205,7 @@ describe('配置接口测试', () => {
                 json: () => Promise.resolve(mockConfig)
             });
 
-            const result = await api.request('http://localhost:8000/api/config/all');
+            const result = await api.request('http://172.20.10.2:8000/api/config/all');
 
             expect(result.config.map.arcgis).toBeNull();
         });
@@ -218,8 +218,8 @@ describe('配置接口测试', () => {
                 json: () => Promise.resolve({ success: true, config: {} })
             });
 
-            await api.request('http://localhost:8000/api/config/map');
-            await api.request('http://localhost:8000/api/config/map');
+            await api.request('http://172.20.10.2:8000/api/config/map');
+            await api.request('http://172.20.10.2:8000/api/config/map');
 
             expect(mockFetch).toHaveBeenCalledTimes(1);
         });
@@ -230,9 +230,9 @@ describe('配置接口测试', () => {
                 json: () => Promise.resolve({ success: true, config: {} })
             });
 
-            await api.request('http://localhost:8000/api/config/app');
+            await api.request('http://172.20.10.2:8000/api/config/app');
             api.clearCache();
-            await api.request('http://localhost:8000/api/config/app');
+            await api.request('http://172.20.10.2:8000/api/config/app');
 
             expect(mockFetch).toHaveBeenCalledTimes(2);
         });

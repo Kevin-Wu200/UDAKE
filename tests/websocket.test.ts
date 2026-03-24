@@ -19,7 +19,7 @@ describe('WebSocketService', () => {
   let service: WebSocketService;
 
   beforeEach(() => {
-    service = new WebSocketService('ws://localhost:8000');
+    service = new WebSocketService('ws://172.20.10.2:8000');
   });
 
   afterEach(() => {
