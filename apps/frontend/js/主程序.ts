@@ -1321,13 +1321,21 @@ class App {
     private initializeDeepLearningPanel(): void {
         const section = document.getElementById('deep-learning-section');
         const container = document.getElementById('deep-learning-container');
+        const legacyApiServer = (this as unknown as { apiServer?: IAPIService | null }).apiServer ?? null;
+        const panelApiService = this.apiService ?? legacyApiServer;
 
-        if (!section || !container || !this.apiService) {
+        if (!section || !container || !panelApiService) {
+            console.warn('[深度学习面板] 初始化跳过:', {
+                hasSection: Boolean(section),
+                hasContainer: Boolean(container),
+                hasApiService: Boolean(this.apiService),
+                hasLegacyApiServer: Boolean(legacyApiServer)
+            });
             return;
         }
 
         try {
-            this.deepLearningPanel = new DeepLearningPanel('deep-learning-section', 'deep-learning-container', this.apiService);
+            this.deepLearningPanel = new DeepLearningPanel('deep-learning-section', 'deep-learning-container', panelApiService);
             this.componentInitializer.registerComponent('deepLearningPanel', this.deepLearningPanel);
             console.log('深度学习面板初始化成功');
         } catch (error) {
