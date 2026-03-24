@@ -161,14 +161,14 @@ export class Logger {
                 const sanitized = args.map(item => sanitizeValue(item));
                 ORIGINAL_CONSOLE[fallback](`[${timestamp}]`, ...sanitized);
             };
-            (console as Record<string, unknown>)[method] = patched;
+            (console as unknown as Record<string, unknown>)[method] = patched;
         };
 
         patchMethod('debug', 'debug');
         patchMethod('info', 'info');
         patchMethod('warn', 'warn');
         patchMethod('error', 'error');
-        (console as Record<string, unknown>).log = (console as Record<string, unknown>).info;
+        (console as unknown as Record<string, unknown>).log = (console as unknown as Record<string, unknown>).info;
     }
 
     static debug(scope: string, message: string, payload?: unknown): void {
