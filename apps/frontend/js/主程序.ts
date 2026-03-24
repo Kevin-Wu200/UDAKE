@@ -63,6 +63,29 @@ import {
 } from '../types/app';
 import { TaskStatus } from '../types/core';
 
+function stripApiSuffix(baseUrl: string): string {
+    const trimmed = baseUrl.trim().replace(/\/+$/, '');
+    return trimmed.endsWith('/api') ? trimmed.slice(0, -4) : trimmed;
+}
+
+function buildApiUrl(baseUrl: string, backendPort: number): string {
+    const normalizedBaseUrl = stripApiSuffix(baseUrl);
+
+    // Electron 桌面端由本地后端分配端口，移动端直接使用环境变量地址。
+    if (!window.electronAPI) {
+        return `${normalizedBaseUrl}/api`;
+    }
+
+    try {
+        const parsed = new URL(normalizedBaseUrl);
+        parsed.port = String(backendPort);
+        const basePath = parsed.pathname === '/' ? '' : parsed.pathname.replace(/\/+$/, '');
+        return `${parsed.origin}${basePath}/api`;
+    } catch {
+        return `http://127.0.0.1:${backendPort}/api`;
+    }
+}
+
 // 初始化全局工具
 Logger.bootstrap();
 RuntimeLifecycle.installGlobalTracking();
@@ -103,6 +126,7 @@ class App {
 
     // 启动相关
     private splashScreen: SplashScreen | null = null;
+    private splashScreenHidden: boolean = false;
     private launchProgressManager: LaunchProgressManager | null = null;
     private startupManager: StartupManager | null = null;
     private resourceOptimizationManager: ResourceOptimizationManager | null = null;
@@ -178,6 +202,7 @@ class App {
                 showProgress: true,
                 minDisplayTime: 2500
             });
+            this.splashScreenHidden = false;
             this.splashScreen.show();
 
             // 设置进度回调
@@ -214,7 +239,11 @@ class App {
                 return port;
             });
 
-            const apiURL = `http://172.20.10.2:${backendPort}/api`;
+            const configuredApiBaseUrl =
+                (import.meta.env.VITE_API_BASE_URL as string) ||
+                (import.meta.env.VITE_API_URL as string) ||
+                'https://172.20.10.2:8443';
+            const apiURL = buildApiUrl(configuredApiBaseUrl, backendPort);
 
             // 阶段3：初始化API
             await this.launchProgressManager.executeStage('api-init', async (updateProgress) => {
@@ -275,10 +304,7 @@ class App {
 
             // 阶段8：准备就绪
             await this.launchProgressManager.executeStage('ready', async (updateProgress) => {
-                console.log('准备初始化新手引导');
-                updateProgress(50);
-                const components = this.componentInitializer.getComponentRegistry();
-                components.onboardingGuide.autoStart();
+                console.log('准备就绪');
                 updateProgress(100);
             });
 
@@ -289,6 +315,13 @@ class App {
 
             // 隐藏启动画面
             await this.splashScreen?.hide();
+            this.splashScreenHidden = true;
+
+            // 启动画面完全隐藏后再触发新手引导，避免与动画重叠
+            if (this.splashScreenHidden) {
+                const components = this.componentInitializer.getComponentRegistry();
+                components.onboardingGuide.autoStart();
+            }
 
             LoadingManager.hide();
             PerformanceMonitor.mark('appReady');

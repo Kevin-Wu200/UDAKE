@@ -78,10 +78,38 @@ export class OnboardingGuide {
      * 自动检查并启动引导
      */
     public autoStart(): void {
-        if (this.shouldShow()) {
-            // 延迟启动，等待页面渲染完成
-            setTimeout(() => this.start(), 1000);
+        if (!this.shouldShow()) {
+            return;
         }
+
+        let retryCount = 0;
+        const maxRetries = 10;
+
+        const tryStart = () => {
+            if (!this.shouldShow()) {
+                return;
+            }
+
+            const splashElement = document.querySelector('.splash-screen') as HTMLElement | null;
+            const splashIsVisible = Boolean(
+                splashElement &&
+                splashElement.style.display !== 'none' &&
+                !splashElement.classList.contains('splash-hidden')
+            );
+
+            if (!splashIsVisible) {
+                this.start();
+                return;
+            }
+
+            retryCount += 1;
+            if (retryCount <= maxRetries) {
+                setTimeout(tryStart, 300);
+            }
+        };
+
+        // 稍等页面稳定后再判断启动条件
+        setTimeout(tryStart, 300);
     }
 
     /**

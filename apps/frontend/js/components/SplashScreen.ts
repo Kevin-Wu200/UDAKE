@@ -25,6 +25,7 @@ export class SplashScreen {
     private showProgress: boolean = true;
     private progress: number = 0;
     private onReadyCallback: (() => void) | null = null;
+    private hidePromise: Promise<void> | null = null;
 
     private constructor(options: SplashScreenOptions = {}) {
         this.showProgress = options.showProgress ?? true;
@@ -201,29 +202,70 @@ export class SplashScreen {
      */
     public async hide(): Promise<void> {
         if (!this.element) return;
-
-        // 确保至少显示最短时间
-        const elapsedTime = Date.now() - this.startTime;
-        if (elapsedTime < this.minDisplayTime) {
-            await new Promise(resolve => setTimeout(resolve, this.minDisplayTime - elapsedTime));
+        if (this.hidePromise) {
+            return this.hidePromise;
         }
 
-        // 添加隐藏动画
-        this.element.classList.remove('splash-visible');
-        this.element.classList.add('splash-hidden');
+        const currentElement = this.element;
+        const fadeDuration = this.getCssDurationMs('--splash-fade-duration', 500);
 
-        // 动画完成后移除元素
-        setTimeout(() => {
-            if (this.element) {
-                this.element.style.display = 'none';
-                this.element.remove();
-                this.element = null;
+        this.hidePromise = (async () => {
+            // 确保至少显示最短时间
+            const elapsedTime = Date.now() - this.startTime;
+            if (elapsedTime < this.minDisplayTime) {
+                await new Promise(resolve => setTimeout(resolve, this.minDisplayTime - elapsedTime));
             }
-        }, 500);
 
-        // 触发就绪回调
-        if (this.onReadyCallback) {
-            this.onReadyCallback();
+            if (!currentElement.isConnected) {
+                return;
+            }
+
+            await new Promise<void>((resolve) => {
+                let done = false;
+
+                const cleanup = () => {
+                    if (done) {
+                        return;
+                    }
+                    done = true;
+                    currentElement.removeEventListener('transitionend', onTransitionEnd);
+                    currentElement.style.display = 'none';
+                    currentElement.remove();
+                    if (this.element === currentElement) {
+                        this.element = null;
+                    }
+                    this.logoElement = null;
+                    this.textElement = null;
+                    this.progressContainer = null;
+                    this.progressBar = null;
+                    this.progressText = null;
+                    resolve();
+                };
+
+                const onTransitionEnd = (event: TransitionEvent) => {
+                    if (event.target === currentElement && event.propertyName === 'opacity') {
+                        cleanup();
+                    }
+                };
+
+                currentElement.addEventListener('transitionend', onTransitionEnd, { once: true });
+                currentElement.classList.remove('splash-visible');
+                currentElement.classList.add('splash-hidden');
+
+                // 兜底超时，防止某些设备不触发 transitionend
+                setTimeout(cleanup, fadeDuration + 120);
+            });
+
+            // 触发就绪回调
+            if (this.onReadyCallback) {
+                this.onReadyCallback();
+            }
+        })();
+
+        try {
+            await this.hidePromise;
+        } finally {
+            this.hidePromise = null;
         }
     }
 
