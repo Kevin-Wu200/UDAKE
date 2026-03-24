@@ -9,6 +9,7 @@ import numpy as np
 
 from ai_extension.异常检测模块 import DeepAnomalyFusionDetector
 from deep_learning.inference import BatchPredictor
+from deep_learning.fusion.service import fusion_platform_service
 from deep_learning.models.anomaly_detection import AnomalyTrainingConfig, AnomalyTrainingManager
 from deep_learning.models import AttentionKrigingModel, GNNKrigingModel, ModelRegistry, ResidualKrigingModel
 from deep_learning.models.sampling_rl import SamplingRLIntegrator
@@ -71,6 +72,7 @@ class DeepLearningService:
         self.deep_fusion = DeepAnomalyFusionDetector()
         self.sampling_rl_integrators: dict[str, SamplingRLIntegrator] = {}
         self.spatiotemporal_integrator = SpatioTemporalSystemIntegrator(cache_ttl_seconds=180)
+        self.fusion_platform = fusion_platform_service
 
     def health(self) -> dict[str, Any]:
         profile = self.device_manager.configure()
@@ -83,6 +85,7 @@ class DeepLearningService:
             "trained_anomaly_models": sorted(self.anomaly_models.keys()),
             "trained_sampling_rl_models": sorted(self.sampling_rl_integrators.keys()),
             "trained_spatiotemporal_models": sorted(self.spatiotemporal_integrator.training_records.keys()),
+            "fusion_profiles": self.fusion_platform.model_registry_status().get("profiles", []),
         }
 
     def train_demo_model(self, samples: list[list[float]]) -> dict[str, Any]:
@@ -556,3 +559,121 @@ class DeepLearningService:
             "online": payload,
             "resource": self.resource_monitor.collect(),
         }
+
+    def train_fusion_profile(
+        self,
+        profile_id: str,
+        models: list[dict[str, Any]],
+        true_values: list[float],
+        strategy: str = "dynamic",
+        weight_method: str = "adaptive",
+        adaptive_mode: str = "neural",
+        context: dict[str, list[float]] | None = None,
+    ) -> dict[str, Any]:
+        result = self.fusion_platform.train_fusion_profile(
+            profile_id=profile_id,
+            models=models,
+            true_values=true_values,
+            strategy=strategy,
+            weight_method=weight_method,
+            adaptive_mode=adaptive_mode,
+            context=context,
+        )
+        rmse = float(result["result"]["metrics"].get("rmse", 0.0)) if result.get("result") else 0.0
+        self.metric_monitor.log("fusion_profile_train_rmse", rmse)
+        return result
+
+    def predict_fusion(
+        self,
+        models: list[dict[str, Any]],
+        profile_id: str | None = None,
+        strategy: str | None = None,
+        weight_method: str | None = None,
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+    ) -> dict[str, Any]:
+        payload = self.fusion_platform.inference(
+            models=models,
+            profile_id=profile_id,
+            strategy=strategy,
+            weight_method=weight_method,
+            true_values=true_values,
+            context=context,
+        )
+        self.metric_monitor.log("fusion_inference_count", float(len(models)))
+        return payload
+
+    def compare_fusion_strategies(
+        self,
+        models: list[dict[str, Any]],
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+    ) -> dict[str, Any]:
+        return self.fusion_platform.compare_strategies(
+            models=models,
+            true_values=true_values,
+            context=context,
+        )
+
+    def optimize_fusion_weights(
+        self,
+        models: list[dict[str, Any]],
+        true_values: list[float],
+        strategy: str = "weighted_average",
+    ) -> dict[str, Any]:
+        return self.fusion_platform.optimize_weights(
+            models=models,
+            true_values=true_values,
+            strategy=strategy,
+        )
+
+    def hybrid_fusion(
+        self,
+        kriging_prediction: list[float],
+        deep_prediction: list[float],
+        mode: str = "residual",
+        ratio: float = 0.6,
+        kriging_variance: list[float] | None = None,
+        deep_variance: list[float] | None = None,
+    ) -> dict[str, Any]:
+        return self.fusion_platform.hybrid_fusion(
+            kriging_prediction=kriging_prediction,
+            deep_prediction=deep_prediction,
+            mode=mode,
+            ratio=ratio,
+            kriging_variance=kriging_variance,
+            deep_variance=deep_variance,
+        )
+
+    def multimodal_fusion(
+        self,
+        modalities: list[list[float]],
+        strategy: str = "hybrid",
+        weights: list[float] | None = None,
+    ) -> dict[str, Any]:
+        return self.fusion_platform.multimodal_fusion(
+            modalities=modalities,
+            strategy=strategy,
+            weights=weights,
+        )
+
+    def select_fusion_model(
+        self,
+        performance_scores: dict[str, float] | None = None,
+        uncertainty_scores: dict[str, float] | None = None,
+        input_score: float | None = None,
+    ) -> dict[str, Any]:
+        return self.fusion_platform.select_model(
+            performance_scores=performance_scores,
+            uncertainty_scores=uncertainty_scores,
+            input_score=input_score,
+        )
+
+    def fusion_monitor_status(self) -> dict[str, Any]:
+        return self.fusion_platform.monitor_status()
+
+    def fusion_registry_status(self) -> dict[str, Any]:
+        return self.fusion_platform.model_registry_status()
+
+    def fusion_check_access(self, token: str | None, client_id: str = "anonymous") -> dict[str, Any]:
+        return self.fusion_platform.check_access(token=token, client_id=client_id)

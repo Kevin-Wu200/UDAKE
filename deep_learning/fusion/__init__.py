@@ -1,23 +1,43 @@
-"""模型融合占位模块。"""
+"""阶段7：模型融合与系统集成模块。"""
 
-from dataclasses import dataclass
-from typing import Iterable, Sequence
+from .adaptive import AdaptiveFusionSystem
+from .common import (
+    AdaptiveLearningMode,
+    FusionConfig,
+    FusionProfile,
+    FusionResult,
+    FusionStrategy,
+    HybridFusionMode,
+    ModelMetric,
+    ModelPrediction,
+    MultiModalStrategy,
+    WeightMethod,
+)
+from .engine import ModelFusionEngine
+from .evaluation import FusionEvaluator
+from .hybrid import HybridFusionBridge, MultiModalFusion
+from .model_management import FusionModelManager
+from .service import FusionPlatformService, fusion_platform_service
+from .weighting import FusionWeightCalculator
 
-
-@dataclass
-class WeightedFusion:
-    """基础加权融合器。"""
-
-    weights: Sequence[float]
-
-    def fuse(self, predictions: Iterable[Sequence[float]]) -> list[float]:
-        rows = list(predictions)
-        if not rows:
-            return []
-        total_w = sum(self.weights) or 1.0
-        size = len(rows[0])
-        result = [0.0] * size
-        for w, row in zip(self.weights, rows):
-            for idx in range(size):
-                result[idx] += float(row[idx]) * w
-        return [x / total_w for x in result]
+__all__ = [
+    "AdaptiveFusionSystem",
+    "AdaptiveLearningMode",
+    "FusionConfig",
+    "FusionEvaluator",
+    "FusionModelManager",
+    "FusionPlatformService",
+    "FusionProfile",
+    "FusionResult",
+    "FusionStrategy",
+    "FusionWeightCalculator",
+    "HybridFusionBridge",
+    "HybridFusionMode",
+    "ModelFusionEngine",
+    "ModelMetric",
+    "ModelPrediction",
+    "MultiModalFusion",
+    "MultiModalStrategy",
+    "WeightMethod",
+    "fusion_platform_service",
+]

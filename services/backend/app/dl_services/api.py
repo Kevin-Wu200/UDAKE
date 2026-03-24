@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
@@ -114,6 +114,72 @@ class SpatioTemporalOnlineRequest(BaseModel):
     pred_horizon: int = Field(default=6, ge=1, le=48)
     update_interval: int = Field(default=1, ge=1, le=20)
     strategy: str = Field(default="standard", description="light/standard/aggressive")
+
+
+class FusionModelInput(BaseModel):
+    model_id: str
+    model_name: Optional[str] = None
+    predictions: list[float] = Field(default_factory=list)
+    variances: Optional[list[float]] = None
+    confidence_intervals: Optional[list[dict[str, float]]] = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class FusionTrainRequest(BaseModel):
+    profile_id: str = Field(default="default")
+    models: list[FusionModelInput] = Field(default_factory=list)
+    true_values: list[float] = Field(default_factory=list)
+    strategy: str = Field(default="dynamic")
+    weight_method: str = Field(default="adaptive")
+    adaptive_mode: str = Field(default="neural", description="neural/attention")
+    context: Optional[dict[str, list[float]]] = None
+
+
+class FusionPredictRequest(BaseModel):
+    models: list[FusionModelInput] = Field(default_factory=list)
+    profile_id: Optional[str] = None
+    strategy: Optional[str] = None
+    weight_method: Optional[str] = None
+    true_values: Optional[list[float]] = None
+    context: Optional[dict[str, list[float]]] = None
+
+
+class FusionCompareRequest(BaseModel):
+    models: list[FusionModelInput] = Field(default_factory=list)
+    true_values: Optional[list[float]] = None
+    context: Optional[dict[str, list[float]]] = None
+
+
+class FusionOptimizeRequest(BaseModel):
+    models: list[FusionModelInput] = Field(default_factory=list)
+    true_values: list[float] = Field(default_factory=list)
+    strategy: str = Field(default="weighted_average")
+
+
+class HybridFusionRequest(BaseModel):
+    kriging_prediction: list[float] = Field(default_factory=list)
+    deep_prediction: list[float] = Field(default_factory=list)
+    mode: str = Field(default="residual", description="residual/feature/decision")
+    ratio: float = Field(default=0.6, ge=0.0, le=1.0)
+    kriging_variance: Optional[list[float]] = None
+    deep_variance: Optional[list[float]] = None
+
+
+class MultiModalFusionRequest(BaseModel):
+    modalities: list[list[float]] = Field(default_factory=list)
+    strategy: str = Field(default="hybrid", description="data_level/feature_level/decision_level/hybrid")
+    weights: Optional[list[float]] = None
+
+
+class FusionModelSelectRequest(BaseModel):
+    performance_scores: Optional[dict[str, float]] = None
+    uncertainty_scores: Optional[dict[str, float]] = None
+    input_score: Optional[float] = None
+
+
+class FusionAccessRequest(BaseModel):
+    token: Optional[str] = None
+    client_id: str = Field(default="anonymous")
 
 
 @router.get("/health")
@@ -244,3 +310,91 @@ def update_spatiotemporal_online(payload: SpatioTemporalOnlineRequest) -> dict:
         update_interval=payload.update_interval,
         strategy=payload.strategy,
     )
+
+
+@router.post("/fusion/train-profile")
+def train_fusion_profile(payload: FusionTrainRequest) -> dict:
+    return service.train_fusion_profile(
+        profile_id=payload.profile_id,
+        models=[m.model_dump() for m in payload.models],
+        true_values=payload.true_values,
+        strategy=payload.strategy,
+        weight_method=payload.weight_method,
+        adaptive_mode=payload.adaptive_mode,
+        context=payload.context,
+    )
+
+
+@router.post("/fusion/predict")
+def predict_fusion(payload: FusionPredictRequest) -> dict:
+    return service.predict_fusion(
+        models=[m.model_dump() for m in payload.models],
+        profile_id=payload.profile_id,
+        strategy=payload.strategy,
+        weight_method=payload.weight_method,
+        true_values=payload.true_values,
+        context=payload.context,
+    )
+
+
+@router.post("/fusion/compare")
+def compare_fusion_strategies(payload: FusionCompareRequest) -> dict:
+    return service.compare_fusion_strategies(
+        models=[m.model_dump() for m in payload.models],
+        true_values=payload.true_values,
+        context=payload.context,
+    )
+
+
+@router.post("/fusion/optimize")
+def optimize_fusion_weights(payload: FusionOptimizeRequest) -> dict:
+    return service.optimize_fusion_weights(
+        models=[m.model_dump() for m in payload.models],
+        true_values=payload.true_values,
+        strategy=payload.strategy,
+    )
+
+
+@router.post("/fusion/hybrid")
+def hybrid_fusion(payload: HybridFusionRequest) -> dict:
+    return service.hybrid_fusion(
+        kriging_prediction=payload.kriging_prediction,
+        deep_prediction=payload.deep_prediction,
+        mode=payload.mode,
+        ratio=payload.ratio,
+        kriging_variance=payload.kriging_variance,
+        deep_variance=payload.deep_variance,
+    )
+
+
+@router.post("/fusion/multimodal")
+def multimodal_fusion(payload: MultiModalFusionRequest) -> dict:
+    return service.multimodal_fusion(
+        modalities=payload.modalities,
+        strategy=payload.strategy,
+        weights=payload.weights,
+    )
+
+
+@router.post("/fusion/select-model")
+def select_fusion_model(payload: FusionModelSelectRequest) -> dict:
+    return service.select_fusion_model(
+        performance_scores=payload.performance_scores,
+        uncertainty_scores=payload.uncertainty_scores,
+        input_score=payload.input_score,
+    )
+
+
+@router.get("/fusion/monitor")
+def fusion_monitor_status() -> dict:
+    return service.fusion_monitor_status()
+
+
+@router.get("/fusion/registry")
+def fusion_registry_status() -> dict:
+    return service.fusion_registry_status()
+
+
+@router.post("/fusion/access")
+def fusion_access_check(payload: FusionAccessRequest) -> dict:
+    return service.fusion_check_access(token=payload.token, client_id=payload.client_id)

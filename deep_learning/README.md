@@ -14,6 +14,7 @@
 - 强化学习采样优化（SamplingEnv、PPO/DQN/A2C、多智能体协作、在线学习）
 - 不确定性量化模型（BNN、MC Dropout、Deep Ensemble、EDL）
 - 不确定性聚合/校准/评估与系统集成工具
+- 模型融合与系统集成（多策略融合、权重学习、自适应融合、模型管理与服务化接口）
 
 ## 快速开始
 
@@ -55,4 +56,11 @@ python3 deep_learning/examples/uncertainty_inference_demo.py
 ```bash
 python3 deep_learning/training/train_spatiotemporal.py --model st_transformer --epochs 20 --seq-len 24 --horizon 6
 python3 deep_learning/inference/run_spatiotemporal_inference.py --model gcn_lstm --seq-len 24 --horizon 6
+```
+
+## 阶段7快速命令
+
+```bash
+python3 -m pytest tests/deep_learning/test_fusion_system.py -q
+python3 -m pytest tests/deep_learning/test_dl_service_fusion_api.py -q
 ```

@@ -64,3 +64,6 @@ TODOList/
 
 # 测试数据
 data/
+
+# 阶段7融合系统本地仓库
+deep_learning/fusion/repository/
