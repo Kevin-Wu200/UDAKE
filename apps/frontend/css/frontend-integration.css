@@ -1,0 +1,115 @@
+.frontend-integration-hub {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: 70vh;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.integration-detail {
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 8px;
+    background: var(--card-bg, #ffffff);
+}
+
+.integration-summary {
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 10px 12px;
+    user-select: none;
+}
+
+.integration-detail-content {
+    border-top: 1px solid var(--border-color, #e5e7eb);
+    padding: 10px;
+}
+
+.integration-module-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.integration-module-title {
+    margin: 0;
+    font-size: 15px;
+}
+
+.integration-module-description {
+    margin: 0;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.integration-form-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+}
+
+.integration-field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.integration-field-label {
+    font-size: 12px;
+    color: #374151;
+    font-weight: 500;
+}
+
+.integration-input {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.integration-textarea {
+    min-height: 110px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+}
+
+.integration-checkbox {
+    width: auto;
+    align-self: flex-start;
+}
+
+.integration-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.integration-action-btn {
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.integration-result {
+    margin: 0;
+    max-height: 240px;
+    overflow: auto;
+    background: #111827;
+    color: #f9fafb;
+    border-radius: 6px;
+    padding: 10px;
+    font-size: 11px;
+    line-height: 1.5;
+}
+
+@media (max-width: 768px) {
+    .frontend-integration-hub {
+        max-height: 55vh;
+    }
+
+    .integration-actions {
+        flex-direction: column;
+    }
+
+    .integration-action-btn {
+        width: 100%;
+    }
+}

@@ -34,6 +34,7 @@ import { StartupManager } from './utils/StartupManager.js';
 import { ResourceOptimizationManager } from './config/ResourceOptimizationConfig.js';
 import { Kriging3DPanel } from './components/Kriging3DPanel.js';
 import { DeepLearningPanel } from './components/DeepLearningPanel.js';
+import { FrontendIntegrationHub } from './components/FrontendIntegrationHub.js';
 import { CSSFeatureDetector } from './utils/CSSFeatureDetector.js';
 import { Logger } from './utils/Logger.js';
 import { RuntimeLifecycle } from './utils/RuntimeLifecycle.js';
@@ -92,6 +93,7 @@ class App {
     private mapSwitchSessionId: number = 0;
     private kriging3DPanel: Kriging3DPanel | null = null;
     private deepLearningPanel: DeepLearningPanel | null = null;
+    private frontendIntegrationHub: FrontendIntegrationHub | null = null;
 
     // 管理器
     private componentInitializer: ComponentInitializer;
@@ -374,6 +376,9 @@ class App {
 
             // 初始化深度学习面板
             this.initializeDeepLearningPanel();
+
+            // 初始化前端功能集成补齐面板
+            this.initializeFrontendIntegrationPanel();
 
             // 初始化位置服务
             await this.initializeLocationService();
@@ -1340,6 +1345,28 @@ class App {
             console.log('深度学习面板初始化成功');
         } catch (error) {
             console.error('深度学习面板初始化失败:', error);
+        }
+    }
+
+    /**
+     * 初始化前端功能集成补齐面板
+     */
+    private initializeFrontendIntegrationPanel(): void {
+        if (!(this.apiService instanceof APIService)) {
+            console.warn('[前端功能集成面板] 初始化跳过: APIService 不可用');
+            return;
+        }
+
+        try {
+            this.frontendIntegrationHub = new FrontendIntegrationHub(
+                'frontend-integration-section',
+                'frontend-integration-container',
+                this.apiService
+            );
+            this.frontendIntegrationHub.init();
+            console.log('前端功能集成补齐面板初始化成功');
+        } catch (error) {
+            console.error('前端功能集成补齐面板初始化失败:', error);
         }
     }
 

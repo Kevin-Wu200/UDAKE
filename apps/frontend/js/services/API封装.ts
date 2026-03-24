@@ -565,6 +565,396 @@ export class APIService implements IAPIService {
         });
     }
 
+    // ==================== 前端功能集成补齐接口 ====================
+
+    // 数据质量
+    public async getDataQualityHealth(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/data-quality/health`);
+    }
+
+    public async listDataQualityRules(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/data-quality/rules`);
+    }
+
+    public async createDataQualityRule(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/data-quality/rules', payload);
+    }
+
+    public async updateDataQualityRule(ruleId: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/data-quality/rules/${ruleId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    }
+
+    public async toggleDataQualityRule(ruleId: string, enabled: boolean): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/data-quality/rules/${ruleId}/enabled`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+        });
+    }
+
+    public async deleteDataQualityRule(ruleId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/data-quality/rules/${ruleId}`, {
+            method: 'DELETE'
+        });
+    }
+
+    public async evaluateDataQuality(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/data-quality/evaluate', payload);
+    }
+
+    public async getDataQualityReport(reportId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/data-quality/reports/${reportId}`);
+    }
+
+    public async getDataQualityAnomalies(reportId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/data-quality/reports/${reportId}/anomalies`);
+    }
+
+    public async getDataQualitySuggestions(reportId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/data-quality/reports/${reportId}/suggestions`);
+    }
+
+    public async exportDataQualityReport(reportId: string, fmt: 'json' | 'markdown' | 'html' = 'json'): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/data-quality/reports/${reportId}/export?fmt=${fmt}`);
+    }
+
+    public async getDataQualityHistory(datasetId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/data-quality/history/${datasetId}`);
+    }
+
+    // 模型评估与自评估
+    public async evaluateModel(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/model/evaluation', payload);
+    }
+
+    public async runRealtimeEvaluation(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/evaluation/realtime', payload);
+    }
+
+    public async getEvaluationPerformance(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/evaluation/performance`);
+    }
+
+    public async getEvaluationErrors(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/evaluation/errors`);
+    }
+
+    public async getEvaluationUncertainty(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/evaluation/uncertainty`);
+    }
+
+    public async selectBestModel(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/model-selection/select', payload);
+    }
+
+    public async getModelSelectionStatus(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/model-selection/status`);
+    }
+
+    public async switchModel(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/model-selection/switch', payload);
+    }
+
+    public async rollbackModel(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/model-selection/rollback', payload);
+    }
+
+    public async triggerOptimization(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/optimization/trigger', payload);
+    }
+
+    public async getOptimizationStatus(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/optimization/status`);
+    }
+
+    public async cancelOptimization(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/optimization/cancel', payload);
+    }
+
+    public async getPerformanceReportSnapshot(windowMinutes: number = 120, sampleSize: number = 200): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(
+            `${this.baseURL}/reports/performance?window_minutes=${windowMinutes}&sample_size=${sampleSize}`
+        );
+    }
+
+    public async getEvaluationReportSnapshot(windowMinutes: number = 120, sampleSize: number = 200): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(
+            `${this.baseURL}/reports/evaluation?window_minutes=${windowMinutes}&sample_size=${sampleSize}`
+        );
+    }
+
+    public async getOptimizationReportSnapshot(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/reports/optimization`);
+    }
+
+    public async generateComposedReport(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/reports/generate', payload);
+    }
+
+    // 模型融合与推荐
+    public async createModelFusionTask(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/fusion/create-task', payload);
+    }
+
+    public async getModelFusionTaskStatus(taskId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/fusion/task/${taskId}/status`);
+    }
+
+    public async getModelFusionTaskResult(taskId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/fusion/task/${taskId}/result`);
+    }
+
+    public async compareFusionStrategies(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/fusion/compare-strategies', payload);
+    }
+
+    public async optimizeFusionWeights(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/fusion/optimize-weights', payload);
+    }
+
+    public async listFusionTasks(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/fusion/tasks`);
+    }
+
+    public async listFusionStrategies(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/fusion/strategies`);
+    }
+
+    public async listFusionWeightMethods(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/fusion/weight-methods`);
+    }
+
+    public async getFusionStatus(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/fusion/status`);
+    }
+
+    public async recommendModelParameters(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/recommend-parameters', payload);
+    }
+
+    // 批量处理
+    public async startBatchKriging(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/batch-kriging', payload);
+    }
+
+    public async getBatchKrigingStatus(batchId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/batch-kriging/${batchId}/status`);
+    }
+
+    public async controlBatchKriging(batchId: string, action: string): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>(`/batch-kriging/${batchId}/control`, { action });
+    }
+
+    public async getBatchKrigingResults(batchId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/batch-kriging/${batchId}/results`);
+    }
+
+    public async listBatchKrigingTasks(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/batch-kriging`);
+    }
+
+    public async generateBatchReports(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/batch-reports/generate', payload);
+    }
+
+    public async getBatchReportTemplates(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/batch-reports/templates`);
+    }
+
+    public async getBatchReportSections(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/batch-reports/sections`);
+    }
+
+    public async getBatchReportFormats(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/batch-reports/formats`);
+    }
+
+    public async previewBatchReport(batchId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/batch-reports/preview/${batchId}`);
+    }
+
+    public async createParameterTemplate(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/parameter-templates', payload);
+    }
+
+    public async listParameterTemplates(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/parameter-templates`);
+    }
+
+    public async getDefaultParameterTemplates(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/parameter-templates/defaults`);
+    }
+
+    public async getParameterTemplate(templateId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/parameter-templates/${templateId}`);
+    }
+
+    public async deleteParameterTemplate(templateId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/parameter-templates/${templateId}`, {
+            method: 'DELETE'
+        });
+    }
+
+    public async applyParameterTemplate(templateId: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>(`/parameter-templates/${templateId}/apply`, payload);
+    }
+
+    public async validateParameters(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/parameters/validate', payload);
+    }
+
+    public async applyParameters(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/parameters/apply', payload);
+    }
+
+    public async autoAdjustParameters(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/parameters/auto-adjust', payload);
+    }
+
+    // 报告与高级分析
+    public async createPerformanceReport(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/performance/report', payload);
+    }
+
+    public async getPerformanceTrend(taskId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/performance/trend/${taskId}`);
+    }
+
+    public async getPerformanceHistoricalStats(taskType: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/performance/historical-stats/${taskType}`);
+    }
+
+    public async classifyUncertainty(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/uncertainty/classify', payload);
+    }
+
+    public async analyzeDecisionThreshold(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/decision/thresholds', payload);
+    }
+
+    public async calculateRiskIndex(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/risk/calculate', payload);
+    }
+
+    public async generateRiskReport(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/risk/report', payload);
+    }
+
+    public async getBatchComparison(batchId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/batch-kriging/${batchId}/comparison`);
+    }
+
+    public async getBatchComparisonRanking(batchId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/batch-kriging/${batchId}/ranking`);
+    }
+
+    public async getBatchComparisonDifference(batchId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/batch-kriging/${batchId}/difference`);
+    }
+
+    public async getBatchComparisonSummary(batchId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/batch-kriging/${batchId}/comparison/summary`);
+    }
+
+    public async predictError(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/error/predict', payload);
+    }
+
+    // 任务队列
+    public async createQueueTask(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/queue/tasks', payload);
+    }
+
+    public async getQueueTask(taskId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/queue/tasks/${taskId}`);
+    }
+
+    public async listQueueTasks(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/queue/tasks`);
+    }
+
+    public async controlQueueTask(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/queue/tasks/control', payload);
+    }
+
+    public async updateQueueTaskPriority(taskId: string, payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/queue/tasks/${taskId}/priority`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    }
+
+    public async getQueueStatistics(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/queue/statistics`);
+    }
+
+    public async startQueue(): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/queue/start', {});
+    }
+
+    public async stopQueue(): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/queue/stop', {});
+    }
+
+    // GPU
+    public async getGPUHealth(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/gpu/health`);
+    }
+
+    public async getGPUStatus(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/gpu/status`);
+    }
+
+    public async getGPUDevices(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/gpu/devices`);
+    }
+
+    public async updateGPUConfig(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/gpu/config`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+    }
+
+    public async getGPUMetrics(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/gpu/metrics`);
+    }
+
+    public async listGPUTasks(limit: number = 100): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/gpu/tasks?limit=${limit}`);
+    }
+
+    public async getGPUTask(taskId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/gpu/tasks/${taskId}`);
+    }
+
+    public async gpuMatrixMultiply(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/gpu/compute/matrix/multiply', payload);
+    }
+
+    // 数据反馈
+    public async getFeedbackHealth(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/feedback/health`);
+    }
+
+    public async submitFeedbackInput(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/feedback/input', payload);
+    }
+
+    public async submitFeedbackModification(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/feedback/modification', payload);
+    }
+
+    public async queryFeedbackData(datasetId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/feedback/data?dataset_id=${encodeURIComponent(datasetId)}`);
+    }
+
     // ==================== 深度学习模块相关方法 ====================
 
     /**
