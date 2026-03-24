@@ -51,6 +51,33 @@ def _spatiotemporal_series(n_nodes: int = 10, seq_len: int = 18, n_features: int
     return series
 
 
+def _fusion_models() -> list[dict[str, object]]:
+    return [
+        {
+            "model_id": "m1",
+            "model_name": "gnn_kriging",
+            "predictions": [1.0, 1.2, 1.1, 1.3, 1.25, 1.35],
+            "variances": [0.05, 0.05, 0.06, 0.05, 0.05, 0.06],
+        },
+        {
+            "model_id": "m2",
+            "model_name": "attention_kriging",
+            "predictions": [0.95, 1.25, 1.05, 1.28, 1.2, 1.33],
+            "variances": [0.07, 0.06, 0.07, 0.07, 0.08, 0.07],
+        },
+        {
+            "model_id": "m3",
+            "model_name": "residual_kriging",
+            "predictions": [1.05, 1.18, 1.12, 1.27, 1.22, 1.31],
+            "variances": [0.06, 0.06, 0.06, 0.06, 0.06, 0.06],
+        },
+    ]
+
+
+def _fusion_true_values() -> list[float]:
+    return [1.0, 1.2, 1.1, 1.3, 1.24, 1.34]
+
+
 def test_service_core() -> None:
     service = DeepLearningService()
     health = service.health()
@@ -294,3 +321,176 @@ def test_api_spatiotemporal_routes() -> None:
     online_payload = online_resp.json()
     assert online_payload["model_type"] == "gcn_lstm"
     assert online_payload["online"]["online_update"]["updated_steps"] >= 1
+
+
+def test_service_fusion_workflow() -> None:
+    service = DeepLearningService()
+    models = _fusion_models()
+    true_values = _fusion_true_values()
+
+    train = service.train_fusion_profile(
+        profile_id="demo_profile",
+        models=models,
+        true_values=true_values,
+        strategy="dynamic",
+        weight_method="adaptive",
+        adaptive_mode="attention",
+        context={"difficulty": [1.0] * len(true_values)},
+    )
+    assert train["profile"]["profile_id"] == "demo_profile"
+    assert "rmse" in train["result"]["metrics"]
+
+    infer = service.predict_fusion(
+        models=models,
+        profile_id="demo_profile",
+        true_values=true_values,
+        context={"difficulty": [0.9] * len(true_values)},
+    )
+    assert len(infer["result"]["fused_predictions"]) == len(true_values)
+    assert infer["selected_strategy"] in {
+        "dynamic",
+        "stacking",
+        "variance_weighted",
+        "median",
+        "weighted_average",
+    }
+
+    compare = service.compare_fusion_strategies(models=models, true_values=true_values)
+    assert "weighted_average" in compare
+    assert "dynamic" in compare
+
+    optimize = service.optimize_fusion_weights(models=models, true_values=true_values, strategy="weighted_average")
+    assert optimize["best_method"] is not None
+
+    hybrid = service.hybrid_fusion(
+        kriging_prediction=[1.0, 1.2, 1.1],
+        deep_prediction=[0.98, 1.23, 1.12],
+        mode="residual",
+        ratio=0.65,
+    )
+    assert len(hybrid["prediction"]) == 3
+
+    multimodal = service.multimodal_fusion(
+        modalities=[[1.0, 1.2, 1.1], [0.9, 1.3, 1.0], [1.1, 1.1, 1.2]],
+        strategy="hybrid",
+        weights=[0.4, 0.3, 0.3],
+    )
+    assert len(multimodal["fused"]) == 3
+
+    selected = service.select_fusion_model(
+        performance_scores={"gnn": 0.12, "attention": 0.1},
+        uncertainty_scores={"gnn": 0.2, "attention": 0.08},
+        input_score=0.8,
+    )
+    assert selected["selected_model"] in {"gnn", "attention"}
+
+    monitor = service.fusion_monitor_status()
+    assert monitor["requests"]["total"] >= 4
+
+    registry = service.fusion_registry_status()
+    assert "demo_profile" in registry["profiles"]
+
+    access_ok = service.fusion_check_access(token="internal-token", client_id="ut-fusion")
+    access_fail = service.fusion_check_access(token="bad-token", client_id="ut-fusion")
+    assert access_ok["ok"] is True
+    assert access_fail["ok"] is False
+
+
+def test_api_fusion_routes() -> None:
+    app = FastAPI()
+    app.include_router(router, prefix="/api")
+    client = TestClient(app)
+
+    models = _fusion_models()
+    true_values = _fusion_true_values()
+
+    train_resp = client.post(
+        "/api/dl/fusion/train-profile",
+        json={
+            "profile_id": "api_profile",
+            "models": models,
+            "true_values": true_values,
+            "strategy": "dynamic",
+            "weight_method": "adaptive",
+            "adaptive_mode": "neural",
+            "context": {"difficulty": [1.0] * len(true_values)},
+        },
+    )
+    assert train_resp.status_code == 200
+    assert train_resp.json()["profile"]["profile_id"] == "api_profile"
+
+    pred_resp = client.post(
+        "/api/dl/fusion/predict",
+        json={
+            "models": models,
+            "profile_id": "api_profile",
+            "true_values": true_values,
+            "context": {"difficulty": [0.9] * len(true_values)},
+        },
+    )
+    assert pred_resp.status_code == 200
+    pred_payload = pred_resp.json()
+    assert len(pred_payload["result"]["fused_predictions"]) == len(true_values)
+
+    compare_resp = client.post(
+        "/api/dl/fusion/compare",
+        json={"models": models, "true_values": true_values},
+    )
+    assert compare_resp.status_code == 200
+    assert "weighted_average" in compare_resp.json()
+
+    optimize_resp = client.post(
+        "/api/dl/fusion/optimize",
+        json={"models": models, "true_values": true_values, "strategy": "weighted_average"},
+    )
+    assert optimize_resp.status_code == 200
+    assert optimize_resp.json()["best_method"] is not None
+
+    hybrid_resp = client.post(
+        "/api/dl/fusion/hybrid",
+        json={
+            "kriging_prediction": [1.0, 1.2, 1.1],
+            "deep_prediction": [0.98, 1.23, 1.12],
+            "mode": "feature",
+            "ratio": 0.55,
+        },
+    )
+    assert hybrid_resp.status_code == 200
+    assert len(hybrid_resp.json()["prediction"]) == 3
+
+    multimodal_resp = client.post(
+        "/api/dl/fusion/multimodal",
+        json={
+            "modalities": [[1.0, 1.2], [0.9, 1.3], [1.1, 1.1]],
+            "strategy": "decision_level",
+            "weights": [0.5, 0.25, 0.25],
+        },
+    )
+    assert multimodal_resp.status_code == 200
+    assert len(multimodal_resp.json()["fused"]) == 2
+
+    select_resp = client.post(
+        "/api/dl/fusion/select-model",
+        json={
+            "performance_scores": {"gnn": 0.2, "attention": 0.1},
+            "uncertainty_scores": {"gnn": 0.25, "attention": 0.09},
+            "input_score": 0.85,
+        },
+    )
+    assert select_resp.status_code == 200
+    assert select_resp.json()["selected_model"] in {"gnn", "attention"}
+
+    monitor_resp = client.get("/api/dl/fusion/monitor")
+    assert monitor_resp.status_code == 200
+    assert monitor_resp.json()["requests"]["total"] >= 1
+
+    registry_resp = client.get("/api/dl/fusion/registry")
+    assert registry_resp.status_code == 200
+    assert "profiles" in registry_resp.json()
+
+    access_ok_resp = client.post("/api/dl/fusion/access", json={"token": "internal-token", "client_id": "api-fusion"})
+    access_fail_resp = client.post("/api/dl/fusion/access", json={"token": "wrong-token", "client_id": "api-fusion"})
+    assert access_ok_resp.status_code == 200
+    assert access_fail_resp.status_code == 200
+    assert access_ok_resp.json()["ok"] is True
+    assert access_fail_resp.json()["ok"] is False

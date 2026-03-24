@@ -28,7 +28,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest-cov
 
-      - name: Run deep learning tests
+      - name: Run deep learning tests with coverage
+        env:
+          PYTHONPATH: services
         run: |
-          pytest tests/deep_learning -q
+          pytest tests/deep_learning -q \
+            --cov=deep_learning \
+            --cov=services/backend/app/dl_services \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=80
