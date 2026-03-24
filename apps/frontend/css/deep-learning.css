@@ -1,0 +1,151 @@
+/* 深度学习面板样式 */
+
+#deep-learning-section .panel-title {
+    cursor: pointer;
+    user-select: none;
+}
+
+#deep-learning-container {
+    padding: 10px;
+}
+
+.deep-learning-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.dl-overview {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--border-color, #e0e0e0);
+    border-radius: 8px;
+    background: var(--panel-bg, #fafafa);
+}
+
+.dl-overview-left {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-color, #333);
+}
+
+.dl-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.dl-status-dot.pending {
+    background: #f59e0b;
+}
+
+.dl-status-dot.online {
+    background: #10b981;
+}
+
+.dl-status-dot.offline {
+    background: #ef4444;
+}
+
+.dl-health-detail {
+    font-size: 12px;
+    color: var(--text-secondary, #6b7280);
+    line-height: 1.5;
+}
+
+.dl-module-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.dl-module-card {
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 10px;
+    padding: 12px;
+    background: var(--panel-bg, #fff);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+.dl-module-header h4 {
+    margin: 0;
+    font-size: 15px;
+    color: var(--text-color, #1f2937);
+}
+
+.dl-module-header p {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: var(--text-secondary, #6b7280);
+}
+
+.dl-form-grid {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px;
+}
+
+.dl-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 12px;
+}
+
+.dl-field span {
+    color: var(--text-secondary, #4b5563);
+}
+
+.dl-field-full {
+    margin-top: 8px;
+}
+
+.dl-textarea {
+    width: 100%;
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    resize: vertical;
+    line-height: 1.4;
+}
+
+.dl-actions {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.dl-result {
+    margin: 10px 0 0;
+    max-height: 220px;
+    overflow: auto;
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+@media (max-width: 768px) {
+    .dl-overview {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .dl-actions .btn {
+        width: 100%;
+    }
+}

@@ -28,6 +28,7 @@ import { HistoryManager } from '../utils/HistoryManager.js';
 import { FeedbackCollector } from '../components/FeedbackCollector.js';
 import { MapEngineSwitcher } from '../components/MapEngineSwitcher';
 import { getMapProvider } from '../地图初始化.js';
+import type { DeepLearningPanel } from '../components/DeepLearningPanel.js';
 
 // 导入类型
 import {
@@ -73,6 +74,7 @@ export interface ComponentRegistry {
     onboardingGuide: IOnboardingGuide;
     cacheManagementPanel: any;
     offlineModeBanner: any;
+    deepLearningPanel: DeepLearningPanel | null;
 
     // 参数组件
     parameterAdjustmentPanel: ParameterAdjustmentPanel;
@@ -409,6 +411,7 @@ export class ComponentInitializer {
 
         // 初始化离线模式横幅
         this.components.set('offlineModeBanner', OfflineModeBanner);
+        this.components.set('deepLearningPanel', null);
 
         console.log('[ComponentInitializer] 高级功能组件初始化完成');
     }
@@ -487,6 +490,7 @@ export class ComponentInitializer {
             onboardingGuide: this.components.get('onboardingGuide'),
             cacheManagementPanel: this.components.get('cacheManagementPanel'),
             offlineModeBanner: this.components.get('offlineModeBanner'),
+            deepLearningPanel: this.components.get('deepLearningPanel'),
 
             // 参数组件
             parameterAdjustmentPanel: this.components.get('parameterAdjustmentPanel'),
@@ -499,6 +503,13 @@ export class ComponentInitializer {
      */
     public getComponent<T>(name: string): T {
         return this.components.get(name) as T;
+    }
+
+    /**
+     * 注册或覆盖组件实例
+     */
+    public registerComponent(name: string, component: any): void {
+        this.components.set(name, component);
     }
 
     /**

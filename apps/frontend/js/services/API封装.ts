@@ -565,6 +565,204 @@ export class APIService implements IAPIService {
         });
     }
 
+    // ==================== 深度学习模块相关方法 ====================
+
+    /**
+     * 检查深度学习服务状态
+     */
+    public async health(): Promise<{
+        status: string;
+        device: string;
+        cuda_available: boolean;
+        mps_available: boolean;
+        registered_models: string[];
+        trained_anomaly_models: string[];
+        trained_sampling_rl_models: string[];
+        trained_spatiotemporal_models: string[];
+    }> {
+        return this.request<{
+            status: string;
+            device: string;
+            cuda_available: boolean;
+            mps_available: boolean;
+            registered_models: string[];
+            trained_anomaly_models: string[];
+            trained_sampling_rl_models: string[];
+            trained_spatiotemporal_models: string[];
+        }>(`${this.baseURL}/dl/health`);
+    }
+
+    /**
+     * 训练空间插值模型
+     */
+    public async trainSpatial(data: {
+        model_type: 'gnn' | 'attention' | 'residual';
+        samples: Array<[number, number, number]>;
+        epochs: number;
+    }): Promise<{
+        model_type: string;
+        training: Record<string, unknown>;
+        history: Record<string, unknown>;
+    }> {
+        return this.request<{
+            model_type: string;
+            training: Record<string, unknown>;
+            history: Record<string, unknown>;
+        }>(`${this.baseURL}/dl/spatial/train`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 空间插值预测
+     */
+    public async predictSpatial(data: {
+        model_type: 'gnn' | 'attention' | 'residual';
+        samples: Array<[number, number, number]>;
+        queries: Array<[number, number]>;
+        blend_ratio: number;
+    }): Promise<{
+        model_type: string;
+        prediction: number[];
+        variance: number[];
+        source: string;
+        resource: Record<string, unknown>;
+    }> {
+        return this.request<{
+            model_type: string;
+            prediction: number[];
+            variance: number[];
+            source: string;
+            resource: Record<string, unknown>;
+        }>(`${this.baseURL}/dl/spatial/predict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 训练异常检测模型
+     */
+    public async trainAnomaly(data: {
+        model_name: 'vae' | 'gcae' | 'gan' | 'contrastive';
+        coords: Array<[number, number]>;
+        values: number[];
+        epochs: number;
+    }): Promise<{
+        model_name: string;
+        training: Record<string, unknown>;
+        config: Record<string, unknown>;
+    }> {
+        return this.request<{
+            model_name: string;
+            training: Record<string, unknown>;
+            config: Record<string, unknown>;
+        }>(`${this.baseURL}/dl/anomaly/train`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 异常检测预测
+     */
+    public async predictAnomaly(data: {
+        model_name: 'vae' | 'gcae' | 'gan' | 'contrastive' | 'fusion';
+        coords: Array<[number, number]>;
+        values: number[];
+        threshold_method: 'statistical' | 'percentile' | 'adaptive';
+        percentile: number;
+        k: number;
+    }): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/dl/anomaly/predict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 训练强化学习采样模型
+     */
+    public async trainSamplingRL(data: {
+        model_name: 'ppo' | 'dqn' | 'a2c' | 'a3c';
+        uncertainty_map: number[][];
+        existing_points: Array<[number, number]>;
+        episodes: number;
+        budget: number;
+    }): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/dl/sampling-rl/train`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 强化学习采样推荐
+     */
+    public async recommendSamplingRL(data: {
+        model_name: 'ppo' | 'dqn' | 'a2c' | 'a3c';
+        uncertainty_map: number[][];
+        existing_points: Array<[number, number]>;
+        n_recommendations: number;
+        fusion_strategy: 'rl_only' | 'rule_only' | 'hybrid';
+        realtime: boolean;
+    }): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/dl/sampling-rl/recommend`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 训练时空预测模型
+     */
+    public async trainSpatiotemporal(data: {
+        model_type: 'st_transformer' | 'gcn_lstm' | 'convlstm' | 'stgcn';
+        coords: Array<[number, number]>;
+        series: number[][][];
+        targets?: number[][];
+        epochs: number;
+        pred_horizon: number;
+    }): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/dl/spatiotemporal/train`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 时空预测
+     */
+    public async predictSpatiotemporal(data: {
+        model_type: 'st_transformer' | 'gcn_lstm' | 'convlstm' | 'stgcn';
+        coords: Array<[number, number]>;
+        series: number[][][];
+        pred_horizon: number;
+        fusion_strategy: 'concat' | 'add' | 'gating';
+        targets?: number[][];
+        blend_ratio: number;
+        uncertainty_method?: 'mc_dropout' | 'deep_ensemble' | 'bayesian';
+        enable_memory_optimization: boolean;
+        enable_gpu_acceleration: boolean;
+        enable_inference_acceleration: boolean;
+        enable_long_sequence_optimization: boolean;
+        long_sequence_chunk: number;
+    }): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/dl/spatiotemporal/predict`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
     public cancelAllRequests(): void {
         this.pendingRequests.clear();
     }

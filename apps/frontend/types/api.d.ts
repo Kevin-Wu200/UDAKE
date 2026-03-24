@@ -39,4 +39,14 @@ export interface IAPIService {
     exportData(data: any): Promise<any>;
     parseImportFile(file: File): Promise<any>;
     importData(data: any): Promise<any>;
+    // 深度学习模块
+    health(): Promise<any>;
+    trainSpatial(data: any): Promise<any>;
+    predictSpatial(data: any): Promise<any>;
+    trainAnomaly(data: any): Promise<any>;
+    predictAnomaly(data: any): Promise<any>;
+    trainSamplingRL(data: any): Promise<any>;
+    recommendSamplingRL(data: any): Promise<any>;
+    trainSpatiotemporal(data: any): Promise<any>;
+    predictSpatiotemporal(data: any): Promise<any>;
 }

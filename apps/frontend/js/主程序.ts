@@ -33,6 +33,7 @@ import { PreferencesPanel } from './components/PreferencesPanel.js';
 import { StartupManager } from './utils/StartupManager.js';
 import { ResourceOptimizationManager } from './config/ResourceOptimizationConfig.js';
 import { Kriging3DPanel } from './components/Kriging3DPanel.js';
+import { DeepLearningPanel } from './components/DeepLearningPanel.js';
 import { CSSFeatureDetector } from './utils/CSSFeatureDetector.js';
 import { Logger } from './utils/Logger.js';
 import { RuntimeLifecycle } from './utils/RuntimeLifecycle.js';
@@ -90,6 +91,7 @@ class App {
     private mapSwitchAbortController: AbortController | null = null;
     private mapSwitchSessionId: number = 0;
     private kriging3DPanel: Kriging3DPanel | null = null;
+    private deepLearningPanel: DeepLearningPanel | null = null;
 
     // 管理器
     private componentInitializer: ComponentInitializer;
@@ -369,6 +371,9 @@ class App {
 
             // 初始化3D克里金面板
             this.initializeKriging3DPanel();
+
+            // 初始化深度学习面板
+            this.initializeDeepLearningPanel();
 
             // 初始化位置服务
             await this.initializeLocationService();
@@ -1307,6 +1312,26 @@ class App {
             } catch (error) {
                 console.error('3D克里金面板初始化失败:', error);
             }
+        }
+    }
+
+    /**
+     * 初始化深度学习面板
+     */
+    private initializeDeepLearningPanel(): void {
+        const section = document.getElementById('deep-learning-section');
+        const container = document.getElementById('deep-learning-container');
+
+        if (!section || !container || !this.apiService) {
+            return;
+        }
+
+        try {
+            this.deepLearningPanel = new DeepLearningPanel('deep-learning-section', 'deep-learning-container', this.apiService);
+            this.componentInitializer.registerComponent('deepLearningPanel', this.deepLearningPanel);
+            console.log('深度学习面板初始化成功');
+        } catch (error) {
+            console.error('深度学习面板初始化失败:', error);
         }
     }
 
