@@ -45,14 +45,23 @@ app = FastAPI(
     description="基于克里金插值的空间不确定性分析平台"
 )
 
-# CORS中间件
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins_list,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS中间件 —— 开发环境放行所有来源，避免 Capacitor/局域网调试时 origin 不匹配
+if settings.is_development:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=False,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins_list,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 # 挂载静态文件
 app.mount("/results", StaticFiles(directory=str(settings.RESULTS_DIR)), name="results")

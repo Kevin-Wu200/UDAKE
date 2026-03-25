@@ -1,16 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false">
+    <!--
+        开发环境：允许明文 HTTP（Android <domain> 不支持 IP 地址，
+        而局域网后端通过 IP 访问，因此 base-config 必须放行明文流量）。
+        生产环境应改回 cleartextTrafficPermitted="false" 并使用 HTTPS。
+    -->
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
             <certificates src="user" />
         </trust-anchors>
     </base-config>
-
-    <!-- 开发环境保留本机与内网地址明文访问，生产环境应全部使用 HTTPS -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">172.20.10.2</domain>
-        <domain includeSubdomains="true">localhost</domain>
-        <domain includeSubdomains="true">127.0.0.1</domain>
-    </domain-config>
 </network-security-config>

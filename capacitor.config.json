@@ -4,7 +4,7 @@
   "webDir": "apps/frontend/dist",
   "bundledWebRuntime": false,
   "server": {
-    "androidScheme": "https"
+    "androidScheme": "http"
   },
   "plugins": {
     "SplashScreen": {
