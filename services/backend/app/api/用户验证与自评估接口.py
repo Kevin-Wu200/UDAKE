@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from ..services.self_evaluation_service import self_evaluation_service
 
@@ -58,6 +58,8 @@ write_auth = _auth("write")
 
 
 class RealtimeRecord(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     evaluation_id: Optional[str] = None
     dataset_id: Optional[str] = None
     model_id: Optional[str] = None
@@ -90,6 +92,8 @@ class RealtimeEvaluationRequest(BaseModel):
 
 
 class CandidateModel(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_id: str = Field(..., min_length=1, max_length=128)
     model_name: Optional[str] = None
     version: str = Field(default="v1", max_length=64)

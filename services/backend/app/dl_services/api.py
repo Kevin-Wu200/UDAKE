@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any, Optional
 
 from fastapi import APIRouter
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .service import DeepLearningService
 
@@ -23,12 +23,16 @@ class PredictRequest(BaseModel):
 
 
 class SpatialTrainRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_type: str = Field(default="gnn", description="gnn/attention/residual")
     samples: list[list[float]] = Field(default_factory=list, description="[[x, y, value], ...]")
     epochs: int = Field(default=30, ge=1, le=200)
 
 
 class SpatialPredictRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_type: str = Field(default="gnn", description="gnn/attention/residual")
     samples: list[list[float]] = Field(default_factory=list, description="[[x, y, value], ...]")
     queries: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
@@ -36,6 +40,8 @@ class SpatialPredictRequest(BaseModel):
 
 
 class AnomalyTrainRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_name: str = Field(default="vae", description="vae/gcae/gan/contrastive")
     coords: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
     values: list[float] = Field(default_factory=list, description="[value, ...]")
@@ -43,6 +49,8 @@ class AnomalyTrainRequest(BaseModel):
 
 
 class AnomalyPredictRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_name: str = Field(default="vae", description="vae/gcae/gan/contrastive/fusion")
     coords: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
     values: list[float] = Field(default_factory=list, description="[value, ...]")
@@ -57,6 +65,8 @@ class RealtimeBatch(BaseModel):
 
 
 class AnomalyRealtimeRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_name: str = Field(default="vae", description="vae/gcae/gan/contrastive/fusion")
     stream_batches: list[RealtimeBatch] = Field(default_factory=list)
     threshold_method: str = Field(default="adaptive", description="statistical/percentile/adaptive")
@@ -65,6 +75,8 @@ class AnomalyRealtimeRequest(BaseModel):
 
 
 class SamplingRLTrainRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_name: str = Field(default="ppo", description="ppo/dqn/a2c/a3c")
     uncertainty_map: list[list[float]] = Field(default_factory=list, description="二维不确定性矩阵")
     existing_points: list[list[float]] = Field(default_factory=list, description="已有采样点 [[x, y], ...]")
@@ -73,6 +85,8 @@ class SamplingRLTrainRequest(BaseModel):
 
 
 class SamplingRLPredictRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_name: str = Field(default="ppo", description="ppo/dqn/a2c/a3c")
     uncertainty_map: list[list[float]] = Field(default_factory=list, description="二维不确定性矩阵")
     existing_points: list[list[float]] = Field(default_factory=list, description="已有采样点 [[x, y], ...]")
@@ -82,6 +96,8 @@ class SamplingRLPredictRequest(BaseModel):
 
 
 class SpatioTemporalTrainRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_type: str = Field(default="st_transformer", description="st_transformer/gcn_lstm/convlstm/stgcn")
     coords: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
     series: list[list[list[float]]] = Field(default_factory=list, description="[n_nodes, seq_len, n_features]")
@@ -91,6 +107,8 @@ class SpatioTemporalTrainRequest(BaseModel):
 
 
 class SpatioTemporalPredictRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_type: str = Field(default="st_transformer", description="st_transformer/gcn_lstm/convlstm/stgcn")
     coords: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
     series: list[list[list[float]]] = Field(default_factory=list, description="[n_nodes, seq_len, n_features]")
@@ -107,6 +125,8 @@ class SpatioTemporalPredictRequest(BaseModel):
 
 
 class SpatioTemporalOnlineRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_type: str = Field(default="st_transformer", description="st_transformer/gcn_lstm/convlstm/stgcn")
     coords: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
     long_series: list[list[list[float]]] = Field(default_factory=list, description="[n_nodes, total_steps, n_features]")
@@ -117,6 +137,8 @@ class SpatioTemporalOnlineRequest(BaseModel):
 
 
 class FusionModelInput(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     model_id: str
     model_name: Optional[str] = None
     predictions: list[float] = Field(default_factory=list)

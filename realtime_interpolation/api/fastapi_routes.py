@@ -3,7 +3,7 @@
 Real-time Interpolation System API Routes
 """
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import List, Dict, Any, Optional
 import sys
 from pathlib import Path
@@ -50,6 +50,8 @@ class PredictionRequest(BaseModel):
 
 class RealtimeSpatioTemporalTrainRequest(BaseModel):
     """realtime_interpolation 时空模型训练请求"""
+    model_config = ConfigDict(protected_namespaces=())
+
     model_type: str = Field(default="st_transformer", description="st_transformer/gcn_lstm/convlstm/stgcn")
     coords: List[List[float]] = Field(default_factory=list, description="[[x, y], ...]")
     series: List[List[List[float]]] = Field(default_factory=list, description="[n_nodes, seq_len, n_features]")
@@ -60,6 +62,8 @@ class RealtimeSpatioTemporalTrainRequest(BaseModel):
 
 class RealtimeSpatioTemporalPredictRequest(BaseModel):
     """realtime_interpolation 时空模型推理请求"""
+    model_config = ConfigDict(protected_namespaces=())
+
     model_type: str = Field(default="st_transformer", description="st_transformer/gcn_lstm/convlstm/stgcn")
     coords: List[List[float]] = Field(default_factory=list, description="[[x, y], ...]")
     series: List[List[List[float]]] = Field(default_factory=list, description="[n_nodes, seq_len, n_features]")
