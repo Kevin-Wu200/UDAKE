@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UDAKE - 智能不确定性驱动空间决策平台</title>
+    <link rel="stylesheet" href="./css/variables.css" />
+    <link rel="stylesheet" href="./css/styles.css" />
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header reveal">
+        <a class="brand" href="#hero" aria-label="UDAKE Home">
+          <img src="./assets/logo.png" alt="UDAKE Logo" class="brand-logo" />
+          <div class="brand-copy">
+            <p class="brand-name">UDAKE</p>
+            <p class="brand-sub" data-i18n="brand.title">智能不确定性驱动空间决策平台</p>
+          </div>
+        </a>
+        <button id="languageToggle" class="lang-btn" type="button" aria-label="切换语言">English</button>
+      </header>
+
+      <main>
+        <section id="hero" class="hero reveal">
+          <p class="hero-kicker">UDAKE Platform</p>
+          <h1 data-i18n="hero.title">智能空间决策，驱动未来</h1>
+          <p class="hero-subtitle" data-i18n="hero.subtitle">专业的空间插值与不确定性分析平台</p>
+          <button id="heroCta" class="cta-btn" type="button" data-i18n="hero.cta">立即体验</button>
+        </section>
+
+        <section class="features section-alt reveal" id="features">
+          <h2 data-i18n="features.title">核心功能模块</h2>
+          <div class="feature-grid">
+            <article class="feature-card reveal">
+              <h3 data-i18n="features.items.interpolation.title">空间插值模块</h3>
+              <p data-i18n="features.items.interpolation.desc">支持克里金、反距离加权等多种插值方法，实时预测结果可视化。</p>
+            </article>
+            <article class="feature-card reveal">
+              <h3 data-i18n="features.items.uncertainty.title">不确定性分析模块</h3>
+              <p data-i18n="features.items.uncertainty.desc">方差估计与置信区间计算，不确定性分级可视化。</p>
+            </article>
+            <article class="feature-card reveal">
+              <h3 data-i18n="features.items.sampling.title">采样优化模块</h3>
+              <p data-i18n="features.items.sampling.desc">自适应采样策略，高不确定性区域自动识别。</p>
+            </article>
+            <article class="feature-card reveal">
+              <h3 data-i18n="features.items.optimization.title">多目标优化模块</h3>
+              <p data-i18n="features.items.optimization.desc">帕累托前沿分析，多约束条件下的最优决策。</p>
+            </article>
+            <article class="feature-card reveal">
+              <h3 data-i18n="features.items.realtime.title">实时插值模块</h3>
+              <p data-i18n="features.items.realtime.desc">WebSocket 实时数据更新，动态采样点推荐。</p>
+            </article>
+            <article class="feature-card reveal">
+              <h3 data-i18n="features.items.deepLearning.title">深度学习模块</h3>
+              <p data-i18n="features.items.deepLearning.desc">神经网络辅助插值，GPU 加速计算。</p>
+            </article>
+            <article class="feature-card reveal">
+              <h3 data-i18n="features.items.anomaly.title">异常检测模块</h3>
+              <p data-i18n="features.items.anomaly.desc">自动识别数据异常，智能数据清洗。</p>
+            </article>
+            <article class="feature-card reveal">
+              <h3 data-i18n="features.items.risk.title">风险评估模块</h3>
+              <p data-i18n="features.items.risk.desc">多维度风险指数计算，决策阈值建议。</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="downloads reveal" id="downloads">
+          <h2 data-i18n="download.title">客户端下载</h2>
+          <p class="downloads-sub" data-i18n="download.subtitle">从统一下载入口获取 UDAKE 最新版本。</p>
+          <div class="download-grid">
+            <a
+              id="androidDownload"
+              class="download-card download-card-primary"
+              href="http://172.20.10.2:6060/android_downloads/app-release.apk"
+              download
+            >
+              <span class="platform" data-i18n="download.android">Android</span>
+              <span class="status" data-i18n="download.direct">立即下载 APK</span>
+            </a>
+            <button class="download-card coming-soon" data-platform="windows" type="button">
+              <span class="platform" data-i18n="download.windows">Windows</span>
+              <span class="status" data-i18n="download.comingSoon">即将推出</span>
+            </button>
+            <button class="download-card coming-soon" data-platform="macos" type="button">
+              <span class="platform" data-i18n="download.macos">macOS</span>
+              <span class="status" data-i18n="download.comingSoon">即将推出</span>
+            </button>
+          </div>
+        </section>
+
+        <section class="contact section-alt reveal" id="contact">
+          <h2 data-i18n="contact.title">联系我们</h2>
+          <div class="contact-list">
+            <a href="mailto:1447954419@qq.com">
+              <span data-i18n="contact.email">邮箱</span>
+              <strong>1447954419@qq.com</strong>
+            </a>
+            <a href="https://github.com/Kevin-Wu200/UDAKE" target="_blank" rel="noreferrer">
+              <span>GitHub</span>
+              <strong>github.com/Kevin-Wu200/UDAKE</strong>
+            </a>
+          </div>
+        </section>
+      </main>
+
+      <footer class="site-footer reveal">
+        <p data-i18n="footer.copy">© 2026 UDAKE. All rights reserved.</p>
+      </footer>
+    </div>
+
+    <div id="comingSoonModal" class="modal" aria-hidden="true">
+      <div class="modal-backdrop" data-close-modal="true"></div>
+      <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <h3 id="modalTitle" data-i18n="modal.title">提示</h3>
+        <p id="modalMessage" data-i18n="modal.message">该平台版本开发中，敬请期待。</p>
+        <button id="modalClose" class="modal-btn" type="button" data-i18n="modal.close">我知道了</button>
+      </div>
+    </div>
+
+    <script src="./js/i18n.js"></script>
+    <script src="./js/main.js"></script>
+  </body>
+</html>

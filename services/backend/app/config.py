@@ -26,6 +26,7 @@ def _default_frontend_origin() -> str:
 def _default_cors_origins() -> List[str]:
     origins = [
         _default_frontend_origin(),
+        "http://172.20.10.2:6060",
         "http://localhost:3000",
         "https://localhost",
         "http://localhost",
@@ -72,6 +73,7 @@ class Settings(BaseSettings):
     # 文件路径配置
     RESULTS_DIR: Path = BASE_DIR / "app" / "结果文件"
     DATA_DIR: Path = PROJECT_ROOT / "data" / "samples"
+    ANDROID_APK_DIR: Path = PROJECT_ROOT / "android" / "app" / "build" / "outputs" / "apk" / "release"
 
     # 任务配置
     MAX_CONCURRENT_TASKS: int = 5

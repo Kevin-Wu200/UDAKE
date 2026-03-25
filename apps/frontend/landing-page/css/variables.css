@@ -1,0 +1,26 @@
+:root {
+  --color-primary: #007aff;
+  --color-accent: #ff9500;
+  --color-bg-main: #ffffff;
+  --color-bg-alt: #f5f5f7;
+  --color-text-main: #1d1d1f;
+  --color-text-sub: #86868b;
+  --color-border: rgba(0, 0, 0, 0.08);
+  --color-shadow: rgba(20, 20, 24, 0.08);
+
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --radius-sm: 12px;
+
+  --space-xs: 8px;
+  --space-sm: 14px;
+  --space-md: 20px;
+  --space-lg: 32px;
+  --space-xl: 48px;
+  --space-2xl: 80px;
+
+  --content-width: 1120px;
+  --transition-base: 240ms ease;
+
+  --font-main: "SF Pro Display", "SF Pro Text", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
+}
