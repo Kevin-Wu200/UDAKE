@@ -213,3 +213,90 @@
         background: #3d3d3d;
     }
 }
+
+/* 启动降级：致命错误全屏 */
+.startup-degrade-fatal {
+    position: fixed;
+    inset: 0;
+    z-index: 12000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+}
+
+.startup-degrade-fatal-card {
+    width: min(560px, 90vw);
+    background: #f8fafc;
+    border-radius: 16px;
+    padding: 32px 28px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+}
+
+.startup-degrade-fatal-card h1 {
+    margin: 0 0 12px;
+    font-size: 28px;
+    color: #0f172a;
+}
+
+.startup-degrade-fatal-card p {
+    margin: 0;
+    color: #334155;
+    line-height: 1.6;
+}
+
+.startup-degrade-actions {
+    margin-top: 24px;
+    display: flex;
+    gap: 12px;
+}
+
+.startup-degrade-retry,
+.startup-degrade-exit {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    font-size: 15px;
+    cursor: pointer;
+}
+
+.startup-degrade-retry {
+    background: #0ea5e9;
+    color: #fff;
+}
+
+.startup-degrade-exit {
+    background: #fff;
+    color: #0f172a;
+    border-color: #cbd5e1;
+}
+
+/* 启动降级：功能受限横幅 */
+.startup-degrade-banner {
+    position: fixed;
+    left: 0;
+    right: 0;
+    top: 0;
+    z-index: 11000;
+    background: #f59e0b;
+    color: #111827;
+    text-align: center;
+    padding: 10px 14px;
+    font-weight: 600;
+}
+
+/* 启动降级：体验受限提示 */
+.startup-degrade-toast {
+    position: fixed;
+    left: 50%;
+    bottom: 28px;
+    transform: translateX(-50%);
+    z-index: 11000;
+    padding: 10px 16px;
+    border-radius: 999px;
+    background: rgba(15, 23, 42, 0.9);
+    color: #fff;
+    font-size: 13px;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.24);
+}

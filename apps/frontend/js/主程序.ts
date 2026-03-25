@@ -27,6 +27,8 @@ import { KeyboardManager } from './utils/KeyboardManager.js';
 import { HistoryManager } from './utils/HistoryManager.js';
 import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
 import { SplashScreen } from './components/SplashScreen.js';
+import { StartupLoader } from './components/StartupLoader.js';
+import { StartupDegradationView, type StartupDegradationLevel } from './components/StartupDegradationView.js';
 import { LaunchProgressManager } from './utils/LaunchProgressManager.js';
 import { FeedbackCollector } from './components/FeedbackCollector.js';
 import { PreferencesPanel } from './components/PreferencesPanel.js';
@@ -109,6 +111,24 @@ function buildApiUrl(baseUrl: string, backendPort: number): string {
     }
 }
 
+class StartupStepTimeoutError extends Error {
+    public readonly stepName: string;
+    public readonly timeoutMs: number;
+
+    constructor(stepName: string, timeoutMs: number) {
+        super(`${stepName} 执行超时（>${timeoutMs}ms）`);
+        this.name = 'StartupStepTimeoutError';
+        this.stepName = stepName;
+        this.timeoutMs = timeoutMs;
+    }
+}
+
+type StartupStepPriority = 'P0' | 'P1' | 'P2';
+
+interface NativeSplashPlugin {
+    hide: () => Promise<void>;
+}
+
 // 初始化全局工具
 Logger.bootstrap();
 RuntimeLifecycle.installGlobalTracking();
@@ -150,9 +170,17 @@ class App {
     // 启动相关
     private splashScreen: SplashScreen | null = null;
     private splashScreenHidden: boolean = false;
+    private startupLoader: StartupLoader | null = null;
+    private startupDegradationView: StartupDegradationView | null = null;
     private launchProgressManager: LaunchProgressManager | null = null;
     private startupManager: StartupManager | null = null;
     private resourceOptimizationManager: ResourceOptimizationManager | null = null;
+    private startupTimeoutTimer: number | null = null;
+    private startupCompleted: boolean = false;
+    private startupHardDeadlineReached: boolean = false;
+    private startupHasFunctionalDegradation: boolean = false;
+    private startupApiBaseUrl: string = resolveConfiguredApiBaseUrl();
+    private startupBackendPort: number = 8000;
 
     // 工具
     private formValidator: FormValidator | null = null;
@@ -199,6 +227,11 @@ class App {
         Logger.debug('主程序', 'init 被执行');
 
         try {
+            this.startupCompleted = false;
+            this.startupHardDeadlineReached = false;
+            this.startupHasFunctionalDegradation = false;
+            this.startupDegradationView = new StartupDegradationView();
+
             // 阶段0：初始化核心管理器
             Logger.debug('主程序', '初始化启动管理器');
             this.startupManager = StartupManager.getInstance({
@@ -227,17 +260,38 @@ class App {
             });
             this.splashScreenHidden = false;
             this.splashScreen.show();
+            this.splashScreen.setStage('loading');
+
+            this.startupLoader = new StartupLoader({
+                rotateIntervalMs: 1400,
+                onStatusChange: (status) => {
+                    if (!this.startupHardDeadlineReached) {
+                        this.splashScreen?.updateStatus(status);
+                    }
+                }
+            });
+            this.startupLoader.start();
+
+            this.armStartupHardTimeout();
+            await this.reportStartupPerformance('startup_begin', {
+                platform: window.electronAPI ? 'electron' : 'web'
+            });
 
             // 设置进度回调
             this.launchProgressManager.setCallbacks({
                 onStageStart: (stage) => {
-                    this.splashScreen?.updateStatus(stage.description);
+                    if (!this.startupHardDeadlineReached) {
+                        this.splashScreen?.updateStatus(stage.description);
+                    }
                     this.splashScreen?.setStage('loading');
                 },
                 onTotalProgress: (total) => {
                     this.splashScreen?.updateProgress(total);
                 }
             });
+
+            // 方案A：硬编码依赖顺序 + 分阶段超时 + 三级降级
+            await this.runPlannedStartupSequence();
 
             // 阶段1：完成初始化准备
             await this.launchProgressManager.executeStage('initialize', async () => {
@@ -247,22 +301,11 @@ class App {
             // 阶段2：连接后端
             const backendPort = await this.launchProgressManager.executeStage('backend-connection', async (updateProgress) => {
                 updateProgress(20);
-                let port = 8000;
-
-                if (window.electronAPI) {
-                    try {
-                        port = await window.electronAPI.getBackendPort();
-                        console.log('获取端口完成，端口:', port);
-                    } catch (error) {
-                        console.warn('获取端口失败', error);
-                    }
-                }
-
                 updateProgress(80);
-                return port;
+                return this.startupBackendPort;
             });
 
-            const configuredApiBaseUrl = resolveConfiguredApiBaseUrl();
+            const configuredApiBaseUrl = this.startupApiBaseUrl;
             const apiURL = buildApiUrl(configuredApiBaseUrl, backendPort);
 
             // 阶段3：初始化API
@@ -332,10 +375,10 @@ class App {
             this.splashScreen?.setStage('ready');
             this.splashScreen?.updateStatus('准备就绪');
             this.splashScreen?.updateProgress(100);
+            this.startupLoader?.stop('即将完成...');
 
             // 隐藏启动画面
-            await this.splashScreen?.hide();
-            this.splashScreenHidden = true;
+            await this.hideAllSplashLayers();
 
             // 启动画面完全隐藏后再触发新手引导，避免与动画重叠
             if (this.splashScreenHidden) {
@@ -355,17 +398,257 @@ class App {
 
             // 标记为已初始化
             this.stateManager.setState('initialized', true);
+            this.startupCompleted = true;
+            this.disarmStartupHardTimeout();
+
+            if (!this.startupHasFunctionalDegradation) {
+                this.startupDegradationView?.clear();
+            }
+
+            await this.reportStartupPerformance('startup_complete', {
+                startupDurationMs: this.startupManager.getStartupTime()
+            });
 
         } catch (error) {
+            this.disarmStartupHardTimeout();
+            this.startupLoader?.stop('启动失败');
+
             console.error('启动过程出错:', error);
             this.splashScreen?.setStage('error');
             this.splashScreen?.updateStatus('启动失败，请重试');
+            await this.hideNativeSplash();
+
+            const errorMessage = error instanceof Error ? error.message : '未知错误';
+            this.startupDegradationView?.show('fatal', {
+                title: '启动失败',
+                message: `应用启动过程中发生致命错误：${errorMessage}`,
+                onRetry: () => window.location.reload()
+            });
+            await this.reportStartupPerformance('startup_fatal', {
+                message: errorMessage
+            });
 
             if (this.startupManager) {
                 await this.startupManager.handleStartupError(error as Error, 'app-init');
             } else {
                 throw error;
             }
+        }
+    }
+
+    /**
+     * 启动流程：8秒硬超时保护
+     */
+    private armStartupHardTimeout(): void {
+        this.disarmStartupHardTimeout();
+        this.startupTimeoutTimer = window.setTimeout(() => {
+            void this.handleStartupHardTimeout();
+        }, 8000);
+    }
+
+    private disarmStartupHardTimeout(): void {
+        if (this.startupTimeoutTimer !== null) {
+            clearTimeout(this.startupTimeoutTimer);
+            this.startupTimeoutTimer = null;
+        }
+    }
+
+    private async handleStartupHardTimeout(): Promise<void> {
+        if (this.startupCompleted || this.startupHardDeadlineReached) {
+            return;
+        }
+
+        this.startupHardDeadlineReached = true;
+        this.startupHasFunctionalDegradation = true;
+        this.startupLoader?.stop('启动耗时较长，进入降级模式...');
+        this.splashScreen?.updateStatus('启动耗时较长，正在降级加载...');
+
+        this.startupDegradationView?.show('functional', {
+            message: '启动超过8秒，已切换为降级模式，核心功能将继续加载。'
+        });
+        await this.hideAllSplashLayers();
+
+        await this.reportStartupPerformance('startup_timeout', {
+            timeoutMs: 8000
+        });
+    }
+
+    private async hideAllSplashLayers(): Promise<void> {
+        const hideTasks: Promise<unknown>[] = [];
+        if (!this.splashScreenHidden && this.splashScreen) {
+            hideTasks.push(this.splashScreen.hide());
+        }
+        hideTasks.push(this.hideNativeSplash());
+        await Promise.allSettled(hideTasks);
+        this.splashScreenHidden = true;
+    }
+
+    private getNativeSplashPlugin(): NativeSplashPlugin | null {
+        const win = window as unknown as {
+            Capacitor?: {
+                Plugins?: {
+                    SplashScreen?: Partial<NativeSplashPlugin>;
+                };
+            };
+        };
+        const plugin = win.Capacitor?.Plugins?.SplashScreen;
+        if (plugin && typeof plugin.hide === 'function') {
+            return plugin as NativeSplashPlugin;
+        }
+        return null;
+    }
+
+    private async hideNativeSplash(): Promise<void> {
+        const plugin = this.getNativeSplashPlugin();
+        if (!plugin) {
+            return;
+        }
+        try {
+            await plugin.hide();
+        } catch (error) {
+            console.warn('隐藏原生启动画面失败:', error);
+        }
+    }
+
+    /**
+     * 方案A：固定依赖顺序
+     * 1) loadConfig -> 2) connectBackend -> 3) loadUserData -> 4) initPushService
+     */
+    private async runPlannedStartupSequence(): Promise<void> {
+        await this.executeStartupStep('loadConfig', 'P0', 3000, async () => {
+            this.startupApiBaseUrl = resolveConfiguredApiBaseUrl();
+            const normalized = stripApiSuffix(this.startupApiBaseUrl);
+            if (!normalized) {
+                throw new Error('API 基础地址无效');
+            }
+            return { apiBaseUrl: normalized };
+        });
+
+        await this.executeStartupStep('connectBackend', 'P1', 3000, async () => {
+            this.startupBackendPort = 8000;
+            if (window.electronAPI) {
+                this.startupBackendPort = await this.withTimeout(
+                    'connectBackend:getBackendPort',
+                    2000,
+                    () => window.electronAPI!.getBackendPort()
+                );
+            }
+
+            const runtimeApi = buildApiUrl(this.startupApiBaseUrl, this.startupBackendPort);
+            const healthUrl = `${runtimeApi.replace(/\/api$/, '')}/health`;
+            await this.withTimeout('connectBackend:health', 2000, async () => {
+                const response = await fetch(healthUrl, { method: 'GET', cache: 'no-store' });
+                if (!response.ok) {
+                    throw new Error(`后端健康检查失败: ${response.status}`);
+                }
+            });
+
+            return { backendPort: this.startupBackendPort };
+        });
+
+        await this.executeStartupStep('loadUserData', 'P1', 3000, async () => {
+            const theme = localStorage.getItem('theme');
+            const language = localStorage.getItem('language');
+            return {
+                hasTheme: Boolean(theme),
+                hasLanguage: Boolean(language)
+            };
+        });
+
+        await this.executeStartupStep('initPushService', 'P2', 8000, async () => {
+            if (!('Notification' in window)) {
+                return { supported: false };
+            }
+            return {
+                supported: true,
+                permission: Notification.permission
+            };
+        });
+    }
+
+    private async executeStartupStep<T>(
+        stepName: string,
+        priority: StartupStepPriority,
+        timeoutMs: number,
+        task: () => Promise<T>
+    ): Promise<T | null> {
+        const startedAt = Date.now();
+        try {
+            const result = await this.withTimeout(stepName, timeoutMs, task);
+            await this.reportStartupPerformance('startup_step_success', {
+                stepName,
+                priority,
+                durationMs: Date.now() - startedAt
+            });
+            return result;
+        } catch (error) {
+            const message = error instanceof Error ? error.message : `${stepName} 失败`;
+            await this.reportStartupPerformance('startup_step_failed', {
+                stepName,
+                priority,
+                durationMs: Date.now() - startedAt,
+                error: message
+            });
+
+            if (priority === 'P0') {
+                throw error;
+            }
+
+            const degradeLevel: StartupDegradationLevel = priority === 'P1' ? 'functional' : 'experience';
+            if (degradeLevel === 'functional') {
+                this.startupHasFunctionalDegradation = true;
+            }
+            this.startupDegradationView?.show(degradeLevel, { message });
+            return null;
+        }
+    }
+
+    private withTimeout<T>(stepName: string, timeoutMs: number, task: () => Promise<T>): Promise<T> {
+        return new Promise<T>((resolve, reject) => {
+            const timerId = window.setTimeout(() => {
+                reject(new StartupStepTimeoutError(stepName, timeoutMs));
+            }, timeoutMs);
+
+            task()
+                .then((result) => {
+                    clearTimeout(timerId);
+                    resolve(result);
+                })
+                .catch((error) => {
+                    clearTimeout(timerId);
+                    reject(error);
+                });
+        });
+    }
+
+    private async reportStartupPerformance(
+        eventType: string,
+        payload: Record<string, unknown>
+    ): Promise<void> {
+        const endpoint = `${buildApiUrl(this.startupApiBaseUrl, this.startupBackendPort)}/startup/performance`;
+        const controller = new AbortController();
+        const timerId = window.setTimeout(() => {
+            controller.abort();
+        }, 1200);
+
+        try {
+            await fetch(endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    eventType,
+                    timestamp: new Date().toISOString(),
+                    ...payload
+                }),
+                keepalive: true,
+                signal: controller.signal
+            });
+        } catch {
+            // 启动监控上报失败不阻塞主流程
+        } finally {
+            clearTimeout(timerId);
         }
     }
 

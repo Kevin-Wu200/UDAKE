@@ -6,6 +6,8 @@ import os
 import warnings
 from pathlib import Path
 from datetime import datetime
+from contextlib import asynccontextmanager
+import uuid
 
 # 添加项目根目录到Python路径
 # 当前文件位于 services/backend/app/main.py，需要回退4层到仓库根目录
@@ -19,10 +21,12 @@ warnings.filterwarnings(
     category=PendingDeprecationWarning
 )
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from .config import settings
+from .startup_manager import StartupManager
 from .services.websocket_service import websocket_service
 from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口, 数据质量接口, GPU加速接口, 数据反馈接口, 主动学习接口, 用户验证与自评估接口
 
@@ -39,10 +43,31 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 
+startup_manager = StartupManager()
+
+
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    """应用生命周期：启动阶段执行预加载与降级判定。"""
+    app_instance.state.startup_manager = startup_manager
+    try:
+        snapshot = await startup_manager.run()
+        logging.info("启动流程完成: %s", snapshot)
+    except Exception as exc:  # pylint: disable=broad-except
+        logging.exception("启动流程异常，进入降级模式: %s", exc)
+        startup_manager.record_performance_event(
+            "backend",
+            {"event": "startup_exception", "error": str(exc)},
+        )
+    yield
+    await startup_manager.shutdown()
+
+
 app = FastAPI(
     title=settings.APP_NAME,
     version=settings.VERSION,
-    description="基于克里金插值的空间不确定性分析平台"
+    description="基于克里金插值的空间不确定性分析平台",
+    lifespan=lifespan,
 )
 
 # CORS中间件 —— 开发环境放行所有来源，避免 Capacitor/局域网调试时 origin 不匹配
@@ -112,6 +137,25 @@ app.include_router(kriging_3d_router, prefix="/api", tags=["3D克里金"])
 # 注册深度学习路由
 app.include_router(deep_learning_router, prefix="/api", tags=["深度学习"])
 
+
+@app.middleware("http")
+async def startup_error_middleware(request: Request, call_next):
+    """统一启动/运行期异常处理，返回可追踪错误ID。"""
+    try:
+        response = await call_next(request)
+        return response
+    except Exception as exc:  # pylint: disable=broad-except
+        error_id = uuid.uuid4().hex[:12]
+        logging.exception("请求处理异常[%s]: %s", error_id, exc)
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "服务暂时不可用，请稍后重试",
+                "error_id": error_id,
+                "detail": str(exc),
+            },
+        )
+
 @app.get("/")
 async def root():
     return {
@@ -122,7 +166,33 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy"}
+    snapshot = startup_manager.get_health_snapshot()
+    return {
+        "status": "healthy",
+        "startup_ready": snapshot["ready"],
+        "startup_degradation_level": snapshot["degradation_level"],
+    }
+
+
+@app.get("/api/startup/health")
+async def startup_health_check():
+    """启动健康检查接口。"""
+    snapshot = startup_manager.get_health_snapshot()
+    status_code = 200 if snapshot.get("ready", False) else 503
+    return JSONResponse(status_code=status_code, content=snapshot)
+
+
+@app.get("/api/startup/performance")
+async def startup_performance_report(limit: int = Query(default=50, ge=1, le=200)):
+    """启动性能监控查询接口。"""
+    return startup_manager.get_performance_report(limit=limit)
+
+
+@app.post("/api/startup/performance")
+async def startup_performance_ingest(payload: dict):
+    """启动性能实时上报接口。"""
+    startup_manager.record_performance_event("frontend", payload)
+    return {"ok": True}
 
 # WebSocket 端点
 @app.websocket("/ws/{client_id}")
