@@ -6,6 +6,14 @@ import { errorHandler } from '../../apps/frontend/js/utils/errors/ErrorHandler';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+const normalizeTestUrl = (value) => value.endsWith('/') ? value.slice(0, -1) : value;
+const TEST_BACKEND_ROOT = (() => {
+    const raw = process.env.TEST_BACKEND_URL || process.env.BACKEND_URL || process.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    const normalized = normalizeTestUrl(raw);
+    return normalized.endsWith('/api') ? normalized.slice(0, -4) : normalized;
+})();
+
+
 // Mock OfflineManager
 vi.mock('../../apps/frontend/js/utils/OfflineManager', () => ({
     OfflineManager: {
@@ -70,7 +78,7 @@ describe('APIService', () => {
     let apiService: APIService;
 
     beforeEach(() => {
-        apiService = new APIService('http://172.20.10.2:8000');
+        apiService = new APIService(TEST_BACKEND_ROOT);
         mockFetch.mockClear();
     });
 
@@ -81,7 +89,7 @@ describe('APIService', () => {
     describe('初始化', () => {
         it('应该成功初始化', () => {
             expect(apiService).toBeDefined();
-            expect(apiService.baseURL).toBe('http://172.20.10.2:8000');
+            expect(apiService.baseURL).toBe(TEST_BACKEND_ROOT);
         });
 
         it('应该使用默认 baseURL', () => {
@@ -100,7 +108,7 @@ describe('APIService', () => {
             const result = await apiService.get('/test');
             expect(result).toEqual({ data: 'test' });
             expect(mockFetch).toHaveBeenCalledWith(
-                'http://172.20.10.2:8000/test',
+                TEST_BACKEND_ROOT + '/test',
                 expect.objectContaining({
                     mode: 'cors',
                     credentials: 'omit'
@@ -156,7 +164,7 @@ describe('APIService', () => {
         });
 
         it('应该处理 500 服务器错误', async () => {
-            const noRetryService = new APIService('http://172.20.10.2:8000', { maxRetries: 0, retryDelay: 1 });
+            const noRetryService = new APIService(TEST_BACKEND_ROOT, { maxRetries: 0, retryDelay: 1 });
             mockFetch.mockResolvedValueOnce({
                 ok: false,
                 status: 500,
@@ -198,7 +206,7 @@ describe('APIService', () => {
 
     describe('重试机制', () => {
         it('应该在 503 错误时重试', async () => {
-            const retryService = new APIService('http://172.20.10.2:8000', { maxRetries: 2, retryDelay: 1 });
+            const retryService = new APIService(TEST_BACKEND_ROOT, { maxRetries: 2, retryDelay: 1 });
             let attempt = 0;
             mockFetch.mockImplementation(() => {
                 attempt++;
@@ -222,7 +230,7 @@ describe('APIService', () => {
         });
 
         it('应该在超过最大重试次数后失败', { timeout: 10000 }, async () => {
-            const retryService = new APIService('http://172.20.10.2:8000', { maxRetries: 2, retryDelay: 1 });
+            const retryService = new APIService(TEST_BACKEND_ROOT, { maxRetries: 2, retryDelay: 1 });
             mockFetch.mockResolvedValue({
                 ok: false,
                 status: 503,
@@ -618,7 +626,7 @@ describe('APIService', () => {
                     fileName: 'export.geojson',
                     format: 'geojson',
                     size: 1024,
-                    downloadUrl: 'http://172.20.10.2:8000/download/file-123',
+                    downloadUrl: TEST_BACKEND_ROOT + '/download/file-123',
                     expiresAt: new Date(),
                     recordCount: 100
                 })

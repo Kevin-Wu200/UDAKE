@@ -5,11 +5,19 @@ import { APIService } from '../apps/frontend/js/services/API封装.js';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+const normalizeTestUrl = (value) => value.endsWith('/') ? value.slice(0, -1) : value;
+const TEST_BACKEND_ROOT = (() => {
+    const raw = process.env.TEST_BACKEND_URL || process.env.BACKEND_URL || process.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    const normalized = normalizeTestUrl(raw);
+    return normalized.endsWith('/api') ? normalized.slice(0, -4) : normalized;
+})();
+
+
 describe('模型评估接口测试', () => {
     let api;
 
     beforeEach(() => {
-        api = new APIService('http://172.20.10.2:8000/api', { maxRetries: 0 });
+        api = new APIService(TEST_BACKEND_ROOT + '/api', { maxRetries: 0 });
         mockFetch.mockReset();
     });
 
@@ -78,7 +86,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -107,7 +115,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -131,7 +139,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -149,7 +157,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -174,7 +182,7 @@ describe('模型评估接口测试', () => {
             });
 
             await expect(api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -197,7 +205,7 @@ describe('模型评估接口测试', () => {
             });
 
             await expect(api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -222,7 +230,7 @@ describe('模型评估接口测试', () => {
             });
 
             await expect(api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -240,7 +248,7 @@ describe('模型评估接口测试', () => {
             });
 
             await expect(api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -253,7 +261,7 @@ describe('模型评估接口测试', () => {
             mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
             await expect(api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -278,7 +286,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -309,7 +317,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -334,7 +342,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -354,7 +362,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -376,7 +384,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -397,7 +405,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -417,7 +425,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -442,7 +450,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -466,7 +474,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -486,7 +494,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -510,7 +518,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -533,7 +541,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -557,7 +565,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -578,7 +586,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -596,7 +604,7 @@ describe('模型评估接口测试', () => {
             });
 
             const result = await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -618,7 +626,7 @@ describe('模型评估接口测试', () => {
             });
 
             await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -626,7 +634,7 @@ describe('模型评估接口测试', () => {
                 }
             );
             await api.request(
-                'http://172.20.10.2:8000/api/model/evaluation',
+                TEST_BACKEND_ROOT + '/api/model/evaluation',
                 {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

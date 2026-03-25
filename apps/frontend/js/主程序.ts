@@ -68,6 +68,29 @@ function stripApiSuffix(baseUrl: string): string {
     return trimmed.endsWith('/api') ? trimmed.slice(0, -4) : trimmed;
 }
 
+function resolveFrontendBackendHost(): string {
+    return (
+        (import.meta.env.VITE_BACKEND_HOST as string) ||
+        (import.meta.env.VITE_IPCONFIG as string) ||
+        'localhost'
+    );
+}
+
+function resolveFrontendBackendPort(): string {
+    return (
+        (import.meta.env.VITE_BACKEND_PORT as string) ||
+        '8000'
+    );
+}
+
+function resolveConfiguredApiBaseUrl(): string {
+    return (
+        (import.meta.env.VITE_API_BASE_URL as string) ||
+        (import.meta.env.VITE_API_URL as string) ||
+        `http://${resolveFrontendBackendHost()}:${resolveFrontendBackendPort()}`
+    );
+}
+
 function buildApiUrl(baseUrl: string, backendPort: number): string {
     const normalizedBaseUrl = stripApiSuffix(baseUrl);
 
@@ -82,7 +105,7 @@ function buildApiUrl(baseUrl: string, backendPort: number): string {
         const basePath = parsed.pathname === '/' ? '' : parsed.pathname.replace(/\/+$/, '');
         return `${parsed.origin}${basePath}/api`;
     } catch {
-        return `http://127.0.0.1:${backendPort}/api`;
+        return `http://${resolveFrontendBackendHost()}:${backendPort}/api`;
     }
 }
 
@@ -239,10 +262,7 @@ class App {
                 return port;
             });
 
-            const configuredApiBaseUrl =
-                (import.meta.env.VITE_API_BASE_URL as string) ||
-                (import.meta.env.VITE_API_URL as string) ||
-                'https://172.20.10.2:8443';
+            const configuredApiBaseUrl = resolveConfiguredApiBaseUrl();
             const apiURL = buildApiUrl(configuredApiBaseUrl, backendPort);
 
             // 阶段3：初始化API

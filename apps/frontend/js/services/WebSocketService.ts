@@ -256,7 +256,26 @@ export class WebSocketService {
   }
 }
 
+function resolveWebSocketUrl(): string {
+  const configuredWs = import.meta.env.VITE_WS_URL as string | undefined;
+  if (configuredWs) {
+    return configuredWs;
+  }
+
+  const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) ||
+    (import.meta.env.VITE_API_URL as string | undefined);
+  if (apiBase) {
+    return apiBase.replace(/\/api\/?$/, '').replace(/^http/i, 'ws');
+  }
+
+  const backendHost = (import.meta.env.VITE_BACKEND_HOST as string | undefined) ||
+    (import.meta.env.VITE_IPCONFIG as string | undefined) ||
+    'localhost';
+  const backendPort = (import.meta.env.VITE_BACKEND_PORT as string | undefined) || '8000';
+  return `ws://${backendHost}:${backendPort}`;
+}
+
 // 导出单例
 export const webSocketService = new WebSocketService(
-  (import.meta.env.VITE_WS_URL as string) || 'ws://172.20.10.2:8000'
+  resolveWebSocketUrl()
 );

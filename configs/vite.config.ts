@@ -6,6 +6,18 @@ export default defineConfig(({ mode }) => {
   // 加载环境变量
   const env = loadEnv(mode, envDir, '');
 
+  const backendHost = env.IPCONFIG || env.VITE_IPCONFIG || env.VITE_BACKEND_HOST || 'localhost';
+  const backendPort = env.BACKEND_PORT || env.VITE_BACKEND_PORT || '8000';
+  const defaultFrontendPort = mode === 'testing' ? '5174' : '5173';
+  const frontendPort = env.FRONTEND_PORT || env.VITE_FRONTEND_PORT || defaultFrontendPort;
+  const backendUrl = (env.BACKEND_URL || env.VITE_API_BASE_URL || env.VITE_API_URL || `http://${backendHost}:${backendPort}`)
+    .replace(/\/+$/, '')
+    .replace(/\/api$/, '');
+  const wsUrl = (env.WS_URL || env.VITE_WS_URL || backendUrl.replace(/^http/i, 'ws'))
+    .replace(/\/+$/, '');
+  const frontendUrl = (env.FRONTEND_URL || env.BASE_URL || `http://${backendHost}:${frontendPort}`)
+    .replace(/\/+$/, '');
+
   // 获取当前环境
   const isDevelopment = mode === 'development';
   const isTesting = mode === 'testing';
@@ -22,7 +34,7 @@ export default defineConfig(({ mode }) => {
 
     // 开发服务器配置
     server: {
-      port: isTesting ? 5174 : 5173,
+      port: Number(frontendPort),
       strictPort: false,
       host: true,
       open: true,
@@ -33,12 +45,12 @@ export default defineConfig(({ mode }) => {
       proxy: {
         // 代理后端 API 请求
         '/api': {
-          target: env.VITE_API_BASE_URL || 'http://172.20.10.2:8000',
+          target: backendUrl,
           changeOrigin: true,
         },
         // 代理 WebSocket 连接
         '/ws': {
-          target: env.VITE_WS_URL || 'ws://172.20.10.2:8000',
+          target: wsUrl,
           ws: true,
           changeOrigin: true,
         },
@@ -196,12 +208,12 @@ export default defineConfig(({ mode }) => {
       open: true,
       proxy: {
         '/api': {
-          target: env.VITE_API_BASE_URL || 'http://172.20.10.2:8000',
+          target: backendUrl,
           changeOrigin: true,
         },
         // 代理 WebSocket 连接
         '/ws': {
-          target: env.VITE_WS_URL || 'ws://172.20.10.2:8000',
+          target: wsUrl,
           ws: true,
           changeOrigin: true,
         },
@@ -213,7 +225,9 @@ export default defineConfig(({ mode }) => {
       __APP_ENV__: JSON.stringify(mode),
       __APP_VERSION__: JSON.stringify(env.VITE_APP_VERSION || '1.0.0'),
       __APP_NAME__: JSON.stringify(env.VITE_APP_NAME || 'UDAKE'),
-      __API_BASE_URL__: JSON.stringify(env.VITE_API_BASE_URL || 'http://172.20.10.2:8000'),
+      __API_BASE_URL__: JSON.stringify(backendUrl),
+      __WS_URL__: JSON.stringify(wsUrl),
+      __FRONTEND_URL__: JSON.stringify(frontendUrl),
     },
   };
 });

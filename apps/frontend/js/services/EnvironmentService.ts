@@ -39,10 +39,12 @@ class EnvironmentService {
     const env = (import.meta.env.VITE_APP_ENV || 'development') as Environment;
     const appName = import.meta.env.VITE_APP_NAME || 'UDAKE';
     const appVersion = import.meta.env.VITE_APP_VERSION || '1.0.0';
+    const backendHost = import.meta.env.VITE_BACKEND_HOST || import.meta.env.VITE_IPCONFIG || 'localhost';
+    const backendPort = import.meta.env.VITE_BACKEND_PORT || '8000';
     const apiBaseUrl =
       import.meta.env.VITE_API_BASE_URL ||
       import.meta.env.VITE_API_URL ||
-      'https://172.20.10.2:8443';
+      `http://${backendHost}:${backendPort}`;
     const mapProvider = import.meta.env.VITE_MAP_PROVIDER || 'arcgis';
     const enableDebug = import.meta.env.VITE_ENABLE_DEBUG === 'true';
     const enablePerformanceMonitor = import.meta.env.VITE_ENABLE_PERFORMANCE_MONITOR === 'true';

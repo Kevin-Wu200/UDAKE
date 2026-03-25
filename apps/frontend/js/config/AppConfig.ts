@@ -43,6 +43,29 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
     return value === 'true';
 }
 
+function parseStringList(value: string | undefined, fallback: string[]): string[] {
+    if (!value) {
+        return fallback;
+    }
+    try {
+        const parsed = JSON.parse(value) as unknown;
+        if (Array.isArray(parsed)) {
+            return parsed.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+        }
+    } catch {
+        return value
+            .split(',')
+            .map(item => item.trim())
+            .filter(Boolean);
+    }
+    return fallback;
+}
+
+function resolveFrontendUrl(): string {
+    return readEnv('VITE_FRONTEND_URL')
+        || `http://${readEnv('VITE_IPCONFIG') || 'localhost'}:${readEnv('VITE_FRONTEND_PORT') || readEnv('FRONTEND_PORT') || '5173'}`;
+}
+
 export const AppConfig: RuntimeAppConfig = {
     map: {
         initTimeoutMs: parseNumber(readEnv('VITE_MAP_INIT_TIMEOUT_MS'), 15000),
@@ -83,7 +106,7 @@ export const DEFAULT_APP_LIMITS = {
     appName: '智能不确定性驱动空间决策平台',
     version: '1.0.0',
     debug: true,
-    corsOrigins: ['http://172.20.10.2:5173'],
+    corsOrigins: parseStringList(readEnv('VITE_CORS_ORIGINS'), [resolveFrontendUrl()]),
     maxFileSize: 100,
     maxConcurrentTasks: 5,
     taskTimeout: 3600

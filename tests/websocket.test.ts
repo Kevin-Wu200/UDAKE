@@ -5,6 +5,14 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { WebSocketService, WebSocketMessage } from '../apps/frontend/js/services/WebSocketService';
 
+const normalizeTestUrl = (value: string): string => value.endsWith('/') ? value.slice(0, -1) : value;
+const TEST_BACKEND_ROOT = (() => {
+  const raw = process.env.TEST_BACKEND_URL || process.env.BACKEND_URL || process.env.VITE_API_BASE_URL || 'http://localhost:8000';
+  const normalized = normalizeTestUrl(raw);
+  return normalized.endsWith('/api') ? normalized.slice(0, -4) : normalized;
+})();
+const TEST_WS_URL = normalizeTestUrl(process.env.TEST_WS_URL || process.env.WS_URL || process.env.VITE_WS_URL || TEST_BACKEND_ROOT.replace(/^http/i, 'ws'));
+
 // Mock socket.io-client
 vi.mock('socket.io-client', () => ({
   io: vi.fn(() => ({
@@ -19,7 +27,7 @@ describe('WebSocketService', () => {
   let service: WebSocketService;
 
   beforeEach(() => {
-    service = new WebSocketService('ws://172.20.10.2:8000');
+    service = new WebSocketService(TEST_WS_URL);
   });
 
   afterEach(() => {

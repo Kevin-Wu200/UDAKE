@@ -4,11 +4,18 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 
+const normalizeTestUrl = (value) => value.endsWith('/') ? value.slice(0, -1) : value;
+const TEST_BACKEND_ROOT = (() => {
+    const raw = process.env.TEST_BACKEND_URL || process.env.BACKEND_URL || process.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    const normalized = normalizeTestUrl(raw);
+    return normalized.endsWith('/api') ? normalized.slice(0, -4) : normalized;
+})();
+
 // 由于我们使用的是Python后端，这里创建API测试
 // 实际测试应该使用vitest或jest进行单元测试
 
 describe('路径规划API测试', () => {
-    const API_BASE_URL = 'http://172.20.10.2:8000/api/route-planning';
+    const API_BASE_URL = `${TEST_BACKEND_ROOT}/api/route-planning`;
     const fetchMock = vi.mocked(global.fetch);
 
     const asList = (payload) => {

@@ -1,6 +1,32 @@
 const { app, BrowserWindow, session, ipcMain, shell } = require('electron')
 const path = require('path')
 
+function stripTrailingSlash(value) {
+  return String(value || '').replace(/\/+$/, '');
+}
+
+function resolveBackendHost() {
+  return process.env.IPCONFIG || process.env.VITE_IPCONFIG || process.env.VITE_BACKEND_HOST || 'localhost';
+}
+
+function resolveBackendPort() {
+  return process.env.BACKEND_PORT || process.env.VITE_BACKEND_PORT || '8000';
+}
+
+function resolveBackendUrl() {
+  const fallback = `http://${resolveBackendHost()}:${resolveBackendPort()}`;
+  const configured = process.env.BACKEND_URL || process.env.VITE_API_BASE_URL || process.env.VITE_API_URL || fallback;
+  return stripTrailingSlash(configured).replace(/\/api$/, '');
+}
+
+function resolveWsUrl(backendUrl) {
+  const configured = process.env.WS_URL || process.env.VITE_WS_URL;
+  if (configured) {
+    return stripTrailingSlash(configured);
+  }
+  return backendUrl.replace(/^http/i, 'ws');
+}
+
 // 优化应用启动性能
 app.commandLine.appendSwitch('disable-gpu-vsync');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
@@ -9,7 +35,7 @@ app.commandLine.appendSwitch('enable-zero-copy');
 
 // IPC 处理程序
 ipcMain.handle('get-backend-port', () => {
-  return 8000 // 后端默认端口
+  return Number(resolveBackendPort()) // 后端默认端口
 })
 
 ipcMain.handle('open-external', async (event, url) => {
@@ -31,6 +57,10 @@ ipcMain.handle('get-app-version', () => {
 })
 
 function createWindow() {
+  const backendUrl = resolveBackendUrl();
+  const wsUrl = resolveWsUrl(backendUrl);
+  const cspConnectSrc = ["'self'", backendUrl, wsUrl, 'https:', 'wss:', 'blob:', 'https://*.amap.com'].join(' ');
+
   const win = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -45,7 +75,7 @@ function createWindow() {
       plugins: false, // 禁用插件
       webGL: true, // 启用 WebGL
       sandbox: true, // 启用沙箱以提高安全性
-      allowRunningInsecureContent: false,
+      allowRunningInsecureContent: true, // 允许加载 HTTP 内容（开发环境）
       webviewTag: true, // 允许使用 webview 标签（支持 iframe）
       preload: path.join(__dirname, 'preload.js')
     },
@@ -66,15 +96,14 @@ function createWindow() {
           "style-src 'self' 'unsafe-inline' blob: https://js.arcgis.com https://webapi.amap.com;",
           "img-src 'self' data: blob: https: https://*.arcgis.com https://*.autonavi.com https://*.amap.com;",
           "font-src 'self' data: blob:;",
-          "connect-src 'self' http://172.20.10.2:8000 ws://172.20.10.2:8000 https: wss: blob: https://*.amap.com;",
+          `connect-src ${cspConnectSrc};`,
           "media-src 'self' data: blob:;",
           "object-src 'none';",
           "base-uri 'self';",
           "form-action 'self';",
           "worker-src 'self' blob:;",
           "frame-src 'self' https://*.arcgis.com https://*.amap.com;",
-          "frame-ancestors 'self';",
-          "upgrade-insecure-requests;"
+          "frame-ancestors 'self';"
         ].join(' ')
       }
     })

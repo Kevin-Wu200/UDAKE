@@ -3,6 +3,10 @@ import { defineConfig, devices } from '@playwright/test';
 /**
  * Playwright 测试配置
  */
+const frontendHost = process.env.IPCONFIG || process.env.VITE_IPCONFIG || 'localhost';
+const frontendPort = process.env.FRONTEND_PORT || process.env.VITE_FRONTEND_PORT || '5173';
+const resolvedFrontendUrl = (process.env.FRONTEND_URL || process.env.BASE_URL || `http://${frontendHost}:${frontendPort}`).replace(/\/+$/, '');
+
 export default defineConfig({
     testDir: '../tests/e2e',
 
@@ -28,7 +32,7 @@ export default defineConfig({
     // 共享配置
     use: {
         // 基础 URL
-        baseURL: process.env.BASE_URL || 'http://172.20.10.2:5173',
+        baseURL: resolvedFrontendUrl,
 
         // 追踪
         trace: 'on-first-retry',
@@ -71,7 +75,7 @@ export default defineConfig({
     // 本地开发服务器
     webServer: {
         command: 'npm run dev',
-        url: 'http://172.20.10.2:5173',
+        url: resolvedFrontendUrl,
         reuseExistingServer: !process.env.CI,
         timeout: 120 * 1000,
     },

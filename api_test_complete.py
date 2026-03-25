@@ -11,9 +11,18 @@ from datetime import datetime
 import base64
 import os
 
-# 配置
-BASE_URL = "http://172.20.10.2:8000"
-FRONTEND_URL = "http://172.20.10.2:5173"
+# 配置（TEST_* 优先，其次使用运行环境配置）
+BASE_URL = (
+    os.getenv("TEST_BACKEND_URL")
+    or os.getenv("BACKEND_URL")
+    or os.getenv("VITE_API_BASE_URL")
+    or "http://localhost:8000"
+).rstrip("/")
+FRONTEND_URL = (
+    os.getenv("TEST_FRONTEND_URL")
+    or os.getenv("FRONTEND_URL")
+    or "http://localhost:5173"
+).rstrip("/")
 
 # 测试结果存储
 test_results: List[Dict[str, Any]] = []

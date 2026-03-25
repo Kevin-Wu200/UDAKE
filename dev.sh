@@ -15,6 +15,35 @@ NC='\033[0m' # No Color
 # 项目根目录
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_ROOT"
+ENV_FILE="$PROJECT_ROOT/configs/env/.env"
+
+read_env_value() {
+    local key="$1"
+    local default_value="$2"
+    local value=""
+
+    if [ -f "$ENV_FILE" ]; then
+        value=$(sed -nE "s/^${key}=(.*)$/\\1/p" "$ENV_FILE" | tail -n 1)
+        value=$(echo "$value" | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+        value="${value%\"}"
+        value="${value#\"}"
+        value="${value%\'}"
+        value="${value#\'}"
+    fi
+
+    if [ -z "$value" ]; then
+        echo "$default_value"
+    else
+        echo "$value"
+    fi
+}
+
+NETWORK_HOST="${IPCONFIG:-$(read_env_value IPCONFIG localhost)}"
+NETWORK_BACKEND_PORT="${BACKEND_PORT:-$(read_env_value BACKEND_PORT 8000)}"
+NETWORK_FRONTEND_PORT="${FRONTEND_PORT:-$(read_env_value FRONTEND_PORT 5173)}"
+NETWORK_BACKEND_URL="${BACKEND_URL:-$(read_env_value BACKEND_URL "http://${NETWORK_HOST}:${NETWORK_BACKEND_PORT}")}"
+NETWORK_FRONTEND_URL="${FRONTEND_URL:-$(read_env_value FRONTEND_URL "http://${NETWORK_HOST}:${NETWORK_FRONTEND_PORT}")}"
+NETWORK_HEALTHCHECK_API="${NETWORK_BACKEND_URL%/}/api/industries"
 
 # 日志函数
 log_info() {
@@ -88,14 +117,14 @@ check_dependencies() {
     fi
     
     # 检查后端端口
-    if check_port 8000; then
-        log_warning "后端端口 8000 已被占用"
+    if check_port "$NETWORK_BACKEND_PORT"; then
+        log_warning "后端端口 ${NETWORK_BACKEND_PORT} 已被占用"
         read -p "是否自动清理端口占用？(y/n) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            cleanup_port 8000
+            cleanup_port "$NETWORK_BACKEND_PORT"
         else
-            log_error "请手动清理端口 8000 后重试"
+            log_error "请手动清理端口 ${NETWORK_BACKEND_PORT} 后重试"
             exit 1
         fi
     fi
@@ -181,9 +210,9 @@ start_backend() {
             fi
             
             # 检查端口是否开始监听
-            if check_port 8000; then
+            if check_port "$NETWORK_BACKEND_PORT"; then
                 # 检查API是否真的可用（测试/industries接口）
-                if curl -s http://172.20.10.2:8000/api/industries > /dev/null 2>&1; then
+                if curl -s "$NETWORK_HEALTHCHECK_API" > /dev/null 2>&1; then
                     echo ""
                     log_success "后端服务就绪，API接口正常响应"
                     return 0
@@ -237,7 +266,7 @@ start_frontend() {
         fi
         
         # 检查前端服务是否可以访问
-        if curl -s http://172.20.10.2:5173 > /dev/null 2>&1; then
+        if curl -s "$NETWORK_FRONTEND_URL" > /dev/null 2>&1; then
             log_success "前端服务就绪"
             return 0
         fi
@@ -316,7 +345,7 @@ health_check() {
     if [ ! -z "$BACKEND_PID" ]; then
         if ps -p $BACKEND_PID > /dev/null; then
             # 检查后端进程和API可用性
-            if check_port 8000 && curl -s http://172.20.10.2:8000/api/industries > /dev/null 2>&1; then
+            if check_port "$NETWORK_BACKEND_PORT" && curl -s "$NETWORK_HEALTHCHECK_API" > /dev/null 2>&1; then
                 echo -e "${GREEN}✓${NC} 后端服务 (PID: $BACKEND_PID, API正常)"
             else
                 echo -e "${YELLOW}⚠${NC} 后端服务运行中但API异常 (PID: $BACKEND_PID)"

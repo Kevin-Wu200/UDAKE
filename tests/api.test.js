@@ -5,11 +5,19 @@ import { APIService } from '../apps/frontend/js/services/API封装.js';
 const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
+const normalizeTestUrl = (value) => value.endsWith('/') ? value.slice(0, -1) : value;
+const TEST_BACKEND_ROOT = (() => {
+    const raw = process.env.TEST_BACKEND_URL || process.env.BACKEND_URL || process.env.VITE_API_BASE_URL || 'http://localhost:8000';
+    const normalized = normalizeTestUrl(raw);
+    return normalized.endsWith('/api') ? normalized.slice(0, -4) : normalized;
+})();
+
+
 describe('APIService', () => {
     let api;
 
     beforeEach(() => {
-        api = new APIService('http://172.20.10.2:8000/api', { maxRetries: 0 });
+        api = new APIService(TEST_BACKEND_ROOT + '/api', { maxRetries: 0 });
         mockFetch.mockReset();
     });
 
@@ -20,7 +28,7 @@ describe('APIService', () => {
                 json: () => Promise.resolve({ data: 'test' })
             });
 
-            const url = 'http://172.20.10.2:8000/api/config/test';
+            const url = TEST_BACKEND_ROOT + '/api/config/test';
             const result1 = await api.request(url);
             const result2 = await api.request(url);
 
@@ -35,7 +43,7 @@ describe('APIService', () => {
                 json: () => Promise.resolve({ ok: true })
             });
 
-            const url = 'http://172.20.10.2:8000/api/test';
+            const url = TEST_BACKEND_ROOT + '/api/test';
             await api.request(url, { method: 'POST', body: '{}' });
             await api.request(url, { method: 'POST', body: '{}' });
 
@@ -48,9 +56,9 @@ describe('APIService', () => {
                 json: () => Promise.resolve({ data: 1 })
             });
 
-            await api.request('http://172.20.10.2:8000/api/a');
+            await api.request(TEST_BACKEND_ROOT + '/api/a');
             api.clearCache();
-            await api.request('http://172.20.10.2:8000/api/a');
+            await api.request(TEST_BACKEND_ROOT + '/api/a');
 
             expect(mockFetch).toHaveBeenCalledTimes(2);
         });
@@ -61,10 +69,10 @@ describe('APIService', () => {
                 json: () => Promise.resolve({ data: 1 })
             });
 
-            await api.request('http://172.20.10.2:8000/api/a');
-            await api.request('http://172.20.10.2:8000/api/b');
+            await api.request(TEST_BACKEND_ROOT + '/api/a');
+            await api.request(TEST_BACKEND_ROOT + '/api/b');
             api.clearCacheFor('/a');
-            await api.request('http://172.20.10.2:8000/api/a');
+            await api.request(TEST_BACKEND_ROOT + '/api/a');
 
             // a 被清除后重新请求，b 仍在缓存
             expect(mockFetch).toHaveBeenCalledTimes(3);
@@ -77,8 +85,8 @@ describe('APIService', () => {
             });
 
             api.cacheTTL = -1; // 立即过期
-            await api.request('http://172.20.10.2:8000/api/test');
-            await api.request('http://172.20.10.2:8000/api/test');
+            await api.request(TEST_BACKEND_ROOT + '/api/test');
+            await api.request(TEST_BACKEND_ROOT + '/api/test');
 
             expect(mockFetch).toHaveBeenCalledTimes(2);
         });
@@ -90,13 +98,13 @@ describe('APIService', () => {
                 json: () => Promise.resolve({ data: 1 })
             });
 
-            await api.request('http://172.20.10.2:8000/api/a');
-            await api.request('http://172.20.10.2:8000/api/b');
-            await api.request('http://172.20.10.2:8000/api/c');
+            await api.request(TEST_BACKEND_ROOT + '/api/a');
+            await api.request(TEST_BACKEND_ROOT + '/api/b');
+            await api.request(TEST_BACKEND_ROOT + '/api/c');
 
             // a 应该被淘汰
             mockFetch.mockClear();
-            await api.request('http://172.20.10.2:8000/api/a');
+            await api.request(TEST_BACKEND_ROOT + '/api/a');
             expect(mockFetch).toHaveBeenCalledTimes(1);
         });
     });
@@ -108,8 +116,8 @@ describe('APIService', () => {
                 resolvePromise = resolve;
             }));
 
-            const p1 = api.request('http://172.20.10.2:8000/api/test');
-            const p2 = api.request('http://172.20.10.2:8000/api/test');
+            const p1 = api.request(TEST_BACKEND_ROOT + '/api/test');
+            const p2 = api.request(TEST_BACKEND_ROOT + '/api/test');
 
             resolvePromise({ ok: true, json: () => Promise.resolve({ data: 1 }) });
 
@@ -129,14 +137,14 @@ describe('APIService', () => {
                 json: () => Promise.resolve({ detail: '服务器错误' })
             });
 
-            await expect(api.request('http://172.20.10.2:8000/api/test'))
+            await expect(api.request(TEST_BACKEND_ROOT + '/api/test'))
                 .rejects.toThrow('服务器错误');
         });
 
         it('网络错误应该抛出友好消息', async () => {
             mockFetch.mockRejectedValueOnce(new TypeError('Failed to fetch'));
 
-            await expect(api.request('http://172.20.10.2:8000/api/test'))
+            await expect(api.request(TEST_BACKEND_ROOT + '/api/test'))
                 .rejects.toThrow('网络连接失败，请检查后端服务是否启动');
         });
     });
@@ -151,7 +159,7 @@ describe('APIService', () => {
             const result = await api.startKriging({ points: [] });
             expect(result.task_id).toBe('123');
             expect(mockFetch).toHaveBeenCalledWith(
-                'http://172.20.10.2:8000/api/start-kriging',
+                TEST_BACKEND_ROOT + '/api/start-kriging',
                 expect.objectContaining({ method: 'POST' })
             );
         });

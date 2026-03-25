@@ -13,6 +13,33 @@ BASE_DIR_PATH = Path(__file__).parent.parent
 PROJECT_ROOT_PATH = BASE_DIR_PATH.parent.parent
 ENV_DIR_PATH = PROJECT_ROOT_PATH / "configs" / "env"
 
+
+def _default_frontend_origin() -> str:
+    frontend_url = os.getenv("FRONTEND_URL")
+    if frontend_url:
+        return frontend_url.rstrip("/")
+    ip_config = os.getenv("IPCONFIG", "localhost")
+    frontend_port = os.getenv("FRONTEND_PORT", "5173")
+    return f"http://{ip_config}:{frontend_port}"
+
+
+def _default_cors_origins() -> List[str]:
+    origins = [
+        _default_frontend_origin(),
+        "http://localhost:3000",
+        "https://localhost",
+        "http://localhost",
+        "capacitor://localhost",
+        "ionic://localhost"
+    ]
+    deduped: List[str] = []
+    for origin in origins:
+        normalized = origin.strip()
+        if normalized and normalized not in deduped:
+            deduped.append(normalized)
+    return deduped
+
+
 class Settings(BaseSettings):
     BASE_DIR: Path = BASE_DIR_PATH
     PROJECT_ROOT: Path = PROJECT_ROOT_PATH
@@ -37,7 +64,7 @@ class Settings(BaseSettings):
     PORT: int = 8000
 
     # CORS配置
-    BACKEND_CORS_ORIGINS: Union[str, List[str]] = '["http://172.20.10.2:5173","http://172.20.10.2:3000"]'
+    BACKEND_CORS_ORIGINS: Union[str, List[str]] = json.dumps(_default_cors_origins(), ensure_ascii=False)
 
     # 文件上传配置
     MAX_FILE_SIZE_MB: int = 100
@@ -90,7 +117,7 @@ class Settings(BaseSettings):
             try:
                 return json.loads(v)
             except json.JSONDecodeError:
-                return ["http://172.20.10.2:5173"]
+                return _default_cors_origins()
         return v
 
     @field_validator('ARCGIS_DEFAULT_CENTER', mode='before')

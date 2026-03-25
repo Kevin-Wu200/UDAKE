@@ -418,7 +418,14 @@
     </div>
 
     <script>
-        const API_BASE = 'http://172.20.10.2:8000/api';
+        const defaultApiBase = window.location.protocol.startsWith('http')
+            ? `${window.location.protocol}//${window.location.hostname}:8000/api`
+            : 'http://localhost:8000/api';
+        const runtimeApiBase =
+            window.__UDAKE_API_BASE__ ||
+            localStorage.getItem('UDAKE_API_BASE_URL') ||
+            defaultApiBase;
+        const API_BASE = runtimeApiBase.replace(/\/+$/, '');
         let currentTaskId = null;
 
         function showTab(tabId) {
