@@ -1,0 +1,770 @@
+{
+  "reservedUnusedKeys": [
+    "common.error",
+    "common.loading",
+    "common.success",
+    "dialog.geofence.defaultName",
+    "dialog.layout.defaultName",
+    "error.common.retryButton",
+    "error.coordinate_format.example",
+    "error.coordinate_format.message",
+    "error.coordinate_format.suggestion",
+    "error.export_failed.message",
+    "error.export_failed.suggestion",
+    "error.file_too_large.message",
+    "error.file_too_large.suggestion",
+    "error.geojson_format.example",
+    "error.geojson_format.message",
+    "error.geojson_format.suggestion",
+    "error.geolocation.position_unavailable",
+    "error.geolocation.timeout",
+    "error.geolocation.unknown",
+    "error.geolocation.user_denied",
+    "error.geolocation_failed.message",
+    "error.geolocation_failed.suggestion",
+    "error.insufficient_points.message",
+    "error.insufficient_points.suggestion",
+    "error.interpolation_failed.message",
+    "error.interpolation_failed.suggestion",
+    "error.invalid_polygon.message",
+    "error.invalid_polygon.suggestion",
+    "error.network_error.suggestion",
+    "error.permission_denied.suggestion",
+    "error.point_out_of_bounds.message",
+    "error.point_out_of_bounds.suggestion",
+    "error.server_error.suggestion",
+    "error.timeout_error.message",
+    "error.timeout_error.suggestion",
+    "error.unsupported_format.message",
+    "error.unsupported_format.suggestion",
+    "error.validation.coordinates_latitude_range",
+    "error.validation.coordinates_longitude_range",
+    "error.validation.coordinates_nan",
+    "error.validation.coordinates_not_number",
+    "error.validation.geojson_missing_features",
+    "error.validation.geojson_missing_geometry",
+    "error.validation.geojson_missing_type",
+    "error.validation.geojson_object",
+    "error.validation.geometry_missing_coordinates",
+    "error.validation.geometry_missing_type",
+    "error.validation_error.suggestion",
+    "export.csv",
+    "export.enhanced",
+    "export.failed",
+    "export.report",
+    "feedback.bug",
+    "feedback.cancel",
+    "feedback.contact",
+    "feedback.feature",
+    "feedback.improvement",
+    "feedback.other",
+    "feedback.placeholder",
+    "feedback.submit",
+    "feedback.title",
+    "industry.custom",
+    "industry.environment",
+    "industry.geology",
+    "industry.hydrology",
+    "industry.meteorology",
+    "industry.mining",
+    "industry.pollution",
+    "industry.soil",
+    "industry.topography",
+    "kriging.resolution",
+    "kriging.resolutionError",
+    "nav.feedback",
+    "nav.guide",
+    "nav.preferences",
+    "nav.themeToggle",
+    "offline.offline",
+    "offline.online",
+    "panel.export",
+    "panel.kriging",
+    "panel.layer",
+    "panel.task",
+    "panel.upload",
+    "prefs.animations",
+    "prefs.appearance",
+    "prefs.autoSave",
+    "prefs.data",
+    "prefs.defaultFormat",
+    "prefs.defaultResolution",
+    "prefs.enableNotifications",
+    "prefs.map",
+    "prefs.mapEngine",
+    "prefs.notifications",
+    "prefs.reset",
+    "prefs.save",
+    "prefs.showCoords",
+    "prefs.theme",
+    "prefs.themeAuto",
+    "prefs.themeDark",
+    "prefs.themeLight",
+    "prefs.title",
+    "project.created",
+    "project.info",
+    "project.mode",
+    "project.mode.free",
+    "project.mode.region",
+    "project.name",
+    "project.points",
+    "project.status",
+    "project.status.active",
+    "project.status.completed",
+    "recommendation.noData",
+    "recommendation.strategy.uncertainty",
+    "recommendation.strategy.uniform",
+    "settings.language.en-US",
+    "settings.language.ja-JP",
+    "settings.language.ko-KR",
+    "settings.language.zh-CN",
+    "task.completed",
+    "task.failed",
+    "task.started",
+    "task.status",
+    "template.desc",
+    "template.download",
+    "template.downloadComplete",
+    "template.downloadMessage",
+    "template.downloadSuccess",
+    "template.openLocation",
+    "template.openLocationQuestion",
+    "template.rules",
+    "template.savedTo",
+    "template.title",
+    "upload.invalidType",
+    "upload.noFile"
+  ],
+  "reviewedHardcoded": [
+    {
+      "file": "apps/frontend/js/components/CacheManagementPanel.ts",
+      "line": 185,
+      "text": "'已连接网络'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/CacheManagementPanel.ts",
+      "line": 282,
+      "text": "'></span> 清理中...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/CacheManagementPanel.ts",
+      "line": 318,
+      "text": "'></span> 清除中...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/CacheManagementPanel.ts",
+      "line": 345,
+      "text": "'></span> 同步中...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/DataImportModal.ts",
+      "line": 89,
+      "text": "'数据字段配置'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/DeepLearningPanel.ts",
+      "line": 94,
+      "text": "'深度学习 ▾'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/DeepLearningPanel.ts",
+      "line": 104,
+      "text": "'深度学习服务状态：检测中...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/DeepLearningPanel.ts",
+      "line": 113,
+      "text": "'深度学习服务状态：${health.status}（device: ${health.device}）'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/DeepLearningPanel.ts",
+      "line": 119,
+      "text": "'模型注册数：${health.registered_models?.length ?? 0}，异常模型：${health.trained_anomaly_models?.length ?? 0}，RL模型：${health.trained_sampling_rl_models?.length ?? 0}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/DeepLearningPanel.ts",
+      "line": 123,
+      "text": "'深度学习服务状态：不可用 (${error instanceof Error ? error.message : String(error)})'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/DeepLearningPanel.ts",
+      "line": 129,
+      "text": "'请确认后端已启动且 /api/dl 路由可访问。'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/EnhancedSamplingRecommendationPanel.ts",
+      "line": 488,
+      "text": "'total-variance-reduction'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/EnhancedSamplingRecommendationPanel.ts",
+      "line": 490,
+      "text": "'rmse-improvement'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/EnhancedSamplingRecommendationPanel.ts",
+      "line": 492,
+      "text": "'coverage-area'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/FeedbackCollector.ts",
+      "line": 341,
+      "text": "'已提交 ${stats.total} 条反馈'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/FrontendIntegrationHub.ts",
+      "line": 93,
+      "text": "'前端功能集成补齐 ▸'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/FrontendIntegrationHub.ts",
+      "line": 98,
+      "text": "'前端功能集成补齐 ▾'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/IndustrySelector.ts",
+      "line": 393,
+      "text": "'下载中...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/InterpolationAnimationPanel.ts",
+      "line": 480,
+      "text": "'${speed.toFixed(0)} 点/秒'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/Kriging3DPanel.ts",
+      "line": 270,
+      "text": "'请先选择文件'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/Kriging3DPanel.ts",
+      "line": 278,
+      "text": "'上传中...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/Kriging3DPanel.ts",
+      "line": 283,
+      "text": "'上传成功: ${data.point_count} 个3D点'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/Kriging3DPanel.ts",
+      "line": 308,
+      "text": "'上传失败: ${err.message}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/Kriging3DPanel.ts",
+      "line": 336,
+      "text": "'启动中...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/Kriging3DPanel.ts",
+      "line": 347,
+      "text": "'任务已启动: ${this.taskId?.slice(0, 8)}...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/Kriging3DPanel.ts",
+      "line": 350,
+      "text": "'启动失败: ${err.message}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/Kriging3DPanel.ts",
+      "line": 373,
+      "text": "'3D插值完成'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/Kriging3DPanel.ts",
+      "line": 377,
+      "text": "'失败: ${status.error || '",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/Kriging3DPanel.ts",
+      "line": 379,
+      "text": "'计算中... ${(status.progress || 0).toFixed(1)}%'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/Kriging3DPanel.ts",
+      "line": 470,
+      "text": "'>${slice.axis.toUpperCase()}轴切片 @ ${slice.position.toFixed(2)}</p>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/LocationServicePanel.ts",
+      "line": 414,
+      "text": "'>暂无地理围栏</div>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/MapEngineSwitcher.ts",
+      "line": 183,
+      "text": "'✅ 已切换'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/MapEngineSwitcher.ts",
+      "line": 198,
+      "text": "'❌ 失败'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/MeasureTool.ts",
+      "line": 369,
+      "text": "'点击地图添加测量点'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/MeasureTool.ts",
+      "line": 852,
+      "text": "'总距离: ${this.formatDistance(totalDistance)}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/MeasureTool.ts",
+      "line": 861,
+      "text": "'面积: ${this.formatArea(this.polygon.area)}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/MobileNavigation.ts",
+      "line": 103,
+      "text": "'打开菜单'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/MobileParameterDrawer.ts",
+      "line": 134,
+      "text": "'参数设置'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/MobileResultViewer.ts",
+      "line": 122,
+      "text": "'结果详情'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/NewProjectModal.ts",
+      "line": 49,
+      "text": "'新建项目'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/OnboardingGuide.ts",
+      "line": 184,
+      "text": "'新手引导'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/OnboardingGuide.ts",
+      "line": 203,
+      "text": "'新手引导：${step.title}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/PreferencesPanel.ts",
+      "line": 80,
+      "text": "'偏好设置'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/ProgressDetailPanel.ts",
+      "line": 312,
+      "text": "'${data.block_progress.processing_speed.toFixed(2)} 块/秒'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/RealtimeControlPanel.ts",
+      "line": 383,
+      "text": "'>暂无订阅</p>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/RealtimeControlPanel.ts",
+      "line": 574,
+      "text": "'>暂无日志</p>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/ResourceMonitoringPanel.ts",
+      "line": 260,
+      "text": "'>暂无警告</div>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/ResourceMonitoringPanel.ts",
+      "line": 286,
+      "text": "'>暂无建议</div>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SamplingEfficiencyChart.ts",
+      "line": 670,
+      "text": "'<h4>最优采样点数量</h4>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SamplingRecommendationPanel.ts",
+      "line": 105,
+      "text": "'建议点数量'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SamplingRecommendationPanel.ts",
+      "line": 119,
+      "text": "'基于方差优先'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SamplingRecommendationPanel.ts",
+      "line": 120,
+      "text": "'基于空间覆盖'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SamplingRecommendationPanel.ts",
+      "line": 236,
+      "text": "'建议点：${this.recommendations.length}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SamplingRecommendationPanel.ts",
+      "line": 664,
+      "text": "'视口内还有 ${hiddenCount} 个建议点未显示，请放大地图查看'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SettingsPanel.ts",
+      "line": 290,
+      "text": "'存储管理'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SettingsPanel.ts",
+      "line": 291,
+      "text": "'模板存储路径'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SettingsPanel.ts",
+      "line": 292,
+      "text": "'已用空间'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SettingsPanel.ts",
+      "line": 293,
+      "text": "'刷新'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SettingsPanel.ts",
+      "line": 294,
+      "text": "'打开文件夹'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SettingsPanel.ts",
+      "line": 295,
+      "text": "'清空模板'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/SettingsPanel.ts",
+      "line": 410,
+      "text": "'${this.formatBytes(summary.usedBytes)}（${summary.fileCount} 个文件）'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/StartupDegradationView.ts",
+      "line": 89,
+      "text": "'部分功能暂不可用：${message}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/TemplateDownloader.ts",
+      "line": 172,
+      "text": "'下载'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/TemplateDownloader.ts",
+      "line": 176,
+      "text": "'下载中...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/TemplateDownloader.ts",
+      "line": 398,
+      "text": "'${this.formatBytes(summary.usedBytes)}（${summary.fileCount} 个文件）'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/TemplateDownloader.ts",
+      "line": 412,
+      "text": "'>当前环境不支持读取本地文件列表。</div>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/TemplateDownloader.ts",
+      "line": 418,
+      "text": "'>当前目录暂无已下载模板。</div>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/components/integration/ConfigurableApiPanel.ts",
+      "line": 103,
+      "text": "'等待操作...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/map/core/MockMapEngine.ts",
+      "line": 186,
+      "text": "'中心点: 116.390000, 39.900000'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/map/core/MockMapEngine.ts",
+      "line": 286,
+      "text": "'中心点: ${lng.toFixed(6)}, ${lat.toFixed(6)}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/route_planning/components/RoutePlanningPanel.ts",
+      "line": 225,
+      "text": "'>暂无采样点，请在地图上添加</div>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/route_planning/components/RoutePlanningPanel.ts",
+      "line": 272,
+      "text": "'>请选择起点</option>${options}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/route_planning/components/RoutePlanningPanel.ts",
+      "line": 273,
+      "text": "'>请选择终点（可选）</option>${options}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/route_planning/components/RoutePlanningPanel.ts",
+      "line": 328,
+      "text": "'规划中...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/route_planning/components/RoutePlanningPanel.ts",
+      "line": 345,
+      "text": "'开始规划'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/route_planning/components/RoutePlanningPanel.ts",
+      "line": 362,
+      "text": "'>规划失败，未找到有效路径</div>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/sampling/CoordinateInput.ts",
+      "line": 207,
+      "text": "'正在获取位置...'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/sampling/CoordinateInput.ts",
+      "line": 214,
+      "text": "'位置获取失败'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/sampling/CoordinateInput.ts",
+      "line": 246,
+      "text": "'位置获取失败'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/sampling/CoordinateInput.ts",
+      "line": 284,
+      "text": "'位置获取成功'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/sampling/CoordinateInput.ts",
+      "line": 286,
+      "text": "'经度: ${longitude.toFixed(6)}, 纬度: ${latitude.toFixed(6)}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/sampling/CoordinateInput.ts",
+      "line": 491,
+      "text": "'准备获取位置'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/sampling/CoordinateInput.ts",
+      "line": 551,
+      "text": "'经度: ${position.longitude.toFixed(6)}, 纬度: ${position.latitude.toFixed(6)}'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/sampling/CoordinateInput.ts",
+      "line": 557,
+      "text": "'位置已设置'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/sampling/RegionSampling.ts",
+      "line": 133,
+      "text": "'点击选择 GeoJSON 文件'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/services/TrackManager.ts",
+      "line": 444,
+      "text": "'导入的轨迹'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/utils/HistoryManager.ts",
+      "line": 214,
+      "text": "'operations recorded'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/utils/KeyboardManager.ts",
+      "line": 111,
+      "text": "'键盘快捷键'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/utils/OfflineManager.ts",
+      "line": 517,
+      "text": "'检测到离线冲突'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/utils/OfflineManager.ts",
+      "line": 519,
+      "text": "'操作类型：${context.action.type}，请逐字段确认保留哪一侧数据。'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/utils/OfflineManager.ts",
+      "line": 574,
+      "text": "'客户端'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/utils/OfflineManager.ts",
+      "line": 577,
+      "text": "'服务端'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/utils/OfflineManager.ts",
+      "line": 596,
+      "text": "'合并预览'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/utils/OfflineManager.ts",
+      "line": 618,
+      "text": "'应用智能建议'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/utils/OfflineManager.ts",
+      "line": 625,
+      "text": "'保留服务端'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/utils/OfflineManager.ts",
+      "line": 632,
+      "text": "'确认合并'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/主程序.ts",
+      "line": 1762,
+      "text": "'在线'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/图层管理.ts",
+      "line": 70,
+      "text": "'></div><span>正在更新地图...</span>'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/图层管理.ts",
+      "line": 308,
+      "text": "'视口内还有 ${hiddenCount} 个采样点未显示，请放大地图查看'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/坐标系统信息.ts",
+      "line": 97,
+      "text": "'展开'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/坐标系统信息.ts",
+      "line": 119,
+      "text": "'未识别'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/坐标系统信息.ts",
+      "line": 132,
+      "text": "'未识别坐标系'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/js/坐标系统信息.ts",
+      "line": 184,
+      "text": "'未识别坐标系'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/landing-page/js/i18n.js",
+      "line": 213,
+      "text": "'中文'",
+      "reason": "manual-reviewed-non-blocking"
+    },
+    {
+      "file": "apps/frontend/test-page-i18n.js",
+      "line": 412,
+      "text": "'placeholder'",
+      "reason": "manual-reviewed-non-blocking"
+    }
+  ]
+}

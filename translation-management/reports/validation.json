@@ -1,0 +1,38 @@
+{
+  "generatedAt": "2026-03-26T10:05:28.940Z",
+  "baseKeyCount": 355,
+  "results": [
+    {
+      "locale": "en-US",
+      "total": 355,
+      "missingCount": 0,
+      "extraCount": 0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "locale": "zh-TW",
+      "total": 355,
+      "missingCount": 0,
+      "extraCount": 0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "locale": "ja-JP",
+      "total": 355,
+      "missingCount": 0,
+      "extraCount": 0,
+      "missing": [],
+      "extra": []
+    },
+    {
+      "locale": "ko-KR",
+      "total": 355,
+      "missingCount": 0,
+      "extraCount": 0,
+      "missing": [],
+      "extra": []
+    }
+  ]
+}

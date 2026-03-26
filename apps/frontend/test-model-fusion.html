@@ -282,49 +282,49 @@
                 <h2 data-i18n="test.modelFusion.modelInput">模型输入</h2>
                 <div class="model-inputs" id="modelInputs">
                     <div class="model-input">
-                        <h3>模型 1</h3>
+                        <h3 data-i18n="test.modelFusion.model1.title">模型 1</h3>
                         <div class="form-group">
-                            <label>模型ID</label>
+                            <label data-i18n="test.modelFusion.field.modelId">模型ID</label>
                             <input type="text" id="model1_id" value="model_1">
                         </div>
                         <div class="form-group">
-                            <label>模型名称</label>
+                            <label data-i18n="test.modelFusion.field.modelName">模型名称</label>
                             <input type="text" id="model1_name" value="普通克里金">
                         </div>
                         <div class="form-group">
-                            <label>预测值 (逗号分隔)</label>
+                            <label data-i18n="test.modelFusion.field.predictions">预测值 (逗号分隔)</label>
                             <textarea id="model1_predictions" rows="3">10.5, 11.2, 10.8, 11.5, 10.9, 11.1, 10.7, 11.3, 10.6, 11.0</textarea>
                         </div>
                     </div>
 
                     <div class="model-input">
-                        <h3>模型 2</h3>
+                        <h3 data-i18n="test.modelFusion.model2.title">模型 2</h3>
                         <div class="form-group">
-                            <label>模型ID</label>
+                            <label data-i18n="test.modelFusion.field.modelId">模型ID</label>
                             <input type="text" id="model2_id" value="model_2">
                         </div>
                         <div class="form-group">
-                            <label>模型名称</label>
+                            <label data-i18n="test.modelFusion.field.modelName">模型名称</label>
                             <input type="text" id="model2_name" value="泛克里金">
                         </div>
                         <div class="form-group">
-                            <label>预测值 (逗号分隔)</label>
+                            <label data-i18n="test.modelFusion.field.predictions">预测值 (逗号分隔)</label>
                             <textarea id="model2_predictions" rows="3">10.8, 11.0, 10.9, 11.3, 11.1, 10.8, 10.9, 11.1, 10.8, 11.2</textarea>
                         </div>
                     </div>
 
                     <div class="model-input">
-                        <h3>模型 3</h3>
+                        <h3 data-i18n="test.modelFusion.model3.title">模型 3</h3>
                         <div class="form-group">
-                            <label>模型ID</label>
+                            <label data-i18n="test.modelFusion.field.modelId">模型ID</label>
                             <input type="text" id="model3_id" value="model_3">
                         </div>
                         <div class="form-group">
-                            <label>模型名称</label>
+                            <label data-i18n="test.modelFusion.field.modelName">模型名称</label>
                             <input type="text" id="model3_name" value="分块克里金">
                         </div>
                         <div class="form-group">
-                            <label>预测值 (逗号分隔)</label>
+                            <label data-i18n="test.modelFusion.field.predictions">预测值 (逗号分隔)</label>
                             <textarea id="model3_predictions" rows="3">10.7, 11.1, 10.7, 11.4, 10.8, 11.0, 10.8, 11.2, 10.7, 11.1</textarea>
                         </div>
                     </div>
@@ -334,50 +334,50 @@
             <div class="section">
                 <h2 data-i18n="test.modelFusion.config">融合配置</h2>
                 <div class="form-group">
-                    <label>真实值 (可选，用于评估)</label>
+                    <label data-i18n="test.modelFusion.field.trueValues">真实值 (可选，用于评估)</label>
                     <textarea id="true_values" rows="1">10.6, 11.0, 10.9, 11.2, 10.8, 11.1, 10.7, 11.2, 10.6, 11.0</textarea>
                 </div>
                 <div class="form-group">
-                    <label>融合策略</label>
+                    <label data-i18n="test.modelFusion.field.strategy">融合策略</label>
                     <select id="fusion_strategy">
-                        <option value="simple_average">简单平均</option>
-                        <option value="weighted_average" selected>加权平均</option>
-                        <option value="median">中位数融合</option>
-                        <option value="stacking">堆叠融合</option>
-                        <option value="bayesian_model_average">贝叶斯模型平均</option>
-                        <option value="variance_weighted">方差加权</option>
-                        <option value="max_min">最大最小融合</option>
+                        <option value="simple_average" data-i18n="test.modelFusion.strategy.simpleAverage">简单平均</option>
+                        <option value="weighted_average" selected data-i18n="test.modelFusion.strategy.weightedAverage">加权平均</option>
+                        <option value="median" data-i18n="test.modelFusion.strategy.median">中位数融合</option>
+                        <option value="stacking" data-i18n="test.modelFusion.strategy.stacking">堆叠融合</option>
+                        <option value="bayesian_model_average" data-i18n="test.modelFusion.strategy.bma">贝叶斯模型平均</option>
+                        <option value="variance_weighted" data-i18n="test.modelFusion.strategy.varianceWeighted">方差加权</option>
+                        <option value="max_min" data-i18n="test.modelFusion.strategy.maxMin">最大最小融合</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>权重计算方法</label>
+                    <label data-i18n="test.modelFusion.field.weightMethod">权重计算方法</label>
                     <select id="weight_method">
-                        <option value="equal">等权重</option>
-                        <option value="rmse_based" selected>基于RMSE</option>
-                        <option value="mae_based">基于MAE</option>
-                        <option value="r2_based">基于R²</option>
-                        <option value="cross_validation">交叉验证</option>
-                        <option value="bma">贝叶斯模型平均</option>
-                        <option value="uncertainty_based">基于不确定性</option>
-                        <option value="adaptive">自适应</option>
+                        <option value="equal" data-i18n="test.modelFusion.weightMethod.equal">等权重</option>
+                        <option value="rmse_based" selected data-i18n="test.modelFusion.weightMethod.rmse">基于RMSE</option>
+                        <option value="mae_based" data-i18n="test.modelFusion.weightMethod.mae">基于MAE</option>
+                        <option value="r2_based" data-i18n="test.modelFusion.weightMethod.r2">基于R²</option>
+                        <option value="cross_validation" data-i18n="test.modelFusion.weightMethod.cv">交叉验证</option>
+                        <option value="bma" data-i18n="test.modelFusion.weightMethod.bma">贝叶斯模型平均</option>
+                        <option value="uncertainty_based" data-i18n="test.modelFusion.weightMethod.uncertainty">基于不确定性</option>
+                        <option value="adaptive" data-i18n="test.modelFusion.weightMethod.adaptive">自适应</option>
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>最小权重</label>
+                    <label data-i18n="test.modelFusion.field.minWeight">最小权重</label>
                     <input type="number" id="min_weight" value="0.0" step="0.1" min="0" max="1">
                 </div>
                 <div class="form-group">
-                    <label>最大权重</label>
+                    <label data-i18n="test.modelFusion.field.maxWeight">最大权重</label>
                     <input type="number" id="max_weight" value="1.0" step="0.1" min="0" max="1">
                 </div>
                 <div class="form-group">
                     <label>
-                        <input type="checkbox" id="normalize" checked> 归一化权重
+                        <input type="checkbox" id="normalize" checked> <span data-i18n="test.modelFusion.field.normalize">归一化权重</span>
                     </label>
                 </div>
                 <div class="form-group">
                     <label>
-                        <input type="checkbox" id="smoothing"> 平滑权重
+                        <input type="checkbox" id="smoothing"> <span data-i18n="test.modelFusion.field.smoothing">平滑权重</span>
                     </label>
                 </div>
                 <button onclick="createFusionTask()" data-i18n="test.modelFusion.createTask">创建融合任务</button>

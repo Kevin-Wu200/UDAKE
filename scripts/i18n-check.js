@@ -5,9 +5,14 @@ const path = require('path');
 
 const ROOT = process.cwd();
 const I18N_FILE = path.join(ROOT, 'apps/frontend/js/utils/I18n.ts');
+const I18N_CONFIG_FILE = path.join(ROOT, 'apps/frontend/js/i18n/config.ts');
 const FRONTEND_ROOT = path.join(ROOT, 'apps/frontend');
+const TEST_ROOT = path.join(ROOT, 'tests');
 const REPORT_DIR = path.join(ROOT, 'reports/i18n');
+const BASELINE_FILE = path.join(ROOT, 'configs/i18n-baseline.json');
 const STRICT = process.argv.includes('--strict');
+const DEBUG = process.env.I18N_CHECK_DEBUG === '1' || process.argv.includes('--debug');
+const STRICT_ALL_LOCALES = process.env.I18N_STRICT_ALL_LOCALES === '1';
 const STRICT_REQUIRED_LOCALES = new Set(['en-US']);
 
 const KEY_NAME_PATTERN = /^[a-z]+(?:\.[a-zA-Z0-9_-]+)+$/;
@@ -15,17 +20,62 @@ const TRANSLATION_ATTR_RE = /data-i18n(?:-(?:title|placeholder|aria-label|value)
 const I18N_CALL_RE = /I18n\.(?:t|tv|tp)\(\s*["'`]([^"'`]+)["'`]/g;
 const I18N_DIALOG_CALL_RE = /I18nDialog\.(?:alert|confirm|prompt)\(\s*["'`]([^"'`]+)["'`]/g;
 const CJK_RE = /[\u3400-\u9fff]/;
+const STRING_LITERAL_RE = /["'`]([^"'`]+)["'`]/g;
+const HTML_TAG_RE = /<[^>]*>/g;
+const FILE_CACHE = new Map();
+let readCount = 0;
+let cacheHitCount = 0;
+
+function logDebug(message) {
+  if (DEBUG) {
+    console.log(`[i18n-check][debug] ${message}`);
+  }
+}
 
 function readFileSafe(filePath) {
+  if (FILE_CACHE.has(filePath)) {
+    cacheHitCount += 1;
+    return FILE_CACHE.get(filePath);
+  }
   try {
-    return fs.readFileSync(filePath, 'utf8');
-  } catch {
+    const content = fs.readFileSync(filePath, 'utf8');
+    FILE_CACHE.set(filePath, content);
+    readCount += 1;
+    return content;
+  } catch (error) {
+    console.error(`[i18n-check] 读取文件失败: ${path.relative(ROOT, filePath)} (${error.message})`);
+    FILE_CACHE.set(filePath, '');
     return '';
   }
 }
 
+function loadBaseline() {
+  try {
+    const parsed = JSON.parse(fs.readFileSync(BASELINE_FILE, 'utf8'));
+    const reservedUnusedKeys = new Set(Array.isArray(parsed.reservedUnusedKeys) ? parsed.reservedUnusedKeys : []);
+    const reviewedHardcoded = new Set(
+      Array.isArray(parsed.reviewedHardcoded)
+        ? parsed.reviewedHardcoded.map((item) => `${item.file}:${item.line}:${item.text}`)
+        : []
+    );
+    return { reservedUnusedKeys, reviewedHardcoded };
+  } catch {
+    return { reservedUnusedKeys: new Set(), reviewedHardcoded: new Set() };
+  }
+}
+
 function walkFiles(dir, exts, list = []) {
-  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  if (!fs.existsSync(dir)) {
+    logDebug(`目录不存在，跳过扫描: ${path.relative(ROOT, dir)}`);
+    return list;
+  }
+  let entries = [];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch (error) {
+    console.error(`[i18n-check] 读取目录失败: ${path.relative(ROOT, dir)} (${error.message})`);
+    return list;
+  }
   for (const entry of entries) {
     if (entry.name === 'dist' || entry.name === 'node_modules' || entry.name.startsWith('.')) {
       continue;
@@ -63,6 +113,9 @@ function collectUsedKeys(files) {
 
   for (const filePath of files) {
     const content = readFileSafe(filePath);
+    I18N_CALL_RE.lastIndex = 0;
+    I18N_DIALOG_CALL_RE.lastIndex = 0;
+    TRANSLATION_ATTR_RE.lastIndex = 0;
     let match;
 
     while ((match = I18N_CALL_RE.exec(content)) !== null) {
@@ -100,42 +153,104 @@ function collectHardcodedText(files) {
   for (const filePath of files) {
     const ext = path.extname(filePath);
     const lines = readFileSafe(filePath).split('\n');
+    let insideScriptBlock = false;
+    let insideStyleBlock = false;
 
     lines.forEach((line, index) => {
       const lineNo = index + 1;
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return;
+      }
 
       if (ext === '.html') {
-        if (line.includes('data-i18n')) {
+        if (trimmed.includes('<script')) {
+          insideScriptBlock = true;
+        }
+        if (trimmed.includes('<style')) {
+          insideStyleBlock = true;
+        }
+
+        if (insideScriptBlock || insideStyleBlock || trimmed.startsWith('<!--')) {
+          if (trimmed.includes('</script>')) {
+            insideScriptBlock = false;
+          }
+          if (trimmed.includes('</style>')) {
+            insideStyleBlock = false;
+          }
           return;
         }
 
+        if (line.includes('data-i18n')) {
+          if (trimmed.includes('</script>')) {
+            insideScriptBlock = false;
+          }
+          if (trimmed.includes('</style>')) {
+            insideStyleBlock = false;
+          }
+          return;
+        }
+
+        const visibleText = line.replace(HTML_TAG_RE, ' ').replace(/&nbsp;/g, ' ').trim();
         const cjkNodeMatch = line.match(/>([^<>\n]*[\u3400-\u9fff][^<>\n]*)</);
-        if (cjkNodeMatch && cjkNodeMatch[1].trim()) {
+        if (cjkNodeMatch && cjkNodeMatch[1].trim() && visibleText) {
           htmlHits.push({ file: filePath, line: lineNo, text: cjkNodeMatch[1].trim() });
         }
 
         const enNodeMatch = line.match(/>([^<>\n]*[A-Za-z]{4,}(?:\s+[A-Za-z]{4,})+[^<>\n]*)</);
-        if (enNodeMatch && enNodeMatch[1].trim()) {
+        if (enNodeMatch && enNodeMatch[1].trim() && visibleText) {
           htmlHits.push({ file: filePath, line: lineNo, text: enNodeMatch[1].trim() });
         }
 
+        if (trimmed.includes('</script>')) {
+          insideScriptBlock = false;
+        }
+        if (trimmed.includes('</style>')) {
+          insideStyleBlock = false;
+        }
+        return;
+      }
+
+      if (
+        trimmed.startsWith('//') ||
+        trimmed.startsWith('/*') ||
+        trimmed.startsWith('*') ||
+        trimmed.startsWith('*/')
+      ) {
         return;
       }
 
       const uiLine = /(innerHTML|textContent|insertAdjacentHTML|alert\(|confirm\(|prompt\(|setAttribute\(\s*['"](?:title|placeholder|aria-label|value)['"])/.test(line);
-      if (!uiLine || line.includes('I18n.t(') || line.includes('data-i18n')) {
+      if (
+        !uiLine ||
+        line.includes('I18n.t(') ||
+        line.includes('I18n.tv(') ||
+        line.includes('I18n.tp(') ||
+        line.includes('data-i18n') ||
+        line.includes('I18nDialog.')
+      ) {
         return;
       }
 
-      const cjkString = line.match(/["'`][^"'`]*[\u3400-\u9fff][^"'`]*["'`]/);
-      if (cjkString) {
-        jsHits.push({ file: filePath, line: lineNo, text: cjkString[0] });
-        return;
+      STRING_LITERAL_RE.lastIndex = 0;
+      const literals = [];
+      let literalMatch;
+      while ((literalMatch = STRING_LITERAL_RE.exec(line)) !== null) {
+        literals.push(literalMatch[1]);
       }
+      for (const literal of literals) {
+        if (!literal || KEY_NAME_PATTERN.test(literal)) {
+          continue;
+        }
+        if (CJK_RE.test(literal)) {
+          jsHits.push({ file: filePath, line: lineNo, text: `'${literal}'` });
+          return;
+        }
 
-      const enString = line.match(/["'`][A-Za-z][A-Za-z0-9\s,.:!?()\/-]{10,}["'`]/);
-      if (enString) {
-        jsHits.push({ file: filePath, line: lineNo, text: enString[0] });
+        if (/^[A-Za-z][A-Za-z0-9\s,.:!?()\/-]{10,}$/.test(literal)) {
+          jsHits.push({ file: filePath, line: lineNo, text: `'${literal}'` });
+          return;
+        }
       }
     });
   }
@@ -149,11 +264,33 @@ function collectHardcodedText(files) {
 function loadJsonLocale(localeCode) {
   const filePath = path.join(ROOT, 'apps/frontend/js/locales', `${localeCode}.json`);
   try {
-    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    const content = readFileSafe(filePath);
+    if (!content) {
+      return new Set();
+    }
+    const parsed = JSON.parse(content);
     return new Set(Object.keys(parsed));
-  } catch {
+  } catch (error) {
+    console.error(`[i18n-check] 读取语言包失败: ${path.relative(ROOT, filePath)} (${error.message})`);
     return new Set();
   }
+}
+
+function ensureRequiredFiles(filePaths) {
+  const missing = filePaths.filter((filePath) => !fs.existsSync(filePath));
+  if (missing.length > 0) {
+    for (const filePath of missing) {
+      console.error(`[i18n-check] 必要文件缺失: ${path.relative(ROOT, filePath)}`);
+    }
+    return false;
+  }
+  if (DEBUG) {
+    for (const filePath of filePaths) {
+      const stat = fs.statSync(filePath);
+      logDebug(`文件检查通过: ${path.relative(ROOT, filePath)} (${stat.size} bytes)`);
+    }
+  }
+  return true;
 }
 
 function toMarkdown(report) {
@@ -164,7 +301,9 @@ function toMarkdown(report) {
   lines.push(`- 基准语言总键数: ${report.summary.baseKeyCount}`);
   lines.push(`- 检测到使用键数: ${report.summary.usedKeyCount}`);
   lines.push(`- 未使用键数: ${report.summary.unusedKeyCount}`);
+  lines.push(`- 基线保留键数: ${report.summary.baselineUnusedKeyCount}`);
   lines.push(`- 可疑硬编码数: ${report.summary.hardcodedCount}`);
+  lines.push(`- 基线忽略硬编码数: ${report.summary.baselineHardcodedCount}`);
   lines.push('');
   lines.push('## 语言覆盖率');
   lines.push('');
@@ -207,12 +346,18 @@ function toMarkdown(report) {
 }
 
 function main() {
-  const source = readFileSafe(I18N_FILE);
-  if (!source) {
-    console.error('[i18n-check] 未找到 I18n.ts');
+  logDebug(`运行环境: node=${process.version}, platform=${process.platform}, cwd=${ROOT}`);
+  if (!ensureRequiredFiles([I18N_FILE, I18N_CONFIG_FILE])) {
     process.exit(1);
   }
 
+  const source = readFileSafe(I18N_FILE);
+  if (!source.trim()) {
+    console.error('[i18n-check] I18n.ts 内容为空或读取失败');
+    process.exit(1);
+  }
+
+  const baseline = loadBaseline();
   const zhKeys = extractBlockKeys(source, 'const ZH_CN', 'const EN_US');
   const enKeys = extractBlockKeys(source, 'const EN_US', '// ========== 语言包注册表 ==========');
   const baseKeySet = new Set(zhKeys);
@@ -226,8 +371,12 @@ function main() {
   };
 
   const appFiles = walkFiles(FRONTEND_ROOT, new Set(['.ts', '.js', '.html']));
-  const usedKeys = collectUsedKeys(appFiles);
-  const unusedKeys = [...baseKeySet].filter((key) => !usedKeys.has(key)).sort();
+  const testFiles = fs.existsSync(TEST_ROOT) ? walkFiles(TEST_ROOT, new Set(['.ts', '.js', '.html'])) : [];
+  const scanFiles = [...appFiles, ...testFiles];
+  logDebug(`扫描文件数: app=${appFiles.length}, test=${testFiles.length}, total=${scanFiles.length}`);
+  const usedKeys = collectUsedKeys(scanFiles);
+  const rawUnusedKeys = [...baseKeySet].filter((key) => !usedKeys.has(key)).sort();
+  const unusedKeys = rawUnusedKeys.filter((key) => !baseline.reservedUnusedKeys.has(key));
 
   const invalidNaming = [...baseKeySet].filter((key) => !KEY_NAME_PATTERN.test(key)).sort();
 
@@ -244,7 +393,15 @@ function main() {
     };
   });
 
-  const hardcoded = collectHardcodedText(appFiles);
+  const hardcodedRaw = collectHardcodedText(appFiles);
+  const hardcoded = {
+    html: hardcodedRaw.html.filter(
+      (item) => !baseline.reviewedHardcoded.has(`${path.relative(ROOT, item.file)}:${item.line}:${item.text}`)
+    ),
+    js: hardcodedRaw.js.filter(
+      (item) => !baseline.reviewedHardcoded.has(`${path.relative(ROOT, item.file)}:${item.line}:${item.text}`)
+    )
+  };
 
   const report = {
     generatedAt: new Date().toISOString(),
@@ -252,7 +409,11 @@ function main() {
       baseKeyCount: baseKeySet.size,
       usedKeyCount: usedKeys.size,
       unusedKeyCount: unusedKeys.length,
+      baselineUnusedKeyCount: rawUnusedKeys.length - unusedKeys.length,
       hardcodedCount: hardcoded.html.length + hardcoded.js.length
+      ,
+      baselineHardcodedCount:
+        hardcodedRaw.html.length + hardcodedRaw.js.length - (hardcoded.html.length + hardcoded.js.length)
     },
     coverage,
     invalidNaming,
@@ -267,12 +428,17 @@ function main() {
   console.log('[i18n-check] 报告已生成: reports/i18n/i18n-report.json');
   console.log(`[i18n-check] 覆盖率: ${coverage.map((item) => `${item.locale} ${(item.coverage * 100).toFixed(1)}%`).join(', ')}`);
   console.log(`[i18n-check] 未使用键: ${unusedKeys.length}, 可疑硬编码: ${report.summary.hardcodedCount}`);
+  logDebug(`文件读取统计: read=${readCount}, cacheHit=${cacheHitCount}`);
 
-  const hasMissing = coverage.some(
-    (item) => STRICT_REQUIRED_LOCALES.has(item.locale) && item.missingCount > 0
-  );
+  const hasMissing = coverage.some((item) => {
+    if (STRICT_ALL_LOCALES) {
+      return item.locale !== 'zh-CN' && item.missingCount > 0;
+    }
+    return STRICT_REQUIRED_LOCALES.has(item.locale) && item.missingCount > 0;
+  });
   if (STRICT && (hasMissing || invalidNaming.length > 0)) {
-    console.error('[i18n-check] strict 模式失败: 存在缺失键或命名问题');
+    const mode = STRICT_ALL_LOCALES ? 'all-locales' : 'required-locales';
+    console.error(`[i18n-check] strict 模式失败(${mode}): 存在缺失键或命名问题`);
     process.exit(1);
   }
 }

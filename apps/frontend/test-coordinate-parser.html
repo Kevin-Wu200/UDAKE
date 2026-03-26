@@ -101,8 +101,21 @@
         </div>
     </div>
 
+    <script src="./test-page-i18n.js"></script>
     <script type="module">
         import { CoordinateParser } from './js/utils/CoordinateParser.js';
+        let currentLocale = window.TestPageI18n?.getLocale?.() || 'zh-CN';
+
+        function t(key, params = {}) {
+            const translate = window.TestPageI18n?.t;
+            const template = typeof translate === 'function' ? translate(key, currentLocale) : key;
+            return template.replace(/\{(\w+)\}/g, (_, token) => {
+                if (Object.prototype.hasOwnProperty.call(params, token)) {
+                    return String(params[token]);
+                }
+                return `{${token}}`;
+            });
+        }
 
         // 测试用例
         const testCases = [
@@ -156,12 +169,12 @@
                 const testDiv = document.createElement('div');
                 testDiv.className = `test-case ${passed ? 'pass' : 'fail'}`;
                 testDiv.innerHTML = `
-                    <strong>测试 ${index + 1}:</strong> "${testCase.input}" (${testCase.type})<br>
+                    <strong>${t('test.coordinateParser.case', { index: index + 1 })}</strong> "${testCase.input}" (${testCase.type})<br>
                     <span class="result">
-                        结果: ${result.valid ? '✓ 有效' : '✗ 无效'} |
-                        值: ${result.value !== null ? result.value.toFixed(6) : 'null'} |
-                        格式: ${result.format || 'null'} |
-                        错误: ${result.error || 'none'}
+                        ${t('test.coordinateParser.label.result')}: ${result.valid ? t('test.coordinateParser.result.valid') : t('test.coordinateParser.result.invalid')} |
+                        ${t('test.coordinateParser.label.value')}: ${result.value !== null ? result.value.toFixed(6) : t('test.coordinateParser.none')} |
+                        ${t('test.coordinateParser.label.format')}: ${result.format || t('test.coordinateParser.none')} |
+                        ${t('test.coordinateParser.label.error')}: ${result.error || t('test.coordinateParser.none')}
                     </span>
                 `;
                 resultsDiv.appendChild(testDiv);
@@ -173,7 +186,7 @@
             const summary = document.createElement('div');
             summary.style.marginTop = '16px';
             summary.style.fontWeight = 'bold';
-            summary.innerHTML = `测试完成: ${passCount} 通过, ${failCount} 失败`;
+            summary.innerHTML = t('test.coordinateParser.summary', { passCount, failCount });
             resultsDiv.appendChild(summary);
         }
 
@@ -221,14 +234,20 @@
             } else {
                 input.classList.remove('invalid');
                 errorDiv.style.display = 'none';
-                resultDiv.textContent = `✓ 有效 | 值: ${result.value.toFixed(6)}${result.format ? ' | 格式: ' + result.format : ''}`;
+                resultDiv.textContent = `${t('test.coordinateParser.result.valid')} | ${t('test.coordinateParser.label.value')}: ${result.value.toFixed(6)}${result.format ? ` | ${t('test.coordinateParser.label.format')}: ${result.format}` : ''}`;
             }
         }
+
+        window.addEventListener('udake-test-language-change', (event) => {
+            currentLocale = event.detail?.locale || currentLocale;
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '';
+            runTests();
+        });
 
         // 初始化
         runTests();
         setupInteractiveTests();
     </script>
-    <script src="./test-page-i18n.js"></script>
 </body>
 </html>

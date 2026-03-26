@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-03-26T10:08:17.542Z",
+  "summary": {
+    "baseKeyCount": 355,
+    "usedKeyCount": 463,
+    "unusedKeyCount": 0,
+    "baselineUnusedKeyCount": 134,
+    "hardcodedCount": 0,
+    "baselineHardcodedCount": 105
+  },
+  "coverage": [
+    {
+      "locale": "zh-CN",
+      "coverage": 1,
+      "missingCount": 0,
+      "missingKeys": []
+    },
+    {
+      "locale": "en-US",
+      "coverage": 1,
+      "missingCount": 0,
+      "missingKeys": []
+    },
+    {
+      "locale": "zh-TW",
+      "coverage": 1,
+      "missingCount": 0,
+      "missingKeys": []
+    },
+    {
+      "locale": "ja-JP",
+      "coverage": 1,
+      "missingCount": 0,
+      "missingKeys": []
+    },
+    {
+      "locale": "ko-KR",
+      "coverage": 1,
+      "missingCount": 0,
+      "missingKeys": []
+    }
+  ],
+  "invalidNaming": [],
+  "unusedKeys": [],
+  "hardcoded": {
+    "html": [],
+    "js": []
+  }
+}
