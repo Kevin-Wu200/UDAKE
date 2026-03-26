@@ -1,3 +1,4 @@
+import { I18nDialog } from '../components/I18nDialog.js';
 /**
  * 启动流程管理器
  * 协调应用启动的各个方面，包括资源预加载、性能监控、错误处理等
@@ -379,7 +380,7 @@ export class StartupManager {
         console.log('[StartupManager] 报告错误:', error, context);
 
         // 显示感谢信息
-        alert('感谢您的反馈！我们已记录此错误。');
+        I18nDialog.alert('感谢您的反馈！我们已记录此错误。');
     }
 
     /**

@@ -4,6 +4,7 @@
  */
 
 import { ChartService, type ScatterDataPoint } from '../services/ChartService';
+import { I18nDialog } from './I18nDialog.js';
 
 export interface CrossValidationScatterChartConfig {
   container: HTMLElement;
@@ -583,7 +584,7 @@ export class CrossValidationScatterChart {
       ChartService.downloadFile(blob, `cross-validation-scatter.${format}`);
     } catch (error) {
       console.error('导出图表失败:', error);
-      alert('导出图表失败，请重试');
+      I18nDialog.alert('导出图表失败，请重试');
     }
   }
 

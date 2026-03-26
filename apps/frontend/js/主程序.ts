@@ -1834,6 +1834,8 @@ class App {
      * 更新界面文本
      */
     private updateUIText(): void {
+        I18n.applyToDOM(document);
+
         // 更新标题
         const titleZh = document.querySelector('.title-zh');
         const titleEn = document.querySelector('.title-en');
@@ -1846,32 +1848,6 @@ class App {
                 titleEn.style.display = 'inline';
             }
         }
-
-        // 更新导航按钮
-        const newProjectBtn = document.getElementById('new-project-btn') as HTMLButtonElement;
-        if (newProjectBtn) {
-            newProjectBtn.textContent = I18n.t('nav.newProject');
-        }
-
-        // 更新面板标题
-        const panelTitles = document.querySelectorAll('.panel-title');
-        const panelIndex: Record<number, string> = {
-            0: 'panel.project',
-            1: 'upload.title',
-            2: 'kriging.title',
-            3: 'task.title',
-            4: 'export.title',
-            5: 'layer.title'
-        };
-
-        panelTitles.forEach((title, index) => {
-            if (title && panelIndex[index]) {
-                title.textContent = I18n.t(panelIndex[index]);
-            }
-        });
-
-        // 更新其他界面文本...
-        // (这里省略了其他界面文本更新，因为代码太长)
     }
 }
 

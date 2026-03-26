@@ -5,6 +5,7 @@
 
 import { geofenceManager } from '../services/GeofenceManager';
 import type { Geofence } from '../types/sensor';
+import { I18nDialog } from './I18nDialog.js';
 
 /**
  * 地理围栏可视化类
@@ -131,16 +132,16 @@ export class GeofenceVisualization {
    */
   private async handleCreateGeofence(lnglat: any): Promise<void> {
     // 创建一个临时围栏，等待用户输入半径
-    const radius = prompt('请输入围栏半径（米）：', '100');
+    const radius = I18nDialog.prompt('请输入围栏半径（米）：', '100');
     if (!radius) return;
 
     const radiusNum = parseFloat(radius);
     if (isNaN(radiusNum) || radiusNum <= 0) {
-      alert('请输入有效的半径');
+      I18nDialog.alert('请输入有效的半径');
       return;
     }
 
-    const name = prompt('请输入围栏名称：', `围栏_${new Date().toLocaleString()}`);
+    const name = I18nDialog.prompt('请输入围栏名称：', `围栏_${new Date().toLocaleString()}`);
     if (!name) return;
 
     try {
@@ -152,13 +153,13 @@ export class GeofenceVisualization {
       );
 
       this.addGeofence(geofence);
-      alert(`地理围栏 "${name}" 创建成功`);
+      I18nDialog.alert(`地理围栏 "${name}" 创建成功`);
 
       // 退出创建模式
       (window as any).isCreatingGeofence = false;
     } catch (error) {
       console.error('创建地理围栏失败:', error);
-      alert('创建地理围栏失败：' + (error as Error).message);
+      I18nDialog.alert('创建地理围栏失败：' + (error as Error).message);
     }
   }
 
@@ -390,7 +391,7 @@ export class GeofenceVisualization {
     const geofence = geofenceManager.getGeofence(geofenceId);
     if (!geofence) return;
 
-    const newName = prompt('请输入新的围栏名称：', geofence.name);
+    const newName = I18nDialog.prompt('请输入新的围栏名称：', geofence.name);
     if (!newName) return;
 
     geofenceManager.updateGeofence(geofenceId, { name: newName });
@@ -412,7 +413,7 @@ export class GeofenceVisualization {
    * 处理删除围栏
    */
   private async handleDeleteGeofence(geofenceId: string): Promise<void> {
-    if (confirm('确定要删除这个地理围栏吗？')) {
+    if (I18nDialog.confirm('确定要删除这个地理围栏吗？')) {
       await geofenceManager.deleteGeofence(geofenceId);
       this.removeGeofence(geofenceId);
     }

@@ -5,6 +5,7 @@
 
 import { TemplateDownloader } from './TemplateDownloader';
 import { I18n } from '../utils/I18n.js';
+import { I18nDialog } from './I18nDialog.js';
 
 interface IndustryConfig {
   industry: string;
@@ -320,7 +321,7 @@ export class IndustrySelector {
       }
     } catch (error) {
       console.error('获取推荐参数失败:', error);
-      alert('获取推荐参数失败，请稍后重试');
+      I18nDialog.alert('获取推荐参数失败，请稍后重试');
     }
   }
 
@@ -429,7 +430,7 @@ export class IndustrySelector {
       }
     } catch (error) {
       console.error('下载模板失败:', error);
-      alert(I18n.t('template.downloadFailed'));
+      I18nDialog.alert(I18n.t('template.downloadFailed'));
     }
   }
 

@@ -4,6 +4,7 @@
  */
 
 import { ChartService, type VariogramModel } from '../services/ChartService';
+import { I18nDialog } from './I18nDialog.js';
 
 export interface VariogramChartConfig {
   container: HTMLElement;
@@ -658,7 +659,7 @@ export class VariogramChart {
       ChartService.downloadFile(blob, `variogram-chart.${format}`);
     } catch (error) {
       console.error('导出图表失败:', error);
-      alert('导出图表失败，请重试');
+      I18nDialog.alert('导出图表失败，请重试');
     }
   }
 

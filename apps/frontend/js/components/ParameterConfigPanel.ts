@@ -5,6 +5,7 @@
 
 import { parameterConfigManager } from '../services/ParameterConfigManager';
 import type { ParamPresetType } from '../../types/core';
+import { I18nDialog } from './I18nDialog.js';
 
 export class ParameterConfigPanel {
     private container: HTMLElement;
@@ -219,7 +220,7 @@ export class ParameterConfigPanel {
         parameterConfigManager.setActiveConfig(configId);
         
         this.loadConfigs();
-        alert(`已应用 ${preset.name} 预设`);
+        I18nDialog.alert(`已应用 ${preset.name} 预设`);
         this.hide();
     }
 
@@ -229,17 +230,17 @@ export class ParameterConfigPanel {
             parameterConfigManager.setActiveConfig(configId);
             parameterConfigManager.applyConfigToPanel(config);
             this.loadConfigs();
-            alert(`已应用配置: ${config.name}`);
+            I18nDialog.alert(`已应用配置: ${config.name}`);
             this.hide();
         }
     }
 
     private createNewConfig(): void {
-        const name = prompt('请输入配置名称：');
+        const name = I18nDialog.prompt('请输入配置名称：');
         if (!name) return;
 
-        const description = prompt('请输入配置描述（可选）：') || '';
-        const presetType = prompt('请选择预设类型（environment/agriculture/geology/custom）：', 'custom') as ParamPresetType;
+        const description = I18nDialog.prompt('请输入配置描述（可选）：') || '';
+        const presetType = I18nDialog.prompt('请选择预设类型（environment/agriculture/geology/custom）：', 'custom') as ParamPresetType;
 
         try {
             if (presetType === 'custom') {
@@ -269,9 +270,9 @@ export class ParameterConfigPanel {
             }
 
             this.loadConfigs();
-            alert('配置创建成功');
+            I18nDialog.alert('配置创建成功');
         } catch (e) {
-            alert(`创建配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
+            I18nDialog.alert(`创建配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
         }
     }
 
@@ -279,10 +280,10 @@ export class ParameterConfigPanel {
         const config = parameterConfigManager.getConfig(configId);
         if (!config) return;
 
-        const newName = prompt('配置名称：', config.name);
+        const newName = I18nDialog.prompt('配置名称：', config.name);
         if (newName === null) return;
 
-        const newDescription = prompt('配置描述：', config.description || '');
+        const newDescription = I18nDialog.prompt('配置描述：', config.description || '');
 
         try {
             parameterConfigManager.updateConfig(configId, {
@@ -290,9 +291,9 @@ export class ParameterConfigPanel {
                 description: newDescription || undefined
             });
             this.loadConfigs();
-            alert('配置更新成功');
+            I18nDialog.alert('配置更新成功');
         } catch (e) {
-            alert(`更新配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
+            I18nDialog.alert(`更新配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
         }
     }
 
@@ -300,9 +301,9 @@ export class ParameterConfigPanel {
         try {
             const newId = parameterConfigManager.duplicateConfig(configId);
             this.loadConfigs();
-            alert('配置复制成功');
+            I18nDialog.alert('配置复制成功');
         } catch (e) {
-            alert(`复制配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
+            I18nDialog.alert(`复制配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
         }
     }
 
@@ -310,13 +311,13 @@ export class ParameterConfigPanel {
         const config = parameterConfigManager.getConfig(configId);
         if (!config) return;
 
-        if (confirm(`确定要删除配置 "${config.name}" 吗？`)) {
+        if (I18nDialog.confirm(`确定要删除配置 "${config.name}" 吗？`)) {
             try {
                 parameterConfigManager.deleteConfig(configId);
                 this.loadConfigs();
-                alert('配置删除成功');
+                I18nDialog.alert('配置删除成功');
             } catch (e) {
-                alert(`删除配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
+                I18nDialog.alert(`删除配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
             }
         }
     }
@@ -333,9 +334,9 @@ export class ParameterConfigPanel {
             a.click();
             
             URL.revokeObjectURL(url);
-            alert('配置导出成功');
+            I18nDialog.alert('配置导出成功');
         } catch (e) {
-            alert(`导出配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
+            I18nDialog.alert(`导出配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
         }
     }
 
@@ -355,12 +356,12 @@ export class ParameterConfigPanel {
                     const result = parameterConfigManager.importConfigs(configsJson);
                     
                     this.loadConfigs();
-                    alert(
+                    I18nDialog.alert(
                         `导入完成：\n成功: ${result.success}\n失败: ${result.failed}` +
                         (result.errors.length > 0 ? `\n错误:\n${result.errors.join('\n')}` : '')
                     );
                 } catch (e) {
-                    alert(`导入配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
+                    I18nDialog.alert(`导入配置失败: ${e instanceof Error ? e.message : '未知错误'}`);
                 }
             };
             reader.readAsText(file);
@@ -370,13 +371,13 @@ export class ParameterConfigPanel {
     }
 
     private resetToDefaults(): void {
-        if (confirm('确定要重置为默认配置吗？这将清除所有自定义配置。')) {
+        if (I18nDialog.confirm('确定要重置为默认配置吗？这将清除所有自定义配置。')) {
             try {
                 parameterConfigManager.resetToDefaults();
                 this.loadConfigs();
-                alert('已重置为默认配置');
+                I18nDialog.alert('已重置为默认配置');
             } catch (e) {
-                alert(`重置失败: ${e instanceof Error ? e.message : '未知错误'}`);
+                I18nDialog.alert(`重置失败: ${e instanceof Error ? e.message : '未知错误'}`);
             }
         }
     }

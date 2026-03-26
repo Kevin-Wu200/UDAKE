@@ -10,7 +10,7 @@
         windows: "Windows",
         macos: "macOS"
       },
-      en: {
+      "en-US": {
         windows: "Windows",
         macos: "macOS"
       }
@@ -18,10 +18,10 @@
 
     const templates = {
       "zh-CN": "{platform} 版本开发中，敬请期待。",
-      en: "{platform} version is under development. Stay tuned."
+      "en-US": "{platform} version is under development. Stay tuned."
     };
 
-    const lang = language === "en" ? "en" : "zh-CN";
+    const lang = language === "en-US" ? "en-US" : "zh-CN";
     const name = (platformNames[lang] && platformNames[lang][platform]) || platform;
     return templates[lang].replace("{platform}", name);
   }

@@ -5,6 +5,7 @@
 
 import { appStore } from '../store/Store';
 import type { PanelInfo } from '../../types/core';
+import { I18nDialog } from './I18nDialog.js';
 
 export class DraggablePanel {
     private panelId: string;
@@ -475,7 +476,7 @@ export class LayoutManager {
 
     public saveLayout(name?: string): void {
         if (!name) {
-            const inputName = prompt('请输入布局名称：', `布局_${new Date().toLocaleDateString()}`);
+            const inputName = I18nDialog.prompt('请输入布局名称：', `布局_${new Date().toLocaleDateString()}`);
             if (!inputName) return;
             name = inputName;
         }
@@ -490,7 +491,7 @@ export class LayoutManager {
         
         this.updateSavedLayoutsList();
         
-        alert(`布局 "${name}" 已保存`);
+        I18nDialog.alert(`布局 "${name}" 已保存`);
     }
 
     public loadLayout(name?: string): void {
@@ -499,13 +500,13 @@ export class LayoutManager {
             const layoutNames = Object.keys(savedLayouts);
 
             if (layoutNames.length === 0) {
-                alert('没有已保存的布局');
+                I18nDialog.alert('没有已保存的布局');
                 return;
             }
 
-            const inputName = prompt(`请选择要加载的布局：\n${layoutNames.join('\n')}`, layoutNames[0]);
+            const inputName = I18nDialog.prompt(`请选择要加载的布局：\n${layoutNames.join('\n')}`, layoutNames[0]);
             if (!inputName || !savedLayouts[inputName]) {
-                alert('布局不存在');
+                I18nDialog.alert('布局不存在');
                 return;
             }
             name = inputName;
@@ -517,12 +518,12 @@ export class LayoutManager {
         if (layout) {
             appStore.set('layout.panels', layout);
             appStore.set('layout.activeLayout', name);
-            alert(`布局 "${name}" 已加载`);
+            I18nDialog.alert(`布局 "${name}" 已加载`);
         }
     }
 
     public resetLayout(): void {
-        if (confirm('确定要重置为默认布局吗？')) {
+        if (I18nDialog.confirm('确定要重置为默认布局吗？')) {
             // 恢复默认布局
             const defaultPanels = {
                 'parameter': { id: 'parameter', visible: true, position: 'left', width: 300 },
@@ -534,7 +535,7 @@ export class LayoutManager {
             appStore.set('layout.panels', defaultPanels);
             appStore.set('layout.activeLayout', 'default');
             
-            alert('布局已重置为默认状态');
+            I18nDialog.alert('布局已重置为默认状态');
         }
     }
 
@@ -565,7 +566,7 @@ export class LayoutManager {
     }
 
     private deleteLayout(name: string): void {
-        if (confirm(`确定要删除布局 "${name}" 吗？`)) {
+        if (I18nDialog.confirm(`确定要删除布局 "${name}" 吗？`)) {
             const savedLayouts = appStore.get('layout.savedLayouts') as Record<string, Record<string, PanelInfo>>;
             delete savedLayouts[name];
             

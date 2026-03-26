@@ -1,3 +1,4 @@
+import { I18nDialog } from './I18nDialog.js';
 /**
  * 3D克里金插值组件
  * 提供3D数据上传、参数配置、插值执行、结果可视化
@@ -476,9 +477,9 @@ export class Kriging3DPanel {
             const resp = await fetch(`${API_BASE}/kriging3d/export/${this.taskId}?format=${format}`);
             if (!resp.ok) throw new Error('导出失败');
             const data = await resp.json();
-            alert(`导出成功: ${data.path}`);
+            I18nDialog.alert(`导出成功: ${data.path}`);
         } catch (err: any) {
-            alert(`导出失败: ${err.message}`);
+            I18nDialog.alert(`导出失败: ${err.message}`);
         }
     }
 

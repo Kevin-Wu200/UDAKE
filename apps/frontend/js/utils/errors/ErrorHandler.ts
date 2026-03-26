@@ -6,8 +6,9 @@
 import type { AppError } from '../../types/errors';
 import { ErrorType, ErrorSeverity } from '../../types/errors';
 import { ApplicationError, NetworkError, ValidationError, AuthenticationError, AuthorizationError, NotFoundError, ServerError, PluginError, CacheError } from './AppError';
-import i18n from '../../i18n/config';
+import { I18n } from '../I18n';
 import { Logger } from '../Logger';
+import { I18nDialog } from '../../components/I18nDialog.js';
 
 export interface ErrorHandlerConfig {
   enableLogging: boolean;
@@ -244,7 +245,7 @@ export class ErrorHandler {
 
     // 在未接入统一通知中心时，回退为基础提示，避免静默失败。
     if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-      alert(message);
+      I18nDialog.alert(message);
     }
   }
 
@@ -267,15 +268,15 @@ export class ErrorHandler {
 
   private getUserFriendlyMessage(error: AppError): string {
     const errorMessages: Record<ErrorType, string> = {
-      [ErrorType.NETWORK]: i18n.t('errors.network'),
-      [ErrorType.VALIDATION]: i18n.t('errors.validation'),
-      [ErrorType.AUTHENTICATION]: i18n.t('errors.authentication'),
-      [ErrorType.AUTHORIZATION]: i18n.t('errors.authorization'),
-      [ErrorType.NOT_FOUND]: i18n.t('errors.notFound'),
-      [ErrorType.SERVER]: i18n.t('errors.server'),
-      [ErrorType.PLUGIN]: i18n.t('errors.plugin'),
-      [ErrorType.CACHE]: i18n.t('errors.cache'),
-      [ErrorType.UNKNOWN]: i18n.t('errors.unknown')
+      [ErrorType.NETWORK]: I18n.t('error.network_error.message'),
+      [ErrorType.VALIDATION]: I18n.t('error.validation_error.message'),
+      [ErrorType.AUTHENTICATION]: I18n.t('error.permission_denied.message'),
+      [ErrorType.AUTHORIZATION]: I18n.t('error.permission_denied.message'),
+      [ErrorType.NOT_FOUND]: I18n.t('error.common.unknown'),
+      [ErrorType.SERVER]: I18n.t('error.server_error.message'),
+      [ErrorType.PLUGIN]: I18n.t('error.common.unknown'),
+      [ErrorType.CACHE]: I18n.t('error.common.unknown'),
+      [ErrorType.UNKNOWN]: I18n.t('error.common.unknown')
     };
 
     return errorMessages[error.type] || error.message;

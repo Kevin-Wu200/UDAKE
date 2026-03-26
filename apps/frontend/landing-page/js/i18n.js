@@ -1,7 +1,7 @@
 (function () {
-  const STORAGE_KEY = "udake_landing_language";
+  const STORAGE_KEY = "udake_locale";
   const DEFAULT_LANGUAGE = "zh-CN";
-  const SUPPORTED_LANGUAGES = ["zh-CN", "en"];
+  const SUPPORTED_LANGUAGES = ["zh-CN", "en-US"];
 
   const translations = {
     "zh-CN": {
@@ -73,7 +73,7 @@
         close: "我知道了"
       }
     },
-    en: {
+    "en-US": {
       title: "UDAKE - Intelligent Uncertainty-Driven Spatial Decision Platform",
       brand: {
         title: "Intelligent Uncertainty-Driven Spatial Decision Platform"
@@ -200,7 +200,7 @@
 
   function toggleLanguage() {
     const current = getCurrentLanguage();
-    const next = current === "zh-CN" ? "en" : "zh-CN";
+    const next = current === "zh-CN" ? "en-US" : "zh-CN";
     return applyLanguage(next);
   }
 

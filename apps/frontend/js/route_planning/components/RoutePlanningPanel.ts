@@ -15,6 +15,7 @@ import {
     OptimizationGoalInfo
 } from '../models/RoutePlanningModels';
 import { RoutePlanningService } from '../services/RoutePlanningService';
+import { I18nDialog } from '../../components/I18nDialog.js';
 
 export class RoutePlanningPanel {
     private container: HTMLElement;
@@ -277,12 +278,12 @@ export class RoutePlanningPanel {
      */
     private async planRoute() {
         if (!this.startPoint) {
-            alert('请先选择起点');
+            I18nDialog.alert('请先选择起点');
             return;
         }
 
         if (this.samplingPoints.length < 2) {
-            alert('请至少添加2个采样点');
+            I18nDialog.alert('请至少添加2个采样点');
             return;
         }
 
@@ -335,7 +336,7 @@ export class RoutePlanningPanel {
 
         } catch (error) {
             console.error('路径规划失败:', error);
-            alert(`路径规划失败: ${error}`);
+            I18nDialog.alert(`路径规划失败: ${error}`);
         } finally {
             // 恢复按钮状态
             const planBtn = document.getElementById('plan-route-btn');

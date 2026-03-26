@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://js.arcgis.com https://webapi.amap.com https://*.amap.com; style-src 'self' 'unsafe-inline' https://js.arcgis.com https://webapi.amap.com; img-src 'self' data: blob: https:; font-src 'self' data: blob:; connect-src 'self' http: https: ws: wss:; frame-src 'self' https://*.arcgis.com https://*.amap.com;">
-    <title>智能不确定性驱动空间决策平台</title>
+    <title data-i18n="app.title">智能不确定性驱动空间决策平台</title>
 
     <!-- 自定义样式 -->
     <link rel="stylesheet" href="css/theme-variables.css">
@@ -73,17 +73,17 @@
             <div class="header-content">
                 <div class="header-left"></div>
                 <h1 class="title">
-                    <span class="title-zh">智能不确定性驱动空间决策平台</span>
-                    <span class="title-en">UDAKE</span>
+                    <span class="title-zh" data-i18n="app.title">智能不确定性驱动空间决策平台</span>
+                    <span class="title-en" data-i18n="app.subtitle">UDAKE</span>
                 </h1>
                 <div class="header-right">
-                    <button id="settings-btn" class="btn btn-secondary" title="设置">
+                    <button id="settings-btn" class="btn btn-secondary" title="设置" data-i18n-title="settings.button">
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <circle cx="12" cy="12" r="3"></circle>
                             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                         </svg>
                     </button>
-                    <button id="new-project-btn" class="btn btn-primary">新建项目</button>
+                    <button id="new-project-btn" class="btn btn-primary" data-i18n="nav.newProject">新建项目</button>
                 </div>
             </div>
         </header>
@@ -94,92 +94,92 @@
             <aside class="sidebar">
                 <!-- 项目面板 -->
                 <div class="panel" id="project-panel" style="display: none;">
-                    <h2 class="panel-title">当前项目</h2>
+                    <h2 class="panel-title" data-i18n="panel.project">当前项目</h2>
                     <div class="panel-content" id="project-content">
                         <!-- 采样组件将动态插入这里 -->
                     </div>
                 </div>
 
                 <div class="panel">
-                    <h2 class="panel-title">数据上传</h2>
+                    <h2 class="panel-title" data-i18n="upload.title">数据上传</h2>
                     <div class="panel-content">
                         <div id="file-picker" class="file-picker">
-                            <span id="file-name">点击选择 GeoJSON 文件</span>
+                            <span id="file-name" data-i18n="upload.selectFile">点击选择 GeoJSON 文件</span>
                             <input type="file"
                                    id="file-input"
                                    accept=".geojson,.json"
                                    class="file-input">
                         </div>
-                        <button id="upload-btn" class="btn btn-primary">上传数据</button>
+                        <button id="upload-btn" class="btn btn-primary" data-i18n="upload.button">上传数据</button>
                         <div id="upload-status" class="status-message"></div>
                     </div>
                 </div>
 
                 <div class="panel">
-                    <h2 class="panel-title">插值参数</h2>
+                    <h2 class="panel-title" data-i18n="kriging.title">插值参数</h2>
                     <div class="panel-content">
                         <div class="form-group">
-                            <label>克里金方法</label>
+                            <label data-i18n="kriging.method">克里金方法</label>
                             <select id="kriging-method" class="select">
-                                <option value="ordinary">普通克里金</option>
-                                <option value="universal">泛克里金</option>
-                                <option value="block">分块克里金</option>
+                                <option value="ordinary" data-i18n="kriging.ordinary">普通克里金</option>
+                                <option value="universal" data-i18n="kriging.universal">泛克里金</option>
+                                <option value="block" data-i18n="kriging.block">分块克里金</option>
                             </select>
                         </div>
 
                         <div class="form-group">
-                            <label>变异函数模型</label>
+                            <label data-i18n="kriging.variogram">变异函数模型</label>
                             <select id="variogram-model" class="select">
-                                <option value="spherical">球状模型</option>
-                                <option value="exponential">指数模型</option>
-                                <option value="gaussian">高斯模型</option>
+                                <option value="spherical" data-i18n="kriging.spherical">球状模型</option>
+                                <option value="exponential" data-i18n="kriging.exponential">指数模型</option>
+                                <option value="gaussian" data-i18n="kriging.gaussian">高斯模型</option>
                             </select>
                         </div>
 
                         <div class="form-group slider-group">
-                            <label>网格分辨率 <span class="param-value" id="grid-resolution-value">100</span></label>
+                            <label data-i18n="kriging.gridResolution">网格分辨率 <span class="param-value" id="grid-resolution-value">100</span></label>
                             <input type="range" id="grid-resolution-slider" class="slider" min="50" max="500" value="100" step="10">
                             <input type="number" id="grid-resolution" class="input" value="100" min="50" max="500" step="10">
-                            <span class="param-description">影响输出栅格的精细度，值越大越精细但计算越慢</span>
+                            <span class="param-description" data-i18n="kriging.gridResolution.desc">影响输出栅格的精细度，值越大越精细但计算越慢</span>
                         </div>
 
                         <div class="form-group slider-group">
-                            <label>滞后数 <span class="param-value" id="nlags-value">12</span></label>
+                            <label data-i18n="kriging.nlags">滞后数 <span class="param-value" id="nlags-value">12</span></label>
                             <input type="range" id="nlags-slider" class="slider" min="6" max="24" value="12" step="1">
                             <input type="number" id="nlags" class="input" value="12" min="6" max="24" step="1">
-                            <span class="param-description">变异函数计算时的距离分组数量</span>
+                            <span class="param-description" data-i18n="kriging.nlags.desc">变异函数计算时的距离分组数量</span>
                         </div>
 
                         <div class="form-group slider-group">
-                            <label>变差值 <span class="param-value" id="nugget-value">0.0</span></label>
+                            <label data-i18n="kriging.nugget">变差值 <span class="param-value" id="nugget-value">0.0</span></label>
                             <input type="range" id="nugget-slider" class="slider" min="0" max="1" value="0" step="0.05">
                             <input type="number" id="nugget" class="input" value="0" min="0" max="1" step="0.05">
-                            <span class="param-description">表示测量误差或微观变异，值越小拟合越好</span>
+                            <span class="param-description" data-i18n="kriging.nugget.desc">表示测量误差或微观变异，值越小拟合越好</span>
                         </div>
 
                         <div class="form-group slider-group">
-                            <label>基台值 <span class="param-value" id="sill-value">1.0</span></label>
+                            <label data-i18n="kriging.sill">基台值 <span class="param-value" id="sill-value">1.0</span></label>
                             <input type="range" id="sill-slider" class="slider" min="0" max="10" value="1" step="0.1">
                             <input type="number" id="sill" class="input" value="1" min="0" max="10" step="0.1">
-                            <span class="param-description">变异函数的渐近值，表示总方差</span>
+                            <span class="param-description" data-i18n="kriging.sill.desc">变异函数的渐近值，表示总方差</span>
                         </div>
 
                         <div class="form-group slider-group">
-                            <label>范围值 <span class="param-value" id="range-value">10.0</span></label>
+                            <label data-i18n="kriging.range">范围值 <span class="param-value" id="range-value">10.0</span></label>
                             <input type="range" id="range-slider" class="slider" min="0" max="100" value="10" step="1">
                             <input type="number" id="range" class="input" value="10" min="0" max="100" step="1">
-                            <span class="param-description">变异函数达到基台值时的距离，表示空间相关范围</span>
+                            <span class="param-description" data-i18n="kriging.range.desc">变异函数达到基台值时的距离，表示空间相关范围</span>
                         </div>
 
-                        <button id="start-kriging-btn" class="btn btn-primary" disabled>开始插值</button>
+                        <button id="start-kriging-btn" class="btn btn-primary" disabled data-i18n="kriging.start">开始插值</button>
                     </div>
                 </div>
 
                 <div class="panel">
-                    <h2 class="panel-title">任务状态</h2>
+                    <h2 class="panel-title" data-i18n="task.title">任务状态</h2>
                     <div class="panel-content">
                         <div id="task-status" class="task-status">
-                            <p>暂无任务</p>
+                            <p data-i18n="task.noTask">暂无任务</p>
                         </div>
                         <div id="progress-bar" class="progress-bar" style="display: none;">
                             <div class="progress-fill"></div>
@@ -188,22 +188,22 @@
                 </div>
 
                 <div class="panel" id="export-panel" style="display: none;">
-                    <h2 class="panel-title">结果导出</h2>
+                    <h2 class="panel-title" data-i18n="export.title">结果导出</h2>
                     <div class="panel-content">
                         <div class="export-section">
-                            <h3 class="export-subtitle">预测结果</h3>
+                            <h3 class="export-subtitle" data-i18n="export.prediction">预测结果</h3>
                             <div class="export-buttons">
-                                <button class="btn btn-export" id="export-prediction-geojson">导出 GeoJSON</button>
-                                <button class="btn btn-export" id="export-prediction-shp">导出 Shapefile</button>
-                                <button class="btn btn-export" id="export-prediction-tif">导出 GeoTIFF</button>
+                                <button class="btn btn-export" id="export-prediction-geojson" data-i18n="export.geojson">导出 GeoJSON</button>
+                                <button class="btn btn-export" id="export-prediction-shp" data-i18n="export.shapefile">导出 Shapefile</button>
+                                <button class="btn btn-export" id="export-prediction-tif" data-i18n="export.geotiff">导出 GeoTIFF</button>
                             </div>
                         </div>
                         <div class="export-section">
-                            <h3 class="export-subtitle">方差结果</h3>
+                            <h3 class="export-subtitle" data-i18n="export.variance">方差结果</h3>
                             <div class="export-buttons">
-                                <button class="btn btn-export" id="export-variance-geojson">导出 GeoJSON</button>
-                                <button class="btn btn-export" id="export-variance-shp">导出 Shapefile</button>
-                                <button class="btn btn-export" id="export-variance-tif">导出 GeoTIFF</button>
+                                <button class="btn btn-export" id="export-variance-geojson" data-i18n="export.geojson">导出 GeoJSON</button>
+                                <button class="btn btn-export" id="export-variance-shp" data-i18n="export.shapefile">导出 Shapefile</button>
+                                <button class="btn btn-export" id="export-variance-tif" data-i18n="export.geotiff">导出 GeoTIFF</button>
                             </div>
                         </div>
                         <div id="export-status" class="status-message"></div>
@@ -211,20 +211,20 @@
                 </div>
 
                 <div class="panel">
-                    <h2 class="panel-title">图层控制</h2>
+                    <h2 class="panel-title" data-i18n="layer.title">图层控制</h2>
                     <div class="panel-content">
                         <div class="layer-control">
                             <label class="checkbox-label">
                                 <input type="checkbox" id="layer-points" checked>
-                                <span>采样点</span>
+                                <span data-i18n="layer.points">采样点</span>
                             </label>
                             <label class="checkbox-label">
                                 <input type="checkbox" id="layer-prediction">
-                                <span>预测栅格</span>
+                                <span data-i18n="layer.prediction">预测栅格</span>
                             </label>
                             <label class="checkbox-label">
                                 <input type="checkbox" id="layer-variance">
-                                <span>方差栅格</span>
+                                <span data-i18n="layer.variance">方差栅格</span>
                             </label>
                         </div>
                     </div>
@@ -233,37 +233,37 @@
                 <!-- 3D克里金面板 -->
                 <div class="panel" id="kriging3d-section">
                     <h2 class="panel-title" style="cursor:pointer;" onclick="document.getElementById('kriging3d-container').style.display=document.getElementById('kriging3d-container').style.display==='none'?'block':'none'">
-                        3D克里金插值 ▾
+                        <span data-i18n="panel.kriging3d">3D克里金插值</span> ▾
                     </h2>
                     <div id="kriging3d-container" style="display:none;"></div>
                 </div>
 
                 <!-- 深度学习面板 -->
                 <div class="panel" id="deep-learning-section">
-                    <h2 class="panel-title" style="cursor:pointer;">深度学习 ▸</h2>
+                    <h2 class="panel-title" style="cursor:pointer;"><span data-i18n="panel.deepLearning">深度学习</span> ▸</h2>
                     <div id="deep-learning-container" style="display:none;"></div>
                 </div>
 
                 <!-- 前端功能集成补齐面板 -->
                 <div class="panel" id="frontend-integration-section">
-                    <h2 class="panel-title" style="cursor:pointer;">前端功能集成补齐 ▸</h2>
+                    <h2 class="panel-title" style="cursor:pointer;"><span data-i18n="panel.frontendIntegration">前端功能集成补齐</span> ▸</h2>
                     <div id="frontend-integration-container" style="display:none;"></div>
                 </div>
 
                 <div class="panel cache-status-panel" id="cache-status-panel">
-                    <h2 class="panel-title">缓存状态</h2>
+                    <h2 class="panel-title" data-i18n="cache.title">缓存状态</h2>
                     <div class="panel-content">
                         <div class="cache-status-item">
                             <div class="cache-status-label">
                                 <span class="cache-status-icon" id="cache-network-icon"></span>
-                                <span class="cache-status-text">网络状态</span>
+                                <span class="cache-status-text" data-i18n="cache.network">网络状态</span>
                             </div>
-                            <span class="cache-status-value" id="cache-network-status">检测中...</span>
+                            <span class="cache-status-value" id="cache-network-status" data-i18n="cache.checking">检测中...</span>
                         </div>
                         <div class="cache-status-item">
                             <div class="cache-status-label">
                                 <span class="cache-status-icon storage-icon">💾</span>
-                                <span class="cache-status-text">存储使用</span>
+                                <span class="cache-status-text" data-i18n="cache.storage">存储使用</span>
                             </div>
                             <div class="cache-storage-bar">
                                 <div class="cache-storage-fill" id="cache-storage-fill"></div>
@@ -273,12 +273,12 @@
                         <div class="cache-status-item">
                             <div class="cache-status-label">
                                 <span class="cache-status-icon sync-icon">🔄</span>
-                                <span class="cache-status-text">待同步</span>
+                                <span class="cache-status-text" data-i18n="cache.pendingSync">待同步</span>
                             </div>
                             <span class="cache-status-value" id="cache-pending-count">0</span>
                         </div>
                         <button class="btn btn-secondary btn-sm" id="open-cache-management">
-                            管理缓存
+                            <span data-i18n="cache.manage">管理缓存</span>
                         </button>
                     </div>
                 </div>
@@ -288,7 +288,7 @@
             <div class="map-container">
                 <div id="viewDiv" class="map-view"></div>
                 <div id="info-panel" class="info-panel" style="display: none;">
-                    <h3>点击信息</h3>
+                    <h3 data-i18n="map.clickInfo">点击信息</h3>
                     <div id="info-content"></div>
                 </div>
 
@@ -300,7 +300,7 @@
                 </aside>
 
                 <!-- 侧边栏切换按钮 -->
-                <button class="sidebar-toggle" id="sidebar-toggle" title="切换侧边栏"></button>
+                <button class="sidebar-toggle" id="sidebar-toggle" title="切换侧边栏" data-i18n-title="sidebar.toggle"></button>
             </div>
         </main>
     </div>

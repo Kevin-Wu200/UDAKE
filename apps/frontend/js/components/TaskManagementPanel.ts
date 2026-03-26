@@ -5,6 +5,7 @@
 
 import { Task, TaskStatus, TaskPriority } from '../../types/task-manager';
 import TaskManager from '../managers/TaskManager';
+import { I18nDialog } from './I18nDialog.js';
 
 export class TaskManagementPanel {
     private container: HTMLElement;
@@ -376,7 +377,7 @@ export class TaskManagementPanel {
 
         console.log('任务结果:', task.result);
         // 这里可以实现结果显示逻辑
-        alert(`任务结果:\n${JSON.stringify(task.result, null, 2)}`);
+        I18nDialog.alert(`任务结果:\n${JSON.stringify(task.result, null, 2)}`);
     }
 
     /**
@@ -446,7 +447,7 @@ export class TaskManagementPanel {
      * 清空历史
      */
     private async clearHistory(): Promise<void> {
-        if (confirm('确定要清空所有历史记录吗？')) {
+        if (I18nDialog.confirm('确定要清空所有历史记录吗？')) {
             await this.taskManager.clearHistory();
             await this.loadTasks();
         }

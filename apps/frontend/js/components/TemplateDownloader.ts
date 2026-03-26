@@ -1,3 +1,4 @@
+import { I18nDialog } from './I18nDialog.js';
 /**
  * 数据导入模板下载管理器
  * 提供 GeoJSON 模板下载、示例数据和验证规则说明
@@ -127,7 +128,7 @@ export class TemplateDownloader {
                 (window.electronAPI as any).openDownloadFolder();
             } else {
                 // 在浏览器环境中，尝试打开下载文件夹
-                alert('请在浏览器的下载历史中找到下载的文件');
+                I18nDialog.alert('请在浏览器的下载历史中找到下载的文件');
             }
             document.body.removeChild(dialog);
         });

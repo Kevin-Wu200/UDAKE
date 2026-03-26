@@ -10,6 +10,7 @@ import { unitManager } from '../services/UnitManager.js';
 import type { Bounds, CoordinateSystem } from '../../types/core';
 
 import { I18n } from '../utils/I18n.js';
+import { I18nDialog } from './I18nDialog.js';
 
 /** 采样建议点 */
 interface Recommendation {
@@ -817,7 +818,7 @@ export class SamplingRecommendationPanel {
             URL.revokeObjectURL(url);
         } catch (error) {
             console.error('导出失败:', error);
-            alert('导出失败: ' + ((error as Error).message || '未知错误'));
+            I18nDialog.alert('导出失败: ' + ((error as Error).message || '未知错误'));
         }
     }
 

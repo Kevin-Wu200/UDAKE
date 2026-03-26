@@ -4,6 +4,7 @@
  */
 
 import { ChartService, type SamplingEfficiencyData } from '../services/ChartService';
+import { I18nDialog } from './I18nDialog.js';
 
 export interface SamplingEfficiencyChartConfig {
   container: HTMLElement;
@@ -777,7 +778,7 @@ export class SamplingEfficiencyChart {
       ChartService.downloadFile(blob, `sampling-efficiency-chart.${format}`);
     } catch (error) {
       console.error('导出图表失败:', error);
-      alert('导出图表失败，请重试');
+      I18nDialog.alert('导出图表失败，请重试');
     }
   }
 

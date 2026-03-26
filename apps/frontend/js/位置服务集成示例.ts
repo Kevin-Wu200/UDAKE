@@ -10,6 +10,7 @@ import { sensorManager } from './services/SensorManager';
 import { createLocationServicePanel } from './components/LocationServicePanel';
 import { createTrackVisualization } from './components/TrackVisualization';
 import { createGeofenceVisualization } from './components/GeofenceVisualization';
+import { I18nDialog } from './components/I18nDialog.js';
 
 /**
  * 位置服务集成类
@@ -134,7 +135,7 @@ export class LocationServiceIntegration {
   private handleAddGeofence(): void {
     // 进入创建围栏模式
     (window as any).isCreatingGeofence = true;
-    alert('请在地图上点击以创建圆形围栏');
+    I18nDialog.alert('请在地图上点击以创建圆形围栏');
   }
 
   /**

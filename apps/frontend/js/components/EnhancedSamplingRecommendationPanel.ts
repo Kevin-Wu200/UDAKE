@@ -5,6 +5,7 @@
 import { APIService } from '../services/API封装.js';
 import { I18n } from '../utils/I18n.js';
 import type { IMapAdapterExtended } from '../../types/app';
+import { I18nDialog } from './I18nDialog.js';
 
 /** 候选点 */
 interface CandidatePoint {
@@ -570,7 +571,7 @@ export class EnhancedSamplingRecommendationPanel {
      * 显示错误消息
      */
     private showError(message: string): void {
-        alert(message);
+        I18nDialog.alert(message);
     }
 
     private openDialog(options: {

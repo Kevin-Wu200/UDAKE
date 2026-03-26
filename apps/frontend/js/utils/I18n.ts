@@ -44,6 +44,16 @@ const ZH_CN: LocaleMessages = {
     'kriging.exponential': '指数模型',
     'kriging.gaussian': '高斯模型',
     'kriging.resolution': '网格分辨率',
+    'kriging.gridResolution': '网格分辨率',
+    'kriging.gridResolution.desc': '影响输出栅格的精细度，值越大越精细但计算越慢',
+    'kriging.nlags': '滞后数',
+    'kriging.nlags.desc': '变异函数计算时的距离分组数量',
+    'kriging.nugget': '变差值',
+    'kriging.nugget.desc': '表示测量误差或微观变异，值越小拟合越好',
+    'kriging.sill': '基台值',
+    'kriging.sill.desc': '变异函数的渐近值，表示总方差',
+    'kriging.range': '范围值',
+    'kriging.range.desc': '变异函数达到基台值时的距离，表示空间相关范围',
     'kriging.start': '开始插值',
     'kriging.resolutionError': '网格分辨率必须为大于0的整数',
 
@@ -61,6 +71,9 @@ const ZH_CN: LocaleMessages = {
     'export.prediction': '预测结果',
     'export.variance': '方差结果',
     'export.enhanced': '增强导出',
+    'export.geojson': '导出 GeoJSON',
+    'export.shapefile': '导出 Shapefile',
+    'export.geotiff': '导出 GeoTIFF',
     'export.csv': '导出 CSV',
     'export.report': '生成报告',
     'export.downloading': '正在下载 {filename}...',
@@ -187,6 +200,7 @@ const ZH_CN: LocaleMessages = {
 
     // 设置
     'settings.title': '设置',
+    'settings.button': '设置',
     'settings.language': '语言',
     'settings.language.zh-CN': '简体中文',
     'settings.language.en-US': 'English',
@@ -242,6 +256,21 @@ const ZH_CN: LocaleMessages = {
     'panel.task': '任务状态',
     'panel.export': '结果导出',
     'panel.layer': '图层控制',
+    'panel.kriging3d': '3D克里金插值',
+    'panel.deepLearning': '深度学习',
+    'panel.frontendIntegration': '前端功能集成补齐',
+
+    // 缓存
+    'cache.title': '缓存状态',
+    'cache.network': '网络状态',
+    'cache.checking': '检测中...',
+    'cache.storage': '存储使用',
+    'cache.pendingSync': '待同步',
+    'cache.manage': '管理缓存',
+
+    // 地图
+    'map.clickInfo': '点击信息',
+    'sidebar.toggle': '切换侧边栏',
 
     // 采样建议
     'recommendation.title': '采样建议',
@@ -300,6 +329,16 @@ const EN_US: LocaleMessages = {
     'kriging.exponential': 'Exponential',
     'kriging.gaussian': 'Gaussian',
     'kriging.resolution': 'Grid Resolution',
+    'kriging.gridResolution': 'Grid Resolution',
+    'kriging.gridResolution.desc': 'Controls output raster detail. Higher values give finer detail but slower computation',
+    'kriging.nlags': 'Number of Lags',
+    'kriging.nlags.desc': 'Distance group count used in variogram computation',
+    'kriging.nugget': 'Nugget',
+    'kriging.nugget.desc': 'Represents measurement error or micro-scale variation; smaller values usually fit better',
+    'kriging.sill': 'Sill',
+    'kriging.sill.desc': 'Asymptotic variogram value, representing total variance',
+    'kriging.range': 'Range',
+    'kriging.range.desc': 'Distance where the variogram reaches sill, indicating spatial correlation range',
     'kriging.start': 'Start Interpolation',
     'kriging.resolutionError': 'Grid resolution must be a positive integer',
     'task.title': 'Task Status',
@@ -313,6 +352,9 @@ const EN_US: LocaleMessages = {
     'export.prediction': 'Prediction',
     'export.variance': 'Variance',
     'export.enhanced': 'Enhanced Export',
+    'export.geojson': 'Export GeoJSON',
+    'export.shapefile': 'Export Shapefile',
+    'export.geotiff': 'Export GeoTIFF',
     'export.csv': 'Export CSV',
     'export.report': 'Generate Report',
     'export.downloading': 'Downloading {filename}...',
@@ -427,6 +469,7 @@ const EN_US: LocaleMessages = {
 
     // 设置
     'settings.title': 'Settings',
+    'settings.button': 'Settings',
     'settings.language': 'Language',
     'settings.language.zh-CN': '简体中文',
     'settings.language.en-US': 'English',
@@ -482,6 +525,21 @@ const EN_US: LocaleMessages = {
     'panel.task': 'Task Status',
     'panel.export': 'Export Results',
     'panel.layer': 'Layer Control',
+    'panel.kriging3d': '3D Kriging Interpolation',
+    'panel.deepLearning': 'Deep Learning',
+    'panel.frontendIntegration': 'Frontend Integration Completion',
+
+    // Cache
+    'cache.title': 'Cache Status',
+    'cache.network': 'Network Status',
+    'cache.checking': 'Checking...',
+    'cache.storage': 'Storage Usage',
+    'cache.pendingSync': 'Pending Sync',
+    'cache.manage': 'Manage Cache',
+
+    // Map
+    'map.clickInfo': 'Click Information',
+    'sidebar.toggle': 'Toggle Sidebar',
 
     // 采样建议
     'recommendation.title': 'Sampling Recommendations',
@@ -537,6 +595,10 @@ export class I18n {
         if (!LOCALES[this._locale]) {
             this._locale = this._locale.startsWith('zh') ? 'zh-CN' : 'en-US';
         }
+        if (typeof document !== 'undefined') {
+            document.documentElement.lang = this._locale.startsWith('zh') ? 'zh-CN' : 'en';
+            this.applyToDOM(document);
+        }
     }
 
     static get locale(): string { return this._locale; }
@@ -545,8 +607,11 @@ export class I18n {
         if (!LOCALES[locale]) return;
         this._locale = locale;
         localStorage.setItem('udake_locale', locale);
+        if (typeof document !== 'undefined') {
+            document.documentElement.lang = locale.startsWith('zh') ? 'zh-CN' : 'en';
+            this.applyToDOM(document);
+        }
         this._listeners.forEach(cb => { try { cb(locale); } catch (e) { console.error(e); } });
-        document.documentElement.lang = locale.startsWith('zh') ? 'zh-CN' : 'en';
     }
 
     /** 获取翻译文本，支持 {key} 插值 */
@@ -599,6 +664,62 @@ export class I18n {
 
     static clearMissingKeyUsage(): void {
         this._missingKeyUsage.clear();
+    }
+
+    static applyToDOM(root: ParentNode = document): void {
+        if (typeof document === 'undefined') {
+            return;
+        }
+
+        const hasElementCtor = typeof Element !== 'undefined';
+        const isElementRoot = hasElementCtor && root instanceof Element;
+        const canQuery = typeof (root as ParentNode & { querySelectorAll?: unknown }).querySelectorAll === 'function';
+
+        if (!isElementRoot && !canQuery) {
+            return;
+        }
+
+        const resolveNodes = (selector: string): Element[] => {
+            const nodes: Element[] = [];
+            if (isElementRoot && (root as Element).matches(selector)) {
+                nodes.push(root);
+            }
+            if (canQuery) {
+                nodes.push(...Array.from(root.querySelectorAll(selector)));
+            }
+            return nodes;
+        };
+
+        resolveNodes('[data-i18n]').forEach((node) => {
+            const key = node.getAttribute('data-i18n');
+            if (key) {
+                node.textContent = this.t(key);
+            }
+        });
+
+        const attrPairs: Array<[string, string]> = [
+            ['data-i18n-title', 'title'],
+            ['data-i18n-placeholder', 'placeholder'],
+            ['data-i18n-aria-label', 'aria-label'],
+            ['data-i18n-value', 'value']
+        ];
+
+        attrPairs.forEach(([dataAttr, targetAttr]) => {
+            resolveNodes(`[${dataAttr}]`).forEach((node) => {
+                const key = node.getAttribute(dataAttr);
+                if (!key) {
+                    return;
+                }
+
+                const value = this.t(key);
+                if (targetAttr === 'value' && typeof HTMLInputElement !== 'undefined' && node instanceof HTMLInputElement) {
+                    node.value = value;
+                    return;
+                }
+
+                node.setAttribute(targetAttr, value);
+            });
+        });
     }
 
     /** 获取可用语言列表 */

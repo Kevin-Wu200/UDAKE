@@ -3,7 +3,7 @@
  * 提供语言切换功能
  */
 
-import i18n from '../i18n/config';
+import { I18n } from '../utils/I18n';
 
 interface LanguageOption {
   code: string;
@@ -23,7 +23,7 @@ export class LanguageSwitcher {
 
   constructor(container: HTMLElement, onLanguageChange?: (lang: string) => void) {
     this.container = container;
-    this.currentLanguage = localStorage.getItem('language') || 'zh-CN';
+    this.currentLanguage = localStorage.getItem('udake_locale') || I18n.locale || 'zh-CN';
     this.onLanguageChange = onLanguageChange;
     this.render();
   }
@@ -80,8 +80,8 @@ export class LanguageSwitcher {
   private changeLanguage(langCode: string): void {
     this.currentLanguage = langCode;
 
-    // 更新 i18next
-    i18n.changeLanguage(langCode);
+    // 更新统一 I18n 管理器
+    I18n.setLocale(langCode);
 
     // 更新 UI
     this.render();
@@ -92,7 +92,7 @@ export class LanguageSwitcher {
     }
 
     // 保存到 localStorage
-    localStorage.setItem('language', langCode);
+    localStorage.setItem('udake_locale', langCode);
   }
 }
 

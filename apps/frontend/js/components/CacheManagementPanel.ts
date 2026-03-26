@@ -4,6 +4,7 @@
  */
 
 import { OfflineManager } from '../utils/OfflineManager';
+import { I18nDialog } from './I18nDialog.js';
 
 interface CacheInfo {
     name: string;
@@ -303,7 +304,7 @@ export class CacheManagementPanel {
      * 清除所有缓存
      */
     private async clearAllCache(): Promise<void> {
-        if (!confirm('确定要清除所有缓存吗？此操作不可撤销。')) {
+        if (!I18nDialog.confirm('确定要清除所有缓存吗？此操作不可撤销。')) {
             return;
         }
 

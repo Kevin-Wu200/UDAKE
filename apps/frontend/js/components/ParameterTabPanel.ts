@@ -7,6 +7,7 @@ import { ParameterAdjustmentPanel } from './ParameterAdjustmentPanel.js';
 import { ParameterHistoryManager } from './ParameterHistoryManager.js';
 import { ParameterComparisonPanel } from './ParameterComparisonPanel.js';
 import { ParameterInfoPanel } from './ParameterInfoPanel.js';
+import { I18nDialog } from './I18nDialog.js';
 
 export class ParameterTabPanel {
     private static instance: ParameterTabPanel;
@@ -228,7 +229,7 @@ export class ParameterTabPanel {
      * 保存参数
      */
     private saveParameters(): void {
-        const name = prompt('请输入参数组合名称:');
+        const name = I18nDialog.prompt('请输入参数组合名称:');
         if (!name) return;
 
         const panel = ParameterAdjustmentPanel.getInstance();
@@ -238,7 +239,7 @@ export class ParameterTabPanel {
         const manager = ParameterHistoryManager.getInstance();
         manager.addRecord(name, panel.getParameters());
 
-        alert('参数已保存');
+        I18nDialog.alert('参数已保存');
         this.loadHistoryList();
     }
 
@@ -334,7 +335,7 @@ export class ParameterTabPanel {
                 } else if (action === 'apply') {
                     this.applyHistoryRecord(id!);
                 } else if (action === 'delete') {
-                    if (confirm('确定要删除这条记录吗？')) {
+                    if (I18nDialog.confirm('确定要删除这条记录吗？')) {
                         manager.deleteRecord(id!);
                         this.loadHistoryList();
                     }
@@ -358,7 +359,7 @@ export class ParameterTabPanel {
             panel.setParameter(key, value);
         });
 
-        alert(`已应用参数组合: ${record.name}`);
+        I18nDialog.alert(`已应用参数组合: ${record.name}`);
         this.switchTab('adjustment');
     }
 
@@ -419,7 +420,7 @@ export class ParameterTabPanel {
                 const manager = ParameterHistoryManager.getInstance();
                 const result = manager.importRecords(json);
 
-                alert(`导入成功: ${result.success} 条，失败: ${result.failed} 条`);
+                I18nDialog.alert(`导入成功: ${result.success} 条，失败: ${result.failed} 条`);
                 this.loadHistoryList();
             };
             reader.readAsText(file);

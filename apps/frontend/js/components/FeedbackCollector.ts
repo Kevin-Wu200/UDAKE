@@ -1,3 +1,4 @@
+import { I18nDialog } from './I18nDialog.js';
 /**
  * 用户反馈收集组件
  * 反馈表单、分类、优先级、附件、提交和本地统计
@@ -302,12 +303,12 @@ export class FeedbackCollector {
             const file = files[i];
 
             if (this.selectedFiles.length >= maxFiles) {
-                alert(`最多只能上传 ${maxFiles} 个文件`);
+                I18nDialog.alert(`最多只能上传 ${maxFiles} 个文件`);
                 break;
             }
 
             if (file.size > maxSize) {
-                alert(`文件 ${file.name} 超过 5MB 限制`);
+                I18nDialog.alert(`文件 ${file.name} 超过 5MB 限制`);
                 continue;
             }
 
@@ -344,7 +345,7 @@ export class FeedbackCollector {
         const content = (overlay.querySelector('#feedback-content') as HTMLTextAreaElement).value.trim();
         if (!content) {
             (overlay.querySelector('#feedback-content') as HTMLTextAreaElement).focus();
-            alert('请填写反馈内容');
+            I18nDialog.alert('请填写反馈内容');
             return;
         }
 
@@ -368,7 +369,7 @@ export class FeedbackCollector {
             browserInfo: this._getBrowserInfo(),
         });
 
-        alert('反馈已提交，感谢您的建议！');
+        I18nDialog.alert('反馈已提交，感谢您的建议！');
         this.hide();
     }
 
@@ -452,7 +453,7 @@ export class FeedbackCollector {
 
     /** 清除所有反馈 */
     static clearAll(): void {
-        if (confirm('确定要清除所有反馈吗？此操作不可恢复。')) {
+        if (I18nDialog.confirm('确定要清除所有反馈吗？此操作不可恢复。')) {
             localStorage.removeItem(STORAGE_KEY);
         }
     }

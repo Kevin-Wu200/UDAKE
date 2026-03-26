@@ -5,6 +5,7 @@
 
 import './config/主题变量';
 import TouchGestureManager, { GestureType } from './TouchGestureManager';
+import { I18nDialog } from './I18nDialog.js';
 
 export interface GestureSetting {
     type: GestureType;
@@ -288,7 +289,7 @@ class GestureSettingsPanel {
 
         if (resetButton) {
             resetButton.addEventListener('click', () => {
-                if (confirm('确定要重置所有手势设置为默认值吗？')) {
+                if (I18nDialog.confirm('确定要重置所有手势设置为默认值吗？')) {
                     this.resetToDefaults();
                 }
             });
