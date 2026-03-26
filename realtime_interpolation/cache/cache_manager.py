@@ -13,6 +13,7 @@ import threading
 import time
 import hashlib
 import pickle
+import weakref
 from collections import defaultdict
 
 from .cache_strategy import (
@@ -44,6 +45,11 @@ class CacheStats:
 
 class CacheManager:
     """缓存管理器"""
+    # 共享清理线程，避免每个实例都启动后台线程导致线程数失控
+    _cleanup_registry = weakref.WeakSet()
+    _cleanup_lock = threading.Lock()
+    _cleanup_wakeup = threading.Event()
+    _cleanup_thread: Optional[threading.Thread] = None
 
     def __init__(
         self,
@@ -92,6 +98,7 @@ class CacheManager:
 
         # 自动清理线程
         self.cleanup_thread = None
+        self._next_cleanup_at = time.time() + max(1, int(self.cleanup_interval))
         if self.enable_auto_cleanup:
             self._start_cleanup_thread()
 
@@ -247,15 +254,71 @@ class CacheManager:
         return time.time() > self.ttl_map[key]
 
     def _start_cleanup_thread(self) -> None:
-        """启动清理线程"""
-        def cleanup_loop():
-            while True:
-                time.sleep(self.cleanup_interval)
-                self._cleanup_expired()
+        """注册到共享清理线程"""
+        self._next_cleanup_at = time.time() + max(1, int(self.cleanup_interval))
+        with CacheManager._cleanup_lock:
+            CacheManager._cleanup_registry.add(self)
+            if (
+                CacheManager._cleanup_thread is None
+                or not CacheManager._cleanup_thread.is_alive()
+            ):
+                CacheManager._cleanup_thread = threading.Thread(
+                    target=CacheManager._shared_cleanup_loop,
+                    name="cache-manager-cleanup",
+                    daemon=True
+                )
+                CacheManager._cleanup_thread.start()
+                logger.info("缓存共享清理线程已启动")
+            self.cleanup_thread = CacheManager._cleanup_thread
 
-        self.cleanup_thread = threading.Thread(target=cleanup_loop, daemon=True)
-        self.cleanup_thread.start()
-        logger.info("缓存清理线程已启动")
+        CacheManager._cleanup_wakeup.set()
+
+    @classmethod
+    def _shared_cleanup_loop(cls) -> None:
+        """共享清理循环，按实例的 cleanup_interval 执行过期清理"""
+        while True:
+            now = time.time()
+            next_wait = 1.0
+            has_active_manager = False
+
+            for manager in list(cls._cleanup_registry):
+                if not manager.enable_auto_cleanup:
+                    continue
+                has_active_manager = True
+
+                if now >= manager._next_cleanup_at:
+                    try:
+                        manager._cleanup_expired()
+                    except Exception as exc:
+                        logger.exception(f"缓存自动清理失败: {exc}")
+                    finally:
+                        manager._next_cleanup_at = time.time() + max(
+                            1, int(manager.cleanup_interval)
+                        )
+
+                wait_for_manager = max(0.2, manager._next_cleanup_at - now)
+                next_wait = min(next_wait, wait_for_manager)
+
+            if not has_active_manager:
+                next_wait = 1.0
+
+            cls._cleanup_wakeup.wait(timeout=next_wait)
+            cls._cleanup_wakeup.clear()
+
+    def close(self) -> None:
+        """注销共享清理线程中的当前实例。"""
+        self.enable_auto_cleanup = False
+        with CacheManager._cleanup_lock:
+            CacheManager._cleanup_registry.discard(self)
+        self.cleanup_thread = None
+        CacheManager._cleanup_wakeup.set()
+
+    def __del__(self):
+        try:
+            self.close()
+        except Exception:
+            # 析构阶段避免抛出异常影响解释器退出
+            pass
 
     def _cleanup_expired(self) -> None:
         """清理过期的缓存"""
