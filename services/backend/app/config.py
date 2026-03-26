@@ -106,6 +106,12 @@ class Settings(BaseSettings):
 
     # 数据库配置（可选）
     DATABASE_URL: Optional[str] = None
+    AUTH_DATABASE_URL: Optional[str] = None
+    AUTH_DB_POOL_SIZE: int = 10
+    AUTH_DB_MAX_OVERFLOW: int = 20
+    AUTH_DB_POOL_TIMEOUT: int = 30
+    AUTH_DB_POOL_RECYCLE: int = 1800
+    AUTH_DB_PRE_PING: bool = True
     REDIS_URL: Optional[str] = None
 
     # 日志配置
@@ -132,7 +138,17 @@ class Settings(BaseSettings):
                 return [139.767125, 35.681236]
         return v
 
-    @field_validator('MAX_CONCURRENT_TASKS', 'TASK_TIMEOUT', 'GRID_RESOLUTION', 'MAX_FILE_SIZE_MB', 'AI_MAX_BATCH_SIZE')
+    @field_validator(
+        'MAX_CONCURRENT_TASKS',
+        'TASK_TIMEOUT',
+        'GRID_RESOLUTION',
+        'MAX_FILE_SIZE_MB',
+        'AI_MAX_BATCH_SIZE',
+        'AUTH_DB_POOL_SIZE',
+        'AUTH_DB_MAX_OVERFLOW',
+        'AUTH_DB_POOL_TIMEOUT',
+        'AUTH_DB_POOL_RECYCLE',
+    )
     @classmethod
     def validate_positive_int(cls, v):
         if v <= 0:
