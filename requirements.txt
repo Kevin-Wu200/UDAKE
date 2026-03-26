@@ -4,6 +4,11 @@ uvicorn[standard]==0.24.0
 pydantic==2.5.0
 pydantic-settings==2.1.0
 
+# 认证数据库
+SQLAlchemy==2.0.37
+alembic==1.14.1
+psycopg2-binary==2.9.9
+
 # 空间插值
 PyKrige==1.7.0
 gstools==1.5.0
