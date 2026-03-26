@@ -1,0 +1,44 @@
+name: Frontend I18n Check
+
+on:
+  push:
+    paths:
+      - 'apps/frontend/**'
+      - 'scripts/i18n-check.js'
+      - 'package.json'
+      - '.github/workflows/i18n_check.yml'
+  pull_request:
+    paths:
+      - 'apps/frontend/**'
+      - 'scripts/i18n-check.js'
+      - 'package.json'
+      - '.github/workflows/i18n_check.yml'
+  schedule:
+    - cron: '0 2 * * 1'
+
+jobs:
+  i18n-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run i18n quality check
+        run: npm run i18n:check:strict
+
+      - name: Upload i18n reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: i18n-report
+          path: reports/i18n
+          if-no-files-found: ignore

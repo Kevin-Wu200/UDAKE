@@ -38,6 +38,8 @@ export class SettingsPanel {
     }
 
     private createPanel(): void {
+        const languageOptions = this.getLanguageOptionsHtml();
+
         // 创建遮罩层
         this.overlay = document.createElement('div');
         this.overlay.className = 'settings-overlay';
@@ -61,33 +63,24 @@ export class SettingsPanel {
                 <div class="settings-body">
                     <div class="settings-section">
                         <h3 class="settings-section-title">${I18n.t('settings.language')}</h3>
-                        <div class="settings-language-options">
-                            <label class="settings-language-option">
-                                <input type="radio" name="language" value="zh-CN" ${I18n.locale === 'zh-CN' ? 'checked' : ''}>
-                                <span class="settings-language-name">${I18n.t('settings.language.zh-CN')}</span>
-                            </label>
-                            <label class="settings-language-option">
-                                <input type="radio" name="language" value="en-US" ${I18n.locale === 'en-US' ? 'checked' : ''}>
-                                <span class="settings-language-name">${I18n.t('settings.language.en-US')}</span>
-                            </label>
-                        </div>
+                        <div class="settings-language-options">${languageOptions}</div>
                     </div>
 
                     <div class="settings-section">
-                        <h3 class="settings-section-title">单位设置</h3>
+                        <h3 class="settings-section-title settings-units-title">${I18n.t('settings.units')}</h3>
                         
                         <div class="settings-item">
-                            <label class="settings-label">坐标系统</label>
+                            <label class="settings-label settings-coordinate-label">${I18n.t('settings.unit.coordinate')}</label>
                             <div id="coordinate-system-container" class="custom-select-container"></div>
                         </div>
 
                         <div class="settings-item">
-                            <label class="settings-label">长度单位</label>
+                            <label class="settings-label settings-length-label">${I18n.t('settings.unit.length')}</label>
                             <div id="length-unit-container" class="custom-select-container"></div>
                         </div>
 
                         <div class="settings-item">
-                            <label class="settings-label">面积单位</label>
+                            <label class="settings-label settings-area-label">${I18n.t('settings.unit.area')}</label>
                             <div id="area-unit-container" class="custom-select-container"></div>
                         </div>
                     </div>
@@ -104,17 +97,50 @@ export class SettingsPanel {
         this.container.appendChild(this.overlay);
     }
 
+    private getLanguageOptionsHtml(): string {
+        return I18n.getAvailableLocales()
+            .map((locale) => `
+                <label class="settings-language-option">
+                    <input type="radio" name="language" value="${locale.code}" ${I18n.locale === locale.code ? 'checked' : ''}>
+                    <span class="settings-language-name" data-language-code="${locale.code}">${locale.name}</span>
+                </label>
+            `)
+            .join('');
+    }
+
+    private getCoordinateOptions(): Array<{ value: string; label: string }> {
+        return [
+            { value: 'wgs84', label: I18n.t('settings.unit.wgs84') },
+            { value: 'gcj02', label: I18n.t('settings.unit.gcj02') },
+            { value: 'bd09', label: I18n.t('settings.unit.bd09') }
+        ];
+    }
+
+    private getLengthOptions(): Array<{ value: string; label: string }> {
+        return [
+            { value: 'm', label: I18n.t('settings.unit.m') },
+            { value: 'km', label: I18n.t('settings.unit.km') },
+            { value: 'ft', label: I18n.t('settings.unit.ft') },
+            { value: 'mi', label: I18n.t('settings.unit.mi') }
+        ];
+    }
+
+    private getAreaOptions(): Array<{ value: string; label: string }> {
+        return [
+            { value: 'm2', label: I18n.t('settings.unit.m2') },
+            { value: 'km2', label: I18n.t('settings.unit.km2') },
+            { value: 'ha', label: I18n.t('settings.unit.ha') },
+            { value: 'ac', label: I18n.t('settings.unit.ac') }
+        ];
+    }
+
     private initCustomSelects(): void {
         // 初始化坐标系统选择器
         const coordinateSystemContainer = this.panel.querySelector('#coordinate-system-container');
         if (coordinateSystemContainer) {
             this.coordinateSystemSelect = new CustomSelect(coordinateSystemContainer as HTMLElement, {
                 name: 'coordinate-system',
-                options: [
-                    { value: 'wgs84', label: 'WGS84 (经纬度)' },
-                    { value: 'gcj02', label: 'GCJ02 (火星坐标)' },
-                    { value: 'bd09', label: 'BD09 (百度坐标)' }
-                ],
+                options: this.getCoordinateOptions(),
                 value: unitManager.getCoordinateSystem(),
                 onChange: (value) => {
                     unitManager.setCoordinateSystem(value as any);
@@ -127,12 +153,7 @@ export class SettingsPanel {
         if (lengthUnitContainer) {
             this.lengthUnitSelect = new CustomSelect(lengthUnitContainer as HTMLElement, {
                 name: 'length-unit',
-                options: [
-                    { value: 'm', label: '米 (m)' },
-                    { value: 'km', label: '千米 (km)' },
-                    { value: 'ft', label: '英尺 (ft)' },
-                    { value: 'mi', label: '英里 (mi)' }
-                ],
+                options: this.getLengthOptions(),
                 value: unitManager.getLengthUnit(),
                 onChange: (value) => {
                     unitManager.setLengthUnit(value as any);
@@ -145,12 +166,7 @@ export class SettingsPanel {
         if (areaUnitContainer) {
             this.areaUnitSelect = new CustomSelect(areaUnitContainer as HTMLElement, {
                 name: 'area-unit',
-                options: [
-                    { value: 'm2', label: '平方米 (m²)' },
-                    { value: 'km2', label: '平方千米 (km²)' },
-                    { value: 'ha', label: '公顷 (ha)' },
-                    { value: 'ac', label: '英亩 (ac)' }
-                ],
+                options: this.getAreaOptions(),
                 value: unitManager.getAreaUnit(),
                 onChange: (value) => {
                     unitManager.setAreaUnit(value as any);
@@ -186,7 +202,7 @@ export class SettingsPanel {
         languageInputs.forEach(input => {
             input.addEventListener('change', (e) => {
                 const target = e.target as HTMLInputElement;
-                this.updateLanguage(target.value);
+                void this.updateLanguage(target.value);
             });
         });
 
@@ -201,8 +217,8 @@ export class SettingsPanel {
         });
     }
 
-    private updateLanguage(language: string): void {
-        I18n.setLocale(language);
+    private async updateLanguage(language: string): Promise<void> {
+        await I18n.setLocaleAsync(language);
         this.updateUIText();
         if (this.onLanguageChange) {
             this.onLanguageChange(language);
@@ -213,21 +229,34 @@ export class SettingsPanel {
         const title = this.panel.querySelector('.settings-title') as HTMLElement;
         const closeBtn = this.panel.querySelector('.settings-close-btn') as HTMLButtonElement;
         const sectionTitle = this.panel.querySelector('.settings-section-title') as HTMLElement;
+        const unitsTitle = this.panel.querySelector('.settings-units-title') as HTMLElement;
+        const coordinateLabel = this.panel.querySelector('.settings-coordinate-label') as HTMLElement;
+        const lengthLabel = this.panel.querySelector('.settings-length-label') as HTMLElement;
+        const areaLabel = this.panel.querySelector('.settings-area-label') as HTMLElement;
         const resetBtn = this.panel.querySelector('.settings-reset-btn') as HTMLButtonElement;
         const saveBtn = this.panel.querySelector('.settings-save-btn') as HTMLButtonElement;
 
         if (title) title.textContent = I18n.t('settings.title');
         if (closeBtn) closeBtn.setAttribute('title', I18n.t('common.close'));
         if (sectionTitle) sectionTitle.textContent = I18n.t('settings.language');
+        if (unitsTitle) unitsTitle.textContent = I18n.t('settings.units');
+        if (coordinateLabel) coordinateLabel.textContent = I18n.t('settings.unit.coordinate');
+        if (lengthLabel) lengthLabel.textContent = I18n.t('settings.unit.length');
+        if (areaLabel) areaLabel.textContent = I18n.t('settings.unit.area');
         if (resetBtn) resetBtn.textContent = I18n.t('settings.reset');
         if (saveBtn) saveBtn.textContent = I18n.t('settings.save');
 
-        // 更新语言选项文本
         const languageOptions = this.panel.querySelectorAll('.settings-language-name');
-        languageOptions.forEach((option, index) => {
-            const language = index === 0 ? 'zh-CN' : 'en-US';
-            option.textContent = I18n.t(`settings.language.${language}`);
+        languageOptions.forEach((option) => {
+            const language = (option as HTMLElement).dataset.languageCode;
+            if (language) {
+                option.textContent = I18n.t(`settings.language.${language}`);
+            }
         });
+
+        this.coordinateSystemSelect?.setOptions(this.getCoordinateOptions());
+        this.lengthUnitSelect?.setOptions(this.getLengthOptions());
+        this.areaUnitSelect?.setOptions(this.getAreaOptions());
     }
 
     private resetSettings(): void {

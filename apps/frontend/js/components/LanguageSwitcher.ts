@@ -11,10 +11,13 @@ interface LanguageOption {
   flag: string;
 }
 
-const languages: LanguageOption[] = [
-  { code: 'zh-CN', name: '简体中文', flag: '🇨🇳' },
-  { code: 'en-US', name: 'English', flag: '🇺🇸' }
-];
+const languageFlags: Record<string, string> = {
+  'zh-CN': '🇨🇳',
+  'en-US': '🇺🇸',
+  'zh-TW': '🇹🇼',
+  'ja-JP': '🇯🇵',
+  'ko-KR': '🇰🇷'
+};
 
 export class LanguageSwitcher {
   private currentLanguage: string;
@@ -28,18 +31,29 @@ export class LanguageSwitcher {
     this.render();
   }
 
+  private getLanguageOptions(): LanguageOption[] {
+    return I18n.getAvailableLocales().map((locale) => ({
+      code: locale.code,
+      name: locale.name,
+      flag: languageFlags[locale.code] || '🌐'
+    }));
+  }
+
   render(): void {
+    const languages = this.getLanguageOptions();
+    const current = this.getCurrentLanguage();
+
     this.container.innerHTML = `
       <div class="language-switcher">
-        <button class="language-button">
-          ${this.getCurrentLanguage().flag} ${this.getCurrentLanguage().name}
+        <button class="language-button" type="button">
+          <span class="language-current">${current.flag} ${current.name}</span>
           <span class="arrow">▼</span>
         </button>
         <div class="language-dropdown">
           ${languages.map(lang => `
-            <div class="language-option" data-lang="${lang.code}">
+            <button class="language-option ${lang.code === current.code ? 'active' : ''}" type="button" data-lang="${lang.code}">
               ${lang.flag} ${lang.name}
-            </div>
+            </button>
           `).join('')}
         </div>
       </div>
@@ -49,6 +63,7 @@ export class LanguageSwitcher {
   }
 
   private getCurrentLanguage(): LanguageOption {
+    const languages = this.getLanguageOptions();
     return languages.find(lang => lang.code === this.currentLanguage) || languages[0];
   }
 
@@ -62,11 +77,11 @@ export class LanguageSwitcher {
       dropdown.classList.toggle('show');
     });
 
-    options.forEach(option => {
+    options.forEach((option) => {
       option.addEventListener('click', (e) => {
         const langCode = (e.currentTarget as HTMLElement).dataset.lang;
         if (langCode) {
-          this.changeLanguage(langCode);
+          void this.changeLanguage(langCode);
           dropdown.classList.remove('show');
         }
       });
@@ -77,22 +92,18 @@ export class LanguageSwitcher {
     });
   }
 
-  private changeLanguage(langCode: string): void {
-    this.currentLanguage = langCode;
-
-    // 更新统一 I18n 管理器
-    I18n.setLocale(langCode);
-
-    // 更新 UI
-    this.render();
-
-    // 触发回调
-    if (this.onLanguageChange) {
-      this.onLanguageChange(langCode);
+  private async changeLanguage(langCode: string): Promise<void> {
+    const changed = await I18n.setLocaleAsync(langCode);
+    if (!changed) {
+      return;
     }
 
-    // 保存到 localStorage
-    localStorage.setItem('udake_locale', langCode);
+    this.currentLanguage = I18n.locale;
+    this.render();
+
+    if (this.onLanguageChange) {
+      this.onLanguageChange(this.currentLanguage);
+    }
   }
 }
 
@@ -116,6 +127,10 @@ export const languageSwitcherStyles = `
     transition: all 0.2s;
   }
 
+  .language-current {
+    white-space: nowrap;
+  }
+
   .language-button:hover {
     background: #f5f5f5;
   }
@@ -135,8 +150,9 @@ export const languageSwitcherStyles = `
     border-radius: 4px;
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     display: none;
-    min-width: 150px;
+    min-width: 180px;
     z-index: 1000;
+    animation: language-dropdown-fade 0.18s ease;
   }
 
   .language-dropdown.show {
@@ -144,12 +160,33 @@ export const languageSwitcherStyles = `
   }
 
   .language-option {
+    width: 100%;
+    text-align: left;
     padding: 10px 16px;
     cursor: pointer;
     transition: background 0.2s;
+    border: 0;
+    background: transparent;
   }
 
   .language-option:hover {
     background: #f5f5f5;
+  }
+
+  .language-option.active {
+    background: #ecf5ff;
+    color: #1f73b7;
+    font-weight: 600;
+  }
+
+  @keyframes language-dropdown-fade {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 `;

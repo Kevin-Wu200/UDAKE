@@ -37,6 +37,7 @@ import { ResourceOptimizationManager } from './config/ResourceOptimizationConfig
 import { Kriging3DPanel } from './components/Kriging3DPanel.js';
 import { DeepLearningPanel } from './components/DeepLearningPanel.js';
 import { FrontendIntegrationHub } from './components/FrontendIntegrationHub.js';
+import { LanguageSwitcher, languageSwitcherStyles } from './components/LanguageSwitcher.js';
 import { CSSFeatureDetector } from './utils/CSSFeatureDetector.js';
 import { Logger } from './utils/Logger.js';
 import { RuntimeLifecycle } from './utils/RuntimeLifecycle.js';
@@ -181,6 +182,7 @@ class App {
     private startupHasFunctionalDegradation: boolean = false;
     private startupApiBaseUrl: string = resolveConfiguredApiBaseUrl();
     private startupBackendPort: number = 8000;
+    private languageSwitcher: LanguageSwitcher | null = null;
 
     // 工具
     private formValidator: FormValidator | null = null;
@@ -195,6 +197,10 @@ class App {
         this.stateManager = StateManager.getInstance();
         this.stateBridge = createStateBridge(this.stateManager);
         this.stateBridge.start();
+
+        I18n.onChange(() => {
+            this.updateUIText();
+        });
 
         window.addEventListener('beforeunload', () => {
             this.stateBridge?.stop();
@@ -349,6 +355,7 @@ class App {
             await this.launchProgressManager.executeStage('events-bind', async (updateProgress) => {
                 console.log('准备绑定事件');
                 updateProgress(50);
+                this.initializeLanguageSwitcher();
                 this.bindEvents();
                 this.bindMobileEvents();
                 console.log('bindEvents 调用完成');
@@ -548,7 +555,7 @@ class App {
 
         await this.executeStartupStep('loadUserData', 'P1', 3000, async () => {
             const theme = localStorage.getItem('theme');
-            const language = localStorage.getItem('language');
+            const language = localStorage.getItem('udake_locale');
             return {
                 hasTheme: Boolean(theme),
                 hasLanguage: Boolean(language)
@@ -783,6 +790,24 @@ class App {
 
         // 监听自定义事件
         this.bindCustomEvents();
+    }
+
+    private initializeLanguageSwitcher(): void {
+        const container = document.getElementById('language-switcher-container');
+        if (!container || this.languageSwitcher) {
+            return;
+        }
+
+        if (!document.getElementById('language-switcher-style')) {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'language-switcher-style';
+            styleEl.textContent = languageSwitcherStyles;
+            document.head.appendChild(styleEl);
+        }
+
+        this.languageSwitcher = new LanguageSwitcher(container, () => {
+            this.updateUIText();
+        });
     }
 
     /**
@@ -1835,6 +1860,7 @@ class App {
      */
     private updateUIText(): void {
         I18n.applyToDOM(document);
+        this.languageSwitcher?.render();
 
         // 更新标题
         const titleZh = document.querySelector('.title-zh');

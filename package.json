@@ -26,6 +26,8 @@
     "test:e2e": "playwright test --config configs/playwright.config.ts",
     "test:e2e:ui": "playwright test --config configs/playwright.config.ts --ui",
     "test:performance": "vitest --config configs/vitest.config.js --run tests/performance-monitor.test.ts",
+    "i18n:check": "node scripts/i18n-check.js",
+    "i18n:check:strict": "node scripts/i18n-check.js --strict",
     "deps:check": "npm ls --depth=0",
     "deps:audit": "npm audit --omit=dev --audit-level=high",
     "build:electron": "npm run build:prod && electron-builder --mac",

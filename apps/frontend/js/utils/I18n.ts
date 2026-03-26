@@ -1,15 +1,14 @@
 /**
  * 国际化 (i18n) 管理器
- * 支持中文、英文语言切换
+ * 支持多语言切换、格式化、懒加载与性能优化
  */
+
+import zhTWMessages from '../locales/zh-TW.json';
+import jaJPMessages from '../locales/ja-JP.json';
+import koKRMessages from '../locales/ko-KR.json';
 
 type LocaleKey = string;
 type LocaleMessages = Record<LocaleKey, string>;
-
-interface I18nConfig {
-    defaultLocale: string;
-    fallbackLocale: string;
-}
 
 // ========== 语言包 ==========
 
@@ -197,6 +196,8 @@ const ZH_CN: LocaleMessages = {
     'common.loading': '加载中...',
     'common.error': '错误',
     'common.success': '成功',
+    'common.items.one': '{count} 个项目',
+    'common.items.other': '{count} 个项目',
 
     // 设置
     'settings.title': '设置',
@@ -204,8 +205,26 @@ const ZH_CN: LocaleMessages = {
     'settings.language': '语言',
     'settings.language.zh-CN': '简体中文',
     'settings.language.en-US': 'English',
+    'settings.language.zh-TW': '繁體中文',
+    'settings.language.ja-JP': '日本語',
+    'settings.language.ko-KR': '한국어',
     'settings.save': '保存',
     'settings.reset': '重置',
+    'settings.units': '单位设置',
+    'settings.unit.coordinate': '坐标系统',
+    'settings.unit.length': '长度单位',
+    'settings.unit.area': '面积单位',
+    'settings.unit.wgs84': 'WGS84 (经纬度)',
+    'settings.unit.gcj02': 'GCJ02 (火星坐标)',
+    'settings.unit.bd09': 'BD09 (百度坐标)',
+    'settings.unit.m': '米 (m)',
+    'settings.unit.km': '千米 (km)',
+    'settings.unit.ft': '英尺 (ft)',
+    'settings.unit.mi': '英里 (mi)',
+    'settings.unit.m2': '平方米 (m²)',
+    'settings.unit.km2': '平方千米 (km²)',
+    'settings.unit.ha': '公顷 (ha)',
+    'settings.unit.ac': '英亩 (ac)',
 
     // 行业
     'industry.title': '选择行业类型',
@@ -466,6 +485,8 @@ const EN_US: LocaleMessages = {
     'common.loading': 'Loading...',
     'common.error': 'Error',
     'common.success': 'Success',
+    'common.items.one': '{count} item',
+    'common.items.other': '{count} items',
 
     // 设置
     'settings.title': 'Settings',
@@ -473,8 +494,26 @@ const EN_US: LocaleMessages = {
     'settings.language': 'Language',
     'settings.language.zh-CN': '简体中文',
     'settings.language.en-US': 'English',
+    'settings.language.zh-TW': '繁體中文',
+    'settings.language.ja-JP': '日本語',
+    'settings.language.ko-KR': '한국어',
     'settings.save': 'Save',
     'settings.reset': 'Reset',
+    'settings.units': 'Unit Settings',
+    'settings.unit.coordinate': 'Coordinate System',
+    'settings.unit.length': 'Length Unit',
+    'settings.unit.area': 'Area Unit',
+    'settings.unit.wgs84': 'WGS84 (Latitude/Longitude)',
+    'settings.unit.gcj02': 'GCJ02 (Mars Coordinates)',
+    'settings.unit.bd09': 'BD09 (Baidu Coordinates)',
+    'settings.unit.m': 'Meter (m)',
+    'settings.unit.km': 'Kilometer (km)',
+    'settings.unit.ft': 'Foot (ft)',
+    'settings.unit.mi': 'Mile (mi)',
+    'settings.unit.m2': 'Square Meter (m²)',
+    'settings.unit.km2': 'Square Kilometer (km²)',
+    'settings.unit.ha': 'Hectare (ha)',
+    'settings.unit.ac': 'Acre (ac)',
 
     // 行业
     'industry.title': 'Select Industry',
@@ -581,53 +620,133 @@ const LOCALES: Record<string, LocaleMessages> = {
     'en-US': EN_US,
 };
 
+type LocaleLoader = () => Promise<LocaleMessages>;
+type IntlFormatter =
+    | Intl.DateTimeFormat
+    | Intl.NumberFormat
+    | Intl.RelativeTimeFormat
+    | Intl.Collator
+    | Intl.PluralRules;
+
+const LAZY_LOCALE_LOADERS: Record<string, LocaleLoader> = {
+    'zh-TW': async () => zhTWMessages as LocaleMessages,
+    'ja-JP': async () => jaJPMessages as LocaleMessages,
+    'ko-KR': async () => koKRMessages as LocaleMessages
+};
+
+const RTL_LOCALE_PREFIXES = ['ar', 'fa', 'he', 'ur'];
+
 // ========== I18n 管理器 ==========
 
 export class I18n {
     private static _locale: string = 'zh-CN';
     private static _listeners: Set<(locale: string) => void> = new Set();
     private static _missingKeyUsage: Map<string, number> = new Map();
+    private static _translationCache: Map<string, string> = new Map();
+    private static _pendingLocaleLoads: Map<string, Promise<boolean>> = new Map();
+    private static _intlFormatterCache: Map<string, IntlFormatter> = new Map();
+    private static _timeZone: string | null = null;
 
     static init(locale?: string): void {
-        const saved = localStorage.getItem('udake_locale');
-        this._locale = locale || saved || navigator.language || 'zh-CN';
-        // 规范化
-        if (!LOCALES[this._locale]) {
-            this._locale = this._locale.startsWith('zh') ? 'zh-CN' : 'en-US';
-        }
-        if (typeof document !== 'undefined') {
-            document.documentElement.lang = this._locale.startsWith('zh') ? 'zh-CN' : 'en';
-            this.applyToDOM(document);
-        }
+        const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('udake_locale') : null;
+        this._locale = this.normalizeLocale(locale || saved || navigator.language || 'zh-CN');
+        this.applyLocaleSideEffects(this._locale);
+        void this.ensureLocaleLoaded(this._locale).then((loaded) => {
+            if (loaded && this._locale) {
+                this.applyLocaleSideEffects(this._locale);
+            }
+        });
     }
 
     static get locale(): string { return this._locale; }
 
     static setLocale(locale: string): void {
-        if (!LOCALES[locale]) return;
-        this._locale = locale;
-        localStorage.setItem('udake_locale', locale);
-        if (typeof document !== 'undefined') {
-            document.documentElement.lang = locale.startsWith('zh') ? 'zh-CN' : 'en';
-            this.applyToDOM(document);
+        const normalized = this.normalizeLocale(locale);
+        const isUnsupportedInput = normalized === 'en-US'
+            && !LOCALES[locale]
+            && !LAZY_LOCALE_LOADERS[locale]
+            && !locale.toLowerCase().startsWith('en');
+        if (isUnsupportedInput) {
+            return;
         }
-        this._listeners.forEach(cb => { try { cb(locale); } catch (e) { console.error(e); } });
+        if (!LOCALES[normalized] && LAZY_LOCALE_LOADERS[normalized]) {
+            void this.setLocaleAsync(normalized);
+            return;
+        }
+        if (!LOCALES[normalized]) {
+            return;
+        }
+        this.applyLocale(normalized);
+    }
+
+    static async setLocaleAsync(locale: string): Promise<boolean> {
+        const normalized = this.normalizeLocale(locale);
+        const isUnsupportedInput = normalized === 'en-US'
+            && !LOCALES[locale]
+            && !LAZY_LOCALE_LOADERS[locale]
+            && !locale.toLowerCase().startsWith('en');
+        if (isUnsupportedInput) {
+            return false;
+        }
+        const loaded = await this.ensureLocaleLoaded(normalized);
+        if (!loaded) {
+            return false;
+        }
+        this.applyLocale(normalized);
+        return true;
     }
 
     /** 获取翻译文本，支持 {key} 插值 */
     static t(key: string, params?: Record<string, string | number>): string {
-        const messages = LOCALES[this._locale] || LOCALES['zh-CN'];
-        let text = messages[key] || LOCALES['zh-CN'][key] || key;
+        if (key === '') {
+            return '';
+        }
+        const cachedKey = params ? null : `${this._locale}:${key}`;
+        if (cachedKey && this._translationCache.has(cachedKey)) {
+            return this._translationCache.get(cachedKey)!;
+        }
+
+        let text = this.resolveMessage(key, this._locale);
         if (text === key) {
             const count = this._missingKeyUsage.get(key) || 0;
             this._missingKeyUsage.set(key, count + 1);
         }
+
         if (params) {
-            Object.entries(params).forEach(([k, v]) => {
-                text = text.replace(`{${k}}`, String(v));
+            text = text.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, paramName: string) => {
+                const value = params[paramName];
+                return value === undefined ? match : String(value);
             });
         }
+
+        if (cachedKey && text !== key) {
+            this._translationCache.set(cachedKey, text);
+        }
+
         return text;
+    }
+
+    /** 复数翻译：优先使用 .one/.other（也支持 Intl.PluralRules 分类） */
+    static tp(baseKey: string, count: number, params?: Record<string, string | number>): string {
+        const pluralRules = this.getIntlFormatter(
+            `plural:${this._locale}`,
+            () => new Intl.PluralRules(this.toIntlLocale(this._locale))
+        ) as Intl.PluralRules;
+        const pluralCategory = pluralRules.select(count);
+        const candidates = [
+            `${baseKey}.${pluralCategory}`,
+            `${baseKey}.${count === 1 ? 'one' : 'other'}`,
+            baseKey
+        ];
+        const mergedParams = { count, ...(params || {}) };
+        const resolved = candidates.find((candidate) => this.hasKey(candidate));
+        return this.t(resolved || baseKey, mergedParams);
+    }
+
+    /** 变体翻译：如 greeting.male / greeting.female */
+    static tv(baseKey: string, variant: string, params?: Record<string, string | number>): string {
+        const variantKey = `${baseKey}.${variant}`;
+        return this.hasKey(variantKey) ? this.t(variantKey, params) : this.t(baseKey, params);
     }
 
     static getMissingKeys(baseLocale: string = 'zh-CN'): Record<string, string[]> {
@@ -664,6 +783,127 @@ export class I18n {
 
     static clearMissingKeyUsage(): void {
         this._missingKeyUsage.clear();
+    }
+
+    static async preloadAllLocales(): Promise<void> {
+        const allLocaleCodes = Object.keys(LAZY_LOCALE_LOADERS);
+        await Promise.all(allLocaleCodes.map((localeCode) => this.ensureLocaleLoaded(localeCode)));
+    }
+
+    static formatDate(
+        value: Date | number | string,
+        options: Intl.DateTimeFormatOptions = {},
+        locale: string = this._locale
+    ): string {
+        const date = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(date.getTime())) {
+            return '';
+        }
+        const effectiveLocale = this.normalizeLocale(locale);
+        const timeZone = options.timeZone || this.getTimeZone();
+        const cacheKey = `date:${effectiveLocale}:${timeZone}:${JSON.stringify(options)}`;
+        const formatter = this.getIntlFormatter(
+            cacheKey,
+            () => new Intl.DateTimeFormat(this.toIntlLocale(effectiveLocale), { ...options, timeZone })
+        ) as Intl.DateTimeFormat;
+        return formatter.format(date);
+    }
+
+    static formatDateTime(
+        value: Date | number | string,
+        locale: string = this._locale
+    ): string {
+        return this.formatDate(
+            value,
+            {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+            },
+            locale
+        );
+    }
+
+    static formatNumber(
+        value: number,
+        options: Intl.NumberFormatOptions = {},
+        locale: string = this._locale
+    ): string {
+        const effectiveLocale = this.normalizeLocale(locale);
+        const cacheKey = `number:${effectiveLocale}:${JSON.stringify(options)}`;
+        const formatter = this.getIntlFormatter(
+            cacheKey,
+            () => new Intl.NumberFormat(this.toIntlLocale(effectiveLocale), options)
+        ) as Intl.NumberFormat;
+        return formatter.format(value);
+    }
+
+    static formatCurrency(
+        value: number,
+        currency: string = 'CNY',
+        locale: string = this._locale
+    ): string {
+        return this.formatNumber(
+            value,
+            {
+                style: 'currency',
+                currency,
+                currencyDisplay: 'symbol'
+            },
+            locale
+        );
+    }
+
+    static formatRelativeTime(
+        value: number,
+        unit: Intl.RelativeTimeFormatUnit,
+        locale: string = this._locale
+    ): string {
+        const effectiveLocale = this.normalizeLocale(locale);
+        const cacheKey = `relative:${effectiveLocale}`;
+        const formatter = this.getIntlFormatter(
+            cacheKey,
+            () => new Intl.RelativeTimeFormat(this.toIntlLocale(effectiveLocale), { numeric: 'auto' })
+        ) as Intl.RelativeTimeFormat;
+        return formatter.format(value, unit);
+    }
+
+    static sortByLocale(
+        values: string[],
+        locale: string = this._locale,
+        options: Intl.CollatorOptions = {}
+    ): string[] {
+        const effectiveLocale = this.normalizeLocale(locale);
+        const cacheKey = `collator:${effectiveLocale}:${JSON.stringify(options)}`;
+        const collator = this.getIntlFormatter(
+            cacheKey,
+            () => new Intl.Collator(this.toIntlLocale(effectiveLocale), { numeric: true, sensitivity: 'base', ...options })
+        ) as Intl.Collator;
+        return [...values].sort((a, b) => collator.compare(a, b));
+    }
+
+    static setTimeZone(timeZone: string | null): void {
+        this._timeZone = timeZone && timeZone.trim() ? timeZone.trim() : null;
+        this._intlFormatterCache.clear();
+    }
+
+    static getTimeZone(): string {
+        if (this._timeZone) {
+            return this._timeZone;
+        }
+        try {
+            return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+        } catch {
+            return 'UTC';
+        }
+    }
+
+    static getDirection(locale: string = this._locale): 'ltr' | 'rtl' {
+        const normalized = this.normalizeLocale(locale).toLowerCase();
+        return RTL_LOCALE_PREFIXES.some((prefix) => normalized.startsWith(prefix)) ? 'rtl' : 'ltr';
     }
 
     static applyToDOM(root: ParentNode = document): void {
@@ -724,10 +964,11 @@ export class I18n {
 
     /** 获取可用语言列表 */
     static getAvailableLocales(): Array<{ code: string; name: string }> {
-        return [
-            { code: 'zh-CN', name: '简体中文' },
-            { code: 'en-US', name: 'English' },
-        ];
+        const localeCodes = ['zh-CN', 'en-US', 'zh-TW', 'ja-JP', 'ko-KR'];
+        return localeCodes.map((code) => ({
+            code,
+            name: this.resolveMessage(`settings.language.${code}`, this._locale)
+        }));
     }
 
     static onChange(cb: (locale: string) => void): () => void {
@@ -738,6 +979,7 @@ export class I18n {
     /** 注册自定义语言包 */
     static registerLocale(code: string, messages: LocaleMessages): void {
         LOCALES[code] = { ...(LOCALES[code] || {}), ...messages };
+        this._translationCache.clear();
     }
 
     /** 获取模版文件名（根据当前语言） */
@@ -826,5 +1068,134 @@ export class I18n {
         };
 
         return industryNames[industry]?.[this._locale] || industryNames[industry]?.['en-US'] || industry;
+    }
+
+    private static normalizeLocale(locale: string): string {
+        const normalized = (locale || '').trim();
+        if (!normalized) {
+            return 'zh-CN';
+        }
+
+        if (LOCALES[normalized] || LAZY_LOCALE_LOADERS[normalized]) {
+            return normalized;
+        }
+
+        const lower = normalized.toLowerCase();
+        if (lower.startsWith('zh-tw') || lower.includes('hant')) {
+            return 'zh-TW';
+        }
+        if (lower.startsWith('zh')) {
+            return 'zh-CN';
+        }
+        if (lower.startsWith('ja')) {
+            return 'ja-JP';
+        }
+        if (lower.startsWith('ko')) {
+            return 'ko-KR';
+        }
+        return 'en-US';
+    }
+
+    private static async ensureLocaleLoaded(locale: string): Promise<boolean> {
+        if (LOCALES[locale]) {
+            return true;
+        }
+        const loader = LAZY_LOCALE_LOADERS[locale];
+        if (!loader) {
+            return false;
+        }
+        if (this._pendingLocaleLoads.has(locale)) {
+            return this._pendingLocaleLoads.get(locale)!;
+        }
+
+        const loadPromise = loader()
+            .then((messages) => {
+                LOCALES[locale] = { ...(LOCALES[locale] || {}), ...messages };
+                this._translationCache.clear();
+                return true;
+            })
+            .catch((error) => {
+                console.error(`[I18n] 语言包加载失败: ${locale}`, error);
+                return false;
+            })
+            .finally(() => {
+                this._pendingLocaleLoads.delete(locale);
+            });
+        this._pendingLocaleLoads.set(locale, loadPromise);
+        return loadPromise;
+    }
+
+    private static applyLocale(locale: string): void {
+        this._locale = locale;
+        this._translationCache.clear();
+        if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('udake_locale', locale);
+        }
+        this.applyLocaleSideEffects(locale);
+        this._listeners.forEach((callback) => {
+            try {
+                callback(locale);
+            } catch (error) {
+                console.error(error);
+            }
+        });
+    }
+
+    private static applyLocaleSideEffects(locale: string): void {
+        if (typeof document === 'undefined') {
+            return;
+        }
+        document.documentElement.lang = locale.startsWith('zh') ? locale : locale.split('-')[0];
+        document.documentElement.dir = this.getDirection(locale);
+        this.applyToDOM(document);
+    }
+
+    private static resolveLocaleChain(locale: string): string[] {
+        const normalized = this.normalizeLocale(locale);
+        const chain = [normalized];
+        if (normalized !== 'en-US') {
+            chain.push('en-US');
+        }
+        if (normalized !== 'zh-CN') {
+            chain.push('zh-CN');
+        }
+        return chain;
+    }
+
+    private static resolveMessage(key: string, locale: string): string {
+        const chain = this.resolveLocaleChain(locale);
+        for (const localeCode of chain) {
+            const messages = LOCALES[localeCode];
+            if (messages && Object.prototype.hasOwnProperty.call(messages, key)) {
+                return messages[key];
+            }
+        }
+        return key;
+    }
+
+    private static hasKey(key: string): boolean {
+        return this.resolveLocaleChain(this._locale).some((localeCode) => {
+            const messages = LOCALES[localeCode];
+            return Boolean(messages && Object.prototype.hasOwnProperty.call(messages, key));
+        });
+    }
+
+    private static toIntlLocale(locale: string): string {
+        if (locale === 'zh-TW') {
+            return 'zh-Hant-TW';
+        }
+        return locale;
+    }
+
+    private static getIntlFormatter<T extends IntlFormatter>(
+        key: string,
+        factory: () => T
+    ): T {
+        if (this._intlFormatterCache.has(key)) {
+            return this._intlFormatterCache.get(key)! as T;
+        }
+        const formatter = factory();
+        this._intlFormatterCache.set(key, formatter);
+        return formatter;
     }
 }

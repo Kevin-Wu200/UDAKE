@@ -52,7 +52,7 @@ describe('I18n', () => {
 
         it('应该规范化zh开头的语言代码为zh-CN', () => {
             I18n.init('zh-TW');
-            expect(I18n.locale).toBe('zh-CN');
+            expect(I18n.locale).toBe('zh-TW');
         });
     });
 
@@ -136,9 +136,12 @@ describe('I18n', () => {
     describe('可用语言列表', () => {
         it('应该返回正确的可用语言列表', () => {
             const locales = I18n.getAvailableLocales();
-            expect(locales).toEqual([
-                { code: 'zh-CN', name: '简体中文' },
-                { code: 'en-US', name: 'English' }
+            expect(locales.map(item => item.code)).toEqual([
+                'zh-CN',
+                'en-US',
+                'zh-TW',
+                'ja-JP',
+                'ko-KR'
             ]);
         });
 
@@ -150,6 +153,16 @@ describe('I18n', () => {
                 expect(typeof locale.code).toBe('string');
                 expect(typeof locale.name).toBe('string');
             });
+        });
+    });
+
+    describe('懒加载语言包', () => {
+        it('应该异步切换到 zh-TW', async () => {
+            I18n.init('zh-CN');
+            const changed = await I18n.setLocaleAsync('zh-TW');
+            expect(changed).toBe(true);
+            expect(I18n.locale).toBe('zh-TW');
+            expect(I18n.t('settings.language.zh-TW')).toBe('繁體中文');
         });
     });
 
@@ -217,6 +230,7 @@ describe('I18n', () => {
         });
 
         it('应该能够扩展现有语言包', () => {
+            I18n.init('zh-CN');
             const extraMessages = {
                 'new.key': '新的翻译'
             };
@@ -228,6 +242,7 @@ describe('I18n', () => {
         });
 
         it('注册的语言包应该合并而不是覆盖', () => {
+            I18n.init('zh-CN');
             const extraMessages = {
                 'extra.key': '额外翻译'
             };
@@ -351,6 +366,33 @@ describe('I18n', () => {
             expect(usage.length).toBeGreaterThan(0);
             expect(usage[0].key).toBe('nonexistent.translation.key');
             expect(usage[0].count).toBe(2);
+        });
+
+        it('应支持复数翻译', () => {
+            I18n.init('en-US');
+            expect(I18n.tp('common.items', 1)).toBe('1 item');
+            expect(I18n.tp('common.items', 5)).toBe('5 items');
+        });
+
+        it('应支持数字和货币格式化', () => {
+            I18n.init('en-US');
+            const numberText = I18n.formatNumber(12345.67);
+            const currencyText = I18n.formatCurrency(12345.67, 'USD');
+            expect(numberText).toContain('12');
+            expect(currencyText).toContain('$');
+        });
+
+        it('应支持日期时间格式化和时区设置', () => {
+            I18n.init('zh-CN');
+            I18n.setTimeZone('Asia/Shanghai');
+            const result = I18n.formatDateTime('2026-03-26T08:00:00Z');
+            expect(result).toBeTruthy();
+        });
+
+        it('应支持本地化排序', () => {
+            I18n.init('zh-CN');
+            const sorted = I18n.sortByLocale(['zeta', 'alpha', 'beta']);
+            expect(sorted[0]).toBe('alpha');
         });
     });
 });
