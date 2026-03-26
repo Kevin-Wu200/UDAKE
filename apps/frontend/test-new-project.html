@@ -79,29 +79,29 @@
 </head>
 <body>
     <div class="test-container">
-        <h1 class="test-title">新建项目功能测试</h1>
+        <h1 class="test-title" data-i18n="test.newProject.heading">新建项目功能测试</h1>
 
         <div class="test-section">
-            <h2 class="test-title" style="font-size: 18px;">测试场景</h2>
+            <h2 class="test-title" style="font-size: 18px;" data-i18n="test.newProject.scenarios">测试场景</h2>
             <div class="test-buttons">
-                <button id="test-new-project" class="btn btn-primary">测试新建项目弹窗</button>
-                <button id="test-free-manual" class="btn btn-primary">自由采样 + 手动输入</button>
-                <button id="test-free-device" class="btn btn-primary">自由采样 + 自动定位</button>
-                <button id="test-region-manual" class="btn btn-primary">区域采样 + 手动输入</button>
-                <button id="test-region-device" class="btn btn-primary">区域采样 + 自动定位</button>
-                <button id="test-error-handler" class="btn btn-secondary">测试错误处理</button>
-                <button id="clear-result" class="btn btn-secondary">清空结果</button>
+                <button id="test-new-project" class="btn btn-primary" data-i18n="test.newProject.openModal">测试新建项目弹窗</button>
+                <button id="test-free-manual" class="btn btn-primary" data-i18n="test.newProject.freeManual">自由采样 + 手动输入</button>
+                <button id="test-free-device" class="btn btn-primary" data-i18n="test.newProject.freeDevice">自由采样 + 自动定位</button>
+                <button id="test-region-manual" class="btn btn-primary" data-i18n="test.newProject.regionManual">区域采样 + 手动输入</button>
+                <button id="test-region-device" class="btn btn-primary" data-i18n="test.newProject.regionDevice">区域采样 + 自动定位</button>
+                <button id="test-error-handler" class="btn btn-secondary" data-i18n="test.newProject.errorHandler">测试错误处理</button>
+                <button id="clear-result" class="btn btn-secondary" data-i18n="test.newProject.clearResult">清空结果</button>
             </div>
             <div id="test-result" class="test-result" style="display: none;"></div>
         </div>
 
         <div class="test-section">
-            <h2 class="test-title" style="font-size: 18px;">地图视图</h2>
+            <h2 class="test-title" style="font-size: 18px;" data-i18n="test.newProject.mapView">地图视图</h2>
             <div id="viewDiv"></div>
         </div>
 
         <div class="test-section" id="project-info" style="display: none;">
-            <h2 class="test-title" style="font-size: 18px;">当前项目信息</h2>
+            <h2 class="test-title" style="font-size: 18px;" data-i18n="test.newProject.currentProjectInfo">当前项目信息</h2>
             <div id="project-details" class="test-result"></div>
         </div>
     </div>

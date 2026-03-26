@@ -263,7 +263,12 @@ export class LocationServicePanel {
       trackNameInput.value = '';
     }
 
-    I18nDialog.alert(`轨迹记录完成：\n名称：${track.name}\n点数：${track.points.length}\n距离：${track.totalDistance.toFixed(1)} m\n平均速度：${track.averageSpeed.toFixed(2)} m/s`);
+    I18nDialog.alert('dialog.location.track.recordCompleted', {
+      name: track.name,
+      points: track.points.length,
+      distance: track.totalDistance.toFixed(1),
+      speed: track.averageSpeed.toFixed(2)
+    });
   }
 
   /**
@@ -325,7 +330,7 @@ export class LocationServicePanel {
       if (permission !== 'granted') {
         const granted = await locationService.requestPermission();
         if (!granted) {
-          I18nDialog.alert('位置权限被拒绝');
+          I18nDialog.alert('dialog.location.permissionDenied');
           return;
         }
       }
@@ -334,7 +339,7 @@ export class LocationServicePanel {
       this.updateLocationDisplay(location);
     } catch (error) {
       console.error('获取位置失败:', error);
-      I18nDialog.alert('获取位置失败：' + (error as Error).message);
+      I18nDialog.alert('dialog.location.getFailed', { error: (error as Error).message });
     }
   }
 
@@ -343,7 +348,7 @@ export class LocationServicePanel {
    */
   private async handleCenterOnLocation(): Promise<void> {
     if (!this.currentLocation) {
-      I18nDialog.alert('请先获取当前位置');
+      I18nDialog.alert('dialog.location.getCurrentFirst');
       return;
     }
 
@@ -367,11 +372,11 @@ export class LocationServicePanel {
     try {
       const track = await trackManager.startRecording(trackName);
       if (!track) {
-        I18nDialog.alert('开始记录轨迹失败');
+        I18nDialog.alert('dialog.location.startTrackFailed');
       }
     } catch (error) {
       console.error('开始记录轨迹失败:', error);
-      I18nDialog.alert('开始记录轨迹失败：' + (error as Error).message);
+      I18nDialog.alert('dialog.location.startTrackFailedWithReason', { error: (error as Error).message });
     }
   }
 
@@ -383,7 +388,7 @@ export class LocationServicePanel {
       await trackManager.stopRecording();
     } catch (error) {
       console.error('停止记录轨迹失败:', error);
-      I18nDialog.alert('停止记录轨迹失败：' + (error as Error).message);
+      I18nDialog.alert('dialog.location.stopTrackFailed', { error: (error as Error).message });
     }
   }
 
@@ -446,7 +451,7 @@ export class LocationServicePanel {
    * 处理删除地理围栏
    */
   private async handleDeleteGeofence(geofenceId: string): Promise<void> {
-    if (I18nDialog.confirm('确定要删除这个地理围栏吗？')) {
+    if (I18nDialog.confirm('dialog.location.deleteGeofenceConfirm')) {
       await geofenceManager.deleteGeofence(geofenceId);
       this.updateGeofenceList();
     }

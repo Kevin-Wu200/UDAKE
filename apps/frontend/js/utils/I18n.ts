@@ -3,12 +3,14 @@
  * 支持多语言切换、格式化、懒加载与性能优化
  */
 
-import zhTWMessages from '../locales/zh-TW.json';
-import jaJPMessages from '../locales/ja-JP.json';
-import koKRMessages from '../locales/ko-KR.json';
-
-type LocaleKey = string;
-type LocaleMessages = Record<LocaleKey, string>;
+import {
+    I18N_AVAILABLE_LOCALE_CODES,
+    I18N_DEFAULT_LOCALE as DEFAULT_LOCALE,
+    I18N_FALLBACK_LOCALE as FALLBACK_LOCALE,
+    I18N_LAZY_LOCALE_LOADERS as LAZY_LOCALE_LOADERS,
+    I18N_RTL_LOCALE_PREFIXES as RTL_LOCALE_PREFIXES,
+    type LocaleMessages
+} from '../i18n/config';
 
 // ========== 语言包 ==========
 
@@ -311,6 +313,99 @@ const ZH_CN: LocaleMessages = {
     'recommendation.noData': '暂无采样建议',
     'recommendation.error': '加载行业配置失败，请检查后端服务是否正常启动',
 
+    // 对话框
+    'dialog.geofence.create.clickMap': '请在地图上点击以创建圆形围栏',
+    'dialog.storage.openFolder.unsupported': '当前环境不支持直接打开文件夹，请在系统下载目录中查看。',
+    'dialog.template.clear.confirm': '确定要清空已下载模板吗？此操作不可恢复。',
+    'dialog.template.cleaned': '已清理 {count} 个模板文件',
+    'dialog.template.clearFailed': '清理失败：{error}',
+    'dialog.template.fileExistsOverwrite': '文件 "{filename}" 已存在，是否覆盖？',
+    'dialog.template.findInBrowserHistory': '请在浏览器的下载历史中找到下载的文件',
+    'dialog.template.storagePermissionNotGranted': '存储权限未授予，模板将使用浏览器默认下载方式。您可在系统设置中开启存储权限后重试。',
+    'dialog.template.fileDeleteConfirm': '确定要删除模板文件 "{filename}" 吗？',
+    'dialog.template.fileDeleteFailed': '删除文件失败：{error}',
+    'dialog.template.storagePermissionDenied': '存储权限被拒绝。请在系统设置中开启存储权限后重试。',
+    'dialog.template.insufficientStorage': '存储空间不足。请清理设备空间后重试。',
+    'dialog.template.downloadFailedWithError': '下载模板失败，请稍后重试。错误信息：{message}',
+    'dialog.route.selectStart': '请先选择起点',
+    'dialog.route.needMinSamplingPoints': '请至少添加2个采样点',
+    'dialog.route.planFailed': '路径规划失败: {error}',
+    'dialog.startup.feedbackRecorded': '感谢您的反馈！我们已记录此错误。',
+    'dialog.gesture.resetAllConfirm': '确定要重置所有手势设置为默认值吗？',
+    'dialog.parameterCombo.applied': '已应用参数组合: {name}',
+    'dialog.parameterCombo.saved': '已保存参数组合: {name}',
+    'dialog.layout.name.prompt': '请输入布局名称：',
+    'dialog.layout.defaultName': '布局_{date}',
+    'dialog.layout.saved': '布局 "{name}" 已保存',
+    'dialog.layout.none': '没有已保存的布局',
+    'dialog.layout.selectToLoad': '请选择要加载的布局：\n{names}',
+    'dialog.layout.notFound': '布局不存在',
+    'dialog.layout.loaded': '布局 "{name}" 已加载',
+    'dialog.layout.resetConfirm': '确定要重置为默认布局吗？',
+    'dialog.layout.resetDone': '布局已重置为默认状态',
+    'dialog.layout.deleteConfirm': '确定要删除布局 "{name}" 吗？',
+    'dialog.location.track.recordCompleted': '轨迹记录完成：\n名称：{name}\n点数：{points}\n距离：{distance} m\n平均速度：{speed} m/s',
+    'dialog.location.permissionDenied': '位置权限被拒绝',
+    'dialog.location.getCurrentFirst': '请先获取当前位置',
+    'dialog.location.getFailed': '获取位置失败：{error}',
+    'dialog.location.startTrackFailed': '开始记录轨迹失败',
+    'dialog.location.startTrackFailedWithReason': '开始记录轨迹失败：{error}',
+    'dialog.location.stopTrackFailed': '停止记录轨迹失败：{error}',
+    'dialog.location.deleteGeofenceConfirm': '确定要删除这个地理围栏吗？',
+    'dialog.chart.exportFailed': '导出图表失败，请重试',
+    'dialog.config.appliedPreset': '已应用 {name} 预设',
+    'dialog.config.applied': '已应用配置: {name}',
+    'dialog.config.name.prompt': '请输入配置名称：',
+    'dialog.config.description.prompt': '请输入配置描述（可选）：',
+    'dialog.config.presetType.prompt': '请选择预设类型（environment/agriculture/geology/custom）：',
+    'dialog.config.createSuccess': '配置创建成功',
+    'dialog.config.createFailed': '创建配置失败: {error}',
+    'dialog.config.name.label': '配置名称：',
+    'dialog.config.description.label': '配置描述：',
+    'dialog.config.updateSuccess': '配置更新成功',
+    'dialog.config.updateFailed': '更新配置失败: {error}',
+    'dialog.config.copySuccess': '配置复制成功',
+    'dialog.config.copyFailed': '复制配置失败: {error}',
+    'dialog.config.deleteConfirm': '确定要删除配置 "{name}" 吗？',
+    'dialog.config.deleteSuccess': '配置删除成功',
+    'dialog.config.deleteFailed': '删除配置失败: {error}',
+    'dialog.config.exportSuccess': '配置导出成功',
+    'dialog.config.exportFailed': '导出配置失败: {error}',
+    'dialog.config.importResult': '导入完成：\n成功: {success}\n失败: {failed}\n错误:\n{errors}',
+    'dialog.config.importFailed': '导入配置失败: {error}',
+    'dialog.config.resetConfirm': '确定要重置为默认配置吗？这将清除所有自定义配置。',
+    'dialog.config.resetSuccess': '已重置为默认配置',
+    'dialog.config.resetFailed': '重置失败: {error}',
+    'dialog.feedback.maxFiles': '最多只能上传 {maxFiles} 个文件',
+    'dialog.feedback.fileTooLarge': '文件 {fileName} 超过 5MB 限制',
+    'dialog.feedback.contentRequired': '请填写反馈内容',
+    'dialog.feedback.submitSuccess': '反馈已提交，感谢您的建议！',
+    'dialog.feedback.clearAllConfirm': '确定要清除所有反馈吗？此操作不可恢复。',
+    'dialog.geofence.radius.prompt': '请输入围栏半径（米）：',
+    'dialog.geofence.invalidRadius': '请输入有效的半径',
+    'dialog.geofence.name.prompt': '请输入围栏名称：',
+    'dialog.geofence.defaultName': '围栏_{time}',
+    'dialog.geofence.created': '地理围栏 "{name}" 创建成功',
+    'dialog.geofence.createFailed': '创建地理围栏失败：{error}',
+    'dialog.geofence.rename.prompt': '请输入新的围栏名称：',
+    'dialog.industry.getRecommendationFailed': '获取推荐参数失败，请稍后重试',
+    'dialog.realtime.subscriptionName.prompt': '请输入订阅名称:',
+    'dialog.realtime.updateInterval.prompt': '请输入更新间隔（毫秒）:',
+    'dialog.realtime.updateInterval.invalid': '更新间隔必须大于等于1000毫秒',
+    'dialog.realtime.clearCacheConfirm': '确定要清空所有缓存吗？',
+    'dialog.realtime.resetPerfConfirm': '确定要重置所有性能统计吗？',
+    'dialog.recommendation.exportFailed': '导出失败: {error}',
+    'dialog.task.result': '任务结果:\n{result}',
+    'dialog.task.clearHistoryConfirm': '确定要清空所有历史记录吗？',
+    'dialog.parameterTab.name.prompt': '请输入参数组合名称:',
+    'dialog.parameterTab.saved': '参数已保存',
+    'dialog.parameterTab.deleteConfirm': '确定要删除这条记录吗？',
+    'dialog.parameterTab.applied': '已应用参数组合: {name}',
+    'dialog.parameterTab.importResult': '导入成功: {success} 条，失败: {failed} 条',
+    'dialog.cache.clearAllConfirm': '确定要清除所有缓存吗？此操作不可撤销。',
+    'dialog.kriging3d.exportSuccess': '导出成功: {path}',
+    'dialog.kriging3d.exportFailed': '导出失败: {error}',
+
     // 项目信息
     'project.info': '项目信息',
     'project.name': '项目名称',
@@ -600,6 +695,99 @@ const EN_US: LocaleMessages = {
     'recommendation.noData': 'No sampling recommendations available',
     'recommendation.error': 'Failed to load industry configuration, please check if the backend service is running',
 
+    // Dialog
+    'dialog.geofence.create.clickMap': 'Please click on the map to create a circular geofence',
+    'dialog.storage.openFolder.unsupported': 'Directly opening folders is unsupported in this environment. Please check the system Downloads directory.',
+    'dialog.template.clear.confirm': 'Are you sure you want to clear downloaded templates? This action cannot be undone.',
+    'dialog.template.cleaned': 'Cleaned {count} template files',
+    'dialog.template.clearFailed': 'Cleanup failed: {error}',
+    'dialog.template.fileExistsOverwrite': 'File "{filename}" already exists. Overwrite it?',
+    'dialog.template.findInBrowserHistory': 'Please find the downloaded file in your browser download history',
+    'dialog.template.storagePermissionNotGranted': 'Storage permission is not granted. Templates will use browser download mode. Enable storage permission in system settings and retry.',
+    'dialog.template.fileDeleteConfirm': 'Are you sure you want to delete template file "{filename}"?',
+    'dialog.template.fileDeleteFailed': 'Failed to delete file: {error}',
+    'dialog.template.storagePermissionDenied': 'Storage permission denied. Please enable storage permission in system settings and retry.',
+    'dialog.template.insufficientStorage': 'Insufficient storage space. Please free up space and retry.',
+    'dialog.template.downloadFailedWithError': 'Template download failed. Please retry later. Error: {message}',
+    'dialog.route.selectStart': 'Please select a start point first',
+    'dialog.route.needMinSamplingPoints': 'Please add at least 2 sampling points',
+    'dialog.route.planFailed': 'Route planning failed: {error}',
+    'dialog.startup.feedbackRecorded': 'Thanks for your feedback. We have recorded this error.',
+    'dialog.gesture.resetAllConfirm': 'Are you sure you want to reset all gesture settings to defaults?',
+    'dialog.parameterCombo.applied': 'Applied parameter combination: {name}',
+    'dialog.parameterCombo.saved': 'Saved parameter combination: {name}',
+    'dialog.layout.name.prompt': 'Enter layout name:',
+    'dialog.layout.defaultName': 'layout_{date}',
+    'dialog.layout.saved': 'Layout "{name}" has been saved',
+    'dialog.layout.none': 'No saved layouts',
+    'dialog.layout.selectToLoad': 'Please choose a layout to load:\n{names}',
+    'dialog.layout.notFound': 'Layout not found',
+    'dialog.layout.loaded': 'Layout "{name}" has been loaded',
+    'dialog.layout.resetConfirm': 'Are you sure you want to reset to default layout?',
+    'dialog.layout.resetDone': 'Layout has been reset to default',
+    'dialog.layout.deleteConfirm': 'Are you sure you want to delete layout "{name}"?',
+    'dialog.location.track.recordCompleted': 'Track recording completed:\nName: {name}\nPoints: {points}\nDistance: {distance} m\nAverage speed: {speed} m/s',
+    'dialog.location.permissionDenied': 'Location permission denied',
+    'dialog.location.getCurrentFirst': 'Please get current location first',
+    'dialog.location.getFailed': 'Failed to get location: {error}',
+    'dialog.location.startTrackFailed': 'Failed to start track recording',
+    'dialog.location.startTrackFailedWithReason': 'Failed to start track recording: {error}',
+    'dialog.location.stopTrackFailed': 'Failed to stop track recording: {error}',
+    'dialog.location.deleteGeofenceConfirm': 'Are you sure you want to delete this geofence?',
+    'dialog.chart.exportFailed': 'Failed to export chart, please try again',
+    'dialog.config.appliedPreset': 'Applied preset: {name}',
+    'dialog.config.applied': 'Applied config: {name}',
+    'dialog.config.name.prompt': 'Enter config name:',
+    'dialog.config.description.prompt': 'Enter config description (optional):',
+    'dialog.config.presetType.prompt': 'Choose preset type (environment/agriculture/geology/custom):',
+    'dialog.config.createSuccess': 'Config created successfully',
+    'dialog.config.createFailed': 'Failed to create config: {error}',
+    'dialog.config.name.label': 'Config name:',
+    'dialog.config.description.label': 'Config description:',
+    'dialog.config.updateSuccess': 'Config updated successfully',
+    'dialog.config.updateFailed': 'Failed to update config: {error}',
+    'dialog.config.copySuccess': 'Config copied successfully',
+    'dialog.config.copyFailed': 'Failed to copy config: {error}',
+    'dialog.config.deleteConfirm': 'Are you sure you want to delete config "{name}"?',
+    'dialog.config.deleteSuccess': 'Config deleted successfully',
+    'dialog.config.deleteFailed': 'Failed to delete config: {error}',
+    'dialog.config.exportSuccess': 'Config exported successfully',
+    'dialog.config.exportFailed': 'Failed to export config: {error}',
+    'dialog.config.importResult': 'Import finished:\nSuccess: {success}\nFailed: {failed}\nErrors:\n{errors}',
+    'dialog.config.importFailed': 'Failed to import config: {error}',
+    'dialog.config.resetConfirm': 'Are you sure you want to reset to default config? This will clear all custom configs.',
+    'dialog.config.resetSuccess': 'Reset to default config completed',
+    'dialog.config.resetFailed': 'Reset failed: {error}',
+    'dialog.feedback.maxFiles': 'You can upload up to {maxFiles} files',
+    'dialog.feedback.fileTooLarge': 'File {fileName} exceeds the 5MB limit',
+    'dialog.feedback.contentRequired': 'Please fill in feedback content',
+    'dialog.feedback.submitSuccess': 'Feedback submitted. Thank you for your suggestion!',
+    'dialog.feedback.clearAllConfirm': 'Are you sure you want to clear all feedback? This action cannot be undone.',
+    'dialog.geofence.radius.prompt': 'Please enter geofence radius (meters):',
+    'dialog.geofence.invalidRadius': 'Please enter a valid radius',
+    'dialog.geofence.name.prompt': 'Please enter geofence name:',
+    'dialog.geofence.defaultName': 'geofence_{time}',
+    'dialog.geofence.created': 'Geofence "{name}" created successfully',
+    'dialog.geofence.createFailed': 'Failed to create geofence: {error}',
+    'dialog.geofence.rename.prompt': 'Please enter a new geofence name:',
+    'dialog.industry.getRecommendationFailed': 'Failed to get recommended parameters. Please try again later.',
+    'dialog.realtime.subscriptionName.prompt': 'Please enter subscription name:',
+    'dialog.realtime.updateInterval.prompt': 'Please enter update interval (ms):',
+    'dialog.realtime.updateInterval.invalid': 'Update interval must be greater than or equal to 1000 ms',
+    'dialog.realtime.clearCacheConfirm': 'Are you sure you want to clear all cache?',
+    'dialog.realtime.resetPerfConfirm': 'Are you sure you want to reset all performance metrics?',
+    'dialog.recommendation.exportFailed': 'Export failed: {error}',
+    'dialog.task.result': 'Task result:\n{result}',
+    'dialog.task.clearHistoryConfirm': 'Are you sure you want to clear all history records?',
+    'dialog.parameterTab.name.prompt': 'Enter parameter combination name:',
+    'dialog.parameterTab.saved': 'Parameters have been saved',
+    'dialog.parameterTab.deleteConfirm': 'Are you sure you want to delete this record?',
+    'dialog.parameterTab.applied': 'Applied parameter combination: {name}',
+    'dialog.parameterTab.importResult': 'Import succeeded: {success}, failed: {failed}',
+    'dialog.cache.clearAllConfirm': 'Are you sure you want to clear all cache? This action cannot be undone.',
+    'dialog.kriging3d.exportSuccess': 'Export succeeded: {path}',
+    'dialog.kriging3d.exportFailed': 'Export failed: {error}',
+
     // 项目信息
     'project.info': 'Project Information',
     'project.name': 'Project Name',
@@ -620,7 +808,6 @@ const LOCALES: Record<string, LocaleMessages> = {
     'en-US': EN_US,
 };
 
-type LocaleLoader = () => Promise<LocaleMessages>;
 type IntlFormatter =
     | Intl.DateTimeFormat
     | Intl.NumberFormat
@@ -628,18 +815,10 @@ type IntlFormatter =
     | Intl.Collator
     | Intl.PluralRules;
 
-const LAZY_LOCALE_LOADERS: Record<string, LocaleLoader> = {
-    'zh-TW': async () => zhTWMessages as LocaleMessages,
-    'ja-JP': async () => jaJPMessages as LocaleMessages,
-    'ko-KR': async () => koKRMessages as LocaleMessages
-};
-
-const RTL_LOCALE_PREFIXES = ['ar', 'fa', 'he', 'ur'];
-
 // ========== I18n 管理器 ==========
 
 export class I18n {
-    private static _locale: string = 'zh-CN';
+    private static _locale: string = DEFAULT_LOCALE;
     private static _listeners: Set<(locale: string) => void> = new Set();
     private static _missingKeyUsage: Map<string, number> = new Map();
     private static _translationCache: Map<string, string> = new Map();
@@ -649,7 +828,7 @@ export class I18n {
 
     static init(locale?: string): void {
         const saved = typeof localStorage !== 'undefined' ? localStorage.getItem('udake_locale') : null;
-        this._locale = this.normalizeLocale(locale || saved || navigator.language || 'zh-CN');
+        this._locale = this.normalizeLocale(locale || saved || navigator.language || DEFAULT_LOCALE);
         this.applyLocaleSideEffects(this._locale);
         void this.ensureLocaleLoaded(this._locale).then((loaded) => {
             if (loaded && this._locale) {
@@ -662,7 +841,7 @@ export class I18n {
 
     static setLocale(locale: string): void {
         const normalized = this.normalizeLocale(locale);
-        const isUnsupportedInput = normalized === 'en-US'
+        const isUnsupportedInput = normalized === FALLBACK_LOCALE
             && !LOCALES[locale]
             && !LAZY_LOCALE_LOADERS[locale]
             && !locale.toLowerCase().startsWith('en');
@@ -681,7 +860,7 @@ export class I18n {
 
     static async setLocaleAsync(locale: string): Promise<boolean> {
         const normalized = this.normalizeLocale(locale);
-        const isUnsupportedInput = normalized === 'en-US'
+        const isUnsupportedInput = normalized === FALLBACK_LOCALE
             && !LOCALES[locale]
             && !LAZY_LOCALE_LOADERS[locale]
             && !locale.toLowerCase().startsWith('en');
@@ -964,7 +1143,7 @@ export class I18n {
 
     /** 获取可用语言列表 */
     static getAvailableLocales(): Array<{ code: string; name: string }> {
-        const localeCodes = ['zh-CN', 'en-US', 'zh-TW', 'ja-JP', 'ko-KR'];
+        const localeCodes = I18N_AVAILABLE_LOCALE_CODES;
         return localeCodes.map((code) => ({
             code,
             name: this.resolveMessage(`settings.language.${code}`, this._locale)
@@ -1073,7 +1252,7 @@ export class I18n {
     private static normalizeLocale(locale: string): string {
         const normalized = (locale || '').trim();
         if (!normalized) {
-            return 'zh-CN';
+            return DEFAULT_LOCALE;
         }
 
         if (LOCALES[normalized] || LAZY_LOCALE_LOADERS[normalized]) {
@@ -1093,7 +1272,7 @@ export class I18n {
         if (lower.startsWith('ko')) {
             return 'ko-KR';
         }
-        return 'en-US';
+        return FALLBACK_LOCALE;
     }
 
     private static async ensureLocaleLoaded(locale: string): Promise<boolean> {
@@ -1153,11 +1332,11 @@ export class I18n {
     private static resolveLocaleChain(locale: string): string[] {
         const normalized = this.normalizeLocale(locale);
         const chain = [normalized];
-        if (normalized !== 'en-US') {
-            chain.push('en-US');
+        if (normalized !== FALLBACK_LOCALE) {
+            chain.push(FALLBACK_LOCALE);
         }
-        if (normalized !== 'zh-CN') {
-            chain.push('zh-CN');
+        if (normalized !== DEFAULT_LOCALE) {
+            chain.push(DEFAULT_LOCALE);
         }
         return chain;
     }

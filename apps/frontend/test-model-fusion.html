@@ -267,19 +267,19 @@
 </head>
 <body>
     <div class="container">
-        <h1>🔮 模型融合系统</h1>
-        <p class="subtitle">集成多个克里金模型的预测结果，通过加权平均、堆叠等方法提高预测稳定性和准确性</p>
+        <h1 data-i18n="test.modelFusion.heading">🔮 模型融合系统</h1>
+        <p class="subtitle" data-i18n="test.modelFusion.subtitle">集成多个克里金模型的预测结果，通过加权平均、堆叠等方法提高预测稳定性和准确性</p>
 
         <div class="tabs">
-            <button class="tab active" onclick="showTab('simple')">简单融合</button>
-            <button class="tab" onclick="showTab('compare')">策略对比</button>
-            <button class="tab" onclick="showTab('optimize')">权重优化</button>
+            <button class="tab active" onclick="showTab('simple')" data-i18n="test.modelFusion.tab.simple">简单融合</button>
+            <button class="tab" onclick="showTab('compare')" data-i18n="test.modelFusion.tab.compare">策略对比</button>
+            <button class="tab" onclick="showTab('optimize')" data-i18n="test.modelFusion.tab.optimize">权重优化</button>
         </div>
 
         <!-- 简单融合 -->
         <div id="simple" class="tab-content active">
             <div class="section">
-                <h2>模型输入</h2>
+                <h2 data-i18n="test.modelFusion.modelInput">模型输入</h2>
                 <div class="model-inputs" id="modelInputs">
                     <div class="model-input">
                         <h3>模型 1</h3>
@@ -332,7 +332,7 @@
             </div>
 
             <div class="section">
-                <h2>融合配置</h2>
+                <h2 data-i18n="test.modelFusion.config">融合配置</h2>
                 <div class="form-group">
                     <label>真实值 (可选，用于评估)</label>
                     <textarea id="true_values" rows="1">10.6, 11.0, 10.9, 11.2, 10.8, 11.1, 10.7, 11.2, 10.6, 11.0</textarea>
@@ -380,12 +380,12 @@
                         <input type="checkbox" id="smoothing"> 平滑权重
                     </label>
                 </div>
-                <button onclick="createFusionTask()">创建融合任务</button>
-                <button onclick="checkTaskStatus()" id="checkStatusBtn" disabled>检查状态</button>
+                <button onclick="createFusionTask()" data-i18n="test.modelFusion.createTask">创建融合任务</button>
+                <button onclick="checkTaskStatus()" id="checkStatusBtn" disabled data-i18n="test.modelFusion.checkStatus">检查状态</button>
             </div>
 
             <div class="result" id="taskResult">
-                <h3>任务结果</h3>
+                <h3 data-i18n="test.modelFusion.taskResult">任务结果</h3>
                 <pre id="resultContent"></pre>
             </div>
         </div>
@@ -393,11 +393,11 @@
         <!-- 策略对比 -->
         <div id="compare" class="tab-content">
             <div class="section">
-                <h2>策略对比</h2>
-                <p>对比不同融合策略的性能</p>
-                <button onclick="compareStrategies()">执行策略对比</button>
+                <h2 data-i18n="test.modelFusion.compareTitle">策略对比</h2>
+                <p data-i18n="test.modelFusion.compareDesc">对比不同融合策略的性能</p>
+                <button onclick="compareStrategies()" data-i18n="test.modelFusion.compareAction">执行策略对比</button>
                 <div class="result" id="compareResult">
-                    <h3>对比结果</h3>
+                    <h3 data-i18n="test.modelFusion.compareResult">对比结果</h3>
                     <pre id="compareContent"></pre>
                 </div>
             </div>
@@ -406,11 +406,11 @@
         <!-- 权重优化 -->
         <div id="optimize" class="tab-content">
             <div class="section">
-                <h2>权重优化</h2>
-                <p>自动选择最佳权重计算方法</p>
-                <button onclick="optimizeWeights()">执行权重优化</button>
+                <h2 data-i18n="test.modelFusion.optimizeTitle">权重优化</h2>
+                <p data-i18n="test.modelFusion.optimizeDesc">自动选择最佳权重计算方法</p>
+                <button onclick="optimizeWeights()" data-i18n="test.modelFusion.optimizeAction">执行权重优化</button>
                 <div class="result" id="optimizeResult">
-                    <h3>优化结果</h3>
+                    <h3 data-i18n="test.modelFusion.optimizeResult">优化结果</h3>
                     <pre id="optimizeContent"></pre>
                 </div>
             </div>

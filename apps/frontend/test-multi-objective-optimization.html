@@ -392,65 +392,65 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎯 多目标优化采样系统</h1>
-            <p>综合考虑方差、成本、可达性等多个目标，智能推荐最优采样点组合</p>
+            <h1 data-i18n="test.multiObjective.heading">🎯 多目标优化采样系统</h1>
+            <p data-i18n="test.multiObjective.subtitle">综合考虑方差、成本、可达性等多个目标，智能推荐最优采样点组合</p>
         </div>
 
         <div class="main-content">
             <!-- 参数配置 -->
             <div class="section">
-                <h2 class="section-title">⚙️ 参数配置</h2>
+                <h2 class="section-title" data-i18n="test.multiObjective.configTitle">⚙️ 参数配置</h2>
 
                 <div class="grid-3">
                     <div class="card">
-                        <h3 class="card-title">📊 方差权重</h3>
+                        <h3 class="card-title" data-i18n="test.multiObjective.varianceWeight">📊 方差权重</h3>
                         <div class="slider-container">
                             <input type="range" class="slider" id="varianceWeight" min="0" max="100" value="50">
                             <span class="slider-value" id="varianceWeightValue">0.50</span>
                         </div>
-                        <p style="margin-top: 10px; font-size: 12px; color: #666;">最小化插值预测方差</p>
+                        <p style="margin-top: 10px; font-size: 12px; color: #666;" data-i18n="test.multiObjective.varianceHint">最小化插值预测方差</p>
                     </div>
 
                     <div class="card">
-                        <h3 class="card-title">💰 成本权重</h3>
+                        <h3 class="card-title" data-i18n="test.multiObjective.costWeight">💰 成本权重</h3>
                         <div class="slider-container">
                             <input type="range" class="slider" id="costWeight" min="0" max="100" value="30">
                             <span class="slider-value" id="costWeightValue">0.30</span>
                         </div>
-                        <p style="margin-top: 10px; font-size: 12px; color: #666;">最小化采样总成本</p>
+                        <p style="margin-top: 10px; font-size: 12px; color: #666;" data-i18n="test.multiObjective.costHint">最小化采样总成本</p>
                     </div>
 
                     <div class="card">
-                        <h3 class="card-title">🚀 可达性权重</h3>
+                        <h3 class="card-title" data-i18n="test.multiObjective.accessibilityWeight">🚀 可达性权重</h3>
                         <div class="slider-container">
                             <input type="range" class="slider" id="accessibilityWeight" min="0" max="100" value="20">
                             <span class="slider-value" id="accessibilityWeightValue">0.20</span>
                         </div>
-                        <p style="margin-top: 10px; font-size: 12px; color: #666;">最大化采样点可达性</p>
+                        <p style="margin-top: 10px; font-size: 12px; color: #666;" data-i18n="test.multiObjective.accessibilityHint">最大化采样点可达性</p>
                     </div>
                 </div>
 
                 <div class="grid-2" style="margin-top: 30px;">
                     <div class="card">
-                        <h3 class="card-title">🎯 采样参数</h3>
+                        <h3 class="card-title" data-i18n="test.multiObjective.samplingParams">🎯 采样参数</h3>
                         <div class="form-group">
-                            <label>采样点数量</label>
+                            <label data-i18n="test.multiObjective.sampleCount">采样点数量</label>
                             <input type="number" class="form-control" id="nSamples" value="20" min="1" max="100">
                         </div>
                         <div class="form-group">
-                            <label>进化代数</label>
+                            <label data-i18n="test.multiObjective.generations">进化代数</label>
                             <input type="number" class="form-control" id="nGenerations" value="100" min="10" max="500">
                         </div>
                     </div>
 
                     <div class="card">
-                        <h3 class="card-title">🔒 约束条件</h3>
+                        <h3 class="card-title" data-i18n="test.multiObjective.constraints">🔒 约束条件</h3>
                         <div class="form-group">
-                            <label>最小间距（米）</label>
+                            <label data-i18n="test.multiObjective.minDistance">最小间距（米）</label>
                             <input type="number" class="form-control" id="minDistance" value="50" min="0">
                         </div>
                         <div class="form-group">
-                            <label>预算限制（元）</label>
+                            <label data-i18n="test.multiObjective.budget">预算限制（元）</label>
                             <input type="number" class="form-control" id="budget" value="50000" min="0">
                         </div>
                     </div>
@@ -458,24 +458,24 @@
 
                 <div style="text-align: center; margin-top: 30px;">
                     <button class="btn btn-primary" id="optimizeBtn" onclick="startOptimization()">
-                        <span>🚀 开始优化</span>
+                        <span data-i18n="test.multiObjective.start">🚀 开始优化</span>
                     </button>
                     <button class="btn btn-secondary" id="resetBtn" onclick="resetParameters()">
-                        <span>🔄 重置参数</span>
+                        <span data-i18n="test.multiObjective.reset">🔄 重置参数</span>
                     </button>
                 </div>
             </div>
 
             <!-- 优化进度 -->
             <div class="section hidden" id="progressSection">
-                <h2 class="section-title">📈 优化进度</h2>
+                <h2 class="section-title" data-i18n="test.multiObjective.progress">📈 优化进度</h2>
                 <div class="card">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
                         <div>
-                            <span class="status-badge status-running" id="taskStatus">运行中</span>
+                            <span class="status-badge status-running" id="taskStatus" data-i18n="test.multiObjective.running">运行中</span>
                             <span style="margin-left: 15px; font-weight: 600;" id="progressText">0%</span>
                         </div>
-                        <div style="color: #666;" id="elapsedTime">已耗时: 0s</div>
+                        <div style="color: #666;" id="elapsedTime" data-i18n="test.multiObjective.elapsed">已耗时: 0s</div>
                     </div>
                     <div class="progress-bar">
                         <div class="progress-fill" id="progressFill" style="width: 0%"></div>
@@ -485,17 +485,17 @@
 
             <!-- 优化结果 -->
             <div class="section hidden" id="resultsSection">
-                <h2 class="section-title">✅ 优化结果</h2>
+                <h2 class="section-title" data-i18n="test.multiObjective.results">✅ 优化结果</h2>
 
                 <div class="tabs">
-                    <div class="tab active" onclick="switchTab('pareto')">帕累托前沿</div>
-                    <div class="tab" onclick="switchTab('recommended')">推荐方案</div>
-                    <div class="tab" onclick="switchTab('metrics')">性能指标</div>
+                    <div class="tab active" onclick="switchTab('pareto')" data-i18n="test.multiObjective.tab.pareto">帕累托前沿</div>
+                    <div class="tab" onclick="switchTab('recommended')" data-i18n="test.multiObjective.tab.recommended">推荐方案</div>
+                    <div class="tab" onclick="switchTab('metrics')" data-i18n="test.multiObjective.tab.metrics">性能指标</div>
                 </div>
 
                 <div id="paretoTab" class="tab-content active">
                     <div class="card">
-                        <h3 class="card-title">📊 帕累托前沿可视化</h3>
+                        <h3 class="card-title" data-i18n="test.multiObjective.paretoChart">📊 帕累托前沿可视化</h3>
                         <div class="chart-container" id="paretoChart">
                             <canvas id="paretoCanvas"></canvas>
                         </div>
@@ -504,7 +504,7 @@
 
                 <div id="recommendedTab" class="tab-content">
                     <div class="card">
-                        <h3 class="card-title">🌟 推荐方案详情</h3>
+                        <h3 class="card-title" data-i18n="test.multiObjective.recommendedDetail">🌟 推荐方案详情</h3>
                         <div id="recommendedDetails"></div>
                     </div>
                 </div>
@@ -518,7 +518,7 @@
 
     <div class="loading-overlay hidden" id="loadingOverlay">
         <div class="spinner"></div>
-        <div class="loading-text">正在优化中，请稍候...</div>
+        <div class="loading-text" data-i18n="test.multiObjective.loading">正在优化中，请稍候...</div>
     </div>
 
     <script>

@@ -179,7 +179,7 @@ export class ParameterComparisonPanel {
             panel.setParameter(key, value);
         });
 
-        I18nDialog.alert(`已应用参数组合: ${combo.name}`);
+        I18nDialog.alert('dialog.parameterCombo.applied', { name: combo.name });
     }
 
     /**
@@ -192,7 +192,7 @@ export class ParameterComparisonPanel {
         const manager = ParameterHistoryManager.getInstance();
 
         manager.addRecord(combo.name, combo.parameters, combo.score);
-        I18nDialog.alert(`已保存参数组合: ${combo.name}`);
+        I18nDialog.alert('dialog.parameterCombo.saved', { name: combo.name });
     }
 
     /**

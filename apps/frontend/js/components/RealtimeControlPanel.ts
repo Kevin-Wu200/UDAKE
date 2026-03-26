@@ -411,19 +411,19 @@ export class RealtimeControlPanel {
      */
     private showCreateSubscriptionDialog(): void {
         // 创建简单的对话框
-        const name = I18nDialog.prompt('请输入订阅名称:');
+        const name = I18nDialog.prompt('dialog.realtime.subscriptionName.prompt');
         if (!name) {
             return;
         }
 
-        const interval = I18nDialog.prompt('请输入更新间隔（毫秒）:', '5000');
+        const interval = I18nDialog.prompt('dialog.realtime.updateInterval.prompt', '5000');
         if (!interval) {
             return;
         }
 
         const updateInterval = parseInt(interval, 10);
         if (isNaN(updateInterval) || updateInterval < 1000) {
-            I18nDialog.alert('更新间隔必须大于等于1000毫秒');
+            I18nDialog.alert('dialog.realtime.updateInterval.invalid');
             return;
         }
 
@@ -487,7 +487,7 @@ export class RealtimeControlPanel {
      * 清空缓存
      */
     private clearCache(): void {
-        if (I18nDialog.confirm('确定要清空所有缓存吗？')) {
+        if (I18nDialog.confirm('dialog.realtime.clearCacheConfirm')) {
             // 这里需要调用缓存管理器的清空方法
             this.addLog('info', '缓存已清空');
             this.refreshCacheStats();
@@ -535,7 +535,7 @@ export class RealtimeControlPanel {
      * 重置性能统计
      */
     private resetPerformanceStats(): void {
-        if (I18nDialog.confirm('确定要重置所有性能统计吗？')) {
+        if (I18nDialog.confirm('dialog.realtime.resetPerfConfirm')) {
             // 这里需要实现重置逻辑
             this.addLog('info', '性能统计已重置');
             this.refreshPerformanceMetrics();

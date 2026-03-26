@@ -818,7 +818,9 @@ export class SamplingRecommendationPanel {
             URL.revokeObjectURL(url);
         } catch (error) {
             console.error('导出失败:', error);
-            I18nDialog.alert('导出失败: ' + ((error as Error).message || '未知错误'));
+            I18nDialog.alert('dialog.recommendation.exportFailed', {
+                error: (error as Error).message || '未知错误'
+            });
         }
     }
 

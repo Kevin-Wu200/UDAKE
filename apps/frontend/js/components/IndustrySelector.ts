@@ -322,7 +322,7 @@ export class IndustrySelector {
       }
     } catch (error) {
       console.error('获取推荐参数失败:', error);
-      I18nDialog.alert('获取推荐参数失败，请稍后重试');
+      I18nDialog.alert('dialog.industry.getRecommendationFailed');
     }
   }
 

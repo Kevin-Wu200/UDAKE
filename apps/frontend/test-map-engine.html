@@ -215,36 +215,36 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🧪 地图引擎测试工具</h1>
-            <p class="subtitle">UDAKE 地图引擎切换功能测试套件</p>
+            <h1 data-i18n="test.mapEngine.heading">🧪 地图引擎测试工具</h1>
+            <p class="subtitle" data-i18n="test.mapEngine.subtitle">UDAKE 地图引擎切换功能测试套件</p>
         </div>
 
         <div class="card">
-            <h2>系统信息</h2>
+            <h2 data-i18n="test.mapEngine.systemInfo">系统信息</h2>
             <div class="info-grid">
                 <div class="info-item">
-                    <div class="info-label">当前地图引擎</div>
-                    <div class="info-value" id="current-engine">加载中...</div>
+                    <div class="info-label" data-i18n="test.mapEngine.currentEngine">当前地图引擎</div>
+                    <div class="info-value" id="current-engine" data-i18n="test.mapEngine.loading">加载中...</div>
                 </div>
                 <div class="info-item">
-                    <div class="info-label">浏览器</div>
+                    <div class="info-label" data-i18n="test.mapEngine.browser">浏览器</div>
                     <div class="info-value" id="browser-info">-</div>
                 </div>
                 <div class="info-item">
-                    <div class="info-label">测试状态</div>
+                    <div class="info-label" data-i18n="test.mapEngine.testStatus">测试状态</div>
                     <div class="info-value" id="test-status">
-                        <span class="status-badge warning">未开始</span>
+                        <span class="status-badge warning" data-i18n="test.mapEngine.notStarted">未开始</span>
                     </div>
                 </div>
             </div>
         </div>
 
         <div class="card">
-            <h2>测试控制</h2>
+            <h2 data-i18n="test.mapEngine.control">测试控制</h2>
             <div class="button-group">
-                <button class="btn btn-primary" id="run-tests-btn">运行所有测试</button>
-                <button class="btn btn-secondary" id="clear-console-btn">清空控制台</button>
-                <button class="btn btn-secondary" id="export-report-btn" disabled>导出报告</button>
+                <button class="btn btn-primary" id="run-tests-btn" data-i18n="test.mapEngine.runAllTests">运行所有测试</button>
+                <button class="btn btn-secondary" id="clear-console-btn" data-i18n="test.mapEngine.clearConsole">清空控制台</button>
+                <button class="btn btn-secondary" id="export-report-btn" disabled data-i18n="test.mapEngine.exportReport">导出报告</button>
             </div>
             <div class="progress-bar hidden" id="progress-bar">
                 <div class="progress-fill" id="progress-fill"></div>
@@ -252,17 +252,17 @@
         </div>
 
         <div class="card">
-            <h2>地图预览</h2>
+            <h2 data-i18n="test.mapEngine.mapPreview">地图预览</h2>
             <div id="map-container"></div>
         </div>
 
         <div class="card">
-            <h2>测试结果</h2>
+            <h2 data-i18n="test.mapEngine.results">测试结果</h2>
             <div id="test-results"></div>
         </div>
 
         <div class="card">
-            <h2>控制台输出</h2>
+            <h2 data-i18n="test.mapEngine.consoleOutput">控制台输出</h2>
             <div id="console"></div>
         </div>
     </div>

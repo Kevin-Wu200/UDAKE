@@ -115,7 +115,9 @@ export class TemplateDownloader {
                 }
 
                 const exists = await TemplateStorageService.fileExists(safeFilename);
-                const shouldOverwrite = !exists || I18nDialog.confirm(`文件 "${safeFilename}" 已存在，是否覆盖？`);
+                const shouldOverwrite = !exists || I18nDialog.confirm('dialog.template.fileExistsOverwrite', {
+                    filename: safeFilename
+                });
                 if (!shouldOverwrite) {
                     return;
                 }
@@ -206,7 +208,7 @@ export class TemplateDownloader {
             void (async () => {
                 const opened = await TemplateStorageService.openStorageFolder();
                 if (!opened) {
-                    I18nDialog.alert('请在浏览器的下载历史中找到下载的文件');
+                    I18nDialog.alert('dialog.template.findInBrowserHistory');
                 }
                 document.body.removeChild(dialog);
             })();
@@ -299,7 +301,7 @@ export class TemplateDownloader {
             void (async () => {
                 const opened = await TemplateStorageService.openStorageFolder();
                 if (!opened) {
-                    I18nDialog.alert('请在浏览器的下载历史中找到下载的文件');
+                    I18nDialog.alert('dialog.template.findInBrowserHistory');
                 }
             })();
         });
@@ -324,7 +326,7 @@ export class TemplateDownloader {
 
         const init = await TemplateStorageService.ensureInitialized();
         if (!init.ready) {
-            I18nDialog.alert('存储权限未授予，模板将使用浏览器默认下载方式。您可在系统设置中开启存储权限后重试。');
+            I18nDialog.alert('dialog.template.storagePermissionNotGranted');
             return;
         }
 
@@ -446,7 +448,7 @@ export class TemplateDownloader {
                     return;
                 }
 
-                const confirmed = I18nDialog.confirm(`确定要删除模板文件 "${filename}" 吗？`);
+                const confirmed = I18nDialog.confirm('dialog.template.fileDeleteConfirm', { filename });
                 if (!confirmed) {
                     return;
                 }
@@ -457,7 +459,9 @@ export class TemplateDownloader {
                         await this.updateStorageInfo(panel);
                         await this.renderFileList(panel);
                     } catch (error) {
-                        I18nDialog.alert(`删除文件失败：${String((error as Error)?.message || error)}`);
+                        I18nDialog.alert('dialog.template.fileDeleteFailed', {
+                            error: String((error as Error)?.message || error)
+                        });
                     }
                 })();
             });
@@ -465,7 +469,7 @@ export class TemplateDownloader {
     }
 
     private static async clearTemplates(panel: HTMLElement): Promise<void> {
-        const confirmed = I18nDialog.confirm('确定要清空已下载模板吗？此操作不可恢复。');
+        const confirmed = I18nDialog.confirm('dialog.template.clear.confirm');
         if (!confirmed) {
             return;
         }
@@ -474,9 +478,11 @@ export class TemplateDownloader {
             const deletedCount = await TemplateStorageService.clearTemplates();
             await this.updateStorageInfo(panel);
             await this.renderFileList(panel);
-            I18nDialog.alert(`已清理 ${deletedCount} 个模板文件`);
+            I18nDialog.alert('dialog.template.cleaned', { count: deletedCount });
         } catch (error) {
-            I18nDialog.alert(`清理失败：${String((error as Error)?.message || error)}`);
+            I18nDialog.alert('dialog.template.clearFailed', {
+                error: String((error as Error)?.message || error)
+            });
         }
     }
 
@@ -507,15 +513,17 @@ export class TemplateDownloader {
         const message = String((error as { message?: string })?.message || error || '');
 
         if (message.includes('PERMISSION_DENIED') || message.includes('denied')) {
-            I18nDialog.alert('存储权限被拒绝。请在系统设置中开启存储权限后重试。');
+            I18nDialog.alert('dialog.template.storagePermissionDenied');
             return;
         }
 
         if (message.includes('No space') || message.includes('ENOSPC') || message.includes('quota')) {
-            I18nDialog.alert('存储空间不足。请清理设备空间后重试。');
+            I18nDialog.alert('dialog.template.insufficientStorage');
             return;
         }
 
-        I18nDialog.alert(`下载模板失败，请稍后重试。错误信息：${message || '未知错误'}`);
+        I18nDialog.alert('dialog.template.downloadFailedWithError', {
+            message: message || '未知错误'
+        });
     }
 }

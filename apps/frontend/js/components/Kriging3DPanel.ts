@@ -477,9 +477,9 @@ export class Kriging3DPanel {
             const resp = await fetch(`${API_BASE}/kriging3d/export/${this.taskId}?format=${format}`);
             if (!resp.ok) throw new Error('导出失败');
             const data = await resp.json();
-            I18nDialog.alert(`导出成功: ${data.path}`);
+            I18nDialog.alert('dialog.kriging3d.exportSuccess', { path: data.path });
         } catch (err: any) {
-            I18nDialog.alert(`导出失败: ${err.message}`);
+            I18nDialog.alert('dialog.kriging3d.exportFailed', { error: err.message });
         }
     }
 
@@ -505,4 +505,3 @@ export class Kriging3DPanel {
         this.container.innerHTML = '';
     }
 }
-

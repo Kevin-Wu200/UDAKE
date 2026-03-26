@@ -380,7 +380,7 @@ export class StartupManager {
         console.log('[StartupManager] 报告错误:', error, context);
 
         // 显示感谢信息
-        I18nDialog.alert('感谢您的反馈！我们已记录此错误。');
+        I18nDialog.alert('dialog.startup.feedbackRecorded');
     }
 
     /**

@@ -216,9 +216,16 @@ export class I18nDialog {
         return window.confirm(this.resolve(messageKey, params));
     }
 
-    static prompt(messageKey: string, defaultValueKey?: string, params?: DialogParams): string | null {
+    static prompt(
+        messageKey: string,
+        defaultValueKey?: string,
+        params?: DialogParams,
+        defaultValueParams?: DialogParams
+    ): string | null {
         const message = this.resolve(messageKey, params);
-        const defaultValue = typeof defaultValueKey === 'string' ? this.resolve(defaultValueKey) : undefined;
+        const defaultValue = typeof defaultValueKey === 'string'
+            ? this.resolve(defaultValueKey, defaultValueParams)
+            : undefined;
         return window.prompt(message, defaultValue);
     }
 }

@@ -229,7 +229,7 @@ export class ParameterTabPanel {
      * 保存参数
      */
     private saveParameters(): void {
-        const name = I18nDialog.prompt('请输入参数组合名称:');
+        const name = I18nDialog.prompt('dialog.parameterTab.name.prompt');
         if (!name) return;
 
         const panel = ParameterAdjustmentPanel.getInstance();
@@ -239,7 +239,7 @@ export class ParameterTabPanel {
         const manager = ParameterHistoryManager.getInstance();
         manager.addRecord(name, panel.getParameters());
 
-        I18nDialog.alert('参数已保存');
+        I18nDialog.alert('dialog.parameterTab.saved');
         this.loadHistoryList();
     }
 
@@ -335,7 +335,7 @@ export class ParameterTabPanel {
                 } else if (action === 'apply') {
                     this.applyHistoryRecord(id!);
                 } else if (action === 'delete') {
-                    if (I18nDialog.confirm('确定要删除这条记录吗？')) {
+                    if (I18nDialog.confirm('dialog.parameterTab.deleteConfirm')) {
                         manager.deleteRecord(id!);
                         this.loadHistoryList();
                     }
@@ -359,7 +359,7 @@ export class ParameterTabPanel {
             panel.setParameter(key, value);
         });
 
-        I18nDialog.alert(`已应用参数组合: ${record.name}`);
+        I18nDialog.alert('dialog.parameterTab.applied', { name: record.name });
         this.switchTab('adjustment');
     }
 
@@ -420,7 +420,10 @@ export class ParameterTabPanel {
                 const manager = ParameterHistoryManager.getInstance();
                 const result = manager.importRecords(json);
 
-                I18nDialog.alert(`导入成功: ${result.success} 条，失败: ${result.failed} 条`);
+                I18nDialog.alert('dialog.parameterTab.importResult', {
+                    success: result.success,
+                    failed: result.failed
+                });
                 this.loadHistoryList();
             };
             reader.readAsText(file);

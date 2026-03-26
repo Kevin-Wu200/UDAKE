@@ -135,7 +135,7 @@ export class LocationServiceIntegration {
   private handleAddGeofence(): void {
     // 进入创建围栏模式
     (window as any).isCreatingGeofence = true;
-    I18nDialog.alert('请在地图上点击以创建圆形围栏');
+    I18nDialog.alert('dialog.geofence.create.clickMap');
   }
 
   /**

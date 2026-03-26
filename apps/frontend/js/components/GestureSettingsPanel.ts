@@ -289,7 +289,7 @@ class GestureSettingsPanel {
 
         if (resetButton) {
             resetButton.addEventListener('click', () => {
-                if (I18nDialog.confirm('确定要重置所有手势设置为默认值吗？')) {
+                if (I18nDialog.confirm('dialog.gesture.resetAllConfirm')) {
                     this.resetToDefaults();
                 }
             });

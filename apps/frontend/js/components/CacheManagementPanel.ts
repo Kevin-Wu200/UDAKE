@@ -304,7 +304,7 @@ export class CacheManagementPanel {
      * 清除所有缓存
      */
     private async clearAllCache(): Promise<void> {
-        if (!I18nDialog.confirm('确定要清除所有缓存吗？此操作不可撤销。')) {
+        if (!I18nDialog.confirm('dialog.cache.clearAllConfirm')) {
             return;
         }
 

@@ -377,7 +377,9 @@ export class TaskManagementPanel {
 
         console.log('任务结果:', task.result);
         // 这里可以实现结果显示逻辑
-        I18nDialog.alert(`任务结果:\n${JSON.stringify(task.result, null, 2)}`);
+        I18nDialog.alert('dialog.task.result', {
+            result: JSON.stringify(task.result, null, 2)
+        });
     }
 
     /**
@@ -447,7 +449,7 @@ export class TaskManagementPanel {
      * 清空历史
      */
     private async clearHistory(): Promise<void> {
-        if (I18nDialog.confirm('确定要清空所有历史记录吗？')) {
+        if (I18nDialog.confirm('dialog.task.clearHistoryConfirm')) {
             await this.taskManager.clearHistory();
             await this.loadTasks();
         }

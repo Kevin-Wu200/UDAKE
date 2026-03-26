@@ -303,12 +303,12 @@ export class FeedbackCollector {
             const file = files[i];
 
             if (this.selectedFiles.length >= maxFiles) {
-                I18nDialog.alert(`最多只能上传 ${maxFiles} 个文件`);
+                I18nDialog.alert('dialog.feedback.maxFiles', { maxFiles });
                 break;
             }
 
             if (file.size > maxSize) {
-                I18nDialog.alert(`文件 ${file.name} 超过 5MB 限制`);
+                I18nDialog.alert('dialog.feedback.fileTooLarge', { fileName: file.name });
                 continue;
             }
 
@@ -345,7 +345,7 @@ export class FeedbackCollector {
         const content = (overlay.querySelector('#feedback-content') as HTMLTextAreaElement).value.trim();
         if (!content) {
             (overlay.querySelector('#feedback-content') as HTMLTextAreaElement).focus();
-            I18nDialog.alert('请填写反馈内容');
+            I18nDialog.alert('dialog.feedback.contentRequired');
             return;
         }
 
@@ -369,7 +369,7 @@ export class FeedbackCollector {
             browserInfo: this._getBrowserInfo(),
         });
 
-        I18nDialog.alert('反馈已提交，感谢您的建议！');
+        I18nDialog.alert('dialog.feedback.submitSuccess');
         this.hide();
     }
 
@@ -453,7 +453,7 @@ export class FeedbackCollector {
 
     /** 清除所有反馈 */
     static clearAll(): void {
-        if (I18nDialog.confirm('确定要清除所有反馈吗？此操作不可恢复。')) {
+        if (I18nDialog.confirm('dialog.feedback.clearAllConfirm')) {
             localStorage.removeItem(STORAGE_KEY);
         }
     }

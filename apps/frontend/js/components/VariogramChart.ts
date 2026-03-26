@@ -659,7 +659,7 @@ export class VariogramChart {
       ChartService.downloadFile(blob, `variogram-chart.${format}`);
     } catch (error) {
       console.error('导出图表失败:', error);
-      I18nDialog.alert('导出图表失败，请重试');
+      I18nDialog.alert('dialog.chart.exportFailed');
     }
   }
 

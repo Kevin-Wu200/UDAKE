@@ -13,6 +13,7 @@ const STRICT_REQUIRED_LOCALES = new Set(['en-US']);
 const KEY_NAME_PATTERN = /^[a-z]+(?:\.[a-zA-Z0-9_-]+)+$/;
 const TRANSLATION_ATTR_RE = /data-i18n(?:-(?:title|placeholder|aria-label|value))?=["']([^"']+)["']/g;
 const I18N_CALL_RE = /I18n\.(?:t|tv|tp)\(\s*["'`]([^"'`]+)["'`]/g;
+const I18N_DIALOG_CALL_RE = /I18nDialog\.(?:alert|confirm|prompt)\(\s*["'`]([^"'`]+)["'`]/g;
 const CJK_RE = /[\u3400-\u9fff]/;
 
 function readFileSafe(filePath) {
@@ -74,6 +75,13 @@ function collectUsedKeys(files) {
         used.add(`${key}.few`);
         used.add(`${key}.many`);
         used.add(`${key}.other`);
+      }
+    }
+
+    while ((match = I18N_DIALOG_CALL_RE.exec(content)) !== null) {
+      const key = match[1];
+      if (KEY_NAME_PATTERN.test(key)) {
+        used.add(key);
       }
     }
 

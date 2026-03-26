@@ -7,9 +7,14 @@
     "zh-CN": {
       title: "UDAKE - 智能不确定性驱动空间决策平台",
       brand: {
-        title: "智能不确定性驱动空间决策平台"
+        title: "智能不确定性驱动空间决策平台",
+        ariaHome: "UDAKE 首页"
+      },
+      language: {
+        toggleAria: "切换语言"
       },
       hero: {
+        kicker: "UDAKE 平台",
         title: "智能空间决策，驱动未来",
         subtitle: "专业的空间插值与不确定性分析平台",
         cta: "立即体验"
@@ -62,7 +67,8 @@
       },
       contact: {
         title: "联系我们",
-        email: "邮箱"
+        email: "邮箱",
+        github: "GitHub"
       },
       footer: {
         copy: "© 2026 UDAKE. All rights reserved."
@@ -76,9 +82,14 @@
     "en-US": {
       title: "UDAKE - Intelligent Uncertainty-Driven Spatial Decision Platform",
       brand: {
-        title: "Intelligent Uncertainty-Driven Spatial Decision Platform"
+        title: "Intelligent Uncertainty-Driven Spatial Decision Platform",
+        ariaHome: "UDAKE Home"
+      },
+      language: {
+        toggleAria: "Switch language"
       },
       hero: {
+        kicker: "UDAKE Platform",
         title: "Intelligent Spatial Decisions for the Future",
         subtitle: "A professional platform for spatial interpolation and uncertainty analysis",
         cta: "Get Started"
@@ -131,7 +142,8 @@
       },
       contact: {
         title: "Contact",
-        email: "Email"
+        email: "Email",
+        github: "GitHub"
       },
       footer: {
         copy: "© 2026 UDAKE. All rights reserved."
@@ -185,6 +197,14 @@
       const text = getByPath(dictionary, key);
       if (typeof text === "string") {
         element.textContent = text;
+      }
+    });
+
+    document.querySelectorAll("[data-i18n-aria-label]").forEach(function (element) {
+      const key = element.getAttribute("data-i18n-aria-label");
+      const text = getByPath(dictionary, key);
+      if (typeof text === "string") {
+        element.setAttribute("aria-label", text);
       }
     });
 

@@ -245,7 +245,7 @@ export class SettingsPanel {
             void (async () => {
                 const opened = await TemplateStorageService.openStorageFolder();
                 if (!opened) {
-                    I18nDialog.alert('当前环境不支持直接打开文件夹，请在系统下载目录中查看。');
+                    I18nDialog.alert('dialog.storage.openFolder.unsupported');
                 }
             })();
         });
@@ -415,7 +415,7 @@ export class SettingsPanel {
     }
 
     private async clearTemplateFiles(): Promise<void> {
-        const confirmed = I18nDialog.confirm('确定要清空已下载模板吗？此操作不可恢复。');
+        const confirmed = I18nDialog.confirm('dialog.template.clear.confirm');
         if (!confirmed) {
             return;
         }
@@ -423,9 +423,11 @@ export class SettingsPanel {
         try {
             const count = await TemplateStorageService.clearTemplates();
             await this.refreshStorageManagement();
-            I18nDialog.alert(`已清理 ${count} 个模板文件`);
+            I18nDialog.alert('dialog.template.cleaned', { count });
         } catch (error) {
-            I18nDialog.alert(`清理失败：${String((error as Error)?.message || error)}`);
+            I18nDialog.alert('dialog.template.clearFailed', {
+                error: String((error as Error)?.message || error)
+            });
         }
     }
 

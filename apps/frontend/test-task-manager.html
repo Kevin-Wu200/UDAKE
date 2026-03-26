@@ -140,48 +140,48 @@
 <body>
     <div class="test-container">
         <div class="test-header">
-            <h1>任务管理器测试</h1>
-            <p>测试后台任务管理、通知功能和任务持久化</p>
+            <h1 data-i18n="test.taskManager.heading">任务管理器测试</h1>
+            <p data-i18n="test.taskManager.subtitle">测试后台任务管理、通知功能和任务持久化</p>
 
             <div class="test-controls">
-                <button class="test-btn" onclick="testCreateTask()">创建测试任务</button>
-                <button class="test-btn" onclick="testCreateBatchTasks()">创建批量任务</button>
-                <button class="test-btn success" onclick="testGetStats()">查看统计</button>
-                <button class="test-btn danger" onclick="testClearHistory()">清空历史</button>
-                <button class="test-btn" onclick="testNotification()">测试通知</button>
+                <button class="test-btn" onclick="testCreateTask()" data-i18n="test.taskManager.createTask">创建测试任务</button>
+                <button class="test-btn" onclick="testCreateBatchTasks()" data-i18n="test.taskManager.createBatchTasks">创建批量任务</button>
+                <button class="test-btn success" onclick="testGetStats()" data-i18n="test.taskManager.viewStats">查看统计</button>
+                <button class="test-btn danger" onclick="testClearHistory()" data-i18n="test.taskManager.clearHistory">清空历史</button>
+                <button class="test-btn" onclick="testNotification()" data-i18n="test.taskManager.testNotification">测试通知</button>
             </div>
 
             <div class="stats-display" id="stats-display">
                 <div class="stat-card">
                     <div class="stat-value" id="stat-total">0</div>
-                    <div class="stat-label">总任务数</div>
+                    <div class="stat-label" data-i18n="test.taskManager.totalTasks">总任务数</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-pending">0</div>
-                    <div class="stat-label">待处理</div>
+                    <div class="stat-label" data-i18n="test.taskManager.pending">待处理</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-running">0</div>
-                    <div class="stat-label">运行中</div>
+                    <div class="stat-label" data-i18n="test.taskManager.running">运行中</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-completed">0</div>
-                    <div class="stat-label">已完成</div>
+                    <div class="stat-label" data-i18n="test.taskManager.completed">已完成</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-value" id="stat-failed">0</div>
-                    <div class="stat-label">失败</div>
+                    <div class="stat-label" data-i18n="test.taskManager.failed">失败</div>
                 </div>
             </div>
         </div>
 
         <div class="test-panel">
-            <h2>任务管理面板</h2>
+            <h2 data-i18n="test.taskManager.panelTitle">任务管理面板</h2>
             <div id="task-panel-container"></div>
         </div>
 
         <div class="test-header">
-            <h2>测试日志</h2>
+            <h2 data-i18n="test.taskManager.logTitle">测试日志</h2>
             <div class="log-container" id="log-container"></div>
         </div>
     </div>

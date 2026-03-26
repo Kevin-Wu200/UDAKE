@@ -278,12 +278,12 @@ export class RoutePlanningPanel {
      */
     private async planRoute() {
         if (!this.startPoint) {
-            I18nDialog.alert('请先选择起点');
+            I18nDialog.alert('dialog.route.selectStart');
             return;
         }
 
         if (this.samplingPoints.length < 2) {
-            I18nDialog.alert('请至少添加2个采样点');
+            I18nDialog.alert('dialog.route.needMinSamplingPoints');
             return;
         }
 
@@ -336,7 +336,7 @@ export class RoutePlanningPanel {
 
         } catch (error) {
             console.error('路径规划失败:', error);
-            I18nDialog.alert(`路径规划失败: ${error}`);
+            I18nDialog.alert('dialog.route.planFailed', { error: String(error) });
         } finally {
             // 恢复按钮状态
             const planBtn = document.getElementById('plan-route-btn');
