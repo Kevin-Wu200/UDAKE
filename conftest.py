@@ -1,9 +1,16 @@
 import json
+import sys
 import uuid
+from pathlib import Path
 from typing import Dict, Any
 
 import pytest
 from fastapi.testclient import TestClient
+
+# 兼容直接在仓库根目录执行 pytest 的场景
+SERVICES_ROOT = Path(__file__).resolve().parent / "services"
+if str(SERVICES_ROOT) not in sys.path:
+    sys.path.insert(0, str(SERVICES_ROOT))
 
 from backend.app.main import app
 from backend.app.tasks.任务管理器 import TaskManager

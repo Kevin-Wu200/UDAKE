@@ -24,19 +24,41 @@ jobs:
         with:
           python-version: '3.11'
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgdal-dev gdal-bin
+
+      - name: Show Python environment
+        run: |
+          python --version
+          pip --version
+          python - <<'PY'
+          import os
+          import sys
+          print(f"PYTHONPATH={os.getenv('PYTHONPATH', '')}")
+          print(f"Executable={sys.executable}")
+          PY
+
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
           pip install pytest-cov
+          pip check
 
       - name: Run deep learning tests with coverage
         env:
           PYTHONPATH: services
         run: |
-          pytest tests/deep_learning -q \
+          pytest tests/deep_learning -q -ra -vv --maxfail=1 \
             --cov=deep_learning \
             --cov=services/backend/app/dl_services \
             --cov-report=term-missing \
             --cov-report=xml \
             --cov-fail-under=80
+
+      - name: Dump dependency snapshot on failure
+        if: failure()
+        run: |
+          pip list

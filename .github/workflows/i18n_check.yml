@@ -19,6 +19,10 @@ on:
 jobs:
   i18n-check:
     runs-on: ubuntu-latest
+    env:
+      CI: true
+      I18N_CHECK_DEBUG: '1'
+      I18N_STRICT_ALL_LOCALES: '1'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,11 +30,23 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
+      - name: Show runtime environment
+        run: |
+          node -v
+          npm -v
+          uname -a
+
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --no-audit --prefer-offline
+
+      - name: Verify key i18n files
+        run: |
+          test -f apps/frontend/js/i18n/config.ts
+          test -f apps/frontend/js/utils/I18n.ts
+          ls -la apps/frontend/js/i18n apps/frontend/js/utils
 
       - name: Run i18n quality check
         run: npm run i18n:check:strict

@@ -19,7 +19,7 @@ from .config import settings
 logger = logging.getLogger(__name__)
 
 StartupDegradationLevel = Literal["none", "experience", "functional", "fatal"]
-TaskCallable = Callable[[], Awaitable[Dict[str, Any] | None]]
+TaskCallable = Callable[[], Awaitable[Optional[Dict[str, Any]]]]
 
 
 class StartupPriority(str, Enum):
@@ -185,7 +185,7 @@ class StartupManager:
         started_at = time.time()
         stage_start_perf = time.perf_counter()
         error_text: Optional[str] = None
-        payload: Dict[str, Any] | None = None
+        payload: Optional[Dict[str, Any]] = None
         success = True
 
         self.record_performance_event(
@@ -347,4 +347,3 @@ class StartupManager:
         self._degradation_level = "none"
         self._preloaded_context = {}
         self._status_cursor = 0
-
