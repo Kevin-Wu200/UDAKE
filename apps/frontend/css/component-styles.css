@@ -1212,6 +1212,19 @@
     line-height: 1.5;
 }
 
+.template-dialog-path {
+    margin-top: 6px;
+    margin-bottom: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    color: var(--primary-color);
+    word-break: break-all;
+}
+
 .template-download-dialog .dialog-buttons {
     display: flex;
     gap: 12px;
@@ -1248,6 +1261,89 @@
     background-color: var(--bg-secondary);
     color: var(--text-primary);
     border: 1px solid var(--border-color);
+}
+
+.template-storage-section {
+    margin-top: 14px;
+    border-top: 1px solid var(--border-color);
+    padding-top: 12px;
+}
+
+.template-storage-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.template-storage-actions .btn {
+    height: 34px;
+    padding: 0 12px;
+    font-size: 12px;
+}
+
+.template-storage-summary {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: grid;
+    gap: 4px;
+    margin-bottom: 10px;
+}
+
+.template-file-list {
+    max-height: 220px;
+    overflow: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+}
+
+.template-file-empty {
+    padding: 12px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.template-file-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.template-file-row:last-child {
+    border-bottom: none;
+}
+
+.template-file-meta {
+    min-width: 0;
+}
+
+.template-file-name {
+    font-size: 13px;
+    color: var(--text-primary);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.template-file-info {
+    margin-top: 4px;
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.template-file-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.template-file-actions .btn {
+    height: 30px;
+    padding: 0 10px;
+    font-size: 12px;
 }
 
 /* 设置面板 */
@@ -1386,6 +1482,31 @@
 .settings-footer .btn {
     height: 40px;
     padding: 0 20px;
+}
+
+.settings-value {
+    margin-top: 6px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    line-height: 1.4;
+    word-break: break-all;
+}
+
+.settings-storage-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.settings-storage-actions .btn {
+    height: 34px;
+    padding: 0 12px;
+    font-size: var(--font-size-sm);
 }
 
 .settings-reset-btn {

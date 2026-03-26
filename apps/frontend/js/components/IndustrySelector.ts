@@ -6,6 +6,7 @@
 import { TemplateDownloader } from './TemplateDownloader';
 import { I18n } from '../utils/I18n.js';
 import { I18nDialog } from './I18nDialog.js';
+import { TemplateStorageService } from '../services/TemplateStorageService.js';
 
 interface IndustryConfig {
   industry: string;
@@ -385,6 +386,13 @@ export class IndustrySelector {
 
   private async downloadTemplate(filename: string): Promise<void> {
     try {
+      const downloadTemplateBtn = this.container.querySelector('#download-template-btn') as HTMLButtonElement | null;
+      if (downloadTemplateBtn) {
+        downloadTemplateBtn.disabled = true;
+        downloadTemplateBtn.dataset.originalText = downloadTemplateBtn.textContent || I18n.t('industry.downloadTemplate');
+        downloadTemplateBtn.textContent = '下载中...';
+      }
+
       const response = await fetch(`${this.apiURL}/templates/${filename}`);
 
       if (!response.ok) {
@@ -392,14 +400,18 @@ export class IndustrySelector {
       }
 
       const blob = await response.blob();
-      const arrayBuffer = await blob.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
 
       // 获取本地化的文件名
       const localizedFilename = this.selectedIndustry ? I18n.getTemplateFilename(this.selectedIndustry.industry) : filename;
 
-      // 如果是 Electron 环境，使用保存对话框让用户选择保存位置
-      if (window.electronAPI && (window.electronAPI as any).saveFile) {
+      // 优先复用统一模板存储逻辑（安卓原生环境将落盘到 UDAKE_docs）
+      if (TemplateStorageService.canUseNativeStorage()) {
+        const content = await blob.text();
+        await TemplateDownloader.downloadContent(localizedFilename, content);
+      } else if (window.electronAPI && (window.electronAPI as any).saveFile) {
+        // Electron 环境：使用保存对话框让用户选择保存位置
+        const arrayBuffer = await blob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
         const result = await (window.electronAPI as any).saveFile({
           title: I18n.t('template.downloadDialog'),
           defaultPath: localizedFilename,
@@ -416,21 +428,18 @@ export class IndustrySelector {
         }
       } else {
         // 浏览器环境，使用默认下载方式
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = localizedFilename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-
-        // 显示询问是否跳转到文件位置的弹窗
-        TemplateDownloader.showOpenLocationDialog(localizedFilename);
+        const content = await blob.text();
+        await TemplateDownloader.downloadContent(localizedFilename, content);
       }
     } catch (error) {
       console.error('下载模板失败:', error);
       I18nDialog.alert(I18n.t('template.downloadFailed'));
+    } finally {
+      const downloadTemplateBtn = this.container.querySelector('#download-template-btn') as HTMLButtonElement | null;
+      if (downloadTemplateBtn) {
+        downloadTemplateBtn.disabled = !this.selectedIndustry;
+        downloadTemplateBtn.textContent = downloadTemplateBtn.dataset.originalText || I18n.t('industry.downloadTemplate');
+      }
     }
   }
 

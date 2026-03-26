@@ -4,9 +4,10 @@
  */
 
 import { I18n } from '../utils/I18n';
-import { appStore } from '../store/Store';
 import { unitManager } from '../services/UnitManager';
 import { CustomSelect } from './CustomSelect';
+import { I18nDialog } from './I18nDialog.js';
+import { TemplateStorageService } from '../services/TemplateStorageService.js';
 
 interface SettingsOptions {
     onLanguageChange?: (language: string) => void;
@@ -82,6 +83,23 @@ export class SettingsPanel {
                         <div class="settings-item">
                             <label class="settings-label settings-area-label">${I18n.t('settings.unit.area')}</label>
                             <div id="area-unit-container" class="custom-select-container"></div>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 class="settings-section-title settings-storage-title">存储管理</h3>
+                        <div class="settings-item">
+                            <label class="settings-label settings-storage-path-label">模板存储路径</label>
+                            <div class="settings-value settings-storage-path">--</div>
+                        </div>
+                        <div class="settings-item">
+                            <label class="settings-label settings-storage-usage-label">已用空间</label>
+                            <div class="settings-value settings-storage-usage">--</div>
+                        </div>
+                        <div class="settings-storage-actions">
+                            <button class="btn btn-secondary settings-storage-refresh-btn">刷新</button>
+                            <button class="btn btn-secondary settings-storage-open-btn">打开文件夹</button>
+                            <button class="btn btn-secondary settings-storage-clear-btn">清空模板</button>
                         </div>
                     </div>
                 </div>
@@ -179,6 +197,9 @@ export class SettingsPanel {
         const closeBtn = this.panel.querySelector('.settings-close-btn') as HTMLButtonElement;
         const resetBtn = this.panel.querySelector('.settings-reset-btn') as HTMLButtonElement;
         const saveBtn = this.panel.querySelector('.settings-save-btn') as HTMLButtonElement;
+        const storageRefreshBtn = this.panel.querySelector('.settings-storage-refresh-btn') as HTMLButtonElement | null;
+        const storageOpenBtn = this.panel.querySelector('.settings-storage-open-btn') as HTMLButtonElement | null;
+        const storageClearBtn = this.panel.querySelector('.settings-storage-clear-btn') as HTMLButtonElement | null;
         const languageInputs = this.panel.querySelectorAll('input[name="language"]') as NodeListOf<HTMLInputElement>;
 
         // 关闭按钮
@@ -215,6 +236,23 @@ export class SettingsPanel {
         saveBtn.addEventListener('click', () => {
             this.saveSettings();
         });
+
+        storageRefreshBtn?.addEventListener('click', () => {
+            void this.refreshStorageManagement();
+        });
+
+        storageOpenBtn?.addEventListener('click', () => {
+            void (async () => {
+                const opened = await TemplateStorageService.openStorageFolder();
+                if (!opened) {
+                    I18nDialog.alert('当前环境不支持直接打开文件夹，请在系统下载目录中查看。');
+                }
+            })();
+        });
+
+        storageClearBtn?.addEventListener('click', () => {
+            void this.clearTemplateFiles();
+        });
     }
 
     private async updateLanguage(language: string): Promise<void> {
@@ -233,6 +271,12 @@ export class SettingsPanel {
         const coordinateLabel = this.panel.querySelector('.settings-coordinate-label') as HTMLElement;
         const lengthLabel = this.panel.querySelector('.settings-length-label') as HTMLElement;
         const areaLabel = this.panel.querySelector('.settings-area-label') as HTMLElement;
+        const storageTitle = this.panel.querySelector('.settings-storage-title') as HTMLElement;
+        const storagePathLabel = this.panel.querySelector('.settings-storage-path-label') as HTMLElement;
+        const storageUsageLabel = this.panel.querySelector('.settings-storage-usage-label') as HTMLElement;
+        const storageRefreshBtn = this.panel.querySelector('.settings-storage-refresh-btn') as HTMLButtonElement;
+        const storageOpenBtn = this.panel.querySelector('.settings-storage-open-btn') as HTMLButtonElement;
+        const storageClearBtn = this.panel.querySelector('.settings-storage-clear-btn') as HTMLButtonElement;
         const resetBtn = this.panel.querySelector('.settings-reset-btn') as HTMLButtonElement;
         const saveBtn = this.panel.querySelector('.settings-save-btn') as HTMLButtonElement;
 
@@ -243,6 +287,12 @@ export class SettingsPanel {
         if (coordinateLabel) coordinateLabel.textContent = I18n.t('settings.unit.coordinate');
         if (lengthLabel) lengthLabel.textContent = I18n.t('settings.unit.length');
         if (areaLabel) areaLabel.textContent = I18n.t('settings.unit.area');
+        if (storageTitle) storageTitle.textContent = '存储管理';
+        if (storagePathLabel) storagePathLabel.textContent = '模板存储路径';
+        if (storageUsageLabel) storageUsageLabel.textContent = '已用空间';
+        if (storageRefreshBtn) storageRefreshBtn.textContent = '刷新';
+        if (storageOpenBtn) storageOpenBtn.textContent = '打开文件夹';
+        if (storageClearBtn) storageClearBtn.textContent = '清空模板';
         if (resetBtn) resetBtn.textContent = I18n.t('settings.reset');
         if (saveBtn) saveBtn.textContent = I18n.t('settings.save');
 
@@ -309,6 +359,7 @@ export class SettingsPanel {
         this.overlay.style.display = 'flex';
         this.updateUIText();
         this.loadUnitSettings();
+        void this.refreshStorageManagement();
     }
 
     private loadUnitSettings(): void {
@@ -343,6 +394,50 @@ export class SettingsPanel {
         } else {
             this.show();
         }
+    }
+
+    private async refreshStorageManagement(): Promise<void> {
+        const pathNode = this.panel.querySelector('.settings-storage-path') as HTMLElement | null;
+        const usageNode = this.panel.querySelector('.settings-storage-usage') as HTMLElement | null;
+
+        if (!pathNode || !usageNode) {
+            return;
+        }
+
+        try {
+            const summary = await TemplateStorageService.getStorageSummary();
+            pathNode.textContent = summary.path;
+            usageNode.textContent = `${this.formatBytes(summary.usedBytes)}（${summary.fileCount} 个文件）`;
+        } catch {
+            pathNode.textContent = TemplateStorageService.getPreferredStoragePath();
+            usageNode.textContent = '--';
+        }
+    }
+
+    private async clearTemplateFiles(): Promise<void> {
+        const confirmed = I18nDialog.confirm('确定要清空已下载模板吗？此操作不可恢复。');
+        if (!confirmed) {
+            return;
+        }
+
+        try {
+            const count = await TemplateStorageService.clearTemplates();
+            await this.refreshStorageManagement();
+            I18nDialog.alert(`已清理 ${count} 个模板文件`);
+        } catch (error) {
+            I18nDialog.alert(`清理失败：${String((error as Error)?.message || error)}`);
+        }
+    }
+
+    private formatBytes(bytes: number): string {
+        if (!bytes || bytes <= 0) {
+            return '0 B';
+        }
+
+        const units = ['B', 'KB', 'MB', 'GB'];
+        const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+        const value = bytes / Math.pow(1024, index);
+        return `${value.toFixed(index === 0 ? 0 : 2)} ${units[index]}`;
     }
 
     public destroy(): void {

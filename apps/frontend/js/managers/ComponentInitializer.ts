@@ -27,6 +27,7 @@ import OfflineModeBanner from '../components/OfflineModeBanner.js';
 import { HistoryManager } from '../utils/HistoryManager.js';
 import { FeedbackCollector } from '../components/FeedbackCollector.js';
 import { MapEngineSwitcher } from '../components/MapEngineSwitcher';
+import { TemplateStorageService } from '../services/TemplateStorageService.js';
 import { getMapProvider } from '../地图初始化.js';
 import type { DeepLearningPanel } from '../components/DeepLearningPanel.js';
 
@@ -115,6 +116,15 @@ export class ComponentInitializer {
      */
     private async initializeBasicComponents(): Promise<void> {
         console.log('[ComponentInitializer] 初始化基础UI组件...');
+
+        // 应用启动时预热模板目录：首次启动会自动创建 UDAKE_docs。
+        if (TemplateStorageService.canUseNativeStorage()) {
+            try {
+                await TemplateStorageService.ensureInitialized();
+            } catch (error) {
+                console.warn('[ComponentInitializer] 模板目录初始化失败，将在下载时重试:', error);
+            }
+        }
 
         const sidebar = document.querySelector('.sidebar');
         if (!sidebar) {
