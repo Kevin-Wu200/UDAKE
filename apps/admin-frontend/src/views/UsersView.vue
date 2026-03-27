@@ -28,7 +28,7 @@
             inline-prompt
             active-text="启用"
             inactive-text="禁用"
-            @change="(value:boolean) => onStatusChange(scope.row, value)"
+            @change="(value) => onStatusChange(scope.row, Boolean(value))"
           />
         </template>
       </el-table-column>

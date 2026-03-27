@@ -3,13 +3,18 @@ import { createPinia } from 'pinia';
 import ElementPlus from 'element-plus';
 import App from './App.vue';
 import router from './router';
+import { useAuthStore } from './stores/auth';
 import './styles/index.css';
 
 const app = createApp(App);
 const pinia = createPinia();
 document.title = import.meta.env.VITE_APP_TITLE;
+
 app.use(pinia);
 app.use(ElementPlus);
-
 app.use(router);
+
+const authStore = useAuthStore(pinia);
+void authStore.bootstrapAuth();
+
 app.mount('#app');
