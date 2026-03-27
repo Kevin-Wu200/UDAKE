@@ -1,0 +1,202 @@
+{
+  "config": {
+    "configFile": "/Users/wuchenkai/UDAKE/configs/playwright.auth.config.ts",
+    "rootDir": "/Users/wuchenkai/UDAKE/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/wuchenkai/UDAKE/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/wuchenkai/UDAKE/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "auth-workflow.admin.test.ts"
+        ],
+        "timeout": 45000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "outputFolder": "../playwright-report-auth"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "../test-results-auth.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 5,
+    "webServer": {
+      "command": "npm run dev --prefix ../apps/admin-frontend -- --host 127.0.0.1 --port 5175",
+      "url": "http://127.0.0.1:5175",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "auth-workflow.admin.test.ts",
+      "file": "auth-workflow.admin.test.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "认证流程 E2E（管理员前端用户中心）",
+          "file": "auth-workflow.admin.test.ts",
+          "line": 121,
+          "column": 6,
+          "specs": [
+            {
+              "title": "注册流程：发送验证码并完成注册后自动登录",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 537,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-27T09:29:42.430Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "f1a52f33c52be8087fb8-f3c6175dbddc82ef84a6",
+              "file": "auth-workflow.admin.test.ts",
+              "line": 126,
+              "column": 7
+            },
+            {
+              "title": "登录流程：登录后进入设备管理页面",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 348,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-27T09:29:43.264Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "f1a52f33c52be8087fb8-192199f10f0830f30dbf",
+              "file": "auth-workflow.admin.test.ts",
+              "line": 146,
+              "column": 7
+            },
+            {
+              "title": "找回密码流程：发送验证码并完成重置回到登录页",
+              "ok": true,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 45000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 578,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-27T09:29:43.616Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "f1a52f33c52be8087fb8-2180a21dd36f580fe32e",
+              "file": "auth-workflow.admin.test.ts",
+              "line": 159,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-03-27T09:29:41.625Z",
+    "duration": 2595.484,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

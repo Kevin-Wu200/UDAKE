@@ -1,0 +1,82 @@
+version: '3.9'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: udake-auth-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-udake_auth}
+      POSTGRES_USER: ${POSTGRES_USER:-udake}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-udake_change_me}
+    volumes:
+      - auth_postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-udake} -d ${POSTGRES_DB:-udake_auth}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.2-alpine
+    container_name: udake-auth-redis
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "allkeys-lru"]
+    volumes:
+      - auth_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ..
+      dockerfile: services/backend/Dockerfile
+    container_name: udake-auth-backend
+    restart: unless-stopped
+    env_file:
+      - ./env/auth.production.env
+    environment:
+      ENVIRONMENT: production
+      DEBUG: "False"
+      HOST: 0.0.0.0
+      PORT: 8000
+      AUTH_DATABASE_URL: ${AUTH_DATABASE_URL:-postgresql+psycopg2://udake:udake_change_me@postgres:5432/udake_auth}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      AUTH_DB_REQUIRE_SSL: "False"
+      BACKEND_CORS_ORIGINS: ${BACKEND_CORS_ORIGINS:-["https://localhost","https://127.0.0.1"]}
+    volumes:
+      - ../services/backend/app/结果文件:/app/services/backend/app/结果文件
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 8
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: udake-auth-nginx
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/auth_https.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+      - ../apps/frontend/dist:/usr/share/nginx/html/frontend:ro
+      - ../apps/admin-frontend/dist:/usr/share/nginx/html/admin:ro
+
+volumes:
+  auth_postgres_data:
+  auth_redis_data:

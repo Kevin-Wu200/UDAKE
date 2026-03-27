@@ -1,0 +1,11 @@
+# 每日 02:10 全量备份
+10 2 * * * PGHOST=127.0.0.1 PGPORT=5432 PGUSER=udake PGDATABASE=udake_auth PGPASSWORD=CHANGE_ME /opt/udake/scripts/backup_auth_db.sh full >> /var/log/udake/backup.log 2>&1
+
+# 每小时 10 分增量近似快照（data-only）
+10 * * * * PGHOST=127.0.0.1 PGPORT=5432 PGUSER=udake PGDATABASE=udake_auth PGPASSWORD=CHANGE_ME /opt/udake/scripts/backup_auth_db.sh hourly >> /var/log/udake/backup.log 2>&1
+
+# 每天 03:20 清理 30 天前备份
+20 3 * * * find /opt/udake/deployment/backups -type f -mtime +30 -delete
+
+# 每天 00:05 日志轮转
+5 0 * * * /usr/sbin/logrotate -f /opt/udake/deployment/logrotate/udake-auth
