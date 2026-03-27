@@ -70,12 +70,32 @@ class JWTManager:
             raise JWTValidationError("token payload malformed") from exc
         return header, payload, signature, f"{header_raw}.{payload_raw}"
 
-    def _ensure_not_blacklisted(self, payload: Dict[str, Any]) -> None:
+    @staticmethod
+    def hash_token(token: str) -> str:
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+    def _ensure_not_blacklisted(self, token: str, payload: Dict[str, Any]) -> None:
         if not self.cache:
             return
+        if self.cache.exists(f"blacklist:{self.hash_token(token)}"):
+            raise JWTValidationError("token blacklisted")
         jti = payload.get("jti")
         if jti and self.cache.exists(f"jwt_blacklist:{jti}"):
             raise JWTValidationError("token blacklisted")
+        user_id = payload.get("user_id")
+        iat = int(payload.get("iat", 0))
+        iat_ms = int(payload.get("iat_ms", iat * 1000))
+        if user_id:
+            revoked_after_key = f"jwt_user_revoked_after:{user_id}"
+            revoked_payload = self.cache.get(revoked_after_key) or {}
+            revoked_after_ms = int(
+                revoked_payload.get(
+                    "revoked_after_ms",
+                    int(revoked_payload.get("revoked_after", 0)) * 1000,
+                )
+            )
+            if revoked_after_ms > 0 and iat_ms <= revoked_after_ms:
+                raise JWTValidationError("token blacklisted")
 
     def _build_payload(
         self,
@@ -85,11 +105,13 @@ class JWTManager:
         claims: Dict[str, Any],
     ) -> Dict[str, Any]:
         now = int(time.time())
+        now_ms = int(time.time() * 1000)
         payload = dict(claims)
         payload.update(
             {
                 "jti": uuid.uuid4().hex,
                 "iat": now,
+                "iat_ms": now_ms,
                 "nbf": now,
                 "exp": now + expires_in_seconds,
                 "typ": token_type,
@@ -165,16 +187,66 @@ class JWTManager:
         if expected_type and payload.get("typ") != expected_type:
             raise JWTValidationError("token type mismatch")
         if check_blacklist:
-            self._ensure_not_blacklisted(payload)
+            self._ensure_not_blacklisted(token, payload)
         return payload
 
-    def blacklist_token(self, token: str) -> None:
+    def blacklist_token_hash(
+        self,
+        token_hash: str,
+        *,
+        user_id: Optional[int | str] = None,
+        ttl: int,
+        reason: str = "manual",
+    ) -> None:
+        if not self.cache:
+            return
+        if not token_hash or ttl <= 0:
+            return
+        self.cache.set(
+            f"blacklist:{token_hash}",
+            {"user_id": str(user_id) if user_id is not None else "", "reason": reason},
+            ttl=max(1, int(ttl)),
+        )
+
+    def blacklist_token(
+        self,
+        token: str,
+        *,
+        user_id: Optional[int | str] = None,
+        reason: str = "logout",
+    ) -> None:
         if not self.cache:
             return
         payload = self.parse_token(token, verify=False)
-        jti = payload.get("jti")
         exp = int(payload.get("exp", 0))
-        if not jti or exp <= 0:
+        if exp <= 0:
             return
         ttl = max(1, exp - int(time.time()))
-        self.cache.set(f"jwt_blacklist:{jti}", {"reason": "logout"}, ttl=ttl)
+        self.blacklist_token_hash(
+            self.hash_token(token),
+            user_id=user_id if user_id is not None else payload.get("user_id"),
+            ttl=ttl,
+            reason=reason,
+        )
+        jti = payload.get("jti")
+        if jti:
+            self.blacklist_jti(jti=str(jti), ttl=ttl, reason=reason)
+
+    def blacklist_jti(self, *, jti: str, ttl: int, reason: str = "manual") -> None:
+        if not self.cache:
+            return
+        if not jti or ttl <= 0:
+            return
+        self.cache.set(f"jwt_blacklist:{jti}", {"reason": reason}, ttl=max(1, int(ttl)))
+
+    def blacklist_all_user_tokens(self, *, user_id: int | str) -> None:
+        if not self.cache:
+            return
+        user_id_text = str(user_id)
+        now = int(time.time())
+        now_ms = int(time.time() * 1000)
+        self.cache.set(
+            f"jwt_user_revoked_after:{user_id_text}",
+            {"revoked_after": now, "revoked_after_ms": now_ms},
+            ttl=max(self.refresh_ttl_seconds, self.access_ttl_seconds),
+        )

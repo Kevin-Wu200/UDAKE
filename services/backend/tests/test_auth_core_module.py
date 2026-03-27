@@ -26,6 +26,7 @@ from app.auth import (
     verify_password,
 )
 from app.auth.product_key_service import verify_rsa_signature_sha256
+from app.auth.rate_limiter import AuthRateLimiter, RateLimitExceededError, RateRule
 from app.auth.verification import EmailVerificationService, VerificationCodeError
 
 
@@ -173,3 +174,197 @@ def test_cache_ttl_management():
     assert ttl >= 0
     time.sleep(1.05)
     assert cache.get("foo") is None
+
+
+def test_rate_limiter_lock_behaviour():
+    cache = AuthCacheManager(redis_url=None)
+    limiter = AuthRateLimiter(
+        cache,
+        lock_seconds=2,
+        rules={"login": RateRule(hourly=1, daily=2)},
+    )
+    first = limiter.check_and_consume(identity="u1", action="login")
+    assert first["remaining_hourly"] == 0
+    with pytest.raises(RateLimitExceededError):
+        limiter.check_and_consume(identity="u1", action="login")
+    assert cache.ttl("rate_limit_lock:u1:login") > 0
+
+
+def test_auth_service_change_password_reset_password_and_history(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AUTH_JWT_SECRET", "history-secret")
+    reset_auth_service()
+    service = get_auth_service()
+
+    register_key = service.product_keys.generate_key("change-password-seed").product_key
+    reset_key = service.product_keys.generate_key("reset-password-seed").product_key
+    service.register(email="history@example.com", password="StrongPass123", product_key=register_key)
+    login_payload = service.login(
+        email="history@example.com",
+        password="StrongPass123",
+        device_info={"device_id": "history-device"},
+    )
+    access_token = login_payload["access_token"]
+
+    service.change_password(
+        access_token=access_token,
+        old_password="StrongPass123",
+        new_password="NewStrongPass123",
+        confirm_password="NewStrongPass123",
+    )
+    with pytest.raises(JWTValidationError):
+        service.jwt.verify_token(access_token, expected_type="access")
+
+    refreshed_login = service.login(
+        email="history@example.com",
+        password="NewStrongPass123",
+        device_info={"device_id": "history-device-2"},
+    )
+    with pytest.raises(ValueError):
+        service.change_password(
+            access_token=refreshed_login["access_token"],
+            old_password="NewStrongPass123",
+            new_password="StrongPass123",
+            confirm_password="StrongPass123",
+        )
+
+    service.send_reset_password_code(email="history@example.com", product_key=reset_key)
+    reset_payload = service.cache.get("reset_code:history@example.com")
+    assert reset_payload and reset_payload["code"]
+    service.reset_password(
+        email="history@example.com",
+        code=reset_payload["code"],
+        new_password="ResetStrongPass123",
+        confirm_password="ResetStrongPass123",
+    )
+    final_login = service.login(
+        email="history@example.com",
+        password="ResetStrongPass123",
+        device_info={"device_id": "history-device-3"},
+    )
+    assert "access_token" in final_login
+
+    history = service.get_password_history(final_login["user_info"]["user_id"])
+    assert len(history) <= 5
+    reset_auth_service()
+
+
+def test_auth_service_change_email_flow(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AUTH_JWT_SECRET", "email-change-secret")
+    reset_auth_service()
+    service = get_auth_service()
+
+    register_key = service.product_keys.generate_key("change-email-seed").product_key
+    service.register(email="old-email@example.com", password="StrongPass123", product_key=register_key)
+    login_payload = service.login(
+        email="old-email@example.com",
+        password="StrongPass123",
+        device_info={"device_id": "email-device"},
+    )
+    access_token = login_payload["access_token"]
+    user_id = login_payload["user_info"]["user_id"]
+
+    service.send_change_email_code(
+        access_token=access_token,
+        new_email="new-email@example.com",
+        current_password="StrongPass123",
+    )
+    cached = service.cache.get(f"change_email:{user_id}")
+    assert cached and cached["code"]
+
+    verify_result = service.verify_change_email(access_token=access_token, code=cached["code"])
+    assert verify_result["new_email"] == "new-email@example.com"
+
+    relogin = service.login(
+        email="new-email@example.com",
+        password="StrongPass123",
+        device_info={"device_id": "email-device-2"},
+    )
+    assert relogin["user_info"]["email"] == "new-email@example.com"
+    with pytest.raises(ValueError):
+        service.login(
+            email="old-email@example.com",
+            password="StrongPass123",
+            device_info={"device_id": "email-device-3"},
+        )
+    reset_auth_service()
+
+
+def test_auth_api_reset_password_and_change_email(auth_client: TestClient):
+    service = get_auth_service()
+    register_key = service.product_keys.generate_key("auth-api-03-register").product_key
+    reset_key = service.product_keys.generate_key("auth-api-03-reset").product_key
+
+    register_resp = auth_client.post(
+        "/api/auth/register",
+        json={"email": "flow@example.com", "password": "StrongPass123", "product_key": register_key},
+    )
+    assert register_resp.status_code == 200
+
+    login_resp = auth_client.post(
+        "/api/auth/login",
+        json={"email": "flow@example.com", "password": "StrongPass123", "device_info": {"device_id": "flow-01"}},
+    )
+    assert login_resp.status_code == 200
+    access_token = login_resp.json()["data"]["access_token"]
+
+    change_password_resp = auth_client.post(
+        "/api/auth/change-password",
+        headers={"Authorization": f"Bearer {access_token}"},
+        json={
+            "old_password": "StrongPass123",
+            "new_password": "StrongPass456",
+            "confirm_password": "StrongPass456",
+        },
+    )
+    assert change_password_resp.status_code == 200
+
+    reset_send_resp = auth_client.post(
+        "/api/auth/reset-password/send-code",
+        json={"email": "flow@example.com", "product_key": reset_key},
+    )
+    assert reset_send_resp.status_code == 200
+    reset_code = service.cache.get("reset_code:flow@example.com")["code"]
+
+    reset_verify_resp = auth_client.post(
+        "/api/auth/reset-password/verify",
+        json={
+            "email": "flow@example.com",
+            "code": reset_code,
+            "new_password": "StrongPass789",
+            "confirm_password": "StrongPass789",
+        },
+    )
+    assert reset_verify_resp.status_code == 200
+
+    relogin_resp = auth_client.post(
+        "/api/auth/login",
+        json={"email": "flow@example.com", "password": "StrongPass789", "device_info": {"device_id": "flow-02"}},
+    )
+    assert relogin_resp.status_code == 200
+    new_access_token = relogin_resp.json()["data"]["access_token"]
+
+    send_change_email_resp = auth_client.post(
+        "/api/auth/change-email/send-code",
+        headers={"Authorization": f"Bearer {new_access_token}"},
+        json={"new_email": "flow-new@example.com", "current_password": "StrongPass789"},
+    )
+    assert send_change_email_resp.status_code == 200
+
+    user_id = relogin_resp.json()["data"]["user_info"]["user_id"]
+    email_code = service.cache.get(f"change_email:{user_id}")["code"]
+    verify_change_email_resp = auth_client.post(
+        "/api/auth/change-email/verify",
+        headers={"Authorization": f"Bearer {new_access_token}"},
+        json={"code": email_code},
+    )
+    assert verify_change_email_resp.status_code == 200
+
+    login_new_email_resp = auth_client.post(
+        "/api/auth/login",
+        json={
+            "email": "flow-new@example.com",
+            "password": "StrongPass789",
+            "device_info": {"device_id": "flow-03"},
+        },
+    )
+    assert login_new_email_resp.status_code == 200
