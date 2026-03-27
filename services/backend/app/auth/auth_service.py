@@ -8,6 +8,7 @@ import os
 import re
 import threading
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -24,6 +25,9 @@ logger = logging.getLogger(__name__)
 
 EMAIL_PATTERN = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 PASSWORD_PATTERN = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$")
+SUSPICIOUS_UA_KEYWORDS = ("bot", "spider", "crawler", "curl", "wget", "python-requests", "selenium", "scrapy")
+UNKNOWN_LOCATION = "未知"
+DEVICE_INACTIVE_AFTER_SECONDS = 30 * 24 * 60 * 60
 
 
 @dataclass
@@ -43,9 +47,20 @@ class AuthUser:
 class UserDeviceSession:
     user_id: int
     device_id: str
+    fingerprint: str
     refresh_token_hash: str
+    device_name: Optional[str] = None
+    device_type: str = "unknown"
+    os_name: str = "Unknown"
+    browser: str = "Unknown"
     ip_address: Optional[str] = None
+    location: Optional[str] = None
     user_agent: Optional[str] = None
+    status: str = "active"
+    tokens: Dict[str, Dict[str, Any]] = field(default_factory=dict)
+    created_at: int = field(default_factory=lambda: int(time.time()))
+    last_login_at: int = field(default_factory=lambda: int(time.time()))
+    last_active_at: int = field(default_factory=lambda: int(time.time()))
     updated_at: int = field(default_factory=lambda: int(time.time()))
 
 
@@ -190,6 +205,241 @@ class AuthService:
     def _ensure_rate_limit(self, *, identity: str, action: str) -> Dict[str, int]:
         return self.rate_limiter.check_and_consume(identity=identity, action=action)
 
+    @staticmethod
+    def _normalize_device_value(value: Any) -> str:
+        text = str(value or "").strip()
+        return text
+
+    def generate_device_fingerprint(
+        self, *, device_info: Optional[Dict[str, Any]] = None, user_agent: Optional[str] = None
+    ) -> str:
+        info = device_info or {}
+        if info.get("fingerprint"):
+            return str(info["fingerprint"])
+        screen_resolution = self._normalize_device_value(
+            info.get("screen_resolution") or f"{info.get('screen_width', '')}x{info.get('screen_height', '')}"
+        )
+        timezone = self._normalize_device_value(info.get("timezone"))
+        language = self._normalize_device_value(info.get("language"))
+        canvas_fingerprint = self._normalize_device_value(
+            info.get("canvas_fingerprint") or info.get("canvas") or info.get("canvas_hash")
+        )
+        payload = "|".join(
+            [
+                self._normalize_device_value(user_agent).lower(),
+                screen_resolution.lower(),
+                timezone.lower(),
+                language.lower(),
+                canvas_fingerprint.lower(),
+            ]
+        )
+        return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def _extract_device_type(*, user_agent: str) -> str:
+        ua = user_agent.lower()
+        if any(flag in ua for flag in ("ipad", "tablet")):
+            return "平板"
+        if any(flag in ua for flag in ("iphone", "android", "mobile")):
+            return "手机"
+        if ua:
+            return "PC"
+        return "unknown"
+
+    @staticmethod
+    def _extract_os(*, user_agent: str) -> str:
+        ua = user_agent.lower()
+        if "windows" in ua:
+            return "Windows"
+        if "mac os x" in ua or "macintosh" in ua:
+            return "macOS"
+        if "iphone" in ua or "ipad" in ua or "ios" in ua:
+            return "iOS"
+        if "android" in ua:
+            return "Android"
+        if "linux" in ua:
+            return "Linux"
+        return "Unknown"
+
+    @staticmethod
+    def _extract_browser(*, user_agent: str) -> str:
+        ua = user_agent.lower()
+        if "edg/" in ua:
+            return "Edge"
+        if "opr/" in ua or "opera" in ua:
+            return "Opera"
+        if "chrome/" in ua and "chromium" not in ua and "edg/" not in ua:
+            return "Chrome"
+        if "firefox/" in ua:
+            return "Firefox"
+        if "safari/" in ua and "chrome/" not in ua:
+            return "Safari"
+        return "Unknown"
+
+    @staticmethod
+    def _mask_ip(ip_address: Optional[str]) -> str:
+        if not ip_address:
+            return "-"
+        if ":" in ip_address:
+            segments = [segment for segment in ip_address.split(":") if segment]
+            if len(segments) >= 2:
+                return f"{segments[0]}:{segments[1]}:*:*"
+            return "*:*"
+        parts = ip_address.split(".")
+        if len(parts) == 4:
+            return f"{parts[0]}.{parts[1]}.*.*"
+        return ip_address
+
+    @staticmethod
+    def _parse_device_id_from_token_payload(payload: Dict[str, Any]) -> Optional[str]:
+        candidate = str(payload.get("device_id") or "").strip()
+        return candidate or None
+
+    @staticmethod
+    def _token_hash(token: str) -> str:
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+    def _resolve_device_id(self, info: Dict[str, Any], fingerprint: str) -> str:
+        raw_device_id = str(info.get("device_id") or "").strip()
+        if raw_device_id:
+            return raw_device_id
+        # 使用指纹派生稳定UUID，同一设备可复用同一device_id
+        return str(uuid.uuid5(uuid.NAMESPACE_URL, fingerprint))
+
+    def _token_exp(self, token: str) -> int:
+        payload = self.jwt.parse_token(token, verify=False)
+        exp = int(payload.get("exp", 0))
+        if exp > 0:
+            return exp
+        return int(time.time()) + 60
+
+    @staticmethod
+    def _is_suspicious_user_agent(user_agent: str) -> bool:
+        ua = user_agent.lower()
+        return any(keyword in ua for keyword in SUSPICIOUS_UA_KEYWORDS)
+
+    def _mark_device_inactive_locked(self, session: UserDeviceSession, *, now: int) -> None:
+        session.status = "inactive"
+        session.refresh_token_hash = ""
+        session.tokens.clear()
+        session.updated_at = now
+
+    def _cleanup_expired_tokens_locked(self, session: UserDeviceSession, *, now: int) -> None:
+        expired = [token_hash for token_hash, token_meta in session.tokens.items() if int(token_meta.get("exp", 0)) <= now]
+        for token_hash in expired:
+            session.tokens.pop(token_hash, None)
+
+    def _cleanup_stale_devices_locked(self, *, now: int) -> None:
+        for session in self._devices.values():
+            self._cleanup_expired_tokens_locked(session, now=now)
+            if session.status == "active" and session.last_active_at <= now - DEVICE_INACTIVE_AFTER_SECONDS:
+                self._mark_device_inactive_locked(session, now=now)
+
+    def _add_device_token_locked(
+        self,
+        session: UserDeviceSession,
+        *,
+        token: str,
+        token_type: str,
+        now: int,
+    ) -> None:
+        token_hash = self._token_hash(token)
+        session.tokens[token_hash] = {
+            "type": token_type,
+            "exp": self._token_exp(token),
+            "added_at": now,
+        }
+        session.updated_at = now
+
+    def _blacklist_all_user_device_tokens(self, *, user_id: int, reason: str) -> int:
+        now = int(time.time())
+        blacklisted = 0
+        with self._lock:
+            sessions = [item for (uid, _), item in self._devices.items() if uid == user_id]
+            for session in sessions:
+                for token_hash, token_meta in list(session.tokens.items()):
+                    ttl = int(token_meta.get("exp", 0)) - now
+                    if ttl <= 0:
+                        continue
+                    self.jwt.blacklist_token_hash(token_hash, user_id=user_id, ttl=ttl, reason=reason)
+                    blacklisted += 1
+                self._mark_device_inactive_locked(session, now=now)
+        return blacklisted
+
+    def _detect_anomalies(
+        self,
+        *,
+        previous: Optional[UserDeviceSession],
+        ip_address: Optional[str],
+        location: Optional[str],
+        user_agent: str,
+        is_new_device: bool,
+    ) -> List[Dict[str, Any]]:
+        anomalies: List[Dict[str, Any]] = []
+        if is_new_device:
+            anomalies.append({"type": "new_device", "severity": "info", "message": "检测到首次登录设备"})
+        if previous and previous.ip_address and ip_address and previous.ip_address != ip_address:
+            anomalies.append(
+                {
+                    "type": "ip_changed",
+                    "severity": "medium",
+                    "message": "检测到设备IP变化",
+                    "from": previous.ip_address,
+                    "to": ip_address,
+                }
+            )
+        if previous and previous.location and location and previous.location != location:
+            anomalies.append(
+                {
+                    "type": "location_changed",
+                    "severity": "medium",
+                    "message": "检测到异地登录",
+                    "from": previous.location,
+                    "to": location,
+                }
+            )
+        if previous and previous.user_agent and user_agent and previous.user_agent != user_agent:
+            anomalies.append(
+                {
+                    "type": "user_agent_changed",
+                    "severity": "medium",
+                    "message": "检测到User-Agent变化",
+                }
+            )
+        if user_agent and self._is_suspicious_user_agent(user_agent):
+            anomalies.append(
+                {
+                    "type": "suspicious_user_agent",
+                    "severity": "high",
+                    "message": "检测到疑似爬虫或自动化User-Agent",
+                }
+            )
+        return anomalies
+
+    def _send_security_alert_email(self, *, user: AuthUser, anomalies: List[Dict[str, Any]], device_id: str) -> None:
+        if not anomalies:
+            return
+        lines = "".join(
+            f"<li>{item.get('message', item.get('type', 'unknown'))}</li>"
+            for item in anomalies
+        )
+        html = (
+            "<h3>安全提醒：检测到异常设备行为</h3>"
+            f"<p>账号：{user.email}</p>"
+            f"<p>设备ID：{device_id}</p>"
+            f"<ul>{lines}</ul>"
+            "<p>如果不是本人操作，请尽快修改密码。</p>"
+        )
+        try:
+            self.email_service.send_email(
+                to_email=user.email,
+                subject="UDAKE 安全提醒：检测到异常设备行为",
+                html_content=html,
+                async_send=True,
+            )
+        except Exception as exc:
+            logger.warning("安全提醒邮件发送失败 user=%s err=%s", user.id, exc)
+
     def register(
         self,
         *,
@@ -286,33 +536,114 @@ class AuthService:
             raise ValueError("邮箱或密码错误")
 
         info = device_info or {}
-        default_device = hashlib.sha256(normalized_email.encode("utf-8")).hexdigest()[:16]
-        device_id = str(info.get("device_id") or info.get("fingerprint") or default_device)
+        normalized_ua = str(user_agent or info.get("user_agent") or "")
+        location = str(info.get("location") or UNKNOWN_LOCATION)
+        fingerprint = self.generate_device_fingerprint(device_info=info, user_agent=normalized_ua)
+        device_id = self._resolve_device_id(info, fingerprint=fingerprint)
+        device_name = str(info.get("device_name") or info.get("name") or "") or None
+        device_type = self._extract_device_type(user_agent=normalized_ua)
+        os_name = self._extract_os(user_agent=normalized_ua)
+        browser = self._extract_browser(user_agent=normalized_ua)
+
         access_token = self.jwt.generate_access_token(
             user_id=user.id,
             role=user.role,
             permissions=user.permissions,
+            extra_claims={"device_id": device_id, "fingerprint": fingerprint},
         )
-        refresh_token = self.jwt.generate_refresh_token(user_id=user.id, device_id=device_id)
-        refresh_hash = hashlib.sha256(refresh_token.encode("utf-8")).hexdigest()
+        refresh_token = self.jwt.generate_refresh_token(
+            user_id=user.id,
+            device_id=device_id,
+            extra_claims={"fingerprint": fingerprint},
+        )
+        refresh_hash = self._token_hash(refresh_token)
+        now = int(time.time())
+        anomalies: List[Dict[str, Any]] = []
 
         with self._lock:
-            user.last_login_at = int(time.time())
-            self._devices[(user.id, device_id)] = UserDeviceSession(
-                user_id=user.id,
-                device_id=device_id,
-                refresh_token_hash=refresh_hash,
+            self._cleanup_stale_devices_locked(now=now)
+            user.last_login_at = now
+            session = self._devices.get((user.id, device_id))
+            previous = None
+            if session:
+                previous = UserDeviceSession(
+                    user_id=session.user_id,
+                    device_id=session.device_id,
+                    fingerprint=session.fingerprint,
+                    refresh_token_hash=session.refresh_token_hash,
+                    device_name=session.device_name,
+                    device_type=session.device_type,
+                    os_name=session.os_name,
+                    browser=session.browser,
+                    ip_address=session.ip_address,
+                    location=session.location,
+                    user_agent=session.user_agent,
+                    status=session.status,
+                    tokens=dict(session.tokens),
+                    created_at=session.created_at,
+                    last_login_at=session.last_login_at,
+                    last_active_at=session.last_active_at,
+                    updated_at=session.updated_at,
+                )
+            else:
+                session = UserDeviceSession(
+                    user_id=user.id,
+                    device_id=device_id,
+                    fingerprint=fingerprint,
+                    refresh_token_hash=refresh_hash,
+                    device_name=device_name,
+                    device_type=device_type,
+                    os_name=os_name,
+                    browser=browser,
+                    ip_address=ip_address,
+                    location=location,
+                    user_agent=normalized_ua,
+                    status="active",
+                    last_login_at=now,
+                    last_active_at=now,
+                    updated_at=now,
+                )
+                self._devices[(user.id, device_id)] = session
+
+            anomalies = self._detect_anomalies(
+                previous=previous,
                 ip_address=ip_address,
-                user_agent=user_agent,
+                location=location,
+                user_agent=normalized_ua,
+                is_new_device=previous is None,
             )
+            session.fingerprint = fingerprint
+            session.device_name = device_name
+            session.device_type = device_type
+            session.os_name = os_name
+            session.browser = browser
+            session.ip_address = ip_address
+            session.location = location
+            session.user_agent = normalized_ua
+            session.status = "active"
+            session.last_login_at = now
+            session.last_active_at = now
+            session.refresh_token_hash = refresh_hash
+            self._cleanup_expired_tokens_locked(session, now=now)
+            self._add_device_token_locked(session, token=access_token, token_type="access", now=now)
+            self._add_device_token_locked(session, token=refresh_token, token_type="refresh", now=now)
 
         self._audit(
             operation="login",
             user_id=user.id,
-            details={"result": "success", "device_id": device_id},
+            details={"result": "success", "device_id": device_id, "anomalies": anomalies},
             ip_address=ip_address,
-            user_agent=user_agent,
+            user_agent=normalized_ua,
         )
+        if anomalies:
+            self._audit(
+                operation="other",
+                user_id=user.id,
+                details={"action": "device_anomaly", "device_id": device_id, "events": anomalies},
+                ip_address=ip_address,
+                user_agent=normalized_ua,
+            )
+            self._send_security_alert_email(user=user, anomalies=anomalies, device_id=device_id)
         return {
             "access_token": access_token,
             "refresh_token": refresh_token,
@@ -328,17 +659,25 @@ class AuthService:
         payload = self.jwt.verify_token(refresh_token, expected_type="refresh", check_blacklist=True)
         user_id = int(payload["user_id"])
         device_id = str(payload["device_id"])
-        refresh_hash = hashlib.sha256(refresh_token.encode("utf-8")).hexdigest()
+        refresh_hash = self._token_hash(refresh_token)
         with self._lock:
             session = self._devices.get((user_id, device_id))
             user = self._users_by_id.get(user_id)
-        if not session or session.refresh_token_hash != refresh_hash or not user:
+            now = int(time.time())
+            self._cleanup_stale_devices_locked(now=now)
+        if not session or session.refresh_token_hash != refresh_hash or session.status != "active" or not user:
             raise JWTValidationError("refresh token invalid")
         access_token = self.jwt.generate_access_token(
             user_id=user.id,
             role=user.role,
             permissions=user.permissions,
+            extra_claims={"device_id": device_id, "fingerprint": session.fingerprint},
         )
+        now = int(time.time())
+        with self._lock:
+            session.last_active_at = now
+            self._cleanup_expired_tokens_locked(session, now=now)
+            self._add_device_token_locked(session, token=access_token, token_type="access", now=now)
         self._audit(
             operation="read",
             user_id=user.id,
@@ -350,11 +689,125 @@ class AuthService:
         payload = self.jwt.verify_token(access_token, expected_type="access", check_blacklist=True)
         self.jwt.blacklist_token(access_token)
         user_id = int(payload["user_id"])
+        device_id = self._parse_device_id_from_token_payload(payload)
+        now = int(time.time())
+        with self._lock:
+            if device_id:
+                session = self._devices.get((user_id, device_id))
+                if session:
+                    session.tokens.pop(self._token_hash(access_token), None)
+                    session.last_active_at = now
+                    session.updated_at = now
         self._audit(
             operation="logout",
             user_id=user_id,
-            details={"action": "logout", "result": "success"},
+            details={"action": "logout", "result": "success", "device_id": device_id},
         )
+
+    def list_user_devices(
+        self,
+        *,
+        access_token: str,
+        page: int = 1,
+        page_size: int = 20,
+        current_fingerprint: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = self.jwt.verify_token(access_token, expected_type="access", check_blacklist=True)
+        user_id = int(payload["user_id"])
+        current_device_id = self._parse_device_id_from_token_payload(payload)
+        now = int(time.time())
+
+        with self._lock:
+            self._cleanup_stale_devices_locked(now=now)
+            user_devices = [device for (uid, _), device in self._devices.items() if uid == user_id]
+            if not current_device_id and current_fingerprint:
+                matched = next((item for item in user_devices if item.fingerprint == current_fingerprint), None)
+                current_device_id = matched.device_id if matched else None
+
+            user_devices.sort(key=lambda item: (item.last_login_at, item.updated_at), reverse=True)
+            total = len(user_devices)
+            start = max(0, (page - 1) * page_size)
+            end = start + page_size
+            page_devices = user_devices[start:end]
+
+            items = [
+                {
+                    "device_id": item.device_id,
+                    "device_name": item.device_name or f"{item.os_name} {item.browser}",
+                    "device_type": item.device_type,
+                    "os": item.os_name,
+                    "browser": item.browser,
+                    "ip": self._mask_ip(item.ip_address),
+                    "location": item.location or UNKNOWN_LOCATION,
+                    "last_login_at": item.last_login_at,
+                    "status": item.status,
+                    "is_current": bool(current_device_id and item.device_id == current_device_id),
+                }
+                for item in page_devices
+            ]
+
+        return {
+            "items": items,
+            "pagination": {
+                "page": page,
+                "page_size": page_size,
+                "total": total,
+            },
+            "current_device_id": current_device_id,
+        }
+
+    def kick_device(
+        self,
+        *,
+        access_token: str,
+        target_device_id: str,
+        current_fingerprint: Optional[str] = None,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        payload = self.jwt.verify_token(access_token, expected_type="access", check_blacklist=True)
+        user_id = int(payload["user_id"])
+        current_device_id = self._parse_device_id_from_token_payload(payload)
+        now = int(time.time())
+        blacklisted_tokens = 0
+
+        with self._lock:
+            self._cleanup_stale_devices_locked(now=now)
+            if not current_device_id and current_fingerprint:
+                current_match = next(
+                    (device for (uid, _), device in self._devices.items() if uid == user_id and device.fingerprint == current_fingerprint),
+                    None,
+                )
+                current_device_id = current_match.device_id if current_match else None
+
+            if current_device_id and current_device_id == target_device_id:
+                raise PermissionError("不能踢出当前设备")
+
+            session = self._devices.get((user_id, target_device_id))
+            if not session:
+                raise ValueError("设备不存在")
+
+            for token_hash, token_meta in list(session.tokens.items()):
+                ttl = int(token_meta.get("exp", 0)) - now
+                if ttl <= 0:
+                    continue
+                self.jwt.blacklist_token_hash(token_hash, user_id=user_id, ttl=ttl, reason="kick_device")
+                blacklisted_tokens += 1
+            self._mark_device_inactive_locked(session, now=now)
+
+        self._audit(
+            operation="delete",
+            user_id=user_id,
+            details={
+                "action": "kick_device",
+                "target_device_id": target_device_id,
+                "current_device_id": current_device_id,
+                "blacklisted_tokens": blacklisted_tokens,
+            },
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        return {"device_id": target_device_id, "blacklisted_tokens": blacklisted_tokens}
 
     def verify_email_code(self, email: str, code: str) -> None:
         normalized_email = self._normalize_email(email)
@@ -431,11 +884,12 @@ class AuthService:
             user.password_hash = new_hash
             self._record_password_history(user.id, new_hash)
 
+        blacklisted_tokens = self._blacklist_all_user_device_tokens(user_id=user.id, reason="reset_password")
         self.jwt.blacklist_all_user_tokens(user_id=user.id)
         self._audit(
             operation="password_change",
             user_id=user.id,
-            details={"action": "reset_password", "result": "success"},
+            details={"action": "reset_password", "result": "success", "blacklisted_tokens": blacklisted_tokens},
             ip_address=ip_address,
             user_agent=user_agent,
         )
@@ -463,11 +917,12 @@ class AuthService:
             user.password_hash = new_hash
             self._record_password_history(user.id, new_hash)
 
+        blacklisted_tokens = self._blacklist_all_user_device_tokens(user_id=user.id, reason="change_password")
         self.jwt.blacklist_all_user_tokens(user_id=user.id)
         self._audit(
             operation="password_change",
             user_id=user.id,
-            details={"action": "change_password", "result": "success"},
+            details={"action": "change_password", "result": "success", "blacklisted_tokens": blacklisted_tokens},
             ip_address=ip_address,
             user_agent=user_agent,
         )

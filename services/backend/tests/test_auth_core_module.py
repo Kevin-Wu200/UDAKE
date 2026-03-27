@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.api.auth_api import router as auth_router
+from app.api.devices_api import router as devices_router
 from app.auth import (
     AuthCacheManager,
     JWTManager,
@@ -129,6 +130,7 @@ def auth_client(monkeypatch: pytest.MonkeyPatch):
     reset_auth_service()
     app = FastAPI()
     app.include_router(auth_router, prefix="/api")
+    app.include_router(devices_router, prefix="/api")
     with TestClient(app) as client:
         yield client
     reset_auth_service()
@@ -368,3 +370,157 @@ def test_auth_api_reset_password_and_change_email(auth_client: TestClient):
         },
     )
     assert login_new_email_resp.status_code == 200
+
+
+def test_auth_api_devices_list_pagination_and_masking(auth_client: TestClient):
+    service = get_auth_service()
+    register_key = service.product_keys.generate_key("devices-list-seed").product_key
+    register_resp = auth_client.post(
+        "/api/auth/register",
+        json={"email": "devices@example.com", "password": "StrongPass123", "product_key": register_key},
+    )
+    assert register_resp.status_code == 200
+
+    ua_pc = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/17.0 Safari/605.1.15"
+    ua_android = "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 Chrome/122.0.0.0 Mobile Safari/537.36"
+    login_1 = auth_client.post(
+        "/api/auth/login",
+        headers={"User-Agent": ua_pc, "X-Forwarded-For": "10.20.30.40"},
+        json={
+            "email": "devices@example.com",
+            "password": "StrongPass123",
+            "device_info": {
+                "device_id": "device-a",
+                "screen_resolution": "1920x1080",
+                "timezone": "Asia/Shanghai",
+                "language": "zh-CN",
+                "canvas_fingerprint": "canvas-a",
+                "location": "上海, 中国",
+            },
+        },
+    )
+    assert login_1.status_code == 200
+
+    login_2 = auth_client.post(
+        "/api/auth/login",
+        headers={"User-Agent": ua_android, "X-Forwarded-For": "203.0.113.88"},
+        json={
+            "email": "devices@example.com",
+            "password": "StrongPass123",
+            "device_info": {
+                "device_id": "device-b",
+                "screen_resolution": "1080x2400",
+                "timezone": "Asia/Shanghai",
+                "language": "zh-CN",
+                "canvas_fingerprint": "canvas-b",
+                "location": "北京, 中国",
+            },
+        },
+    )
+    assert login_2.status_code == 200
+    access_token = login_2.json()["data"]["access_token"]
+
+    devices_resp = auth_client.get(
+        "/api/devices?page=1&page_size=20",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    assert devices_resp.status_code == 200
+    data = devices_resp.json()["data"]
+    assert data["pagination"]["total"] == 2
+    assert len(data["items"]) == 2
+    current_items = [item for item in data["items"] if item["is_current"]]
+    assert len(current_items) == 1
+    assert current_items[0]["ip"] == "203.0.*.*"
+
+
+def test_auth_api_kick_device_and_blacklist(auth_client: TestClient):
+    service = get_auth_service()
+    register_key = service.product_keys.generate_key("devices-kick-seed").product_key
+    register_resp = auth_client.post(
+        "/api/auth/register",
+        json={"email": "kick@example.com", "password": "StrongPass123", "product_key": register_key},
+    )
+    assert register_resp.status_code == 200
+
+    login_1 = auth_client.post(
+        "/api/auth/login",
+        json={"email": "kick@example.com", "password": "StrongPass123", "device_info": {"device_id": "kick-a"}},
+    )
+    assert login_1.status_code == 200
+    access_1 = login_1.json()["data"]["access_token"]
+
+    login_2 = auth_client.post(
+        "/api/auth/login",
+        json={"email": "kick@example.com", "password": "StrongPass123", "device_info": {"device_id": "kick-b"}},
+    )
+    assert login_2.status_code == 200
+    access_2 = login_2.json()["data"]["access_token"]
+
+    kick_resp = auth_client.delete(
+        "/api/devices/kick-b",
+        headers={"Authorization": f"Bearer {access_1}"},
+    )
+    assert kick_resp.status_code == 200
+    assert kick_resp.json()["data"]["blacklisted_tokens"] >= 1
+
+    kicked_access_resp = auth_client.get(
+        "/api/devices",
+        headers={"Authorization": f"Bearer {access_2}"},
+    )
+    assert kicked_access_resp.status_code == 401
+
+    payload = service.jwt.parse_token(access_1, verify=False)
+    current_device_id = payload["device_id"]
+    kick_current_resp = auth_client.delete(
+        f"/api/devices/{current_device_id}",
+        headers={"Authorization": f"Bearer {access_1}"},
+    )
+    assert kick_current_resp.status_code == 403
+
+
+def test_auth_service_device_anomaly_detection_and_inactive_cleanup(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AUTH_JWT_SECRET", "device-anomaly-secret")
+    reset_auth_service()
+    service = get_auth_service()
+
+    register_key = service.product_keys.generate_key("device-anomaly-seed").product_key
+    service.register(email="anomaly@example.com", password="StrongPass123", product_key=register_key)
+    service.login(
+        email="anomaly@example.com",
+        password="StrongPass123",
+        device_info={"device_id": "anomaly-device", "location": "北京, 中国"},
+        ip_address="8.8.8.8",
+        user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/122.0.0.0",
+    )
+    service.login(
+        email="anomaly@example.com",
+        password="StrongPass123",
+        device_info={"device_id": "anomaly-device", "location": "纽约, 美国"},
+        ip_address="1.1.1.1",
+        user_agent="python-requests/2.31.0",
+    )
+
+    anomaly_logs = [
+        item
+        for item in service.audit_logs
+        if item.get("operation") == "other" and item.get("details", {}).get("action") == "device_anomaly"
+    ]
+    assert anomaly_logs
+    events = anomaly_logs[-1]["details"]["events"]
+    event_types = {item["type"] for item in events}
+    assert "ip_changed" in event_types
+    assert "location_changed" in event_types
+    assert "user_agent_changed" in event_types
+    assert "suspicious_user_agent" in event_types
+
+    user_id = service._users_by_email["anomaly@example.com"].id  # pylint: disable=protected-access
+    session = service._devices[(user_id, "anomaly-device")]  # pylint: disable=protected-access
+    session.last_active_at = int(time.time()) - (31 * 24 * 60 * 60)
+    listing = service.list_user_devices(access_token=service.login(
+        email="anomaly@example.com",
+        password="StrongPass123",
+        device_info={"device_id": "another-device"},
+    )["access_token"])
+    statuses = {item["device_id"]: item["status"] for item in listing["items"]}
+    assert statuses["anomaly-device"] == "inactive"
+    reset_auth_service()

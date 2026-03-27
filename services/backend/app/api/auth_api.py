@@ -88,6 +88,18 @@ def _extract_bearer_token(request: Request) -> str:
     return token
 
 
+def _extract_client_ip(request: Request) -> Optional[str]:
+    x_forwarded_for = request.headers.get("x-forwarded-for")
+    if x_forwarded_for:
+        first_ip = x_forwarded_for.split(",", 1)[0].strip()
+        if first_ip:
+            return first_ip
+    x_real_ip = request.headers.get("x-real-ip")
+    if x_real_ip:
+        return x_real_ip.strip()
+    return request.client.host if request.client else None
+
+
 @router.post("/register")
 def register(payload: RegisterRequest, request: Request):
     service = get_auth_service()
@@ -96,7 +108,7 @@ def register(payload: RegisterRequest, request: Request):
             email=payload.email,
             password=payload.password,
             product_key=payload.product_key,
-            ip_address=request.client.host if request.client else None,
+            ip_address=_extract_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         )
         return _ok("注册成功，验证码已发送", result)
@@ -116,7 +128,7 @@ def login(payload: LoginRequest, request: Request):
             email=payload.email,
             password=payload.password,
             device_info=payload.device_info,
-            ip_address=request.client.host if request.client else None,
+            ip_address=_extract_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         )
         return _ok("登录成功", result)
@@ -165,7 +177,7 @@ def send_reset_password_code(payload: ResetPasswordSendCodeRequest, request: Req
         service.send_reset_password_code(
             email=payload.email,
             product_key=payload.product_key,
-            ip_address=request.client.host if request.client else None,
+            ip_address=_extract_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         )
         return _ok("验证码已发送")
@@ -186,7 +198,7 @@ def verify_reset_password(payload: ResetPasswordVerifyRequest, request: Request)
             code=payload.code,
             new_password=payload.new_password,
             confirm_password=payload.confirm_password,
-            ip_address=request.client.host if request.client else None,
+            ip_address=_extract_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         )
         return _ok("密码重置成功")
@@ -208,7 +220,7 @@ def change_password(payload: ChangePasswordRequest, request: Request):
             old_password=payload.old_password,
             new_password=payload.new_password,
             confirm_password=payload.confirm_password,
-            ip_address=request.client.host if request.client else None,
+            ip_address=_extract_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         )
         return _ok("密码修改成功")
@@ -227,7 +239,7 @@ def send_change_email_code(payload: ChangeEmailSendCodeRequest, request: Request
             access_token=token,
             new_email=payload.new_email,
             current_password=payload.current_password,
-            ip_address=request.client.host if request.client else None,
+            ip_address=_extract_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         )
         return _ok("验证码已发送")
@@ -245,7 +257,7 @@ def verify_change_email(payload: ChangeEmailVerifyRequest, request: Request):
         service.verify_change_email(
             access_token=token,
             code=payload.code,
-            ip_address=request.client.host if request.client else None,
+            ip_address=_extract_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         )
         return _ok("邮箱修改成功")
