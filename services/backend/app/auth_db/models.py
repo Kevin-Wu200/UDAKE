@@ -25,6 +25,30 @@ class Base(DeclarativeBase):
     """Declarative base for auth database models."""
 
 
+class Company(Base):
+    __tablename__ = "companies"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'active'"))
+    created_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    users = relationship("User", back_populates="company")
+    product_keys = relationship("ProductKey", back_populates="company")
+
+    __table_args__ = (
+        UniqueConstraint("name", name="uq_companies_name"),
+        CheckConstraint("status IN ('active', 'disabled')", name="ck_companies_status_enum"),
+        Index("ix_companies_name", "name"),
+        Index("ix_companies_status", "status"),
+    )
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -36,6 +60,10 @@ class User(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'pending'"))
     is_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     failed_login_attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    company_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
+    )
+    product_key_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
     last_login_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[Any] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -44,6 +72,7 @@ class User(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+    company = relationship("Company", back_populates="users")
     product_keys = relationship("ProductKey", back_populates="user", cascade="all, delete-orphan")
     email_verification_codes = relationship(
         "EmailVerificationCode", back_populates="user", cascade="all, delete-orphan"
@@ -61,16 +90,17 @@ class User(Base):
         UniqueConstraint("username", name="uq_users_username"),
         UniqueConstraint("email", name="uq_users_email"),
         CheckConstraint(
-            "role IN ('user', 'admin', 'enterprise')",
+            "role IN ('user', 'admin', 'enterprise', 'company_admin', 'super_admin')",
             name="ck_users_role_enum",
         ),
         CheckConstraint(
-            "status IN ('pending', 'active', 'disabled', 'locked')",
+            "status IN ('pending', 'active', 'disabled', 'locked', 'deleted')",
             name="ck_users_status_enum",
         ),
         Index("ix_users_username", "username"),
         Index("ix_users_email", "email"),
         Index("ix_users_status", "status"),
+        Index("ix_users_company_id", "company_id"),
     )
 
 
@@ -84,6 +114,11 @@ class ProductKey(Base):
     product_key: Mapped[str] = mapped_column(String(128), nullable=False)
     key_type: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'unused'"))
+    company_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
+    )
+    total_quota: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    used_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     issued_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     activated_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -95,6 +130,7 @@ class ProductKey(Base):
         DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
     )
 
+    company = relationship("Company", back_populates="product_keys")
     user = relationship("User", back_populates="product_keys")
 
     __table_args__ = (
@@ -104,11 +140,14 @@ class ProductKey(Base):
             name="ck_product_keys_type_enum",
         ),
         CheckConstraint(
-            "status IN ('unused', 'active', 'revoked', 'expired')",
+            "status IN ('unused', 'active', 'revoked', 'expired', 'available')",
             name="ck_product_keys_status_enum",
         ),
+        CheckConstraint("total_quota >= 0", name="ck_product_keys_total_quota_non_negative"),
+        CheckConstraint("used_count >= 0", name="ck_product_keys_used_count_non_negative"),
         Index("ix_product_keys_user_id", "user_id"),
         Index("ix_product_keys_status", "status"),
+        Index("ix_product_keys_company_id", "company_id"),
     )
 
 
@@ -164,7 +203,7 @@ class AuditLog(Base):
     __table_args__ = (
         CheckConstraint(
             "operation_type IN ('create', 'read', 'update', 'delete', "
-            "'login', 'logout', 'password_change', 'email_change', 'api_call', 'other')",
+            "'login', 'logout', 'password_change', 'email_change', 'api_call', 'delete_user', 'other')",
             name="ck_audit_logs_operation_type_enum",
         ),
         Index("ix_audit_logs_user_id", "user_id"),

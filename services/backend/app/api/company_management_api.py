@@ -1,0 +1,408 @@
+"""Company user management APIs with enterprise-scope permission controls."""
+
+from __future__ import annotations
+
+import logging
+from functools import wraps
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from sqlalchemy import func, or_
+from sqlalchemy.orm import Session
+
+from ..auth import JWTValidationError, get_auth_service
+from ..auth_db.models import AuditLog, Company, ProductKey, User
+from ..auth_db.session import get_auth_db_session
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/company")
+
+ROLE_CACHE_TTL_SECONDS = 3600
+COMPANY_CACHE_TTL_SECONDS = 3600
+
+
+def _ok(message: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    return {"success": True, "message": message, "data": data or {}}
+
+
+def _fail(status_code: int, message: str) -> HTTPException:
+    return HTTPException(status_code=status_code, detail={"success": False, "message": message, "data": {}})
+
+
+def _extract_bearer_token(request: Request) -> str:
+    auth_header = request.headers.get("authorization", "")
+    if not auth_header.startswith("Bearer "):
+        raise _fail(status.HTTP_401_UNAUTHORIZED, "缺少或无效的Bearer Token")
+    token = auth_header.split(" ", 1)[1].strip()
+    if not token:
+        raise _fail(status.HTTP_401_UNAUTHORIZED, "缺少或无效的Bearer Token")
+    return token
+
+
+def _extract_client_ip(request: Request) -> Optional[str]:
+    x_forwarded_for = request.headers.get("x-forwarded-for")
+    if x_forwarded_for:
+        first_ip = x_forwarded_for.split(",", 1)[0].strip()
+        if first_ip:
+            return first_ip
+    x_real_ip = request.headers.get("x-real-ip")
+    if x_real_ip:
+        return x_real_ip.strip()
+    return request.client.host if request.client else None
+
+
+def _cache_user_role(user_id: int, role: str, company_id: Optional[int]) -> None:
+    try:
+        service = get_auth_service()
+        service.cache.set(
+            f"user_role:{user_id}",
+            {"role": role, "company_id": company_id},
+            ttl=ROLE_CACHE_TTL_SECONDS,
+        )
+    except Exception as exc:  # pragma: no cover - cache failures should not block request
+        logger.warning("缓存用户角色失败 user_id=%s: %s", user_id, exc)
+
+
+def _verify_access_token(request: Request) -> Dict[str, Any]:
+    token = _extract_bearer_token(request)
+    service = get_auth_service()
+    try:
+        payload = service.jwt.verify_token(token, expected_type="access", check_blacklist=True)
+    except JWTValidationError as exc:
+        raise _fail(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
+    return payload
+
+
+def _get_authenticated_user(request: Request, db: Session) -> User:
+    payload = _verify_access_token(request)
+    token_role = str(payload.get("role") or "")
+    user_id = payload.get("user_id")
+    if not user_id:
+        raise _fail(status.HTTP_401_UNAUTHORIZED, "Token缺少用户标识")
+
+    try:
+        user_id_int = int(user_id)
+    except (TypeError, ValueError) as exc:
+        raise _fail(status.HTTP_401_UNAUTHORIZED, "Token用户标识无效") from exc
+
+    user = db.query(User).filter(User.id == user_id_int).one_or_none()
+    if not user:
+        raise _fail(status.HTTP_401_UNAUTHORIZED, "用户不存在或Token无效")
+    if user.status in {"deleted", "disabled", "locked"}:
+        raise _fail(status.HTTP_403_FORBIDDEN, "用户状态不可用")
+
+    if token_role and token_role != user.role:
+        raise _fail(status.HTTP_403_FORBIDDEN, "Token角色与数据库角色不一致")
+
+    _cache_user_role(user.id, user.role, user.company_id)
+    return user
+
+
+def _require_company_admin_user(request: Request, db: Session) -> User:
+    user = _get_authenticated_user(request, db)
+    if user.role != "company_admin":
+        raise _fail(status.HTTP_403_FORBIDDEN, "权限不足，仅企业管理员可访问")
+    if not user.company_id:
+        raise _fail(status.HTTP_403_FORBIDDEN, "企业管理员必须绑定企业")
+    return user
+
+
+def _require_super_admin_user(request: Request, db: Session) -> User:
+    user = _get_authenticated_user(request, db)
+    if user.role not in {"admin", "super_admin"}:
+        raise _fail(status.HTTP_403_FORBIDDEN, "权限不足，仅超级管理员可访问")
+    return user
+
+
+def _get_company_name(db: Session, company_id: Optional[int]) -> Optional[str]:
+    if not company_id:
+        return None
+
+    cache_key = f"company:{company_id}"
+    service = get_auth_service()
+    try:
+        cached = service.cache.get(cache_key)
+    except Exception as exc:  # pragma: no cover - cache failures should not block request
+        logger.warning("读取企业缓存失败 company_id=%s: %s", company_id, exc)
+        cached = None
+    if isinstance(cached, dict):
+        name = cached.get("name")
+        if isinstance(name, str) and name:
+            return name
+
+    company = db.query(Company).filter(Company.id == company_id).one_or_none()
+    if not company:
+        return None
+    try:
+        service.cache.set(cache_key, {"name": company.name}, ttl=COMPANY_CACHE_TTL_SECONDS)
+    except Exception as exc:  # pragma: no cover
+        logger.warning("写入企业缓存失败 company_id=%s: %s", company_id, exc)
+    return company.name
+
+
+def _serialize_user(user: User, *, company_name: Optional[str] = None) -> Dict[str, Any]:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "role": user.role,
+        "created_at": user.created_at,
+        "last_login_at": user.last_login_at,
+        "status": user.status,
+        "company_name": company_name,
+    }
+
+
+def company_admin_required(handler):
+    """Decorator that enforces company-admin role and enterprise scope."""
+
+    @wraps(handler)
+    def wrapper(*args, **kwargs):
+        request = kwargs.get("request")
+        db = kwargs.get("db")
+
+        if request is None:
+            request = next((arg for arg in args if isinstance(arg, Request)), None)
+        if db is None:
+            db = next((arg for arg in args if isinstance(arg, Session)), None)
+
+        if request is None or db is None:
+            raise _fail(status.HTTP_500_INTERNAL_SERVER_ERROR, "权限装饰器参数解析失败")
+
+        request.state.company_admin_user = _require_company_admin_user(request, db)
+        return handler(*args, **kwargs)
+
+    return wrapper
+
+
+@router.get("/users")
+@company_admin_required
+def list_company_users(
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    search: Optional[str] = Query(default=None),
+):
+    current_user: User = request.state.company_admin_user
+
+    query = db.query(User).filter(
+        User.company_id == current_user.company_id,
+        User.status != "deleted",
+    )
+    if search:
+        pattern = f"%{search.strip()}%"
+        query = query.filter(or_(User.username.ilike(pattern), User.email.ilike(pattern)))
+
+    total = query.count()
+    users = (
+        query.order_by(User.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    company_name = _get_company_name(db, current_user.company_id)
+    return _ok(
+        "企业用户列表获取成功",
+        {
+            "users": [_serialize_user(item, company_name=company_name) for item in users],
+            "pagination": {"page": page, "page_size": page_size, "total": total},
+            "total": total,
+        },
+    )
+
+
+@router.delete("/users/{user_id}")
+@company_admin_required
+def delete_company_user(
+    user_id: int,
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+):
+    current_user: User = request.state.company_admin_user
+
+    target_user = db.query(User).filter(User.id == user_id).one_or_none()
+    if not target_user or target_user.status == "deleted":
+        raise _fail(status.HTTP_404_NOT_FOUND, "目标用户不存在")
+    if target_user.company_id != current_user.company_id:
+        raise _fail(status.HTTP_403_FORBIDDEN, "无权限操作其他企业用户")
+    if target_user.id == current_user.id:
+        raise _fail(status.HTTP_400_BAD_REQUEST, "企业管理员不能删除自己")
+    if target_user.role == "company_admin":
+        raise _fail(status.HTTP_403_FORBIDDEN, "不能删除其他企业管理员")
+
+    try:
+        product_key: Optional[ProductKey] = None
+        if target_user.product_key_id:
+            product_key = db.query(ProductKey).filter(ProductKey.id == target_user.product_key_id).one_or_none()
+        if product_key is None:
+            product_key = (
+                db.query(ProductKey)
+                .filter(ProductKey.user_id == target_user.id)
+                .order_by(ProductKey.created_at.desc())
+                .first()
+            )
+
+        target_user.status = "deleted"
+        released_quota = 0
+        if product_key:
+            current_used = max(0, int(product_key.used_count or 0))
+            next_used = max(0, current_used - 1)
+            released_quota = current_used - next_used
+            product_key.used_count = next_used
+            if next_used == 0:
+                product_key.status = "available"
+            target_user.product_key_id = None
+
+        next_audit_id = (db.query(func.max(AuditLog.id)).scalar() or 0) + 1
+        audit = AuditLog(
+            id=next_audit_id,
+            user_id=current_user.id,
+            actor_username=current_user.username,
+            operation_type="delete_user",
+            target_table="users",
+            target_id=str(target_user.id),
+            ip_address=_extract_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
+            details={
+                "operator_role": current_user.role,
+                "operator_company_id": current_user.company_id,
+                "target_user_id": target_user.id,
+                "target_username": target_user.username,
+                "released_quota": released_quota,
+                "product_key_id": getattr(product_key, "id", None),
+            },
+        )
+        db.add(audit)
+        db.commit()
+    except HTTPException:
+        raise
+    except Exception as exc:  # pylint: disable=broad-except
+        db.rollback()
+        logger.exception("删除企业用户失败 user_id=%s err=%s", user_id, exc)
+        raise _fail(status.HTTP_500_INTERNAL_SERVER_ERROR, "删除用户失败，事务已回滚") from exc
+
+    return _ok("删除用户成功", {"user_id": user_id})
+
+
+@router.get("/me")
+def get_my_company_profile(
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+):
+    current_user = _get_authenticated_user(request, db)
+    return _ok(
+        "用户企业信息获取成功",
+        {
+            "user": {
+                "id": current_user.id,
+                "username": current_user.username,
+                "email": current_user.email,
+                "role": current_user.role,
+                "joined_at": current_user.created_at,
+                "company_name": _get_company_name(db, current_user.company_id),
+            }
+        },
+    )
+
+
+@router.get("/admin/users")
+def list_all_users_for_admin(
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=100),
+    search: Optional[str] = Query(default=None),
+):
+    _require_super_admin_user(request, db)
+
+    query = db.query(User).filter(User.status != "deleted")
+    if search:
+        pattern = f"%{search.strip()}%"
+        query = query.filter(or_(User.username.ilike(pattern), User.email.ilike(pattern)))
+
+    total = query.count()
+    users = (
+        query.order_by(User.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    return _ok(
+        "管理员用户列表获取成功",
+        {
+            "users": [_serialize_user(item, company_name=_get_company_name(db, item.company_id)) for item in users],
+            "pagination": {"page": page, "page_size": page_size, "total": total},
+            "total": total,
+        },
+    )
+
+
+@router.get("/admin/users/{user_id}")
+def get_user_detail_for_admin(
+    user_id: int,
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+):
+    _require_super_admin_user(request, db)
+    user = db.query(User).filter(User.id == user_id).one_or_none()
+    if not user or user.status == "deleted":
+        raise _fail(status.HTTP_404_NOT_FOUND, "目标用户不存在")
+
+    company = db.query(Company).filter(Company.id == user.company_id).one_or_none() if user.company_id else None
+    return _ok(
+        "用户详情获取成功",
+        {
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "role": user.role,
+                "status": user.status,
+                "created_at": user.created_at,
+                "last_login_at": user.last_login_at,
+                "company": (
+                    {"id": company.id, "name": company.name, "status": company.status}
+                    if company
+                    else None
+                ),
+            }
+        },
+    )
+
+
+@router.get("/admin/company-stats")
+def get_company_user_stats(
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+):
+    _require_super_admin_user(request, db)
+
+    rows = (
+        db.query(
+            Company.id.label("company_id"),
+            Company.name.label("company_name"),
+            func.count(User.id).label("user_count"),
+        )
+        .outerjoin(User, (User.company_id == Company.id) & (User.status != "deleted"))
+        .group_by(Company.id, Company.name)
+        .order_by(Company.id.asc())
+        .all()
+    )
+
+    return _ok(
+        "企业统计获取成功",
+        {
+            "companies": [
+                {
+                    "company_id": row.company_id,
+                    "company_name": row.company_name,
+                    "user_count": int(row.user_count or 0),
+                }
+                for row in rows
+            ]
+        },
+    )

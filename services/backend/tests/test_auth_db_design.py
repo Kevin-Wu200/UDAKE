@@ -13,6 +13,7 @@ from app.auth_db.database import build_engine_options, ping_database
 from app.auth_db.models import (
     AuditLog,
     Base,
+    Company,
     EmailChangeRequest,
     EmailVerificationCode,
     PasswordHistory,
@@ -54,6 +55,10 @@ def test_build_engine_options_match_required_pool_settings(monkeypatch):
 def test_crud_and_transaction_flow(sqlite_engine):
     now = datetime.now(timezone.utc)
     with Session(sqlite_engine) as session:
+        company = Company(id=100, name="测试企业", status="active")
+        session.add(company)
+        session.flush()
+
         user = User(
             id=1,
             username="alice",
@@ -62,6 +67,7 @@ def test_crud_and_transaction_flow(sqlite_engine):
             role="user",
             status="active",
             is_email_verified=True,
+            company_id=company.id,
         )
         session.add(user)
         session.flush()
@@ -74,6 +80,9 @@ def test_crud_and_transaction_flow(sqlite_engine):
                     product_key="PK-ALICE-001",
                     key_type="personal",
                     status="active",
+                    company_id=company.id,
+                    total_quota=10,
+                    used_count=1,
                     expires_at=now + timedelta(days=30),
                 ),
                 EmailVerificationCode(
@@ -130,6 +139,7 @@ def test_crud_and_transaction_flow(sqlite_engine):
     with Session(sqlite_engine) as session:
         stored_user = session.query(User).filter_by(username="alice").one()
         assert stored_user.email == "alice@example.com"
+        assert stored_user.company_id == 100
 
         stored_user.status = "disabled"
         session.commit()
@@ -161,6 +171,40 @@ def test_crud_and_transaction_flow(sqlite_engine):
         with pytest.raises(IntegrityError):
             session.commit()
         session.rollback()
+
+
+def test_company_model_and_audit_operation_type(sqlite_engine):
+    now = datetime.now(timezone.utc)
+    with Session(sqlite_engine) as session:
+        company = Company(id=1, name="Enterprise A", status="active")
+        session.add(company)
+        session.add(
+            User(
+                id=1,
+                username="admin_a",
+                email="admin_a@example.com",
+                password_hash="hash",
+                role="company_admin",
+                status="active",
+                company_id=company.id,
+            )
+        )
+        session.flush()
+        session.add(
+            AuditLog(
+                id=2,
+                user_id=1,
+                operation_type="delete_user",
+                target_table="users",
+                target_id="2",
+                operated_at=now,
+            )
+        )
+        session.commit()
+
+    with Session(sqlite_engine) as session:
+        assert session.query(Company).count() == 1
+        assert session.query(AuditLog).filter_by(operation_type="delete_user").count() == 1
 
 
 def test_ping_database(sqlite_engine):
