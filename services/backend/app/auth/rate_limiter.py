@@ -31,6 +31,8 @@ class AuthRateLimiter:
 
     DEFAULT_RULES: Dict[str, RateRule] = {
         "login": RateRule(hourly=10, daily=30),
+        "login_ip": RateRule(hourly=10, daily=240),
+        "login_email": RateRule(hourly=5, daily=40),
         "register": RateRule(hourly=3, daily=10),
         "reset_password": RateRule(hourly=3, daily=5),
         "verify_code": RateRule(hourly=10, daily=10_000_000),
@@ -72,7 +74,12 @@ class AuthRateLimiter:
         next_value = current + 1
         current_ttl = self.cache.ttl(key)
         effective_ttl = ttl if current_ttl <= 0 else current_ttl
-        self.cache.set(key, {"count": next_value, "updated_at": int(time.time())}, ttl=effective_ttl)
+        self.cache.set_with_jitter(
+            key,
+            {"count": next_value, "updated_at": int(time.time())},
+            ttl=effective_ttl,
+            jitter_ratio=0.1,
+        )
         return next_value
 
     def check_and_consume(self, *, identity: str, action: str) -> Dict[str, int]:

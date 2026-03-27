@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request, status
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+
+from app.config import settings
 
 from ..auth import (
     JWTValidationError,
@@ -14,6 +17,8 @@ from ..auth import (
     VerificationCodeError,
     get_auth_service,
 )
+from ..auth.csrf import CSRFManager
+from ..auth.input_sanitizer import ensure_safe_text
 
 router = APIRouter(prefix="/auth")
 
@@ -27,14 +32,14 @@ def _fail(status_code: int, message: str) -> HTTPException:
 
 
 class RegisterRequest(BaseModel):
-    email: str = Field(..., description="User email")
-    password: str = Field(..., description="Raw password")
-    product_key: str = Field(..., description="Product key")
+    email: str = Field(..., max_length=320, description="User email")
+    password: str = Field(..., min_length=8, max_length=128, description="Raw password")
+    product_key: str = Field(..., max_length=128, description="Product key")
 
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(..., max_length=320)
+    password: str = Field(..., min_length=8, max_length=128)
     device_info: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -47,35 +52,44 @@ class LogoutRequest(BaseModel):
 
 
 class VerifyCodeRequest(BaseModel):
-    email: str
-    code: str
+    email: str = Field(..., max_length=320)
+    code: str = Field(..., min_length=4, max_length=16)
 
 
 class ResetPasswordSendCodeRequest(BaseModel):
-    email: str
-    product_key: str
+    email: str = Field(..., max_length=320)
+    product_key: str = Field(..., max_length=128)
 
 
 class ResetPasswordVerifyRequest(BaseModel):
-    email: str
-    code: str
-    new_password: str
-    confirm_password: str
+    email: str = Field(..., max_length=320)
+    code: str = Field(..., min_length=4, max_length=16)
+    new_password: str = Field(..., min_length=8, max_length=128)
+    confirm_password: str = Field(..., min_length=8, max_length=128)
 
 
 class ChangePasswordRequest(BaseModel):
-    old_password: str
-    new_password: str
-    confirm_password: str
+    old_password: str = Field(..., min_length=8, max_length=128)
+    new_password: str = Field(..., min_length=8, max_length=128)
+    confirm_password: str = Field(..., min_length=8, max_length=128)
 
 
 class ChangeEmailSendCodeRequest(BaseModel):
-    new_email: str
-    current_password: str
+    new_email: str = Field(..., max_length=320)
+    current_password: str = Field(..., min_length=8, max_length=128)
 
 
 class ChangeEmailVerifyRequest(BaseModel):
-    code: str
+    code: str = Field(..., min_length=4, max_length=16)
+
+
+def _csrf_manager() -> CSRFManager:
+    service = get_auth_service()
+    return CSRFManager(
+        service.cache,
+        cookie_name=settings.AUTH_CSRF_COOKIE_NAME,
+        header_name=settings.AUTH_CSRF_HEADER_NAME,
+    )
 
 
 def _extract_bearer_token(request: Request) -> str:
@@ -105,9 +119,9 @@ def register(payload: RegisterRequest, request: Request):
     service = get_auth_service()
     try:
         result = service.register(
-            email=payload.email,
+            email=ensure_safe_text(payload.email, max_len=settings.AUTH_XSS_MAX_INPUT_LEN, reject_sql=True),
             password=payload.password,
-            product_key=payload.product_key,
+            product_key=ensure_safe_text(payload.product_key, max_len=128, reject_sql=True),
             ip_address=_extract_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         )
@@ -116,6 +130,8 @@ def register(payload: RegisterRequest, request: Request):
         raise _fail(status.HTTP_400_BAD_REQUEST, f"产品密钥校验失败: {exc}") from exc
     except RateLimitExceededError as exc:
         raise _fail(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
+    except PermissionError as exc:
+        raise _fail(status.HTTP_403_FORBIDDEN, str(exc)) from exc
     except ValueError as exc:
         raise _fail(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
@@ -125,7 +141,7 @@ def login(payload: LoginRequest, request: Request):
     service = get_auth_service()
     try:
         result = service.login(
-            email=payload.email,
+            email=ensure_safe_text(payload.email, max_len=settings.AUTH_XSS_MAX_INPUT_LEN, reject_sql=True),
             password=payload.password,
             device_info=payload.device_info,
             ip_address=_extract_client_ip(request),
@@ -136,6 +152,27 @@ def login(payload: LoginRequest, request: Request):
         raise _fail(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
     except RateLimitExceededError as exc:
         raise _fail(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
+    except PermissionError as exc:
+        raise _fail(status.HTTP_403_FORBIDDEN, str(exc)) from exc
+
+
+@router.get("/csrf-token")
+def issue_csrf_token(request: Request):
+    if not settings.AUTH_CSRF_ENABLED:
+        return _ok("CSRF防护未启用", {"enabled": False})
+    manager = _csrf_manager()
+    subject = manager.build_subject(request)
+    token = manager.issue_token(subject=subject)
+    response = JSONResponse(content=_ok("CSRF Token生成成功", {"enabled": True, "csrf_token": token}))
+    response.set_cookie(
+        key=settings.AUTH_CSRF_COOKIE_NAME,
+        value=token,
+        httponly=False,
+        secure=bool(settings.AUTH_CSRF_COOKIE_SECURE),
+        samesite=settings.AUTH_CSRF_COOKIE_SAMESITE,
+        max_age=manager.ttl_seconds,
+    )
+    return response
 
 
 @router.post("/refresh")
@@ -185,6 +222,8 @@ def send_reset_password_code(payload: ResetPasswordSendCodeRequest, request: Req
         raise _fail(status.HTTP_400_BAD_REQUEST, f"产品密钥校验失败: {exc}") from exc
     except RateLimitExceededError as exc:
         raise _fail(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
+    except PermissionError as exc:
+        raise _fail(status.HTTP_403_FORBIDDEN, str(exc)) from exc
     except ValueError as exc:
         raise _fail(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
@@ -206,6 +245,8 @@ def verify_reset_password(payload: ResetPasswordVerifyRequest, request: Request)
         raise _fail(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     except RateLimitExceededError as exc:
         raise _fail(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
+    except PermissionError as exc:
+        raise _fail(status.HTTP_403_FORBIDDEN, str(exc)) from exc
     except ValueError as exc:
         raise _fail(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
@@ -228,6 +269,8 @@ def change_password(payload: ChangePasswordRequest, request: Request):
         raise _fail(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
     except ValueError as exc:
         raise _fail(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    except PermissionError as exc:
+        raise _fail(status.HTTP_403_FORBIDDEN, str(exc)) from exc
 
 
 @router.post("/change-email/send-code")
@@ -247,6 +290,8 @@ def send_change_email_code(payload: ChangeEmailSendCodeRequest, request: Request
         raise _fail(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
     except ValueError as exc:
         raise _fail(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
+    except PermissionError as exc:
+        raise _fail(status.HTTP_403_FORBIDDEN, str(exc)) from exc
 
 
 @router.post("/change-email/verify")
@@ -267,5 +312,7 @@ def verify_change_email(payload: ChangeEmailVerifyRequest, request: Request):
         raise _fail(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     except RateLimitExceededError as exc:
         raise _fail(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
+    except PermissionError as exc:
+        raise _fail(status.HTTP_403_FORBIDDEN, str(exc)) from exc
     except ValueError as exc:
         raise _fail(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

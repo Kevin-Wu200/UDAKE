@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.api.auth_api import router as auth_router
 from app.api.devices_api import router as devices_router
+from app.config import settings
 from app.auth import (
     AuthCacheManager,
     JWTManager,
@@ -29,6 +30,7 @@ from app.auth import (
 from app.auth.product_key_service import verify_rsa_signature_sha256
 from app.auth.rate_limiter import AuthRateLimiter, RateLimitExceededError, RateRule
 from app.auth.verification import EmailVerificationService, VerificationCodeError
+from app.security_middleware import security_guard_middleware
 
 
 def test_tokens_enc_encrypt_and_decrypt_roundtrip():
@@ -129,6 +131,7 @@ def auth_client(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("AUTH_JWT_SECRET", "integration-secret")
     reset_auth_service()
     app = FastAPI()
+    app.middleware("http")(security_guard_middleware)
     app.include_router(auth_router, prefix="/api")
     app.include_router(devices_router, prefix="/api")
     with TestClient(app) as client:
@@ -503,7 +506,7 @@ def test_auth_service_device_anomaly_detection_and_inactive_cleanup(monkeypatch:
     anomaly_logs = [
         item
         for item in service.audit_logs
-        if item.get("operation") == "other" and item.get("details", {}).get("action") == "device_anomaly"
+        if item.get("operation") == "device_risk_event" and item.get("details", {}).get("action") == "device_anomaly"
     ]
     assert anomaly_logs
     events = anomaly_logs[-1]["details"]["events"]
@@ -524,3 +527,73 @@ def test_auth_service_device_anomaly_detection_and_inactive_cleanup(monkeypatch:
     statuses = {item["device_id"]: item["status"] for item in listing["items"]}
     assert statuses["anomaly-device"] == "inactive"
     reset_auth_service()
+
+
+def test_auth_service_failed_login_lock_and_ip_ban(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AUTH_JWT_SECRET", "lock-secret")
+    monkeypatch.setattr(settings, "AUTH_IP_AUTO_BAN_THRESHOLD", 100, raising=False)
+    monkeypatch.setattr(settings, "AUTH_IP_AUTO_BAN_SECONDS", 1800, raising=False)
+    reset_auth_service()
+    service = get_auth_service()
+
+    key = service.product_keys.generate_key("lock-seed").product_key
+    service.register(email="lock@example.com", password="StrongPass123", product_key=key)
+
+    for _ in range(5):
+        with pytest.raises((ValueError, PermissionError)):
+            service.login(
+                email="lock@example.com",
+                password="WrongPass123",
+                device_info={"device_id": "lock-device"},
+                ip_address="198.51.100.10",
+            )
+
+    user = service._users_by_email["lock@example.com"]  # pylint: disable=protected-access
+    assert user.status == "locked"
+    assert user.lock_until and user.lock_until > int(time.time())
+    assert not service.ip_controller.is_blacklisted("198.51.100.10")
+    reset_auth_service()
+
+
+def test_auth_service_auto_ban_ip(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("AUTH_JWT_SECRET", "ban-secret")
+    monkeypatch.setattr(settings, "AUTH_IP_AUTO_BAN_THRESHOLD", 3, raising=False)
+    monkeypatch.setattr(settings, "AUTH_IP_AUTO_BAN_SECONDS", 1800, raising=False)
+    reset_auth_service()
+    service = get_auth_service()
+
+    for _ in range(3):
+        with pytest.raises(ValueError):
+            service.login(
+                email="not-found@example.com",
+                password="WrongPass123",
+                device_info={"device_id": "ban-device"},
+                ip_address="198.51.100.11",
+            )
+    assert service.ip_controller.is_blacklisted("198.51.100.11")
+    reset_auth_service()
+
+
+def test_auth_api_csrf_token_and_security_headers(auth_client: TestClient):
+    csrf_resp = auth_client.get("/api/auth/csrf-token")
+    assert csrf_resp.status_code == 200
+    assert "content-security-policy" in {k.lower() for k in csrf_resp.headers.keys()}
+    token = csrf_resp.json()["data"]["csrf_token"]
+    assert token
+
+    cookie_name = settings.AUTH_CSRF_COOKIE_NAME
+    register_key = get_auth_service().product_keys.generate_key("csrf-seed").product_key
+    blocked_resp = auth_client.post(
+        "/api/auth/register",
+        cookies={cookie_name: token},
+        json={"email": "csrf@example.com", "password": "StrongPass123", "product_key": register_key},
+    )
+    assert blocked_resp.status_code == 403
+
+    allowed_resp = auth_client.post(
+        "/api/auth/register",
+        headers={settings.AUTH_CSRF_HEADER_NAME: token},
+        cookies={cookie_name: token},
+        json={"email": "csrf@example.com", "password": "StrongPass123", "product_key": register_key},
+    )
+    assert allowed_resp.status_code == 200

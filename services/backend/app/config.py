@@ -4,7 +4,7 @@
 """
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, Field
-from typing import List, Optional, Union, Literal
+from typing import List, Optional, Union, Literal, Set
 from pathlib import Path
 import json
 import os
@@ -112,7 +112,41 @@ class Settings(BaseSettings):
     AUTH_DB_POOL_TIMEOUT: int = 30
     AUTH_DB_POOL_RECYCLE: int = 1800
     AUTH_DB_PRE_PING: bool = True
+    AUTH_DB_REQUIRE_SSL: bool = True
+    AUTH_DB_SSLMODE: str = "require"
+    AUTH_DB_SSLCERT: Optional[str] = None
+    AUTH_DB_SSLKEY: Optional[str] = None
+    AUTH_DB_SSLROOTCERT: Optional[str] = None
+    AUTH_DB_LOG_SLOW_QUERY_MS: int = 100
+    AUTH_DB_SLOW_QUERY_ENABLED: bool = True
     REDIS_URL: Optional[str] = None
+    REDIS_ENABLED: bool = False
+    REDIS_HOST: str = "127.0.0.1"
+    REDIS_PORT: int = 6379
+    REDIS_DB: int = 0
+    CACHE_MAX_SIZE: int = 1000
+
+    # 认证安全策略
+    AUTH_ENCRYPTION_KEY: Optional[str] = None
+    AUTH_IP_WHITELIST: str = ""
+    AUTH_IP_BLACKLIST: str = ""
+    AUTH_IP_AUTO_BAN_THRESHOLD: int = 10
+    AUTH_IP_AUTO_BAN_WINDOW_SECONDS: int = 3600
+    AUTH_IP_AUTO_BAN_SECONDS: int = 1800
+    AUTH_ACCOUNT_LOCK_5_FAIL_SECONDS: int = 1800
+    AUTH_ACCOUNT_LOCK_10_FAIL_SECONDS: int = 86400
+    AUTH_XSS_MAX_INPUT_LEN: int = 2048
+    AUTH_CSRF_ENABLED: bool = True
+    AUTH_CSRF_PROTECT_ALL: bool = False
+    AUTH_CSRF_COOKIE_NAME: str = "csrf_token"
+    AUTH_CSRF_HEADER_NAME: str = "x-csrf-token"
+    AUTH_CSRF_COOKIE_SAMESITE: Literal["strict", "lax", "none"] = "strict"
+    AUTH_CSRF_COOKIE_SECURE: bool = False
+    AUTH_SECURITY_HEADERS_ENABLED: bool = True
+    AUTH_CSP_POLICY: str = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
+    )
 
     # 日志配置
     LOG_LEVEL: str = "INFO"
@@ -148,11 +182,27 @@ class Settings(BaseSettings):
         'AUTH_DB_MAX_OVERFLOW',
         'AUTH_DB_POOL_TIMEOUT',
         'AUTH_DB_POOL_RECYCLE',
+        'AUTH_DB_LOG_SLOW_QUERY_MS',
+        'REDIS_PORT',
+        'CACHE_MAX_SIZE',
+        'AUTH_IP_AUTO_BAN_THRESHOLD',
+        'AUTH_IP_AUTO_BAN_WINDOW_SECONDS',
+        'AUTH_IP_AUTO_BAN_SECONDS',
+        'AUTH_ACCOUNT_LOCK_5_FAIL_SECONDS',
+        'AUTH_ACCOUNT_LOCK_10_FAIL_SECONDS',
+        'AUTH_XSS_MAX_INPUT_LEN',
     )
     @classmethod
     def validate_positive_int(cls, v):
         if v <= 0:
             raise ValueError(f'{v} must be positive')
+        return v
+
+    @field_validator('REDIS_DB')
+    @classmethod
+    def validate_non_negative_int(cls, v):
+        if v < 0:
+            raise ValueError(f'{v} must be non-negative')
         return v
 
     @field_validator('ENVIRONMENT', mode='before')
@@ -190,6 +240,14 @@ class Settings(BaseSettings):
     def is_production(self) -> bool:
         """是否为生产环境"""
         return self.ENVIRONMENT == "production"
+
+    @property
+    def ip_whitelist_set(self) -> Set[str]:
+        return {item.strip() for item in self.AUTH_IP_WHITELIST.split(",") if item.strip()}
+
+    @property
+    def ip_blacklist_set(self) -> Set[str]:
+        return {item.strip() for item in self.AUTH_IP_BLACKLIST.split(",") if item.strip()}
 
     def get_env_file(self) -> str:
         """根据环境获取配置文件路径"""

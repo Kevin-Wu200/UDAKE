@@ -4,10 +4,13 @@ from __future__ import annotations
 
 import json
 import logging
+import math
+import random
+import hashlib
 import threading
 import time
 from dataclasses import dataclass
-from typing import Any, Dict, Optional
+from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -167,3 +170,77 @@ class AuthCacheManager:
             return int(self._client.ttl(key))
         except Exception as exc:  # pragma: no cover
             raise CacheUnavailableError(f"cache ttl failed: key={key}") from exc
+
+    def set_with_jitter(
+        self,
+        key: str,
+        value: Any,
+        *,
+        ttl: int,
+        jitter_ratio: float = 0.15,
+        min_jitter_seconds: int = 1,
+    ) -> bool:
+        ttl_value = max(1, int(ttl))
+        jitter_span = max(min_jitter_seconds, int(ttl_value * max(0.0, float(jitter_ratio))))
+        jitter = random.randint(0, jitter_span)
+        return self.set(key, value, ttl=ttl_value + jitter)
+
+    def remember_null(self, key: str, *, ttl: int = 60) -> bool:
+        return self.set(key, {"__null__": True}, ttl=max(1, int(ttl)))
+
+    def get_or_set(
+        self,
+        key: str,
+        factory: Callable[[], Any],
+        *,
+        ttl: int,
+        null_ttl: int = 60,
+    ) -> Any:
+        cached = self.get(key)
+        if isinstance(cached, dict) and cached.get("__null__") is True:
+            return None
+        if cached is not None:
+            return cached
+
+        value = factory()
+        if value is None:
+            self.remember_null(key, ttl=null_ttl)
+            return None
+        self.set_with_jitter(key, value, ttl=ttl)
+        return value
+
+
+class BloomFilter:
+    """Simple in-memory bloom filter used for cache-penetration protection."""
+
+    def __init__(self, expected_items: int = 20_000, error_rate: float = 0.01) -> None:
+        n = max(100, int(expected_items))
+        p = min(max(error_rate, 1e-6), 0.5)
+        m = int(-(n * math.log(p)) / (math.log(2) ** 2))
+        k = max(1, int((m / n) * math.log(2)))
+        self._size = max(256, m)
+        self._hash_count = k
+        self._bits = bytearray((self._size + 7) // 8)
+        self._lock = threading.Lock()
+
+    def _indexes(self, value: str) -> list[int]:
+        text = str(value)
+        indexes: list[int] = []
+        for idx in range(self._hash_count):
+            digest = hashlib.sha256(f"{idx}:{text}".encode("utf-8")).digest()
+            indexes.append(int.from_bytes(digest[:8], "big") % self._size)
+        return indexes
+
+    def add(self, value: str) -> None:
+        indexes = self._indexes(value)
+        with self._lock:
+            for index in indexes:
+                self._bits[index // 8] |= 1 << (index % 8)
+
+    def __contains__(self, value: str) -> bool:
+        indexes = self._indexes(value)
+        with self._lock:
+            for index in indexes:
+                if not (self._bits[index // 8] & (1 << (index % 8))):
+                    return False
+        return True

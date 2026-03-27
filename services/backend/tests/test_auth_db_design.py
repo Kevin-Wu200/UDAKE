@@ -9,7 +9,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.auth_db.database import build_engine_options, ping_database
+from app.auth_db.database import build_engine_options, create_auth_engine, ping_database
 from app.auth_db.models import (
     AuditLog,
     Base,
@@ -50,6 +50,16 @@ def test_build_engine_options_match_required_pool_settings(monkeypatch):
     assert options["pool_timeout"] == 30
     assert options["pool_recycle"] == 1800
     assert options["pool_pre_ping"] is True
+
+
+def test_create_auth_engine_with_ssl_query(monkeypatch):
+    monkeypatch.setattr(settings, "AUTH_DB_REQUIRE_SSL", True, raising=False)
+    monkeypatch.setattr(settings, "AUTH_DB_SSLMODE", "require", raising=False)
+    engine = create_auth_engine("postgresql://user:pass@localhost:5432/demo_auth")
+    try:
+        assert "sslmode=require" in str(engine.url)
+    finally:
+        engine.dispose()
 
 
 def test_crud_and_transaction_flow(sqlite_engine):

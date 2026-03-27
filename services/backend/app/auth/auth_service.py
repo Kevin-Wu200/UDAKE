@@ -12,13 +12,17 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
+from app.config import settings
+
 from .cache import AuthCacheManager
+from .input_sanitizer import ensure_safe_text
+from .ip_control import IPAccessController
 from .email_service import SMTPEmailService
 from .email_templates import EmailTemplateManager
 from .jwt_service import JWTManager, JWTValidationError
 from .product_key_service import ProductKeyRecord, ProductKeyRegistry, ProductKeyValidationError
 from .rate_limiter import AuthRateLimiter, RateLimitExceededError
-from .security import hash_password, verify_password
+from .security import SensitiveDataCipher, hash_password, verify_password
 from .verification import EmailVerificationService, VerificationCodeError
 
 logger = logging.getLogger(__name__)
@@ -41,6 +45,9 @@ class AuthUser:
     created_at: int = field(default_factory=lambda: int(time.time()))
     last_login_at: Optional[int] = None
     is_email_verified: bool = False
+    failed_login_attempts: int = 0
+    lock_until: Optional[int] = None
+    lock_reason: Optional[str] = None
 
 
 @dataclass
@@ -102,6 +109,16 @@ class AuthService:
         self.rate_limiter = rate_limiter or AuthRateLimiter(cache)
         self.email_service = email_service or SMTPEmailService.from_env()
         self.template_manager = template_manager or EmailTemplateManager()
+        key_seed = settings.AUTH_ENCRYPTION_KEY or os.getenv("AUTH_JWT_SECRET") or os.urandom(32).hex()
+        self.field_cipher = SensitiveDataCipher(key_seed)
+        self.ip_controller = IPAccessController(
+            cache,
+            whitelist=settings.ip_whitelist_set,
+            blacklist=settings.ip_blacklist_set,
+            auto_ban_threshold=settings.AUTH_IP_AUTO_BAN_THRESHOLD,
+            auto_ban_window_seconds=settings.AUTH_IP_AUTO_BAN_WINDOW_SECONDS,
+            auto_ban_seconds=settings.AUTH_IP_AUTO_BAN_SECONDS,
+        )
 
         self._lock = threading.Lock()
         self._next_user_id = 1
@@ -113,7 +130,7 @@ class AuthService:
         self.audit_logs: List[Dict[str, Any]] = []
 
     def _normalize_email(self, email: str) -> str:
-        return email.strip().lower()
+        return ensure_safe_text(email, max_len=320, reject_sql=True).lower()
 
     @staticmethod
     def _user_name_from_email(email: str) -> str:
@@ -129,16 +146,115 @@ class AuthService:
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> None:
+        success = str(details.get("result", "")).lower() != "failed"
+        failure_reason = str(details.get("reason", "")) if not success else None
+        masked_ip = self._mask_ip(ip_address)
+        encrypted_ip = self.field_cipher.encrypt(ip_address) if ip_address else None
+        username = None
+        if user_id is not None:
+            with self._lock:
+                user = self._users_by_id.get(user_id)
+            if user:
+                username = user.email.split("@", 1)[0]
         entry = {
             "operation": operation,
+            "event_type": operation,
             "user_id": user_id,
+            "username": username,
+            "target_id": details.get("target_id"),
+            "target_type": details.get("target_type"),
             "details": details,
-            "ip_address": ip_address,
+            "success": success,
+            "failure_reason": failure_reason,
+            "ip_address": encrypted_ip,
+            "ip_address_masked": masked_ip,
             "user_agent": user_agent,
             "operated_at": int(time.time()),
+            "timestamp": int(time.time()),
         }
         self.audit_logs.append(entry)
         logger.info("audit op=%s user=%s details=%s", operation, user_id, details)
+
+    def _is_whitelisted_ip(self, ip_address: Optional[str]) -> bool:
+        return self.ip_controller.is_whitelisted(ip_address)
+
+    def _ensure_ip_allowed(self, *, ip_address: Optional[str]) -> None:
+        result = self.ip_controller.check(ip_address)
+        if result.allowed:
+            return
+        raise PermissionError("当前IP已被封禁，请稍后再试")
+
+    def _record_failed_login_attempt(self, *, user: AuthUser, ip_address: Optional[str]) -> None:
+        now = int(time.time())
+        user.failed_login_attempts += 1
+        locked_seconds = 0
+        lock_reason = None
+        if user.failed_login_attempts >= 10:
+            locked_seconds = settings.AUTH_ACCOUNT_LOCK_10_FAIL_SECONDS
+            lock_reason = "连续10次登录失败"
+        elif user.failed_login_attempts >= 5:
+            locked_seconds = settings.AUTH_ACCOUNT_LOCK_5_FAIL_SECONDS
+            lock_reason = "连续5次登录失败"
+        if locked_seconds > 0:
+            user.status = "locked"
+            user.lock_until = now + locked_seconds
+            user.lock_reason = lock_reason
+            self._send_security_lock_email(user=user, reason=lock_reason, lock_seconds=locked_seconds)
+        auto_banned = self.ip_controller.record_failed_attempt(ip_address)
+        if auto_banned:
+            self._send_ip_ban_alert(ip_address=ip_address, reason="检测到暴力破解并自动封禁30分钟")
+
+    def _reset_failed_login_attempt(self, *, user: AuthUser) -> None:
+        user.failed_login_attempts = 0
+        user.lock_until = None
+        user.lock_reason = None
+        if user.status == "locked":
+            user.status = "active"
+
+    def _decrypt_ip(self, encrypted: Optional[str]) -> Optional[str]:
+        if not encrypted:
+            return None
+        try:
+            return self.field_cipher.decrypt(encrypted)
+        except Exception:
+            return encrypted
+
+    def _send_security_lock_email(self, *, user: AuthUser, reason: str, lock_seconds: int) -> None:
+        html = (
+            "<h3>安全提醒：账号已临时锁定</h3>"
+            f"<p>账号：{user.email}</p>"
+            f"<p>原因：{reason}</p>"
+            f"<p>锁定时长：{lock_seconds} 秒</p>"
+            "<p>如果不是本人操作，请尽快修改密码。</p>"
+        )
+        try:
+            self.email_service.send_email(
+                to_email=user.email,
+                subject="UDAKE 安全提醒：账号锁定",
+                html_content=html,
+                async_send=True,
+            )
+        except Exception as exc:
+            logger.warning("账号锁定提醒邮件发送失败 user=%s err=%s", user.id, exc)
+
+    def _send_ip_ban_alert(self, *, ip_address: Optional[str], reason: str) -> None:
+        security_email = os.getenv("AUTH_SECURITY_ALERT_EMAIL")
+        if not security_email:
+            return
+        html = (
+            "<h3>安全提醒：IP自动封禁</h3>"
+            f"<p>IP：{ip_address or '-'}</p>"
+            f"<p>原因：{reason}</p>"
+        )
+        try:
+            self.email_service.send_email(
+                to_email=security_email,
+                subject="UDAKE 安全提醒：异常IP已封禁",
+                html_content=html,
+                async_send=True,
+            )
+        except Exception as exc:
+            logger.warning("IP封禁提醒邮件发送失败 ip=%s err=%s", ip_address, exc)
 
     def add_product_key(self, product_key: str, *, key_type: str = "personal") -> ProductKeyRecord:
         record = ProductKeyRecord(product_key=product_key, key_type=key_type, status="unused")
@@ -376,16 +492,17 @@ class AuthService:
         is_new_device: bool,
     ) -> List[Dict[str, Any]]:
         anomalies: List[Dict[str, Any]] = []
+        previous_ip = self._decrypt_ip(previous.ip_address) if previous else None
         if is_new_device:
             anomalies.append({"type": "new_device", "severity": "info", "message": "检测到首次登录设备"})
-        if previous and previous.ip_address and ip_address and previous.ip_address != ip_address:
+        if previous_ip and ip_address and previous_ip != ip_address:
             anomalies.append(
                 {
                     "type": "ip_changed",
                     "severity": "medium",
                     "message": "检测到设备IP变化",
-                    "from": previous.ip_address,
-                    "to": ip_address,
+                    "from": self._mask_ip(previous_ip),
+                    "to": self._mask_ip(ip_address),
                 }
             )
         if previous and previous.location and location and previous.location != location:
@@ -452,13 +569,14 @@ class AuthService:
         normalized_email = self._normalize_email(email)
         self.validate_email(normalized_email)
         self.validate_password_strength(password)
+        self._ensure_ip_allowed(ip_address=ip_address)
         self._ensure_rate_limit(identity=normalized_email, action="register")
 
         try:
             record = self.product_keys.validate_key(product_key, require_unused=True)
         except ProductKeyValidationError as exc:
             self._audit(
-                operation="create",
+                operation="register",
                 user_id=None,
                 details={"action": "register", "result": "failed", "reason": str(exc)},
                 ip_address=ip_address,
@@ -492,7 +610,7 @@ class AuthService:
             variables={"username": self._user_name_from_email(normalized_email), "code": code, "valid_time": "10分钟"},
         )
         self._audit(
-            operation="create",
+            operation="register",
             user_id=user.id,
             details={"action": "register", "email": normalized_email, "result": "success"},
             ip_address=ip_address,
@@ -510,7 +628,11 @@ class AuthService:
         user_agent: Optional[str] = None,
     ) -> Dict[str, Any]:
         normalized_email = self._normalize_email(email)
+        self._ensure_ip_allowed(ip_address=ip_address)
         self._ensure_rate_limit(identity=normalized_email, action="login")
+        self._ensure_rate_limit(identity=f"email:{normalized_email}", action="login_email")
+        if ip_address and not self._is_whitelisted_ip(ip_address):
+            self._ensure_rate_limit(identity=f"ip:{ip_address}", action="login_ip")
 
         with self._lock:
             user = self._users_by_email.get(normalized_email)
@@ -522,10 +644,17 @@ class AuthService:
                 ip_address=ip_address,
                 user_agent=user_agent,
             )
+            self.ip_controller.record_failed_attempt(ip_address)
             raise ValueError("邮箱或密码错误")
+        if user.status == "locked":
+            now = int(time.time())
+            if user.lock_until and user.lock_until > now:
+                raise ValueError(f"账号已锁定，请在 {max(1, user.lock_until - now)} 秒后重试")
+            self._reset_failed_login_attempt(user=user)
         if user.status != "active":
             raise ValueError("账号不可用")
         if not verify_password(password, user.password_hash):
+            self._record_failed_login_attempt(user=user, ip_address=ip_address)
             self._audit(
                 operation="login",
                 user_id=user.id,
@@ -563,6 +692,8 @@ class AuthService:
         with self._lock:
             self._cleanup_stale_devices_locked(now=now)
             user.last_login_at = now
+            self._reset_failed_login_attempt(user=user)
+            self.ip_controller.clear_failed_attempts(ip_address)
             session = self._devices.get((user.id, device_id))
             previous = None
             if session:
@@ -595,7 +726,7 @@ class AuthService:
                     device_type=device_type,
                     os_name=os_name,
                     browser=browser,
-                    ip_address=ip_address,
+                    ip_address=self.field_cipher.encrypt(ip_address) if ip_address else None,
                     location=location,
                     user_agent=normalized_ua,
                     status="active",
@@ -617,7 +748,7 @@ class AuthService:
             session.device_type = device_type
             session.os_name = os_name
             session.browser = browser
-            session.ip_address = ip_address
+            session.ip_address = self.field_cipher.encrypt(ip_address) if ip_address else None
             session.location = location
             session.user_agent = normalized_ua
             session.status = "active"
@@ -635,9 +766,17 @@ class AuthService:
             ip_address=ip_address,
             user_agent=normalized_ua,
         )
+        if previous is None:
+            self._audit(
+                operation="register_device",
+                user_id=user.id,
+                details={"result": "success", "device_id": device_id},
+                ip_address=ip_address,
+                user_agent=normalized_ua,
+            )
         if anomalies:
             self._audit(
-                operation="other",
+                operation="device_risk_event",
                 user_id=user.id,
                 details={"action": "device_anomaly", "device_id": device_id, "events": anomalies},
                 ip_address=ip_address,
@@ -737,7 +876,7 @@ class AuthService:
                     "device_type": item.device_type,
                     "os": item.os_name,
                     "browser": item.browser,
-                    "ip": self._mask_ip(item.ip_address),
+                    "ip": self._mask_ip(self._decrypt_ip(item.ip_address)),
                     "location": item.location or UNKNOWN_LOCATION,
                     "last_login_at": item.last_login_at,
                     "status": item.status,
@@ -796,7 +935,7 @@ class AuthService:
             self._mark_device_inactive_locked(session, now=now)
 
         self._audit(
-            operation="delete",
+            operation="kick_device",
             user_id=user_id,
             details={
                 "action": "kick_device",
@@ -818,7 +957,7 @@ class AuthService:
             if user:
                 user.is_email_verified = True
         self._audit(
-            operation="update",
+            operation="verify_email",
             user_id=user.id if user else None,
             details={"action": "verify_email", "result": "success", "email": normalized_email},
         )
@@ -833,6 +972,7 @@ class AuthService:
     ) -> Dict[str, Any]:
         normalized_email = self._normalize_email(email)
         self.validate_email(normalized_email)
+        self._ensure_ip_allowed(ip_address=ip_address)
         self._ensure_rate_limit(identity=normalized_email, action="reset_password")
 
         self.product_keys.validate_key(product_key, require_unused=True)
@@ -848,7 +988,7 @@ class AuthService:
             variables={"username": self._user_name_from_email(normalized_email), "code": code, "valid_time": "10分钟"},
         )
         self._audit(
-            operation="read",
+            operation="reset_password_send_code",
             user_id=user.id,
             details={"action": "send_reset_password_code", "result": "success", "email": normalized_email},
             ip_address=ip_address,
@@ -867,6 +1007,7 @@ class AuthService:
         user_agent: Optional[str] = None,
     ) -> None:
         normalized_email = self._normalize_email(email)
+        self._ensure_ip_allowed(ip_address=ip_address)
         self._ensure_rate_limit(identity=normalized_email, action="verify_code")
         self.validate_password_strength(new_password)
         self.validate_password_confirmation(new_password, confirm_password)
@@ -887,7 +1028,7 @@ class AuthService:
         blacklisted_tokens = self._blacklist_all_user_device_tokens(user_id=user.id, reason="reset_password")
         self.jwt.blacklist_all_user_tokens(user_id=user.id)
         self._audit(
-            operation="password_change",
+            operation="reset_password",
             user_id=user.id,
             details={"action": "reset_password", "result": "success", "blacklisted_tokens": blacklisted_tokens},
             ip_address=ip_address,
@@ -904,6 +1045,7 @@ class AuthService:
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> None:
+        self._ensure_ip_allowed(ip_address=ip_address)
         user = self._get_user_by_token(access_token)
         if not verify_password(old_password, user.password_hash):
             raise ValueError("旧密码错误")
@@ -920,7 +1062,7 @@ class AuthService:
         blacklisted_tokens = self._blacklist_all_user_device_tokens(user_id=user.id, reason="change_password")
         self.jwt.blacklist_all_user_tokens(user_id=user.id)
         self._audit(
-            operation="password_change",
+            operation="change_password",
             user_id=user.id,
             details={"action": "change_password", "result": "success", "blacklisted_tokens": blacklisted_tokens},
             ip_address=ip_address,
@@ -936,6 +1078,7 @@ class AuthService:
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> Dict[str, Any]:
+        self._ensure_ip_allowed(ip_address=ip_address)
         user = self._get_user_by_token(access_token)
         normalized_new_email = self._normalize_email(new_email)
         self.validate_email(normalized_new_email)
@@ -955,7 +1098,7 @@ class AuthService:
             "max_attempts": 3,
             "issued_at": int(time.time()),
         }
-        self.cache.set(key, payload, ttl=600)
+        self.cache.set_with_jitter(key, payload, ttl=600, jitter_ratio=0.05)
 
         with self._lock:
             self._email_change_requests[user.id] = EmailChangeRequestEntry(
@@ -970,7 +1113,7 @@ class AuthService:
             variables={"username": self._user_name_from_email(user.email), "code": code, "valid_time": "10分钟"},
         )
         self._audit(
-            operation="email_change",
+            operation="change_email_send_code",
             user_id=user.id,
             details={"action": "send_change_email_code", "result": "success", "new_email": normalized_new_email},
             ip_address=ip_address,
@@ -986,6 +1129,7 @@ class AuthService:
         ip_address: Optional[str] = None,
         user_agent: Optional[str] = None,
     ) -> Dict[str, str]:
+        self._ensure_ip_allowed(ip_address=ip_address)
         user = self._get_user_by_token(access_token)
         self._ensure_rate_limit(identity=str(user.id), action="verify_code")
 
@@ -1043,7 +1187,7 @@ class AuthService:
             },
         )
         self._audit(
-            operation="email_change",
+            operation="change_email",
             user_id=user.id,
             details={"action": "verify_change_email", "result": "success", "old_email": old_email, "new_email": new_email},
             ip_address=ip_address,
@@ -1079,7 +1223,19 @@ def get_auth_service() -> AuthService:
                 service = AuthService(cache=cache, jwt_manager=jwt_manager)
 
                 bootstrap_seed = os.getenv("AUTH_BOOTSTRAP_PRODUCT_KEY", "UDAKE-DEFAULT-PRODUCT-KEY")
-                service.product_keys.generate_key(bootstrap_seed)
+                bootstrap_record = service.product_keys.generate_key(bootstrap_seed)
+                cache.set_with_jitter(
+                    "auth:warmup:product_keys",
+                    {"keys": [bootstrap_record.product_key], "count": 1},
+                    ttl=1800,
+                    jitter_ratio=0.2,
+                )
+                cache.set_with_jitter(
+                    "auth:warmup:user_summary",
+                    {"total_users": 0, "cached_at": int(time.time())},
+                    ttl=1800,
+                    jitter_ratio=0.2,
+                )
                 _AUTH_SERVICE = service
     return _AUTH_SERVICE
 

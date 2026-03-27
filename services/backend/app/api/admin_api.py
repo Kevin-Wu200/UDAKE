@@ -7,6 +7,7 @@ import csv
 import hashlib
 import io
 import logging
+import os
 import secrets
 import string
 import time
@@ -20,9 +21,10 @@ from pydantic import BaseModel, Field
 from sqlalchemy import String, cast, func, or_
 from sqlalchemy.orm import Session
 
-from ..auth import JWTValidationError, ProductKeyRegistry, get_auth_service, hash_password
+from ..auth import JWTValidationError, ProductKeyRegistry, SensitiveDataCipher, get_auth_service, hash_password
 from ..auth_db.models import AuditLog, Company, PasswordHistory, ProductKey, User, UserDevice
 from ..auth_db.session import get_auth_db_session
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +56,7 @@ _ADMIN_RSA_D = int(
 )
 
 _key_registry = ProductKeyRegistry()
+_product_key_cipher = SensitiveDataCipher(settings.AUTH_ENCRYPTION_KEY or os.getenv("AUTH_JWT_SECRET") or "udake-key")
 
 
 class ProductKeyCreateRequest(BaseModel):
@@ -106,6 +109,20 @@ def _extract_client_ip(request: Request) -> Optional[str]:
     if x_real_ip:
         return x_real_ip.strip()
     return request.client.host if request.client else None
+
+
+def _mask_ip(ip_address: Optional[str]) -> str:
+    if not ip_address:
+        return "-"
+    if ":" in ip_address:
+        segments = [segment for segment in ip_address.split(":") if segment]
+        if len(segments) >= 2:
+            return f"{segments[0]}:{segments[1]}:*:*"
+        return "*:*"
+    parts = ip_address.split(".")
+    if len(parts) == 4:
+        return f"{parts[0]}.{parts[1]}.*.*"
+    return ip_address
 
 
 def _verify_access_token(request: Request) -> Dict[str, Any]:
@@ -183,6 +200,7 @@ def _serialize_product_key(item: ProductKey, company_name: Optional[str] = None)
         "total_quota": int(item.total_quota or 0),
         "used_count": int(item.used_count or 0),
         "signature": item.signature,
+        "encrypted": bool(item.product_key_ciphertext),
         "issued_at": _to_iso(item.issued_at),
         "created_at": _to_iso(item.created_at),
         "updated_at": _to_iso(item.updated_at),
@@ -213,8 +231,11 @@ def _serialize_audit_log(item: AuditLog) -> Dict[str, Any]:
         "target_table": item.target_table,
         "target_id": item.target_id,
         "ip_address": item.ip_address,
+        "ip_address_masked": item.ip_address_masked,
         "user_agent": item.user_agent,
         "request_id": item.request_id,
+        "success": item.success,
+        "failure_reason": item.failure_reason,
         "details": item.details or {},
         "operated_at": _to_iso(item.operated_at),
     }
@@ -296,6 +317,12 @@ def _record_audit_log(
     target_id: Optional[str],
     details: Optional[Dict[str, Any]] = None,
 ) -> None:
+    success = True
+    failure_reason = None
+    if details and str(details.get("result", "")).lower() == "failed":
+        success = False
+        failure_reason = str(details.get("reason", "") or "unknown")
+    ip_address = _extract_client_ip(request)
     db.add(
         AuditLog(
             id=_next_model_id(db, AuditLog),
@@ -304,8 +331,11 @@ def _record_audit_log(
             operation_type=operation_type,
             target_table=target_table,
             target_id=target_id,
-            ip_address=_extract_client_ip(request),
+            ip_address=ip_address,
+            ip_address_masked=_mask_ip(ip_address),
             user_agent=request.headers.get("user-agent"),
+            success=success,
+            failure_reason=failure_reason,
             details=details or {},
         )
     )
@@ -388,6 +418,7 @@ def create_product_keys(
             id=next_key_id,
             user_id=current_user.id,
             product_key=normalized_key,
+            product_key_ciphertext=_product_key_cipher.encrypt(normalized_key),
             key_type=db_type,
             status="unused",
             company_id=company.id if company else None,
@@ -609,6 +640,7 @@ def batch_import_product_keys(
 
             existing.key_type = db_type
             existing.company_id = company.id if company else None
+            existing.product_key_ciphertext = _product_key_cipher.encrypt(normalized_key)
             if db_type == "enterprise":
                 existing.signature = _rsa_sign_pkcs1_v15_sha256(normalized_key.encode("ascii"))
             overwrite_count += 1
@@ -619,6 +651,7 @@ def batch_import_product_keys(
             id=next_key_id,
             user_id=current_user.id,
             product_key=normalized_key,
+            product_key_ciphertext=_product_key_cipher.encrypt(normalized_key),
             key_type=db_type,
             status="unused",
             company_id=company.id if company else None,

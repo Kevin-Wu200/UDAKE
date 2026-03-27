@@ -38,6 +38,47 @@ class TokenBlobHeader:
     tag_length: int
 
 
+class SensitiveDataCipher:
+    """
+    AES-256-GCM sensitive field cipher.
+
+    The payload format is: ``enc:v1:<base64(nonce|ciphertext+tag)>``.
+    """
+
+    def __init__(self, key_material: bytes | str) -> None:
+        if isinstance(key_material, str):
+            key_material = key_material.encode("utf-8")
+        digest = hashlib.sha256(key_material).digest()
+        self._key = digest[:32]
+
+    @staticmethod
+    def _encode(raw: bytes) -> str:
+        return base64.urlsafe_b64encode(raw).decode("ascii")
+
+    @staticmethod
+    def _decode(value: str) -> bytes:
+        return base64.urlsafe_b64decode(value.encode("ascii"))
+
+    def encrypt(self, plaintext: str) -> str:
+        text = str(plaintext or "")
+        nonce = os.urandom(12)
+        encrypted, tag = _encrypt_aes_gcm(self._key, nonce, text.encode("utf-8"))
+        return f"enc:v1:{self._encode(nonce + encrypted + tag)}"
+
+    def decrypt(self, payload: str) -> str:
+        text = str(payload or "")
+        if not text.startswith("enc:v1:"):
+            return text
+        blob = self._decode(text.split(":", 2)[2])
+        if len(blob) < 12 + _TAG_LENGTH:
+            raise ValueError("invalid encrypted payload length")
+        nonce = blob[:12]
+        encrypted = blob[12:-_TAG_LENGTH]
+        tag = blob[-_TAG_LENGTH:]
+        plaintext = _decrypt_aes_gcm(self._key, nonce, encrypted, tag)
+        return plaintext.decode("utf-8")
+
+
 def _b64_encode(raw: bytes) -> str:
     return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
 

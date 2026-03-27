@@ -60,6 +60,8 @@ class User(Base):
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'pending'"))
     is_email_verified: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
     failed_login_attempts: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    lock_until: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
+    lock_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     company_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
     )
@@ -112,6 +114,7 @@ class ProductKey(Base):
         BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
     product_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    product_key_ciphertext: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     key_type: Mapped[str] = mapped_column(String(20), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'unused'"))
     company_id: Mapped[Optional[int]] = mapped_column(
@@ -149,6 +152,7 @@ class ProductKey(Base):
         Index("ix_product_keys_user_id", "user_id"),
         Index("ix_product_keys_status", "status"),
         Index("ix_product_keys_company_id", "company_id"),
+        Index("ix_product_keys_ciphertext", "product_key_ciphertext"),
     )
 
 
@@ -193,9 +197,12 @@ class AuditLog(Base):
     operation_type: Mapped[str] = mapped_column(String(32), nullable=False)
     target_table: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     target_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
-    ip_address: Mapped[Optional[str]] = mapped_column(String(45), nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    ip_address_masked: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     request_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    success: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
+    failure_reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     details: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True)
     operated_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
@@ -204,13 +211,18 @@ class AuditLog(Base):
     __table_args__ = (
         CheckConstraint(
             "operation_type IN ('create', 'read', 'update', 'delete', "
-            "'login', 'logout', 'password_change', 'email_change', 'api_call', 'delete_user', 'other')",
+            "'register', 'login', 'logout', 'reset_password', 'change_password', 'change_email', "
+            "'verify_email', 'register_device', 'kick_device', 'password_change', 'email_change', "
+            "'delete_user', 'api_call', 'other', 'device_risk_event', 'reset_password_send_code', "
+            "'change_email_send_code')",
             name="ck_audit_logs_operation_type_enum",
         ),
         Index("ix_audit_logs_user_id", "user_id"),
         Index("ix_audit_logs_operation_type", "operation_type"),
         Index("ix_audit_logs_operated_at", "operated_at"),
         Index("ix_audit_logs_target", "target_table", "target_id"),
+        Index("ix_audit_logs_operation_time", "operation_type", "operated_at"),
+        Index("ix_audit_logs_user_time", "user_id", "operated_at"),
     )
 
 
