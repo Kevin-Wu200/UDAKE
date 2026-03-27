@@ -119,6 +119,7 @@ class ProductKey(Base):
     )
     total_quota: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     used_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    signature: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     issued_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
     activated_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
     expires_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
