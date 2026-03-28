@@ -2,7 +2,7 @@
  * 增强的采样推荐面板组件
  * 支持影响优化、实时预览、自定义候选点评估和方案对比
  */
-import { APIService } from '../services/API封装.js';
+import { APIService, resolveRuntimeApiBaseUrl } from '../services/API封装.js';
 import { I18n } from '../utils/I18n.js';
 import type { IMapAdapterExtended } from '../../types/app';
 import { I18nDialog } from './I18nDialog.js';
@@ -89,7 +89,7 @@ export class EnhancedSamplingRecommendationPanel {
 
     constructor(mapEngine: IMapAdapterExtended) {
         this.mapEngine = mapEngine;
-        this.apiService = new APIService();
+        this.apiService = new APIService(resolveRuntimeApiBaseUrl());
         this.currentTaskId = null;
         this.currentRecommendations = [];
         this.currentStrategy = 'impact_optimized';

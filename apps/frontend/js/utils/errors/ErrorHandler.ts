@@ -267,19 +267,30 @@ export class ErrorHandler {
   }
 
   private getUserFriendlyMessage(error: AppError): string {
+    const rawMessage = (error.message || '').trim();
+    const translatedUnknown = I18n.t('error.common.unknown');
+    const isGenericUnknownMessage = !rawMessage ||
+      rawMessage === translatedUnknown ||
+      rawMessage.toLowerCase() === 'unknown error' ||
+      rawMessage.toLowerCase() === '未知错误';
+
+    if (!isGenericUnknownMessage) {
+      return rawMessage;
+    }
+
     const errorMessages: Record<ErrorType, string> = {
       [ErrorType.NETWORK]: I18n.t('error.network_error.message'),
       [ErrorType.VALIDATION]: I18n.t('error.validation_error.message'),
       [ErrorType.AUTHENTICATION]: I18n.t('error.permission_denied.message'),
       [ErrorType.AUTHORIZATION]: I18n.t('error.permission_denied.message'),
-      [ErrorType.NOT_FOUND]: I18n.t('error.common.unknown'),
+      [ErrorType.NOT_FOUND]: '请求的资源不存在',
       [ErrorType.SERVER]: I18n.t('error.server_error.message'),
-      [ErrorType.PLUGIN]: I18n.t('error.common.unknown'),
-      [ErrorType.CACHE]: I18n.t('error.common.unknown'),
-      [ErrorType.UNKNOWN]: I18n.t('error.common.unknown')
+      [ErrorType.PLUGIN]: '插件执行失败，请稍后重试',
+      [ErrorType.CACHE]: '缓存处理失败，请稍后重试',
+      [ErrorType.UNKNOWN]: translatedUnknown
     };
 
-    return errorMessages[error.type] || error.message;
+    return errorMessages[error.type] || translatedUnknown;
   }
 
   // 特定类型的错误处理器

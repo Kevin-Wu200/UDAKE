@@ -4,7 +4,7 @@
  */
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
-import { APIService } from '../services/API封装.js';
+import { APIService, resolveRuntimeApiBaseUrl } from '../services/API封装.js';
 import { MapConfig } from '../config/map.config.js';
 import { unitManager } from '../services/UnitManager.js';
 import type { Bounds, CoordinateSystem } from '../../types/core';
@@ -59,7 +59,7 @@ export class SamplingRecommendationPanel {
         this.view = view;
         this.layerManager = layerManager;
         this.onRecommendationSelect = onRecommendationSelect;
-        this.apiService = new APIService();
+        this.apiService = new APIService(resolveRuntimeApiBaseUrl());
         this.currentTaskId = null;
         this.recommendations = [];
         this.markers = [];

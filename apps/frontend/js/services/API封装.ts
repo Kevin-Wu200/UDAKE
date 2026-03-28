@@ -19,6 +19,22 @@ import { Logger } from '../utils/Logger';
 import { buildCacheKey, getApiCacheTTL, shouldUseApiCache } from '../utils/cache/CachePolicy';
 import { AppConfig } from '../config/AppConfig';
 
+interface RuntimeWindowWithConfig extends Window {
+    __UDAKE_API_BASE__?: string;
+    Capacitor?: {
+        config?: {
+            server?: {
+                url?: string;
+            };
+            plugins?: {
+                UDAKEConfig?: {
+                    apiBaseUrl?: string;
+                };
+            };
+        };
+    };
+}
+
 interface RequestConfig {
     url: string;
     method?: string;
@@ -33,6 +49,52 @@ interface HttpLikeError {
     };
     request?: unknown;
     message?: string;
+}
+
+function safeReadEnv(key: string): string | undefined {
+    try {
+        const env = (import.meta as ImportMeta & { env?: Record<string, string> }).env;
+        return env?.[key];
+    } catch {
+        return undefined;
+    }
+}
+
+function stripApiSuffix(baseUrl: string): string {
+    const trimmed = baseUrl.trim().replace(/\/+$/, '');
+    return trimmed.endsWith('/api') ? trimmed.slice(0, -4) : trimmed;
+}
+
+function normalizeApiBaseUrl(baseUrl: string): string {
+    const normalized = stripApiSuffix(baseUrl);
+    if (!normalized) {
+        return '/api';
+    }
+    return `${normalized}/api`;
+}
+
+export function resolveRuntimeApiBaseUrl(): string {
+    const win = (typeof window !== 'undefined' ? window : undefined) as RuntimeWindowWithConfig | undefined;
+    const runtimeGlobal = win?.__UDAKE_API_BASE__;
+
+    let runtimeStorage: string | undefined;
+    if (typeof window !== 'undefined') {
+        try {
+            runtimeStorage = localStorage.getItem('UDAKE_API_BASE_URL') || undefined;
+        } catch {
+            runtimeStorage = undefined;
+        }
+    }
+
+    const capacitorApiBase = win?.Capacitor?.config?.plugins?.UDAKEConfig?.apiBaseUrl;
+    const capacitorServerUrl = win?.Capacitor?.config?.server?.url;
+    const envApiBase = safeReadEnv('VITE_API_BASE_URL') || safeReadEnv('VITE_API_URL');
+    const envHost = safeReadEnv('VITE_BACKEND_HOST') || safeReadEnv('VITE_IPCONFIG');
+    const envPort = safeReadEnv('VITE_BACKEND_PORT') || '8000';
+    const fallbackBase = `http://${envHost || 'localhost'}:${envPort}`;
+
+    const rawBase = runtimeGlobal || runtimeStorage || capacitorApiBase || capacitorServerUrl || envApiBase || fallbackBase;
+    return normalizeApiBaseUrl(rawBase);
 }
 
 export class APIService implements IAPIService {
@@ -159,24 +221,99 @@ export class APIService implements IAPIService {
             504: '请求超时，请稍后重试'
         };
 
-        // 优先使用后端返回的详细信息
-        if (detail) {
-            return detail;
-        }
-
         // 使用预定义的错误消息
         if (errorMessages[status]) {
             return errorMessages[status];
+        }
+
+        // 未预定义状态码时，使用后端返回的详细信息
+        if (detail) {
+            return detail;
         }
 
         // 默认错误消息
         return `请求失败 (${status}): ${statusText}，请稍后重试`;
     }
 
+    private _buildHttpAppError(
+        status: number,
+        responseData: Record<string, unknown> | undefined,
+        fallbackMessage: string,
+        config: RequestConfig,
+        originalError?: Error
+    ): AppError {
+        const data = responseData ?? {};
+        const messageFromBody = typeof data.message === 'string' ? data.message : '';
+        const detailFromBody = typeof data.detail === 'string' ? data.detail : '';
+        const message = detailFromBody || fallbackMessage || messageFromBody;
+
+        const context: ErrorContext = {
+            url: config.url,
+            method: config.method || 'GET',
+            status,
+            timestamp: new Date()
+        };
+
+        if (status === 401) {
+            return new AuthenticationError(message || '认证失败', data, context);
+        }
+        if (status === 403) {
+            return new AuthenticationError(message || '权限不足', data, context);
+        }
+        if (status === 404) {
+            return new NotFoundError(message || '资源不存在', data, context);
+        }
+        if (status >= 500) {
+            return new ServerError(message || '服务器错误', data, context);
+        }
+        if (status === 422 || status === 400) {
+            return new ValidationError(message || '数据验证失败', data, context);
+        }
+        return new ApplicationError(
+            ErrorType.VALIDATION,
+            'REQUEST_ERROR',
+            message || `请求错误 (${status})`,
+            ErrorSeverity.MEDIUM,
+            data,
+            context,
+            originalError
+        );
+    }
+
+    private _looksLikeFetchNetworkError(error: unknown): boolean {
+        if (!(error instanceof Error)) {
+            return false;
+        }
+        const text = error.message.toLowerCase();
+        return error instanceof TypeError
+            || text.includes('failed to fetch')
+            || text.includes('network')
+            || text.includes('load failed')
+            || text.includes('fetch');
+    }
+
     /**
      * 将错误转换为 AppError
      */
     private convertToAppError(error: unknown, config: RequestConfig): AppError {
+        if (error instanceof ApplicationError) {
+            return error;
+        }
+
+        if (this._looksLikeFetchNetworkError(error)) {
+            return new NetworkError(
+                '网络连接失败，请检查后端服务是否启动',
+                {
+                    message: error instanceof Error ? error.message : String(error)
+                },
+                {
+                    url: config.url,
+                    method: config.method || 'GET',
+                    timestamp: new Date()
+                }
+            );
+        }
+
         const normalizedError = (error || {}) as HttpLikeError;
 
         // Axios 或 Fetch 错误
@@ -184,55 +321,13 @@ export class APIService implements IAPIService {
             // 服务器响应了错误状态码
             const status = normalizedError.response.status ?? 500;
             const data = normalizedError.response.data;
-
-            const context: ErrorContext = {
-                url: config.url,
-                method: config.method || 'GET',
+            return this._buildHttpAppError(
                 status,
-                timestamp: new Date()
-            };
-
-            if (status === 401) {
-                return new AuthenticationError(
-                    String(data?.message || '认证失败'),
-                    data,
-                    context
-                );
-            } else if (status === 403) {
-                return new AuthenticationError(
-                    String(data?.message || '权限不足'),
-                    data,
-                    context
-                );
-            } else if (status === 404) {
-                return new NotFoundError(
-                    String(data?.message || '资源不存在'),
-                    data,
-                    context
-                );
-            } else if (status >= 500) {
-                return new ServerError(
-                    String(data?.message || '服务器错误'),
-                    data,
-                    context
-                );
-            } else if (status === 422) {
-                return new ValidationError(
-                    String(data?.message || '数据验证失败'),
-                    data,
-                    context
-                );
-            } else {
-                return new ApplicationError(
-                    ErrorType.VALIDATION,
-                    'REQUEST_ERROR',
-                    String(data?.message || `请求错误 (${status})`),
-                    ErrorSeverity.MEDIUM,
-                    data,
-                    context,
-                    error instanceof Error ? error : undefined
-                );
-            }
+                data,
+                `请求错误 (${status})`,
+                config,
+                error instanceof Error ? error : undefined
+            );
         } else if (normalizedError.request) {
             // 请求已发出但没有收到响应
             return new NetworkError(
@@ -347,8 +442,9 @@ export class APIService implements IAPIService {
                     }
 
                     if (!response.ok) {
-                        const errorData = await response.json().catch(() => ({} as { detail?: string }));
-                        const userMessage = this._getErrorMessage(response.status, response.statusText, errorData.detail);
+                        const errorData = await response.json().catch(() => ({} as Record<string, unknown>));
+                        const detailText = typeof errorData.detail === 'string' ? errorData.detail : undefined;
+                        const userMessage = this._getErrorMessage(response.status, response.statusText, detailText);
 
                         // 检查是否需要重试
                         if (this.retryableStatusCodes.has(response.status) && attempt < this.maxRetries) {
@@ -358,8 +454,7 @@ export class APIService implements IAPIService {
                         }
 
                         Logger.error('APIService', `API请求失败 [${response.status}]`, errorData);
-                        const error = new Error(userMessage);
-                        const appError = this.convertToAppError(error, { url, method });
+                        const appError = this._buildHttpAppError(response.status, errorData, userMessage, { url, method });
                         errorHandler.handle(appError);
                         throw appError;
                     }
@@ -390,15 +485,15 @@ export class APIService implements IAPIService {
                     lastError = error instanceof Error ? error : new Error(String(error));
 
                     // 网络错误也重试
-                    if (error instanceof TypeError && error.message.includes('fetch') && attempt < this.maxRetries) {
+                    if (this._looksLikeFetchNetworkError(error) && attempt < this.maxRetries) {
                         Logger.warn('APIService', `网络失败，${this.retryDelay}ms 后重试 (${attempt + 1}/${this.maxRetries})`);
                         await this._delay(this.retryDelay * (attempt + 1));
                         continue;
                     }
 
                     // 非重试错误，转换为 AppError 并处理
-                    if (error instanceof TypeError && error.message.includes('fetch')) {
-                        const appError = this.convertToAppError(new Error('网络连接失败，请检查后端服务是否启动'), { url, method });
+                    if (this._looksLikeFetchNetworkError(error)) {
+                        const appError = this.convertToAppError(error, { url, method });
                         errorHandler.handle(appError);
                         throw appError;
                     }

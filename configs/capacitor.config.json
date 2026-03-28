@@ -20,6 +20,9 @@
       "splashImmersive": true,
       "layoutName": "splash_screen",
       "useDialog": true
+    },
+    "UDAKEConfig": {
+      "apiBaseUrl": "http://localhost:8000"
     }
   },
   "android": {
