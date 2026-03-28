@@ -1518,6 +1518,10 @@ class App {
             ensureSwitchAlive();
             this.view = mapAdapter.getView();
             this.layerManager = new LayerManager(mapAdapter);
+            this.componentInitializer.updateMapContext({
+                layerManager: this.layerManager,
+                view: this.view
+            });
 
             if (currentCenter && currentZoom) {
                 const center = Array.isArray(currentCenter)
@@ -1563,6 +1567,10 @@ class App {
                 ]);
                 this.view = rollbackAdapter.getView();
                 this.layerManager = new LayerManager(rollbackAdapter);
+                this.componentInitializer.updateMapContext({
+                    layerManager: this.layerManager,
+                    view: this.view
+                });
 
                 if (currentCenter && currentZoom !== null) {
                     const center = Array.isArray(currentCenter) ? currentCenter : [currentCenter.lng, currentCenter.lat];

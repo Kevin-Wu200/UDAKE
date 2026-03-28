@@ -27,6 +27,7 @@ export interface ComponentRegistry {
     mapLegend: any;
     layerComparisonPanel: any;
     measureTool: any;
+    mapVisualEnhancer: any;
 
     // UI组件
     templateDownloader: any;
@@ -37,6 +38,7 @@ export interface ComponentRegistry {
     onboardingGuide: any;
     cacheManagementPanel: any;
     offlineModeBanner: any;
+    deepLearningPanel?: any;
 
     // 参数组件
     parameterAdjustmentPanel: any;

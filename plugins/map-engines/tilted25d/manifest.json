@@ -1,0 +1,15 @@
+{
+  "id": "map25d-engine",
+  "name": "2.5D 地图引擎",
+  "version": "1.0.0",
+  "type": "map-engine",
+  "description": "提供2.5D地图渲染与交互式热力图能力",
+  "entry": "Map25DEngine.ts",
+  "author": "UDAKE",
+  "keywords": [
+    "map",
+    "2.5d",
+    "heatmap",
+    "visualization"
+  ]
+}

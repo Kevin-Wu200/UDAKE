@@ -27,6 +27,7 @@ import OfflineModeBanner from '../components/OfflineModeBanner.js';
 import { HistoryManager } from '../utils/HistoryManager.js';
 import { FeedbackCollector } from '../components/FeedbackCollector.js';
 import { MapEngineSwitcher } from '../components/MapEngineSwitcher';
+import { Map25DHeatmapController } from '../components/Map25DHeatmapController.js';
 import { TemplateStorageService } from '../services/TemplateStorageService.js';
 import { getMapProvider } from '../地图初始化.js';
 import type { DeepLearningPanel } from '../components/DeepLearningPanel.js';
@@ -65,6 +66,7 @@ export interface ComponentRegistry {
     mapLegend: MapLegend;
     layerComparisonPanel: LayerComparisonPanel;
     measureTool: MeasureTool;
+    mapVisualEnhancer: Map25DHeatmapController | null;
 
     // UI组件
     templateDownloader: any;
@@ -376,6 +378,13 @@ export class ComponentInitializer {
         mapContainer.appendChild(measurePanel);
         this.components.set('measureTool', measureTool);
 
+        // 初始化 2.5D 与热力图增强控制器
+        const mapVisualEnhancer = new Map25DHeatmapController(mapContainer, {
+            getView: () => this.config?.view,
+            getSamplingPoints: () => this.config?.layerManager?.getSamplingPoints() || []
+        });
+        this.components.set('mapVisualEnhancer', mapVisualEnhancer);
+
         // 添加工具按钮
         this.addToolbarButtons();
 
@@ -430,46 +439,62 @@ export class ComponentInitializer {
      * 添加工具栏按钮
      */
     private addToolbarButtons(): void {
-        const toolbar = document.querySelector('.map-toolbar');
-        if (!toolbar) {
-            console.warn('[ComponentInitializer] 找不到地图工具栏');
+        const mapContainer = document.querySelector('.map-container') as HTMLElement | null;
+        if (!mapContainer) {
+            console.warn('[ComponentInitializer] 找不到地图容器，跳过工具栏初始化');
             return;
         }
 
+        let toolbar = mapContainer.querySelector('.map-toolbar') as HTMLElement | null;
+        if (!toolbar) {
+            toolbar = document.createElement('div');
+            toolbar.className = 'map-toolbar';
+            mapContainer.appendChild(toolbar);
+        }
+
         // 添加测量工具按钮
-        const measureBtn = document.createElement('button');
-        measureBtn.className = 'toolbar-btn';
-        measureBtn.title = '测量工具';
-        measureBtn.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M2 10h16M10 2v16" stroke="currentColor" stroke-width="2"/>
-            </svg>
-        `;
-        measureBtn.addEventListener('click', () => {
-            const panel = document.querySelector('.measure-tool-panel') as HTMLElement;
-            if (panel) {
-                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-            }
-        });
-        toolbar.appendChild(measureBtn);
+        if (!toolbar.querySelector('[data-toolbar-id="measure"]')) {
+            const measureBtn = document.createElement('button');
+            measureBtn.className = 'toolbar-btn';
+            measureBtn.setAttribute('data-toolbar-id', 'measure');
+            measureBtn.title = '测量工具';
+            measureBtn.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M2 10h16M10 2v16" stroke="currentColor" stroke-width="2"/>
+                </svg>
+            `;
+            measureBtn.addEventListener('click', () => {
+                const panel = document.querySelector('.measure-tool-panel') as HTMLElement;
+                if (panel) {
+                    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+                }
+            });
+            toolbar.appendChild(measureBtn);
+        }
 
         // 添加图层对比按钮
-        const comparisonBtn = document.createElement('button');
-        comparisonBtn.className = 'toolbar-btn';
-        comparisonBtn.title = '图层对比';
-        comparisonBtn.innerHTML = `
-            <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                <rect x="2" y="2" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
-                <line x1="2" y1="10" x2="18" y2="10" stroke="currentColor" stroke-width="2"/>
-            </svg>
-        `;
-        comparisonBtn.addEventListener('click', () => {
-            const panel = document.querySelector('.layer-comparison-panel') as HTMLElement;
-            if (panel) {
-                panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
-            }
-        });
-        toolbar.appendChild(comparisonBtn);
+        if (!toolbar.querySelector('[data-toolbar-id="layer-comparison"]')) {
+            const comparisonBtn = document.createElement('button');
+            comparisonBtn.className = 'toolbar-btn';
+            comparisonBtn.setAttribute('data-toolbar-id', 'layer-comparison');
+            comparisonBtn.title = '图层对比';
+            comparisonBtn.innerHTML = `
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                    <rect x="2" y="2" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <line x1="2" y1="10" x2="18" y2="10" stroke="currentColor" stroke-width="2"/>
+                </svg>
+            `;
+            comparisonBtn.addEventListener('click', () => {
+                const panel = document.querySelector('.layer-comparison-panel') as HTMLElement;
+                if (panel) {
+                    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+                }
+            });
+            toolbar.appendChild(comparisonBtn);
+        }
+
+        const mapVisualEnhancer = this.components.get('mapVisualEnhancer') as Map25DHeatmapController | null;
+        mapVisualEnhancer?.attachToolbarButton(toolbar);
     }
 
     /**
@@ -490,6 +515,7 @@ export class ComponentInitializer {
             mapLegend: this.components.get('mapLegend'),
             layerComparisonPanel: this.components.get('layerComparisonPanel'),
             measureTool: this.components.get('measureTool'),
+            mapVisualEnhancer: this.components.get('mapVisualEnhancer'),
 
             // UI组件
             templateDownloader: this.components.get('templateDownloader'),
@@ -520,6 +546,28 @@ export class ComponentInitializer {
      */
     public registerComponent(name: string, component: any): void {
         this.components.set(name, component);
+    }
+
+    /**
+     * 更新地图上下文（用于地图引擎切换后同步组件）
+     */
+    public updateMapContext(context: Partial<Pick<ComponentConfig, 'layerManager' | 'view'>>): void {
+        if (!this.config) {
+            return;
+        }
+
+        if (context.layerManager) {
+            this.config.layerManager = context.layerManager;
+        }
+        if (context.view) {
+            this.config.view = context.view;
+        }
+
+        const mapVisualEnhancer = this.components.get('mapVisualEnhancer') as Map25DHeatmapController | null;
+        mapVisualEnhancer?.updateContext({
+            getView: () => this.config?.view,
+            getSamplingPoints: () => this.config?.layerManager?.getSamplingPoints() || []
+        });
     }
 
     /**
