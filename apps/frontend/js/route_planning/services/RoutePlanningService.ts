@@ -12,27 +12,78 @@ import {
     ValidationResult,
     PlannedRoute
 } from '../models/RoutePlanningModels';
+import { ComputationService } from '../../services/ComputationService.js';
 
 const API_BASE_URL = '/api/route-planning';
 
 export class RoutePlanningService {
+    private static computationService = ComputationService.getInstance();
+
     /**
      * 执行路径规划
      */
     static async planRoute(request: RoutePlanningRequest): Promise<RoutePlanningResponse> {
-        const response = await fetch(`${API_BASE_URL}/plan`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(request)
-        });
+        const startedAt = performance.now();
+        try {
+            const response = await fetch(`${API_BASE_URL}/plan`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(request)
+            });
 
-        if (!response.ok) {
-            throw new Error(`路径规划失败: ${response.statusText}`);
+            if (!response.ok) {
+                throw new Error(`路径规划失败: ${response.statusText}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            // 服务端不可用时，回退到前端 Worker 的近邻算法，保障核心流程可用
+            const localResult = await this.computationService.planRouteLocally(
+                request.startPoint as unknown as Record<string, unknown>,
+                request.samplingPoints as unknown as Array<Record<string, unknown>>,
+                request.endPoint as unknown as Record<string, unknown> | undefined
+            );
+
+            const points = localResult.route as Array<{ id?: string; latitude: number; longitude: number }>;
+            const pointSequence = points.map((point, index) => point.id || `point_${index}`);
+
+            const segments = points.slice(0, -1).map((point, index) => {
+                const next = points[index + 1];
+                const dx = point.longitude - next.longitude;
+                const dy = point.latitude - next.latitude;
+                const d = Math.sqrt(dx * dx + dy * dy);
+                return {
+                    fromPointId: pointSequence[index],
+                    toPointId: pointSequence[index + 1],
+                    distance: d,
+                    duration: (d / 12) * 3600,
+                    cost: d * 0.8
+                };
+            });
+
+            const plannedRoute: PlannedRoute = {
+                routeId: `local_${Date.now()}`,
+                pointSequence,
+                segments,
+                totalDistance: localResult.totalDistance,
+                totalDuration: localResult.estimatedDurationSeconds,
+                totalCost: localResult.totalDistance * 0.8
+            };
+
+            return {
+                success: true,
+                routes: [plannedRoute],
+                bestRoute: plannedRoute,
+                statistics: {
+                    fallback: 'worker',
+                    fallbackReason: error instanceof Error ? error.message : String(error)
+                },
+                warnings: ['后端路径规划不可用，已启用前端 Worker 回退算法'],
+                computationTime: performance.now() - startedAt
+            };
         }
-
-        return await response.json();
     }
 
     /**

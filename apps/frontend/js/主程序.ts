@@ -34,14 +34,16 @@ import { FeedbackCollector } from './components/FeedbackCollector.js';
 import { PreferencesPanel } from './components/PreferencesPanel.js';
 import { StartupManager } from './utils/StartupManager.js';
 import { ResourceOptimizationManager } from './config/ResourceOptimizationConfig.js';
-import { Kriging3DPanel } from './components/Kriging3DPanel.js';
-import { DeepLearningPanel } from './components/DeepLearningPanel.js';
-import { FrontendIntegrationHub } from './components/FrontendIntegrationHub.js';
 import { LanguageSwitcher, languageSwitcherStyles } from './components/LanguageSwitcher.js';
 import { CSSFeatureDetector } from './utils/CSSFeatureDetector.js';
 import { Logger } from './utils/Logger.js';
 import { RuntimeLifecycle } from './utils/RuntimeLifecycle.js';
 import { AppConfig } from './config/AppConfig.js';
+import { SkeletonLoader } from './utils/SkeletonLoader.js';
+import { ComputationService } from './services/ComputationService.js';
+import type { Kriging3DPanel } from './components/Kriging3DPanel.js';
+import type { DeepLearningPanel } from './components/DeepLearningPanel.js';
+import type { FrontendIntegrationHub } from './components/FrontendIntegrationHub.js';
 
 // 导入管理器
 import { ComponentInitializer } from './managers/ComponentInitializer.js';
@@ -185,6 +187,7 @@ class App {
     private languageSwitcher: LanguageSwitcher | null = null;
 
     // 工具
+    private computationService: ComputationService;
     private formValidator: FormValidator | null = null;
     private locationServiceIntegration: { initialize: () => Promise<void> } | null = null;
 
@@ -197,6 +200,7 @@ class App {
         this.stateManager = StateManager.getInstance();
         this.stateBridge = createStateBridge(this.stateManager);
         this.stateBridge.start();
+        this.computationService = ComputationService.getInstance();
 
         I18n.onChange(() => {
             this.updateUIText();
@@ -204,6 +208,8 @@ class App {
 
         window.addEventListener('beforeunload', () => {
             this.stateBridge?.stop();
+            this.resourceOptimizationManager?.cleanup();
+            this.computationService.cleanup();
         }, { once: true });
 
         // 初始化状态
@@ -665,13 +671,39 @@ class App {
     private deferredInitialization(): void {
         if ('requestIdleCallback' in window) {
             requestIdleCallback(() => {
+                this.computationService.preloadWorkers();
+                this.preloadHeavyPanels();
                 this.initializeNonCriticalComponents();
             }, { timeout: 2000 });
         } else {
             setTimeout(() => {
+                this.computationService.preloadWorkers();
+                this.preloadHeavyPanels();
                 this.initializeNonCriticalComponents();
             }, 100);
         }
+    }
+
+    /**
+     * 空闲时预加载重型功能模块，减少首次打开面板时的等待
+     */
+    private preloadHeavyPanels(): void {
+        const preloadTask = () => Promise.allSettled([
+            import('./components/Kriging3DPanel.js'),
+            import('./components/DeepLearningPanel.js'),
+            import('./components/FrontendIntegrationHub.js')
+        ]);
+
+        if ('requestIdleCallback' in window) {
+            requestIdleCallback(() => {
+                void preloadTask();
+            }, { timeout: 5000 });
+            return;
+        }
+
+        setTimeout(() => {
+            void preloadTask();
+        }, 1500);
     }
 
     /**
@@ -715,13 +747,13 @@ class App {
             this.initializeCacheStatusPanel();
 
             // 初始化3D克里金面板
-            this.initializeKriging3DPanel();
+            await this.initializeKriging3DPanel();
 
             // 初始化深度学习面板
-            this.initializeDeepLearningPanel();
+            await this.initializeDeepLearningPanel();
 
             // 初始化前端功能集成补齐面板
-            this.initializeFrontendIntegrationPanel();
+            await this.initializeFrontendIntegrationPanel();
 
             // 初始化位置服务
             await this.initializeLocationService();
@@ -1108,19 +1140,32 @@ class App {
      */
     private async handleDataImport(transformedData: TransformedData): Promise<void> {
         try {
+            let importedPoints = transformedData.data;
+            if (this.computationService.isWorkerEnabled()) {
+                try {
+                    const preprocessResult = await this.computationService.preprocessSamplingPoints(transformedData.data);
+                    importedPoints = preprocessResult.points as SamplingPoint[];
+                    if (preprocessResult.removedCount > 0) {
+                        this.showStatus(`导入时自动过滤 ${preprocessResult.removedCount} 个无效/重复点`, 'warning');
+                    }
+                } catch (error) {
+                    console.warn('[导入] Worker 预处理失败，继续使用原始点:', error);
+                }
+            }
+
             if (this.layerManager) {
                 await this.layerManager.addPointsLayer(transformedData.geojson);
 
-                for (const point of transformedData.data) {
+                for (const point of importedPoints) {
                     await this.layerManager.addSamplingPoint(point);
                 }
             }
 
-            this.showStatus(`数据导入成功！点数: ${transformedData.data.length}`, 'success');
+            this.showStatus(`数据导入成功！点数: ${importedPoints.length}`, 'success');
             HistoryManager.record({
                 action: '导入数据',
                 type: 'upload',
-                detail: `导入了 ${transformedData.data.length} 个采样点`,
+                detail: `导入了 ${importedPoints.length} 个采样点`,
                 undoable: false
             });
 
@@ -1180,8 +1225,40 @@ class App {
             return;
         }
 
+        let processedSamplingPoints = samplingPoints;
+        if (this.computationService.isWorkerEnabled()) {
+            try {
+                LoadingManager.show('正在预处理采样点数据...', { type: 'progress' });
+                const preprocessResult = await this.computationService.preprocessSamplingPoints(
+                    samplingPoints,
+                    (progress, message) => {
+                        if (message) {
+                            LoadingManager.updateText(message);
+                        }
+                        LoadingManager.updateProgress(progress);
+                    }
+                );
+
+                if (preprocessResult.points.length < 3) {
+                    LoadingManager.hide();
+                    this.showStatus('预处理后可用采样点不足 3 个，无法执行插值', 'error');
+                    return;
+                }
+
+                processedSamplingPoints = preprocessResult.points as SamplingPoint[];
+                if (preprocessResult.removedCount > 0) {
+                    this.showStatus(`已自动过滤 ${preprocessResult.removedCount} 个无效/重复采样点`, 'warning');
+                }
+            } catch (error) {
+                console.warn('[Kriging] Worker 预处理失败，回退主线程原始数据:', error);
+                this.showStatus('数据预处理失败，已回退为原始采样点继续计算', 'warning');
+            } finally {
+                LoadingManager.hide();
+            }
+        }
+
         const params: KrigingParams = {
-            points: samplingPoints,
+            points: processedSamplingPoints,
             method: (krigingMethodSelect?.value || 'ordinary') as 'ordinary' | 'universal' | 'block',
             variogram_model: (variogramModelSelect?.value || 'spherical') as 'spherical' | 'exponential' | 'gaussian',
             grid_resolution: adjustmentParams['grid-resolution'] || 100,
@@ -1205,7 +1282,7 @@ class App {
             HistoryManager.record({
                 action: '开始插值',
                 type: 'kriging',
-                detail: `使用 ${params.method} 方法，${samplingPoints.length} 个采样点`,
+                detail: `使用 ${params.method} 方法，${processedSamplingPoints.length} 个采样点`,
                 undoable: false
             });
             this.startTaskPolling();
@@ -1677,14 +1754,19 @@ class App {
     /**
      * 初始化3D克里金面板
      */
-    private initializeKriging3DPanel(): void {
+    private async initializeKriging3DPanel(): Promise<void> {
         const container = document.getElementById('kriging3d-container');
         if (container) {
+            const skeleton = SkeletonLoader.show(container, 'panel', { lines: 4 });
             try {
-                this.kriging3DPanel = new Kriging3DPanel('kriging3d-container');
+                const module = await import('./components/Kriging3DPanel.js');
+                this.kriging3DPanel = new module.Kriging3DPanel('kriging3d-container');
                 console.log('3D克里金面板初始化成功');
             } catch (error) {
                 console.error('3D克里金面板初始化失败:', error);
+                container.innerHTML = '<div class="status-message error">3D 克里金模块加载失败，请稍后重试</div>';
+            } finally {
+                SkeletonLoader.hide(skeleton);
             }
         }
     }
@@ -1692,7 +1774,7 @@ class App {
     /**
      * 初始化深度学习面板
      */
-    private initializeDeepLearningPanel(): void {
+    private async initializeDeepLearningPanel(): Promise<void> {
         const section = document.getElementById('deep-learning-section');
         const container = document.getElementById('deep-learning-container');
         const legacyApiServer = (this as unknown as { apiServer?: IAPIService | null }).apiServer ?? null;
@@ -1708,26 +1790,38 @@ class App {
             return;
         }
 
+        const skeleton = SkeletonLoader.show(container, 'panel', { lines: 5 });
         try {
-            this.deepLearningPanel = new DeepLearningPanel('deep-learning-section', 'deep-learning-container', panelApiService);
+            const module = await import('./components/DeepLearningPanel.js');
+            this.deepLearningPanel = new module.DeepLearningPanel(
+                'deep-learning-section',
+                'deep-learning-container',
+                panelApiService
+            );
             this.componentInitializer.registerComponent('deepLearningPanel', this.deepLearningPanel);
             console.log('深度学习面板初始化成功');
         } catch (error) {
             console.error('深度学习面板初始化失败:', error);
+            container.innerHTML = '<div class="status-message error">深度学习模块加载失败，请刷新后重试</div>';
+        } finally {
+            SkeletonLoader.hide(skeleton);
         }
     }
 
     /**
      * 初始化前端功能集成补齐面板
      */
-    private initializeFrontendIntegrationPanel(): void {
+    private async initializeFrontendIntegrationPanel(): Promise<void> {
         if (!(this.apiService instanceof APIService)) {
             console.warn('[前端功能集成面板] 初始化跳过: APIService 不可用');
             return;
         }
 
+        const container = document.getElementById('frontend-integration-container');
+        const skeleton = container ? SkeletonLoader.show(container, 'panel', { lines: 5 }) : null;
         try {
-            this.frontendIntegrationHub = new FrontendIntegrationHub(
+            const module = await import('./components/FrontendIntegrationHub.js');
+            this.frontendIntegrationHub = new module.FrontendIntegrationHub(
                 'frontend-integration-section',
                 'frontend-integration-container',
                 this.apiService
@@ -1736,6 +1830,11 @@ class App {
             console.log('前端功能集成补齐面板初始化成功');
         } catch (error) {
             console.error('前端功能集成补齐面板初始化失败:', error);
+            if (container) {
+                container.innerHTML = '<div class="status-message error">功能集成模块加载失败，请稍后重试</div>';
+            }
+        } finally {
+            SkeletonLoader.hide(skeleton);
         }
     }
 

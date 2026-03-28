@@ -237,19 +237,19 @@
                     <h2 class="panel-title" style="cursor:pointer;" onclick="document.getElementById('kriging3d-container').style.display=document.getElementById('kriging3d-container').style.display==='none'?'block':'none'">
                         <span data-i18n="panel.kriging3d">3D克里金插值</span> ▾
                     </h2>
-                    <div id="kriging3d-container" style="display:none;"></div>
+                    <div id="kriging3d-container" data-lazy-component="Kriging3DPanel" style="display:none;"></div>
                 </div>
 
                 <!-- 深度学习面板 -->
                 <div class="panel" id="deep-learning-section">
                     <h2 class="panel-title" style="cursor:pointer;"><span data-i18n="panel.deepLearning">深度学习</span> ▸</h2>
-                    <div id="deep-learning-container" style="display:none;"></div>
+                    <div id="deep-learning-container" data-lazy-component="DeepLearningPanel" style="display:none;"></div>
                 </div>
 
                 <!-- 前端功能集成补齐面板 -->
                 <div class="panel" id="frontend-integration-section">
                     <h2 class="panel-title" style="cursor:pointer;"><span data-i18n="panel.frontendIntegration">前端功能集成补齐</span> ▸</h2>
-                    <div id="frontend-integration-container" style="display:none;"></div>
+                    <div id="frontend-integration-container" data-lazy-component="FrontendIntegrationHub" style="display:none;"></div>
                 </div>
 
                 <div class="panel cache-status-panel" id="cache-status-panel">
