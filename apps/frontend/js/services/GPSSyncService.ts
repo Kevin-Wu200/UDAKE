@@ -8,6 +8,13 @@ export interface GPSSyncStatus {
   projectId: string;
   lastSyncAt: number | null;
   lastError: string | null;
+  connectionHealth: {
+    rttMs: number | null;
+    heartbeatIntervalMs: number;
+    packetLossRate: number;
+    reconnectAttempts: number;
+    lastPongAt: number | null;
+  };
 }
 
 interface PendingAckMessage {
@@ -18,6 +25,51 @@ interface PendingAckMessage {
   reject: (reason?: unknown) => void;
 }
 
+interface BatchSyncPayload {
+  client_id: string;
+  project_id: string;
+  strategy: 'client-wins' | 'server-wins' | 'latest-wins' | 'manual';
+  samples: Array<Record<string, any>>;
+  message_id?: string;
+}
+
+const RECONNECT_BASE_DELAY_MS = 3000;
+const RECONNECT_MAX_DELAY_MS = 60000;
+const RECONNECT_JITTER_RATIO = 0.2;
+const ACK_RETRY_BASE_DELAY_MS = 4000;
+const ACK_RETRY_MAX_ATTEMPTS = 3;
+const COMPRESSION_THRESHOLD_BYTES = 1024;
+const MESSAGE_DEDUP_WINDOW_MS = 5 * 60 * 1000;
+
+export function calculateBackoffDelay(
+  attempt: number,
+  baseDelayMs: number = RECONNECT_BASE_DELAY_MS,
+  maxDelayMs: number = RECONNECT_MAX_DELAY_MS,
+  jitterRatio: number = RECONNECT_JITTER_RATIO
+): number {
+  const exponential = Math.min(maxDelayMs, baseDelayMs * 2 ** Math.max(0, attempt));
+  const jitterFactor = 1 + ((Math.random() * 2 - 1) * jitterRatio);
+  return Math.max(baseDelayMs, Math.round(exponential * jitterFactor));
+}
+
+function toBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function fromBase64(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const output = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    output[i] = binary.charCodeAt(i);
+  }
+  return output;
+}
+
 export class GPSSyncService {
   private static instance: GPSSyncService;
   private websocket: WebSocket | null = null;
@@ -26,15 +78,33 @@ export class GPSSyncService {
   private initialized = false;
   private reconnectTimer: number | null = null;
   private heartbeatTimer: number | null = null;
+  private reconnectAttempts = 0;
+  private heartbeatIntervalMs = 20000;
+  private heartbeatMisses = 0;
+  private lastPingAt: number | null = null;
+  private lastPongAt: number | null = null;
+  private avgRttMs: number | null = null;
+  private heartbeatHistory: number[] = [];
+
   private messageSeq = 0;
   private pendingAck: Map<string, PendingAckMessage> = new Map();
+  private processedMessageIds: Map<string, number> = new Map();
+  private sampleSnapshots: Map<string, Record<string, any>> = new Map();
+
   private listeners: Set<(status: GPSSyncStatus) => void> = new Set();
   private enabled = true;
   private status: GPSSyncStatus = {
     state: 'idle',
     projectId: 'default_mobile_project',
     lastSyncAt: null,
-    lastError: null
+    lastError: null,
+    connectionHealth: {
+      rttMs: null,
+      heartbeatIntervalMs: 20000,
+      packetLossRate: 0,
+      reconnectAttempts: 0,
+      lastPongAt: null
+    }
   };
 
   private constructor() {}
@@ -71,14 +141,14 @@ export class GPSSyncService {
 
   public onStatusChange(listener: (status: GPSSyncStatus) => void): () => void {
     this.listeners.add(listener);
-    listener({ ...this.status });
+    listener({ ...this.status, connectionHealth: { ...this.status.connectionHealth } });
     return () => {
       this.listeners.delete(listener);
     };
   }
 
   public getStatus(): GPSSyncStatus {
-    return { ...this.status };
+    return { ...this.status, connectionHealth: { ...this.status.connectionHealth } };
   }
 
   public async setProjectId(projectId: string): Promise<void> {
@@ -87,11 +157,7 @@ export class GPSSyncService {
     this.status.projectId = normalized;
     this.emitStatus();
     if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
-      await this.sendMessage(
-        'subscribe_gps_project',
-        { project_id: this.projectId },
-        false
-      );
+      await this.sendMessage('subscribe_gps_project', { project_id: this.projectId }, false);
     }
   }
 
@@ -134,18 +200,16 @@ export class GPSSyncService {
         if (settled) return;
         settled = true;
         clearTimeout(timeout);
+        this.reconnectAttempts = 0;
+        this.heartbeatMisses = 0;
         this.updateStatus('connected');
         this.startHeartbeat();
-        await this.sendMessage(
-          'subscribe_gps_project',
-          { project_id: this.projectId },
-          false
-        );
+        await this.sendMessage('subscribe_gps_project', { project_id: this.projectId }, false);
         resolve();
       };
 
       socket.onmessage = (event) => {
-        this.handleMessage(event.data);
+        void this.handleMessage(event.data);
       };
 
       socket.onerror = () => {
@@ -182,6 +246,9 @@ export class GPSSyncService {
 
     this.updateStatus('syncing');
 
+    const normalized = this.normalizeSampleForServer(sample);
+    const incremental = this.buildIncrementalPayload(normalized);
+
     try {
       if (this.websocket && this.websocket.readyState === WebSocket.OPEN) {
         const ok = await this.sendMessage(
@@ -189,7 +256,7 @@ export class GPSSyncService {
           {
             project_id: sample.projectId || this.projectId,
             strategy: 'latest-wins',
-            sample: this.normalizeSampleForServer(sample)
+            sample: incremental
           },
           true
         );
@@ -204,17 +271,21 @@ export class GPSSyncService {
 
     try {
       const apiBase = resolveRuntimeApiBaseUrl();
+      const batchPayload: BatchSyncPayload = {
+        client_id: this.clientId,
+        project_id: sample.projectId || this.projectId,
+        strategy: 'latest-wins',
+        samples: [incremental],
+        message_id: `gps_batch_${Date.now()}_${this.messageSeq++}`
+      };
+
+      const requestBody = await this.createHttpRequestBody(batchPayload);
       const response = await fetch(`${apiBase}/mobile-gps/sync/batch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          client_id: this.clientId,
-          project_id: sample.projectId || this.projectId,
-          strategy: 'latest-wins',
-          samples: [this.normalizeSampleForServer(sample)]
-        })
+        body: JSON.stringify(requestBody)
       });
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}`);
@@ -240,6 +311,9 @@ export class GPSSyncService {
     this.rejectAllPending('同步服务已关闭');
     this.safeCloseSocket();
     this.listeners.clear();
+    this.pendingAck.clear();
+    this.processedMessageIds.clear();
+    this.sampleSnapshots.clear();
   }
 
   private buildWebSocketUrl(): string {
@@ -264,7 +338,15 @@ export class GPSSyncService {
       ...this.status,
       state,
       projectId: this.projectId,
-      lastError
+      lastError,
+      connectionHealth: {
+        ...this.status.connectionHealth,
+        rttMs: this.avgRttMs,
+        heartbeatIntervalMs: this.heartbeatIntervalMs,
+        packetLossRate: this.getPacketLossRate(),
+        reconnectAttempts: this.reconnectAttempts,
+        lastPongAt: this.lastPongAt
+      }
     };
     this.emitStatus();
   }
@@ -275,13 +357,24 @@ export class GPSSyncService {
       state: 'connected',
       projectId: this.projectId,
       lastSyncAt: Date.now(),
-      lastError: null
+      lastError: null,
+      connectionHealth: {
+        ...this.status.connectionHealth,
+        rttMs: this.avgRttMs,
+        heartbeatIntervalMs: this.heartbeatIntervalMs,
+        packetLossRate: this.getPacketLossRate(),
+        reconnectAttempts: this.reconnectAttempts,
+        lastPongAt: this.lastPongAt
+      }
     };
     this.emitStatus();
   }
 
   private emitStatus(): void {
-    const snapshot = { ...this.status };
+    const snapshot: GPSSyncStatus = {
+      ...this.status,
+      connectionHealth: { ...this.status.connectionHealth }
+    };
     this.listeners.forEach((listener) => {
       try {
         listener(snapshot);
@@ -312,6 +405,37 @@ export class GPSSyncService {
     };
   }
 
+  private buildIncrementalPayload(sample: Record<string, any>): Record<string, any> {
+    const sampleId = String(sample.id || `gps_${Date.now()}`);
+    const key = `${sample.project_id || this.projectId}:${sampleId}`;
+    const previous = this.sampleSnapshots.get(key) || {};
+
+    const changedFields = Object.keys(sample).filter((field) => {
+      return JSON.stringify(sample[field]) !== JSON.stringify(previous[field]);
+    });
+
+    const serialized = JSON.stringify(sample);
+    const fingerprint = this.simpleFingerprint(serialized);
+
+    this.sampleSnapshots.set(key, { ...sample });
+
+    return {
+      ...sample,
+      id: sampleId,
+      changed_fields: changedFields,
+      fingerprint
+    };
+  }
+
+  private simpleFingerprint(input: string): string {
+    let hash = 2166136261;
+    for (let i = 0; i < input.length; i += 1) {
+      hash ^= input.charCodeAt(i);
+      hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+    }
+    return `fp_${(hash >>> 0).toString(16)}`;
+  }
+
   private async sendMessage(type: string, data: any, requireAck: boolean): Promise<boolean> {
     if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
       throw new Error('WebSocket 未连接');
@@ -324,7 +448,8 @@ export class GPSSyncService {
       timestamp: new Date().toISOString(),
       message_id: messageId
     };
-    const serialized = JSON.stringify(payload);
+
+    const serialized = await this.serializeOutgoingPayload(type, payload);
     this.websocket.send(serialized);
 
     if (!requireAck || !messageId) {
@@ -335,7 +460,7 @@ export class GPSSyncService {
       const scheduleRetry = (): number => window.setTimeout(() => {
         const pending = this.pendingAck.get(messageId);
         if (!pending) return;
-        if (pending.attempts >= 3) {
+        if (pending.attempts >= ACK_RETRY_MAX_ATTEMPTS) {
           this.pendingAck.delete(messageId);
           reject(new Error('消息 ACK 超时'));
           return;
@@ -346,7 +471,7 @@ export class GPSSyncService {
         }
         clearTimeout(pending.timer);
         pending.timer = scheduleRetry();
-      }, 4000);
+      }, ACK_RETRY_BASE_DELAY_MS);
 
       this.pendingAck.set(messageId, {
         serialized,
@@ -358,7 +483,71 @@ export class GPSSyncService {
     });
   }
 
-  private handleMessage(rawMessage: any): void {
+  private async serializeOutgoingPayload(type: string, payload: Record<string, any>): Promise<string> {
+    const raw = JSON.stringify(payload);
+    if (raw.length < COMPRESSION_THRESHOLD_BYTES) {
+      return raw;
+    }
+
+    const compressed = await this.tryCompressToBase64(raw, 'gzip');
+    if (!compressed) {
+      return raw;
+    }
+
+    return JSON.stringify({
+      type: 'compressed_payload',
+      message_id: payload.message_id,
+      timestamp: payload.timestamp,
+      data: {
+        original_type: type,
+        compression: 'gzip',
+        encoding: 'base64',
+        payload: compressed,
+        original_size: raw.length
+      }
+    });
+  }
+
+  private async tryCompressToBase64(input: string, algorithm: 'gzip' | 'deflate' = 'gzip'): Promise<string | null> {
+    try {
+      const CompressionCtor = (globalThis as any).CompressionStream;
+      if (!CompressionCtor) {
+        return null;
+      }
+
+      const stream = new CompressionCtor(algorithm);
+      const writer = stream.writable.getWriter();
+      await writer.write(new TextEncoder().encode(input));
+      await writer.close();
+
+      const compressedArrayBuffer = await new Response(stream.readable).arrayBuffer();
+      return toBase64(new Uint8Array(compressedArrayBuffer));
+    } catch {
+      return null;
+    }
+  }
+
+  private async tryDecompressFromBase64(base64: string, algorithm: 'gzip' | 'deflate' = 'gzip'): Promise<string | null> {
+    try {
+      const DecompressionCtor = (globalThis as any).DecompressionStream;
+      if (!DecompressionCtor) {
+        return null;
+      }
+
+      const compressed = fromBase64(base64);
+      const stream = new DecompressionCtor(algorithm);
+      const writer = stream.writable.getWriter();
+      await writer.write(compressed);
+      await writer.close();
+
+      const buffer = await new Response(stream.readable).arrayBuffer();
+      return new TextDecoder().decode(buffer);
+    } catch {
+      return null;
+    }
+  }
+
+  private async handleMessage(rawMessage: any): Promise<void> {
     let message: any;
     try {
       message = typeof rawMessage === 'string' ? JSON.parse(rawMessage) : rawMessage;
@@ -366,9 +555,34 @@ export class GPSSyncService {
       return;
     }
 
+    if (message?.type === 'compressed_payload') {
+      const data = message?.data || {};
+      if (data?.encoding === 'base64' && typeof data?.payload === 'string') {
+        const decompressed = await this.tryDecompressFromBase64(data.payload, data.compression || 'gzip');
+        if (decompressed) {
+          try {
+            const parsed = JSON.parse(decompressed);
+            await this.handleParsedMessage(parsed);
+          } catch {
+            // ignore malformed payload
+          }
+        }
+      }
+      return;
+    }
+
+    await this.handleParsedMessage(message);
+  }
+
+  private async handleParsedMessage(message: any): Promise<void> {
     const incomingMessageId = message?.message_id || message?.data?.message_id || message?.data?.id;
+
     if (message?.type !== 'ack' && incomingMessageId) {
-      void this.sendAck(incomingMessageId);
+      await this.sendAck(incomingMessageId);
+      if (this.isDuplicateMessage(incomingMessageId)) {
+        return;
+      }
+      this.markMessageProcessed(incomingMessageId);
     }
 
     if (message?.type === 'ack' && incomingMessageId) {
@@ -382,19 +596,38 @@ export class GPSSyncService {
     }
 
     if (message?.type === 'gps_pong') {
+      this.onHeartbeatSuccess();
       return;
     }
 
     if (message?.type === 'gps_sample_update') {
       const sample = message?.data?.sample || message?.sample;
       if (sample) {
-        void OfflineManager.saveGPSSample({
+        await OfflineManager.saveGPSSample({
           ...sample,
           projectId: sample.project_id || sample.projectId
         });
       }
-      return;
     }
+  }
+
+  private isDuplicateMessage(messageId: string): boolean {
+    this.cleanupProcessedMessageIds();
+    return this.processedMessageIds.has(messageId);
+  }
+
+  private markMessageProcessed(messageId: string): void {
+    this.cleanupProcessedMessageIds();
+    this.processedMessageIds.set(messageId, Date.now());
+  }
+
+  private cleanupProcessedMessageIds(): void {
+    const now = Date.now();
+    this.processedMessageIds.forEach((timestamp, key) => {
+      if (now - timestamp > MESSAGE_DEDUP_WINDOW_MS) {
+        this.processedMessageIds.delete(key);
+      }
+    });
   }
 
   private async sendAck(messageId: string): Promise<void> {
@@ -413,23 +646,95 @@ export class GPSSyncService {
   private startHeartbeat(): void {
     this.stopHeartbeat();
     this.heartbeatTimer = window.setInterval(() => {
-      if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
-        return;
-      }
-      this.websocket.send(
-        JSON.stringify({
-          type: 'gps_ping',
-          data: { project_id: this.projectId },
-          timestamp: new Date().toISOString()
-        })
-      );
-    }, 20000);
+      this.sendHeartbeatPing();
+    }, this.heartbeatIntervalMs);
   }
 
   private stopHeartbeat(): void {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+  }
+
+  private sendHeartbeatPing(): void {
+    if (!this.websocket || this.websocket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+
+    const now = Date.now();
+    if (this.lastPingAt && !this.lastPongAt) {
+      if (now - this.lastPingAt >= this.heartbeatIntervalMs * 2) {
+        this.heartbeatMisses += 1;
+        this.recordHeartbeatResult(false);
+      }
+    }
+
+    if (this.heartbeatMisses >= 3) {
+      this.updateStatus('offline', '心跳连续失败，准备重连');
+      this.safeCloseSocket();
+      return;
+    }
+
+    this.lastPingAt = now;
+    this.lastPongAt = null;
+    this.websocket.send(
+      JSON.stringify({
+        type: 'gps_ping',
+        data: {
+          project_id: this.projectId,
+          sent_at: now
+        },
+        timestamp: new Date(now).toISOString()
+      })
+    );
+  }
+
+  private onHeartbeatSuccess(): void {
+    const now = Date.now();
+    this.lastPongAt = now;
+    this.heartbeatMisses = 0;
+
+    if (this.lastPingAt) {
+      const rtt = Math.max(0, now - this.lastPingAt);
+      this.avgRttMs = this.avgRttMs === null ? rtt : Math.round(this.avgRttMs * 0.7 + rtt * 0.3);
+    }
+
+    this.recordHeartbeatResult(true);
+    this.adjustHeartbeatInterval();
+    this.updateStatus('connected');
+  }
+
+  private recordHeartbeatResult(success: boolean): void {
+    this.heartbeatHistory.push(success ? 1 : 0);
+    if (this.heartbeatHistory.length > 30) {
+      this.heartbeatHistory.shift();
+    }
+  }
+
+  private getPacketLossRate(): number {
+    if (this.heartbeatHistory.length === 0) {
+      return 0;
+    }
+    const failures = this.heartbeatHistory.filter(item => item === 0).length;
+    return failures / this.heartbeatHistory.length;
+  }
+
+  private adjustHeartbeatInterval(): void {
+    const previous = this.heartbeatIntervalMs;
+
+    if (this.avgRttMs === null) {
+      this.heartbeatIntervalMs = 20000;
+    } else if (this.avgRttMs > 1500) {
+      this.heartbeatIntervalMs = 10000;
+    } else if (this.avgRttMs > 800) {
+      this.heartbeatIntervalMs = 15000;
+    } else {
+      this.heartbeatIntervalMs = 20000;
+    }
+
+    if (previous !== this.heartbeatIntervalMs) {
+      this.startHeartbeat();
     }
   }
 
@@ -440,10 +745,14 @@ export class GPSSyncService {
     if (this.reconnectTimer) {
       return;
     }
+
+    const delay = calculateBackoffDelay(this.reconnectAttempts);
+    this.reconnectAttempts += 1;
+
     this.reconnectTimer = window.setTimeout(() => {
       this.reconnectTimer = null;
       void this.connect();
-    }, 3000);
+    }, delay);
   }
 
   private rejectAllPending(message: string): void {
@@ -464,6 +773,29 @@ export class GPSSyncService {
       this.websocket = null;
     }
   }
+
+  private async createHttpRequestBody(payload: BatchSyncPayload): Promise<Record<string, any>> {
+    const serialized = JSON.stringify(payload);
+    if (serialized.length < COMPRESSION_THRESHOLD_BYTES) {
+      return payload;
+    }
+
+    const compressed = await this.tryCompressToBase64(serialized, 'gzip');
+    if (!compressed) {
+      return payload;
+    }
+
+    return {
+      message_id: payload.message_id,
+      compression: 'gzip',
+      encoding: 'base64',
+      compressed_payload: compressed
+    };
+  }
 }
 
 export const gpsSyncService = GPSSyncService.getInstance();
+
+export const __gpsSyncInternals = {
+  calculateBackoffDelay
+};

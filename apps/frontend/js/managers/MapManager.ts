@@ -1,5 +1,6 @@
 import { ArcGISEngine } from '../map/core/ArcGISEngine';
 import { AMapEngine } from '../map/core/AMapEngine';
+import { offlineMapService, type OfflineMapDownloadProgress, type TileCoordinate } from '../map/services/OfflineMapService';
 import { GeoUtils } from '../utils/GeoUtils';
 import type {
     MapProvider,
@@ -289,5 +290,59 @@ export class MapManager {
         if (this.mapEngine) {
             this.mapEngine.destroy();
         }
+    }
+
+    /**
+     * 创建离线地图下载任务（矩形区域）
+     */
+    async createOfflineMapTask(
+        params: {
+            name: string;
+            bbox: [number, number, number, number];
+            minZoom: number;
+            maxZoom: number;
+            version?: string;
+            tileTemplate?: string;
+        },
+        onProgress?: (progress: OfflineMapDownloadProgress) => void
+    ): Promise<string> {
+        return offlineMapService.createRegionDownloadTask(params, onProgress);
+    }
+
+    /**
+     * 暂停离线地图下载任务
+     */
+    pauseOfflineMapTask(taskId: string): boolean {
+        return offlineMapService.pauseTask(taskId);
+    }
+
+    /**
+     * 恢复离线地图下载任务
+     */
+    async resumeOfflineMapTask(taskId: string): Promise<boolean> {
+        return offlineMapService.resumeTask(taskId);
+    }
+
+    /**
+     * 获取离线地图存储统计
+     */
+    async getOfflineMapStorageStats(): Promise<{
+        totalTiles: number;
+        totalBytes: number;
+        maxBytes: number;
+        usageRate: number;
+        memoryHitRate: number;
+        memoryHits: number;
+        diskHits: number;
+        misses: number;
+    }> {
+        return offlineMapService.getStorageStats();
+    }
+
+    /**
+     * 从离线缓存读取瓦片
+     */
+    async getOfflineTile(tile: TileCoordinate, version: string = 'v1'): Promise<Blob | null> {
+        return offlineMapService.getTile(tile, version);
     }
 }

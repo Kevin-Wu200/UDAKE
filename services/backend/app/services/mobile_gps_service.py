@@ -10,6 +10,7 @@ from datetime import datetime
 from io import StringIO
 from typing import Any, Dict, List, Optional
 import csv
+import time
 
 
 class MobileGPSService:
@@ -17,75 +18,111 @@ class MobileGPSService:
         self.samples: Dict[str, Dict[str, Any]] = {}
         self.conflicts: List[Dict[str, Any]] = []
         self.sample_history: Dict[str, List[Dict[str, Any]]] = {}
+        self.processed_messages: Dict[str, float] = {}
+        self.processed_sample_fingerprints: Dict[str, float] = {}
+        self.dedup_ttl_seconds = 15 * 60
 
     def upsert_samples(
         self,
         client_id: str,
         samples: List[Dict[str, Any]],
-        strategy: str = "latest-wins"
+        strategy: str = "latest-wins",
+        message_id: Optional[str] = None,
+        batch_size: int = 1000
     ) -> Dict[str, Any]:
+        self._cleanup_dedup_state()
+        if message_id and self._is_duplicate_message(message_id):
+            return {
+                "applied": 0,
+                "skipped": 0,
+                "conflicts": 0,
+                "duplicate_samples": 0,
+                "applied_samples": [],
+                "conflict_items": [],
+                "duplicate_message": True
+            }
+
         applied: List[Dict[str, Any]] = []
         conflicts: List[Dict[str, Any]] = []
         skipped: List[Dict[str, Any]] = []
+        duplicate_samples: List[Dict[str, Any]] = []
 
-        for raw_sample in samples:
-            incoming = self._normalize_sample(raw_sample)
-            sample_id = incoming["id"]
-            existing = self.samples.get(sample_id)
-            if not existing:
-                self.samples[sample_id] = incoming
-                applied.append(incoming)
-                continue
+        safe_batch_size = max(1, int(batch_size))
+        for offset in range(0, len(samples), safe_batch_size):
+            batch = samples[offset:offset + safe_batch_size]
+            for raw_sample in batch:
+                incoming = self._normalize_sample(raw_sample)
+                fingerprint = self._build_sample_fingerprint(incoming)
+                if self._is_duplicate_sample_fingerprint(fingerprint):
+                    skipped.append(incoming)
+                    duplicate_samples.append(incoming)
+                    continue
 
-            conflict = self._detect_conflict(existing, incoming)
-            if not conflict:
-                self._archive_sample(existing)
-                self.samples[sample_id] = incoming
-                applied.append(incoming)
-                continue
+                sample_id = incoming["id"]
+                existing = self.samples.get(sample_id)
+                if not existing:
+                    self.samples[sample_id] = incoming
+                    applied.append(incoming)
+                    self.processed_sample_fingerprints[fingerprint] = time.time()
+                    continue
 
-            conflict_item = {
-                "conflict_id": f"gps_conflict_{datetime.now().timestamp()}_{sample_id}",
-                "sample_id": sample_id,
-                "project_id": incoming["project_id"],
-                "client_id": client_id,
-                "server_sample": existing,
-                "client_sample": incoming,
-                "reason": conflict,
-                "created_at": datetime.now().isoformat()
-            }
-
-            if strategy == "client-wins":
-                self._archive_sample(existing)
-                self.samples[sample_id] = incoming
-                applied.append(incoming)
-                conflict_item["resolution"] = "client-wins"
-            elif strategy == "server-wins":
-                skipped.append(incoming)
-                conflict_item["resolution"] = "server-wins"
-            elif strategy == "latest-wins":
-                server_ts = int(existing.get("updated_at", 0))
-                client_ts = int(incoming.get("updated_at", 0))
-                if client_ts >= server_ts:
+                conflict = self._detect_conflict(existing, incoming)
+                if not conflict:
                     self._archive_sample(existing)
                     self.samples[sample_id] = incoming
                     applied.append(incoming)
-                    conflict_item["resolution"] = "client-latest"
-                else:
-                    skipped.append(incoming)
-                    conflict_item["resolution"] = "server-latest"
-            else:
-                conflicts.append(conflict_item)
-                conflict_item["resolution"] = "manual-required"
+                    self.processed_sample_fingerprints[fingerprint] = time.time()
+                    continue
 
-            self.conflicts.append(conflict_item)
+                conflict_item = {
+                    "conflict_id": f"gps_conflict_{datetime.now().timestamp()}_{sample_id}",
+                    "sample_id": sample_id,
+                    "project_id": incoming["project_id"],
+                    "client_id": client_id,
+                    "server_sample": existing,
+                    "client_sample": incoming,
+                    "reason": conflict,
+                    "created_at": datetime.now().isoformat()
+                }
+
+                if strategy == "client-wins":
+                    self._archive_sample(existing)
+                    self.samples[sample_id] = incoming
+                    applied.append(incoming)
+                    self.processed_sample_fingerprints[fingerprint] = time.time()
+                    conflict_item["resolution"] = "client-wins"
+                elif strategy == "server-wins":
+                    skipped.append(incoming)
+                    conflict_item["resolution"] = "server-wins"
+                else:
+                    server_ts = int(existing.get("updated_at", 0))
+                    client_ts = int(incoming.get("updated_at", 0))
+                    if strategy == "latest-wins" and client_ts >= server_ts:
+                        self._archive_sample(existing)
+                        self.samples[sample_id] = incoming
+                        applied.append(incoming)
+                        self.processed_sample_fingerprints[fingerprint] = time.time()
+                        conflict_item["resolution"] = "client-latest"
+                    elif strategy == "latest-wins":
+                        skipped.append(incoming)
+                        conflict_item["resolution"] = "server-latest"
+                    else:
+                        conflicts.append(conflict_item)
+                        conflict_item["resolution"] = "manual-required"
+
+                self.conflicts.append(conflict_item)
+
+        if message_id:
+            self.processed_messages[message_id] = time.time()
 
         return {
             "applied": len(applied),
             "skipped": len(skipped),
             "conflicts": len(conflicts),
+            "duplicate_samples": len(duplicate_samples),
             "applied_samples": applied,
-            "conflict_items": conflicts
+            "conflict_items": conflicts,
+            "duplicate_message": False
         }
 
     def get_samples(
@@ -253,6 +290,35 @@ class MobileGPSService:
     def _archive_sample(self, sample: Dict[str, Any]) -> None:
         sample_id = sample["id"]
         self.sample_history.setdefault(sample_id, []).append(deepcopy(sample))
+
+    def _build_sample_fingerprint(self, sample: Dict[str, Any]) -> str:
+        lat = round(float(sample.get("latitude", 0.0)), 6)
+        lng = round(float(sample.get("longitude", 0.0)), 6)
+        time_bucket = int(sample.get("collected_at", 0)) // 5000
+        project_id = sample.get("project_id", "")
+        return f"{project_id}:{lat}:{lng}:{time_bucket}"
+
+    def _is_duplicate_sample_fingerprint(self, fingerprint: str) -> bool:
+        if fingerprint in self.processed_sample_fingerprints:
+            return True
+        self.processed_sample_fingerprints[fingerprint] = time.time()
+        return False
+
+    def _is_duplicate_message(self, message_id: str) -> bool:
+        if message_id in self.processed_messages:
+            return True
+        self.processed_messages[message_id] = time.time()
+        return False
+
+    def _cleanup_dedup_state(self) -> None:
+        now = time.time()
+        expire_before = now - self.dedup_ttl_seconds
+        self.processed_messages = {
+            key: ts for key, ts in self.processed_messages.items() if ts >= expire_before
+        }
+        self.processed_sample_fingerprints = {
+            key: ts for key, ts in self.processed_sample_fingerprints.items() if ts >= expire_before
+        }
 
 
 mobile_gps_service = MobileGPSService()
