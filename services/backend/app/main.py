@@ -29,12 +29,13 @@ from .config import settings
 from .security_middleware import security_guard_middleware
 from .startup_manager import StartupManager
 from .services.websocket_service import websocket_service
-from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口, 数据质量接口, GPU加速接口, 数据反馈接口, 主动学习接口, 用户验证与自评估接口
+from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口, 数据质量接口, GPU加速接口, 数据反馈接口, 主动学习接口, 用户验证与自评估接口, 移动端GPS接口
 from .api.app_download_api import router as download_router
 from .api.admin_api import router as admin_router
 from .api.auth_api import router as auth_router
 from .api.company_management_api import router as company_management_router
 from .api.devices_api import router as devices_router
+from .services.mobile_gps_service import mobile_gps_service
 
 # 导入新增的系统路由
 from realtime_interpolation.api import fastapi_routes as realtime_routes
@@ -133,6 +134,7 @@ app.include_router(数据反馈接口.router, prefix="/api", tags=["数据反馈
 app.include_router(主动学习接口.router, prefix="/api", tags=["主动学习与半监督"])
 app.include_router(用户验证与自评估接口.router, prefix="/api", tags=["用户验证与模型自评估"])
 app.include_router(GPU加速接口.router, prefix="/api", tags=["GPU加速"])
+app.include_router(移动端GPS接口.router, tags=["移动端GPS"])
 app.include_router(download_router, prefix="/api", tags=["下载"])
 app.include_router(auth_router, prefix="/api", tags=["认证"])
 app.include_router(devices_router, prefix="/api", tags=["设备管理"])
@@ -225,9 +227,11 @@ async def websocket_endpoint(websocket: WebSocket, client_id: str):
 
 async def handle_websocket_message(client_id: str, message: dict):
     message_type = message.get('type')
+    message_data = message.get('data') or {}
+    message_id = message.get('message_id') or message_data.get('message_id')
 
     if message_type == 'subscribe_task':
-        task_id = message.get('task_id')
+        task_id = message.get('task_id') or message_data.get('task_id')
         await websocket_service.subscribe_to_task(client_id, task_id)
         await websocket_service.send_personal_message({
             'type': 'subscription_confirmed',
@@ -235,18 +239,70 @@ async def handle_websocket_message(client_id: str, message: dict):
         }, client_id)
 
     elif message_type == 'unsubscribe_task':
-        task_id = message.get('task_id')
+        task_id = message.get('task_id') or message_data.get('task_id')
         await websocket_service.unsubscribe_from_task(client_id, task_id)
         await websocket_service.send_personal_message({
             'type': 'unsubscription_confirmed',
             'task_id': task_id
         }, client_id)
 
-    elif message_type == 'ping':
+    elif message_type == 'subscribe_gps_project':
+        project_id = message.get('project_id') or message_data.get('project_id') or 'default_mobile_project'
+        await websocket_service.subscribe_to_project(client_id, project_id)
         await websocket_service.send_personal_message({
-            'type': 'pong',
+            'type': 'subscription_confirmed',
+            'project_id': project_id,
+            'message_id': message_id
+        }, client_id)
+
+    elif message_type == 'unsubscribe_gps_project':
+        project_id = message.get('project_id') or message_data.get('project_id') or 'default_mobile_project'
+        await websocket_service.unsubscribe_from_project(client_id, project_id)
+        await websocket_service.send_personal_message({
+            'type': 'unsubscription_confirmed',
+            'project_id': project_id,
+            'message_id': message_id
+        }, client_id)
+
+    elif message_type == 'gps_sample_upsert':
+        sample = message_data.get('sample') or {}
+        project_id = (
+            message_data.get('project_id')
+            or sample.get('project_id')
+            or sample.get('projectId')
+            or 'default_mobile_project'
+        )
+        result = mobile_gps_service.upsert_samples(
+            client_id=client_id,
+            samples=[sample],
+            strategy=message_data.get('strategy', 'latest-wins')
+        )
+        await websocket_service.send_personal_message({
+            'type': 'ack',
+            'message_id': message_id,
+            'data': result,
             'timestamp': datetime.now().isoformat()
         }, client_id)
+
+        if result.get('applied_samples'):
+            for applied in result['applied_samples']:
+                await websocket_service.notify_gps_update(
+                    project_id=project_id,
+                    sample=applied,
+                    exclude_client_id=client_id
+                )
+
+    elif message_type in {'gps_ping', 'ping'}:
+        await websocket_service.send_personal_message({
+            'type': 'gps_pong' if message_type == 'gps_ping' else 'pong',
+            'message_id': message_id,
+            'timestamp': datetime.now().isoformat()
+        }, client_id)
+
+    elif message_type == 'ack':
+        ack_id = message_data.get('message_id') or message_data.get('id') or message_id
+        if ack_id:
+            await websocket_service.confirm_ack(client_id, ack_id)
 
 if __name__ == "__main__":
     import uvicorn

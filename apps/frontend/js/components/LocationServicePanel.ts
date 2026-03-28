@@ -6,6 +6,8 @@
 import { locationService } from '../services/LocationService';
 import { trackManager } from '../services/TrackManager';
 import { geofenceManager } from '../services/GeofenceManager';
+import { gpsSamplingService } from '../services/GPSSamplingService';
+import { gpsSyncService, type GPSSyncStatus } from '../services/GPSSyncService';
 import type { LocationData, Track } from '../types/sensor';
 import { I18nDialog } from './I18nDialog.js';
 
@@ -17,11 +19,14 @@ export class LocationServicePanel {
   private currentLocation: LocationData | null = null;
   private isRecording: boolean = false;
   private currentTrack: Track | null = null;
+  private currentProjectId: string = 'default_mobile_project';
+  private syncStatusListenerCleanup: (() => void) | null = null;
 
   constructor(container: HTMLElement) {
     this.container = container;
     this.render();
     this.initializeListeners();
+    void this.bootstrapGPSSampling();
   }
 
   /**
@@ -101,6 +106,31 @@ export class LocationServicePanel {
 
           <!-- 地理围栏 -->
           <div class="section">
+            <h4>GPS 采样点记录</h4>
+            <div class="location-details">
+              <span class="label">项目 ID:</span>
+              <input id="gps-project-id-input" class="input-text" value="${this.currentProjectId}" />
+            </div>
+            <div class="location-details">
+              <span class="label">属性 JSON:</span>
+              <input id="gps-attributes-input" class="input-text" placeholder='{"ph":7.2,"sampleType":"soil"}' />
+            </div>
+            <div class="location-details">
+              <span class="label">同步状态:</span>
+              <span class="value" id="gps-sync-status-text">初始化中</span>
+            </div>
+            <div class="location-actions" style="gap: 8px; flex-wrap: wrap;">
+              <button class="btn btn-primary" id="collect-gps-sample-btn">采集采样点</button>
+              <button class="btn btn-secondary" id="export-gps-geojson-btn">导出 GeoJSON</button>
+              <button class="btn btn-secondary" id="export-gps-csv-btn">导出 CSV</button>
+            </div>
+            <div class="geofence-list" id="gps-sample-list" style="max-height: 180px; overflow-y: auto;">
+              <div class="empty-message">暂无采样点</div>
+            </div>
+          </div>
+
+          <!-- 地理围栏 -->
+          <div class="section">
             <h4>地理围栏</h4>
             <div class="geofence-list" id="geofence-list">
               <div class="empty-message">暂无地理围栏</div>
@@ -144,6 +174,10 @@ export class LocationServicePanel {
     geofenceManager.addGeofenceListener((event) => {
       this.onGeofenceEvent(event);
     });
+
+    this.syncStatusListenerCleanup = gpsSyncService.onStatusChange((status) => {
+      this.updateSyncStatus(status);
+    });
   }
 
   /**
@@ -185,6 +219,21 @@ export class LocationServicePanel {
     addGeofenceBtn?.addEventListener('click', () => {
       this.handleAddGeofence();
     });
+
+    const collectSampleBtn = this.container.querySelector('#collect-gps-sample-btn') as HTMLElement;
+    collectSampleBtn?.addEventListener('click', () => {
+      void this.handleCollectSample();
+    });
+
+    const exportGeoJSONBtn = this.container.querySelector('#export-gps-geojson-btn') as HTMLElement;
+    exportGeoJSONBtn?.addEventListener('click', () => {
+      void this.handleExportSamples('geojson');
+    });
+
+    const exportCSVBtn = this.container.querySelector('#export-gps-csv-btn') as HTMLElement;
+    exportCSVBtn?.addEventListener('click', () => {
+      void this.handleExportSamples('csv');
+    });
   }
 
   /**
@@ -201,7 +250,11 @@ export class LocationServicePanel {
 
     if (latitudeEl) latitudeEl.textContent = location.latitude.toFixed(6);
     if (longitudeEl) longitudeEl.textContent = location.longitude.toFixed(6);
-    if (accuracyEl) accuracyEl.textContent = locationService.formatAccuracy(location.accuracy);
+    if (accuracyEl) {
+      const accuracyTag = gpsSamplingService.getAccuracyTag(location);
+      accuracyEl.textContent = locationService.formatAccuracy(location.accuracy);
+      accuracyEl.style.color = accuracyTag === 'high' ? '#15803d' : accuracyTag === 'medium' ? '#b45309' : '#b91c1c';
+    }
     if (altitudeEl) altitudeEl.textContent = location.altitude ? `${location.altitude.toFixed(1)} m` : '--';
     if (speedEl) speedEl.textContent = location.speed ? `${location.speed.toFixed(1)} m/s` : '--';
   }
@@ -457,10 +510,116 @@ export class LocationServicePanel {
     }
   }
 
+  private async bootstrapGPSSampling(): Promise<void> {
+    const projectInput = this.container.querySelector('#gps-project-id-input') as HTMLInputElement | null;
+    const savedProjectId = localStorage.getItem('udake_gps_project_id');
+    if (savedProjectId) {
+      this.currentProjectId = savedProjectId;
+      if (projectInput) {
+        projectInput.value = savedProjectId;
+      }
+    }
+
+    projectInput?.addEventListener('change', () => {
+      const nextProject = projectInput.value.trim() || 'default_mobile_project';
+      this.currentProjectId = nextProject;
+      localStorage.setItem('udake_gps_project_id', nextProject);
+      void gpsSyncService.setProjectId(nextProject);
+      void this.refreshGPSSampleList();
+    });
+
+    await gpsSyncService.initialize(this.currentProjectId);
+    await this.refreshGPSSampleList();
+  }
+
+  private updateSyncStatus(status: GPSSyncStatus): void {
+    const statusEl = this.container.querySelector('#gps-sync-status-text') as HTMLElement | null;
+    if (!statusEl) return;
+
+    const labelMap: Record<string, string> = {
+      idle: '空闲',
+      connecting: '连接中',
+      connected: '已连接',
+      offline: '离线',
+      syncing: '同步中',
+      error: '异常'
+    };
+    statusEl.textContent = status.lastError ? `${labelMap[status.state]}: ${status.lastError}` : labelMap[status.state];
+    statusEl.style.color = status.state === 'connected' ? '#15803d' : status.state === 'error' ? '#b91c1c' : '#374151';
+  }
+
+  private async handleCollectSample(): Promise<void> {
+    try {
+      const projectInput = this.container.querySelector('#gps-project-id-input') as HTMLInputElement | null;
+      const attributesInput = this.container.querySelector('#gps-attributes-input') as HTMLInputElement | null;
+      const projectId = projectInput?.value.trim() || this.currentProjectId;
+      const attributes = gpsSamplingService.parseAttributes(attributesInput?.value || '');
+      this.currentProjectId = projectId;
+
+      const sample = await gpsSamplingService.collectSample({
+        projectId,
+        attributes,
+        minAccuracy: 80
+      });
+
+      await gpsSyncService.setProjectId(projectId);
+      await this.refreshGPSSampleList();
+      I18nDialog.alert('dialog.location.getSuccess', {
+        latitude: sample.latitude.toFixed(6),
+        longitude: sample.longitude.toFixed(6)
+      });
+    } catch (error) {
+      console.error('采集采样点失败:', error);
+      I18nDialog.alert('dialog.location.getFailed', { error: (error as Error).message });
+    }
+  }
+
+  private async handleExportSamples(format: 'geojson' | 'csv'): Promise<void> {
+    try {
+      const projectInput = this.container.querySelector('#gps-project-id-input') as HTMLInputElement | null;
+      const projectId = projectInput?.value.trim() || this.currentProjectId;
+      await gpsSamplingService.downloadExport(projectId, format);
+    } catch (error) {
+      console.error('导出 GPS 采样点失败:', error);
+      I18nDialog.alert('dialog.location.getFailed', { error: (error as Error).message });
+    }
+  }
+
+  private async refreshGPSSampleList(): Promise<void> {
+    const listEl = this.container.querySelector('#gps-sample-list') as HTMLElement | null;
+    if (!listEl) return;
+
+    const samples = await gpsSamplingService.getSamples(this.currentProjectId, 20);
+    if (!samples.length) {
+      listEl.innerHTML = '<div class="empty-message">暂无采样点</div>';
+      return;
+    }
+
+    listEl.innerHTML = samples.map((sample) => {
+      const time = new Date(sample.collectedAt).toLocaleString();
+      const attrs = Object.entries(sample.attributes || {})
+        .slice(0, 3)
+        .map(([key, value]) => `${key}:${String(value)}`)
+        .join(', ');
+      return `
+        <div class="geofence-item" style="margin-bottom: 8px;">
+          <div class="geofence-name">${sample.latitude.toFixed(5)}, ${sample.longitude.toFixed(5)}</div>
+          <div class="geofence-info"><span class="label">精度:</span><span class="value">±${sample.accuracy.toFixed(1)}m</span></div>
+          <div class="geofence-info"><span class="label">时间:</span><span class="value">${time}</span></div>
+          <div class="geofence-info"><span class="label">属性:</span><span class="value">${attrs || '无'}</span></div>
+        </div>
+      `;
+    }).join('');
+  }
+
   /**
    * 清理资源
    */
   public dispose(): void {
+    if (this.syncStatusListenerCleanup) {
+      this.syncStatusListenerCleanup();
+      this.syncStatusListenerCleanup = null;
+    }
     this.container.remove();
   }
 }

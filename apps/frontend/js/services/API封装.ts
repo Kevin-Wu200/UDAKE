@@ -400,6 +400,23 @@ export class APIService implements IAPIService {
                     await OfflineManager.enqueue({ type: 'upload', payload: options.body });
                 } else if (url.includes('start-kriging')) {
                     await OfflineManager.enqueue({ type: 'kriging', payload: JSON.parse(options.body as string) });
+                } else if (url.includes('/mobile-gps/')) {
+                    let bodyPayload: any = {};
+                    if (typeof options.body === 'string') {
+                        try {
+                            bodyPayload = JSON.parse(options.body);
+                        } catch {
+                            bodyPayload = {};
+                        }
+                    }
+                    const samples = Array.isArray(bodyPayload?.samples)
+                        ? bodyPayload.samples
+                        : (bodyPayload?.sample ? [bodyPayload.sample] : []);
+                    if (samples.length > 0) {
+                        for (const sample of samples) {
+                            await OfflineManager.enqueue({ type: 'gps_sync', payload: sample });
+                        }
+                    }
                 }
 
                 throw new Error('离线模式：操作已加入队列，将在恢复在线后自动执行');

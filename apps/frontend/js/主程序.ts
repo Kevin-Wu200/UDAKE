@@ -735,6 +735,13 @@ class App {
                 }
             });
 
+            const { gpsSyncService } = await import('./services/GPSSyncService.js');
+            const defaultProjectId = localStorage.getItem('udake_gps_project_id') || 'default_mobile_project';
+            await gpsSyncService.initialize(defaultProjectId);
+            OfflineManager.registerHandler('gps_sync', async (payload: any) => {
+                await gpsSyncService.syncSample(payload, { fromQueue: true });
+            });
+
             // 初始化缓存管理和离线横幅
             const components = this.componentInitializer.getComponentRegistry();
             await components.cacheManagementPanel.init();

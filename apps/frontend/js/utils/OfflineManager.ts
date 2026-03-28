@@ -7,7 +7,7 @@
 
 interface PendingAction {
     id: string;
-    type: 'upload' | 'kriging' | 'export';
+    type: 'upload' | 'kriging' | 'export' | 'gps_sync';
     payload: any;
     timestamp: number;
     retries: number;
@@ -55,12 +55,13 @@ interface ConflictHistoryEntry {
 // ========== 常量 ==========
 
 const DB_NAME = 'udake_offline';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORES = {
     projects: 'projects',
     points: 'points',
     results: 'results',
     pendingActions: 'pendingActions',
+    gpsSamples: 'gpsSamples',
 } as const;
 
 // ========== OfflineManager ==========
@@ -129,6 +130,11 @@ export class OfflineManager {
                 if (!db.objectStoreNames.contains(STORES.pendingActions)) {
                     db.createObjectStore(STORES.pendingActions, { keyPath: 'id' });
                 }
+                if (!db.objectStoreNames.contains(STORES.gpsSamples)) {
+                    const gpsStore = db.createObjectStore(STORES.gpsSamples, { keyPath: 'id' });
+                    gpsStore.createIndex('projectId', 'projectId', { unique: false });
+                    gpsStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+                }
             };
             req.onsuccess = () => { this.db = req.result; resolve(this.db); };
             req.onerror = () => reject(req.error);
@@ -192,6 +198,85 @@ export class OfflineManager {
     static async getCachedResult(taskId: string): Promise<any | null> {
         const store = this._tx(STORES.results, 'readonly');
         return this._req(store.get(taskId));
+    }
+
+    /** 保存单个 GPS 采样点 */
+    static async saveGPSSample(sample: any): Promise<void> {
+        const store = this._tx(STORES.gpsSamples, 'readwrite');
+        const now = Date.now();
+        const projectId = sample.projectId || sample.project_id || 'default_mobile_project';
+        await this._req(
+            store.put({
+                ...sample,
+                projectId,
+                updatedAt: sample.updatedAt || sample.updated_at || now,
+                collectedAt: sample.collectedAt || sample.collected_at || now,
+                _savedAt: now
+            })
+        );
+    }
+
+    /** 批量保存 GPS 采样点 */
+    static async saveGPSSamples(samples: any[]): Promise<void> {
+        const store = this._tx(STORES.gpsSamples, 'readwrite');
+        const now = Date.now();
+        for (const sample of samples) {
+            const projectId = sample.projectId || sample.project_id || 'default_mobile_project';
+            await this._req(
+                store.put({
+                    ...sample,
+                    projectId,
+                    updatedAt: sample.updatedAt || sample.updated_at || now,
+                    collectedAt: sample.collectedAt || sample.collected_at || now,
+                    _savedAt: now
+                })
+            );
+        }
+    }
+
+    /** 获取单个 GPS 采样点 */
+    static async getGPSSample(id: string): Promise<any | null> {
+        const store = this._tx(STORES.gpsSamples, 'readonly');
+        return this._req(store.get(id));
+    }
+
+    /** 获取指定项目 GPS 采样点 */
+    static async getGPSSamples(projectId: string, limit: number = 500): Promise<any[]> {
+        const store = this._tx(STORES.gpsSamples, 'readonly');
+        const idx = store.index('projectId');
+        const rows = await this._req(idx.getAll(projectId));
+        return rows
+            .sort((a: any, b: any) => (b.updatedAt || b.collectedAt || 0) - (a.updatedAt || a.collectedAt || 0))
+            .slice(0, limit);
+    }
+
+    /** 获取所有 GPS 采样点 */
+    static async getAllGPSSamples(limit: number = 5000): Promise<any[]> {
+        const store = this._tx(STORES.gpsSamples, 'readonly');
+        const rows = await this._req(store.getAll());
+        return rows
+            .sort((a: any, b: any) => (b.updatedAt || b.collectedAt || 0) - (a.updatedAt || a.collectedAt || 0))
+            .slice(0, limit);
+    }
+
+    /** 删除 GPS 采样点 */
+    static async deleteGPSSample(id: string): Promise<void> {
+        const store = this._tx(STORES.gpsSamples, 'readwrite');
+        await this._req(store.delete(id));
+    }
+
+    /** 获取 GPS 本地统计 */
+    static async getGPSProjectStats(): Promise<{ total: number; projectCounts: Record<string, number> }> {
+        const rows = await this.getAllGPSSamples();
+        const projectCounts: Record<string, number> = {};
+        for (const row of rows) {
+            const key = row.projectId || 'default_mobile_project';
+            projectCounts[key] = (projectCounts[key] || 0) + 1;
+        }
+        return {
+            total: rows.length,
+            projectCounts
+        };
     }
 
     // ========== 离线队列 ==========
