@@ -51,6 +51,79 @@ interface HttpLikeError {
     message?: string;
 }
 
+export interface HistoryTimeSeriesRecord {
+    timestamp: string;
+    value: number;
+    point_id?: string;
+    x?: number;
+    y?: number;
+    metadata?: Record<string, unknown>;
+}
+
+export interface HistorySnapshotCreatePayload {
+    dataset_id: string;
+    version_label?: string;
+    records: HistoryTimeSeriesRecord[];
+    metadata?: Record<string, unknown>;
+}
+
+export interface HistorySnapshotMetadata {
+    dataset_id: string;
+    version: number;
+    version_label?: string;
+    created_at: string;
+    record_count: number;
+    compressed: boolean;
+    file_name: string;
+    metadata: Record<string, unknown>;
+}
+
+export interface HistorySnapshotListResponse {
+    dataset_id: string;
+    total_versions: number;
+    versions: HistorySnapshotMetadata[];
+}
+
+export interface HistoryComparisonPayload {
+    dataset_id: string;
+    from_version: number;
+    to_version: number;
+    heatmap_grid_size?: number;
+}
+
+export interface HistoryTrendPayload {
+    dataset_id: string;
+    version?: number;
+    alpha?: number;
+    forecast_horizon?: number;
+    seasonal_period?: number;
+    anomaly_z_threshold?: number;
+}
+
+export interface HistoryReportPayload {
+    dataset_id: string;
+    from_version: number;
+    to_version: number;
+    forecast_horizon?: number;
+}
+
+export interface HistoryExportPayload {
+    dataset_id: string;
+    format?: 'json' | 'csv';
+}
+
+export interface HistoryImportPayload {
+    dataset_id: string;
+    format?: 'json' | 'csv';
+    content: string;
+    version_label?: string;
+}
+
+export interface HistoryArchivePayload {
+    dataset_id: string;
+    keep_latest?: number;
+}
+
 function safeReadEnv(key: string): string | undefined {
     try {
         const env = (import.meta as ImportMeta & { env?: Record<string, string> }).env;
@@ -974,6 +1047,48 @@ export class APIService implements IAPIService {
 
     public async predictError(payload: Record<string, unknown>): Promise<Record<string, unknown>> {
         return this.post<Record<string, unknown>>('/error/predict', payload);
+    }
+
+    // 历史对比与趋势分析
+    public async createHistorySnapshot(payload: HistorySnapshotCreatePayload): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/history-analysis/snapshots', payload);
+    }
+
+    public async listHistorySnapshots(datasetId: string): Promise<HistorySnapshotListResponse> {
+        return this.request<HistorySnapshotListResponse>(`${this.baseURL}/history-analysis/snapshots/${encodeURIComponent(datasetId)}`);
+    }
+
+    public async deleteHistorySnapshot(datasetId: string, version: number): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(
+            `${this.baseURL}/history-analysis/snapshots/${encodeURIComponent(datasetId)}/${encodeURIComponent(String(version))}`,
+            {
+                method: 'DELETE'
+            }
+        );
+    }
+
+    public async archiveHistorySnapshots(payload: HistoryArchivePayload): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/history-analysis/archive', payload);
+    }
+
+    public async compareHistoryVersions(payload: HistoryComparisonPayload): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/history-analysis/compare', payload);
+    }
+
+    public async analyzeHistoryTrend(payload: HistoryTrendPayload): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/history-analysis/trend', payload);
+    }
+
+    public async generateHistoryAnalysisReport(payload: HistoryReportPayload): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/history-analysis/report', payload);
+    }
+
+    public async exportHistoryAnalysis(payload: HistoryExportPayload): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/history-analysis/export', payload);
+    }
+
+    public async importHistoryAnalysis(payload: HistoryImportPayload): Promise<Record<string, unknown>> {
+        return this.post<Record<string, unknown>>('/history-analysis/import', payload);
     }
 
     // 任务队列
