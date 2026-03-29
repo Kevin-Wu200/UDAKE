@@ -14,6 +14,23 @@ PROJECT_ROOT_PATH = BASE_DIR_PATH.parent.parent
 ENV_DIR_PATH = PROJECT_ROOT_PATH / "configs" / "env"
 
 
+def _parse_json_or_csv_list(value: Union[str, List[str], None], default: Optional[List[str]] = None) -> List[str]:
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return list(default or [])
+        try:
+            parsed = json.loads(text)
+            if isinstance(parsed, list):
+                return [str(item).strip() for item in parsed if str(item).strip()]
+        except json.JSONDecodeError:
+            pass
+        return [item.strip() for item in text.split(",") if item.strip()]
+    return list(default or [])
+
+
 def _default_frontend_origin() -> str:
     frontend_url = os.getenv("FRONTEND_URL")
     if frontend_url:
@@ -128,6 +145,14 @@ class Settings(BaseSettings):
 
     # 认证安全策略
     AUTH_ENCRYPTION_KEY: Optional[str] = None
+    FEEDBACK_ENCRYPTION_KEY: Optional[str] = None
+    FEEDBACK_HMAC_KEY: Optional[str] = None
+    FEEDBACK_ACTIVE_KEY_ID: str = "k1"
+    FEEDBACK_FALLBACK_KEYS: Union[str, List[str]] = "[]"
+    FEEDBACK_MASK_FIELDS: Union[str, List[str]] = json.dumps(
+        ["password", "token", "api_key", "authorization", "contact", "phone", "email"],
+        ensure_ascii=False
+    )
     AUTH_IP_WHITELIST: str = ""
     AUTH_IP_BLACKLIST: str = ""
     AUTH_IP_AUTO_BAN_THRESHOLD: int = 10
@@ -171,6 +196,11 @@ class Settings(BaseSettings):
             except json.JSONDecodeError:
                 return [139.767125, 35.681236]
         return v
+
+    @field_validator('FEEDBACK_FALLBACK_KEYS', 'FEEDBACK_MASK_FIELDS', mode='before')
+    @classmethod
+    def parse_feedback_lists(cls, v):
+        return _parse_json_or_csv_list(v)
 
     @field_validator(
         'MAX_CONCURRENT_TASKS',

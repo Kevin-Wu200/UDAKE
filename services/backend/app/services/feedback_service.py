@@ -5,9 +5,11 @@ from __future__ import annotations
 import base64
 import csv
 import hashlib
+import hmac
 import io
 import json
 import math
+import os
 import secrets
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta, timezone
@@ -15,6 +17,9 @@ from statistics import mean, pstdev, quantiles
 from threading import RLock
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 from uuid import uuid4
+
+from ..auth.security import _decrypt_aes_gcm, _encrypt_aes_gcm
+from ..config import settings
 
 
 ROLE_PERMISSIONS: Dict[str, set[str]] = {
@@ -40,6 +45,18 @@ ROLE_PERMISSIONS: Dict[str, set[str]] = {
     "viewer": {
         "read_feedback",
     },
+}
+
+FEEDBACK_ENCRYPTION_PREFIX = "fbenc:v1:"
+LEGACY_XOR_KEY = b"udake-feedback-key-v1"
+DEFAULT_MASK_FIELDS = {
+    "password",
+    "token",
+    "api_key",
+    "authorization",
+    "contact",
+    "phone",
+    "email",
 }
 
 
@@ -103,7 +120,31 @@ class FeedbackService:
 
     def __init__(self) -> None:
         self._lock = RLock()
-        self._key = b"udake-feedback-key-v1"
+        self._legacy_xor_key = LEGACY_XOR_KEY
+        self._active_key_id = str(settings.FEEDBACK_ACTIVE_KEY_ID or "k1").strip() or "k1"
+        self._encryption_keys: Dict[str, Dict[str, bytes]] = {}
+        key_material = str(settings.FEEDBACK_ENCRYPTION_KEY or settings.AUTH_ENCRYPTION_KEY or "udake-feedback-key-v2")
+        hmac_material = str(settings.FEEDBACK_HMAC_KEY or f"{key_material}:hmac")
+        self._register_encryption_key(self._active_key_id, key_material, hmac_material)
+
+        for idx, item in enumerate(settings.FEEDBACK_FALLBACK_KEYS or [], start=1):
+            text = str(item).strip()
+            if not text:
+                continue
+            if ":" in text:
+                fallback_id, fallback_material = text.split(":", 1)
+                key_id = fallback_id.strip() or f"legacy_{idx}"
+                material = fallback_material.strip()
+            else:
+                key_id = f"legacy_{idx}"
+                material = text
+            if not material:
+                continue
+            self._register_encryption_key(key_id, material, f"{material}:hmac")
+
+        masked_fields = set(DEFAULT_MASK_FIELDS)
+        masked_fields.update(str(item).strip().lower() for item in (settings.FEEDBACK_MASK_FIELDS or []) if str(item).strip())
+        self._masked_fields = masked_fields
 
         # core storage tables
         self._records: Dict[str, Dict[str, Dict[str, Any]]] = {
@@ -166,6 +207,49 @@ class FeedbackService:
 
     def _hash_user(self, user_id: str) -> str:
         return hashlib.sha256(user_id.encode("utf-8")).hexdigest()[:16]
+
+    def _derive_key(self, material: str, purpose: str) -> bytes:
+        return hashlib.sha256(f"{purpose}:{material}".encode("utf-8")).digest()
+
+    def _register_encryption_key(self, key_id: str, key_material: str, hmac_material: str) -> None:
+        kid = key_id.strip()
+        if not kid:
+            raise ValueError("key_id cannot be empty")
+        self._encryption_keys[kid] = {
+            "enc": self._derive_key(key_material, "feedback-aes-gcm"),
+            "hmac": self._derive_key(hmac_material, "feedback-hmac"),
+        }
+
+    def rotate_encryption_key(
+        self,
+        key_id: str,
+        key_material: str,
+        user_id: str = "system",
+        hmac_material: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        material = str(key_material or "").strip()
+        if not material:
+            raise ValueError("key_material cannot be empty")
+        kid = str(key_id or "").strip()
+        if not kid:
+            raise ValueError("key_id cannot be empty")
+        self._register_encryption_key(kid, material, str(hmac_material or f"{material}:hmac"))
+        previous = self._active_key_id
+        self._active_key_id = kid
+        self._append_audit(
+            "encryption_key_rotate",
+            user_id,
+            {"from_key_id": previous, "to_key_id": kid},
+        )
+        return {"active_key_id": self._active_key_id, "key_count": len(self._encryption_keys)}
+
+    @staticmethod
+    def _b64encode(raw: bytes) -> str:
+        return base64.urlsafe_b64encode(raw).decode("ascii")
+
+    @staticmethod
+    def _b64decode(raw: str) -> bytes:
+        return base64.urlsafe_b64decode(raw.encode("ascii"))
 
     def register_user(self, payload: Dict[str, Any]) -> Dict[str, Any]:
         username = str(payload.get("username") or "").strip()
@@ -449,7 +533,7 @@ class FeedbackService:
         self._require_permission(user_id, "manage_api_keys")
         return [
             {
-                "key": item["key"],
+                "key": self._mask_api_key(str(item["key"])),
                 "owner": item["owner"],
                 "scopes": list(item["scopes"]),
                 "created_at": item["created_at"],
@@ -459,14 +543,46 @@ class FeedbackService:
         ]
 
     def log_request(self, payload: Dict[str, Any]) -> None:
+        sanitized = self._sanitize_payload(payload, flatten_for_log=False)
         item = {
             "id": f"req_{uuid4().hex[:12]}",
             "timestamp": _iso(_utcnow()),
-            **payload,
+            **sanitized,
         }
         self._request_logs.append(item)
         if len(self._request_logs) > 5000:
             self._request_logs = self._request_logs[-5000:]
+
+    @staticmethod
+    def _mask_api_key(raw: str) -> str:
+        text = str(raw or "")
+        if len(text) <= 8:
+            return "***"
+        return f"{text[:4]}***{text[-4:]}"
+
+    def _mask_value(self, value: Any) -> str:
+        text = str(value or "")
+        if not text:
+            return "***"
+        if len(text) <= 6:
+            return "***"
+        return f"{text[:2]}***{text[-2:]}"
+
+    def _sanitize_payload(self, payload: Any, flatten_for_log: bool = False) -> Any:
+        if isinstance(payload, dict):
+            masked: Dict[str, Any] = {}
+            for key, value in payload.items():
+                key_text = str(key).strip().lower()
+                if key_text in self._masked_fields:
+                    masked[key] = self._mask_value(value)
+                elif flatten_for_log and key_text in {"x", "y", "z", "value"}:
+                    masked[key] = "***"
+                else:
+                    masked[key] = self._sanitize_payload(value, flatten_for_log=flatten_for_log)
+            return masked
+        if isinstance(payload, list):
+            return [self._sanitize_payload(item, flatten_for_log=flatten_for_log) for item in payload]
+        return payload
 
     # --------------------------
     # data collection interfaces
@@ -850,7 +966,18 @@ class FeedbackService:
         cached = self._query_cache.get(cache_key)
         if cached:
             # return deep copy-ish via dumps to prevent mutation outside.
-            return json.loads(json.dumps(cached))
+            cached_result = json.loads(json.dumps(cached))
+            self._append_access_audit(
+                "query_data",
+                user_id,
+                {
+                    "filters": self._sanitize_payload(normalized_filters, flatten_for_log=True),
+                    "count": cached_result.get("count", 0),
+                    "include_private": bool(include_private),
+                    "cache_hit": True,
+                },
+            )
+            return cached_result
 
         record_types: List[str]
         req_type = str(normalized_filters.get("record_type") or "").strip().lower()
@@ -897,11 +1024,23 @@ class FeedbackService:
             "items": page,
         }
         self._query_cache[cache_key] = result
-        return json.loads(json.dumps(result))
+        payload = json.loads(json.dumps(result))
+        self._append_access_audit(
+            "query_data",
+            user_id,
+            {
+                "filters": self._sanitize_payload(normalized_filters, flatten_for_log=True),
+                "count": payload.get("count", 0),
+                "include_private": bool(include_private),
+                "cache_hit": False,
+            },
+        )
+        return payload
 
     def get_history(self, entity_id: str, user_id: str) -> Dict[str, Any]:
         self._require_permission(user_id, "read_feedback")
         versions = list(self._versions.get(entity_id, []))
+        self._append_access_audit("get_history", user_id, {"entity_id": entity_id, "count": len(versions)})
         return {"entity_id": entity_id, "count": len(versions), "versions": versions}
 
     def compare_versions(self, entity_id: str, from_version: int, to_version: int, user_id: str) -> Dict[str, Any]:
@@ -999,6 +1138,11 @@ class FeedbackService:
             for table_name, table in self._records.items():
                 row = table.get(record_id)
                 if row:
+                    self._append_access_audit(
+                        "get_quality_report",
+                        user_id,
+                        {"record_id": record_id, "dataset_id": row["dataset_id"], "record_type": table_name},
+                    )
                     return {
                         "record_id": record_id,
                         "record_type": table_name,
@@ -1030,6 +1174,11 @@ class FeedbackService:
             key: round(mean(values), 4) if values else 0.0
             for key, values in metrics.items()
         }
+        self._append_access_audit(
+            "get_quality_report",
+            user_id,
+            {"dataset_id": dataset_id, "record_count": len(metrics["overall"])},
+        )
         return {
             "dataset_id": dataset_id,
             "summary": summary,
@@ -1103,6 +1252,15 @@ class FeedbackService:
         self._require_permission(user_id, "export_feedback")
         data = self.query_data(filters, user_id=user_id, include_private=True)["items"]
         fmt = fmt.lower().strip()
+        self._append_access_audit(
+            "export_data",
+            user_id,
+            {
+                "format": fmt,
+                "filters": self._sanitize_payload(filters, flatten_for_log=True),
+                "count": len(data),
+            },
+        )
 
         if fmt == "json":
             return {"format": "json", "content": data}
@@ -1555,14 +1713,53 @@ class FeedbackService:
     # --------------------------
     def _encrypt_payload(self, payload: Dict[str, Any]) -> str:
         raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
-        key = self._key
-        encrypted = bytes(raw[idx] ^ key[idx % len(key)] for idx in range(len(raw)))
-        return base64.b64encode(encrypted).decode("utf-8")
+        key_entry = self._encryption_keys.get(self._active_key_id)
+        if not key_entry:
+            raise ValueError("active encryption key is unavailable")
+        nonce = os.urandom(12)
+        ciphertext, tag = _encrypt_aes_gcm(key_entry["enc"], nonce, raw)
+        body = nonce + ciphertext + tag
+        signature = hmac.new(
+            key_entry["hmac"],
+            self._active_key_id.encode("utf-8") + b"." + body,
+            hashlib.sha256,
+        ).digest()
+        return (
+            f"{FEEDBACK_ENCRYPTION_PREFIX}{self._active_key_id}:"
+            f"{self._b64encode(body)}:{self._b64encode(signature)}"
+        )
 
     def _decrypt_payload(self, encrypted: str) -> Dict[str, Any]:
-        blob = base64.b64decode(encrypted.encode("utf-8"))
-        key = self._key
-        raw = bytes(blob[idx] ^ key[idx % len(key)] for idx in range(len(blob)))
+        text = str(encrypted or "")
+        if text.startswith(FEEDBACK_ENCRYPTION_PREFIX):
+            _, _, body = text.partition(FEEDBACK_ENCRYPTION_PREFIX)
+            try:
+                key_id, body_b64, signature_b64 = body.split(":", 2)
+            except ValueError as exc:
+                raise ValueError("invalid encrypted payload format") from exc
+            key_entry = self._encryption_keys.get(key_id)
+            if not key_entry:
+                raise ValueError(f"encryption key id not found: {key_id}")
+            packed = self._b64decode(body_b64)
+            signature = self._b64decode(signature_b64)
+            expected = hmac.new(
+                key_entry["hmac"],
+                key_id.encode("utf-8") + b"." + packed,
+                hashlib.sha256,
+            ).digest()
+            if not hmac.compare_digest(expected, signature):
+                raise ValueError("encrypted payload signature mismatch")
+            if len(packed) < 28:
+                raise ValueError("encrypted payload is too short")
+            nonce = packed[:12]
+            ciphertext = packed[12:-16]
+            tag = packed[-16:]
+            raw = _decrypt_aes_gcm(key_entry["enc"], nonce, ciphertext, tag)
+            return json.loads(raw.decode("utf-8"))
+
+        # 兼容历史数据：旧版本采用 XOR + Base64。
+        blob = base64.b64decode(text.encode("utf-8"))
+        raw = bytes(blob[idx] ^ self._legacy_xor_key[idx % len(self._legacy_xor_key)] for idx in range(len(blob)))
         return json.loads(raw.decode("utf-8"))
 
     def _index_record(self, record: Dict[str, Any]) -> None:
@@ -1634,12 +1831,15 @@ class FeedbackService:
                 "audit_id": f"aud_{uuid4().hex[:12]}",
                 "action": action,
                 "actor": actor,
-                "detail": detail,
+                "detail": self._sanitize_payload(detail, flatten_for_log=True),
                 "timestamp": _iso(_utcnow()),
             }
         )
         if len(self._audit_logs) > 20000:
             self._audit_logs = self._audit_logs[-20000:]
+
+    def _append_access_audit(self, action: str, actor: str, detail: Dict[str, Any]) -> None:
+        self._append_audit(f"data_access:{action}", actor, detail)
 
     def _materialize_record(self, record: Dict[str, Any], anonymize: bool = False) -> Dict[str, Any]:
         payload = self._decrypt_payload(record["encrypted_data"])
@@ -1648,6 +1848,7 @@ class FeedbackService:
             user_id = self._hash_user(record["user_id"])
         else:
             user_id = record["user_id"]
+        payload = self._sanitize_payload(payload, flatten_for_log=False)
 
         return {
             "id": record["id"],

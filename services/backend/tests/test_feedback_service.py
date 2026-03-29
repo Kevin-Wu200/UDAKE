@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 import sys
 from pathlib import Path
 
@@ -242,3 +244,88 @@ def test_invalid_import_format(service: FeedbackService) -> None:
             },
             user_id,
         )
+
+
+def _legacy_xor_encrypt(payload: dict) -> str:
+    raw = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+    key = b"udake-feedback-key-v1"
+    encrypted = bytes(raw[idx] ^ key[idx % len(key)] for idx in range(len(raw)))
+    return base64.b64encode(encrypted).decode("utf-8")
+
+
+def test_encrypt_payload_supports_legacy_and_tamper_detection(service: FeedbackService) -> None:
+    payload = {"dataset_id": "legacy", "value": 1.23}
+
+    encrypted = service._encrypt_payload(payload)  # type: ignore[attr-defined]
+    assert encrypted.startswith("fbenc:v1:")
+    assert service._decrypt_payload(encrypted) == payload  # type: ignore[attr-defined]
+
+    parts = encrypted.split(":")
+    parts[-1] = f"{parts[-1][:-2]}AA"
+    with pytest.raises(ValueError):
+        service._decrypt_payload(":".join(parts))  # type: ignore[attr-defined]
+
+    legacy = _legacy_xor_encrypt(payload)
+    assert service._decrypt_payload(legacy) == payload  # type: ignore[attr-defined]
+
+
+def test_encryption_key_rotation_masking_and_access_audit(service: FeedbackService) -> None:
+    user_id = _make_user(service, "greg")
+    admin_id = service.resolve_user_id()
+
+    record = service.submit_input(
+        {
+            "dataset_id": "secure_dataset",
+            "x": 120.1,
+            "y": 30.1,
+            "z": 0,
+            "value": 19.2,
+            "timestamp": "2026-03-10T00:00:00+00:00",
+            "source": "sensor",
+            "device": "d1",
+            "method": "manual",
+            "quality_flag": "good",
+            "metadata": {"contact": "18888888888", "email": "test@example.com"},
+        },
+        user_id,
+    )
+    stored = service._records["input"][record["id"]]["encrypted_data"]  # type: ignore[attr-defined]
+    assert "k1:" in stored
+
+    rotate = service.rotate_encryption_key("k2", "new-feedback-key", user_id=admin_id)
+    assert rotate["active_key_id"] == "k2"
+
+    next_record = service.submit_input(
+        {
+            "dataset_id": "secure_dataset",
+            "x": 120.2,
+            "y": 30.2,
+            "z": 0,
+            "value": 18.5,
+            "timestamp": "2026-03-11T00:00:00+00:00",
+            "source": "sensor",
+            "device": "d2",
+            "method": "manual",
+            "quality_flag": "good",
+            "metadata": {"contact": "16666666666"},
+        },
+        user_id,
+    )
+    rotated_cipher = service._records["input"][next_record["id"]]["encrypted_data"]  # type: ignore[attr-defined]
+    assert "k2:" in rotated_cipher
+    assert service._decrypt_payload(stored)["dataset_id"] == "secure_dataset"  # type: ignore[attr-defined]
+
+    query = service.query_data({"dataset_id": "secure_dataset", "limit": 10, "offset": 0}, user_id=admin_id, include_private=True)
+    assert query["count"] >= 2
+    masked_contact = query["items"][0]["data"]["metadata"]["contact"]
+    assert masked_contact != "16666666666"
+    assert "***" in masked_contact
+
+    service.log_request({"api_key": "dev-feedback-key", "token": "abc123456", "path": "/api/feedback/data"})
+    latest_request = service._request_logs[-1]  # type: ignore[attr-defined]
+    assert latest_request["api_key"] != "dev-feedback-key"
+    assert latest_request["token"] != "abc123456"
+
+    actions = [item["action"] for item in service._audit_logs]  # type: ignore[attr-defined]
+    assert "encryption_key_rotate" in actions
+    assert any(action.startswith("data_access:query_data") for action in actions)
