@@ -6,6 +6,8 @@ const DashboardView = () => import('../views/DashboardView.vue');
 const ProductKeysView = () => import('../views/ProductKeysView.vue');
 const UsersView = () => import('../views/UsersView.vue');
 const AuditLogsView = () => import('../views/AuditLogsView.vue');
+const WorkflowListView = () => import('../views/workflow/WorkflowList.vue');
+const WorkflowEditorView = () => import('../views/workflow/WorkflowEditor.vue');
 const AdminLayout = () => import('../layouts/AdminLayout.vue');
 
 const UserCenterLayout = () => import('../layouts/UserCenterLayout.vue');
@@ -110,6 +112,18 @@ const router = createRouter({
           name: 'product-keys',
           component: ProductKeysView,
           meta: { title: '产品密钥管理' }
+        },
+        {
+          path: '/workflows',
+          name: 'workflows',
+          component: WorkflowListView,
+          meta: { title: '智能工作流引擎' }
+        },
+        {
+          path: '/workflows/editor/:workflowId?',
+          name: 'workflow-editor',
+          component: WorkflowEditorView,
+          meta: { title: '工作流可视化编辑器' }
         },
         { path: '/users', name: 'users', component: UsersView, meta: { title: '用户管理' } },
         { path: '/audit-logs', name: 'audit-logs', component: AuditLogsView, meta: { title: '审计日志' } }

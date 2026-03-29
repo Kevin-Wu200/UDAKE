@@ -1,0 +1,11 @@
+{
+  "total_tasks": 22,
+  "avg_duration_seconds": 0.0013,
+  "p95_duration_seconds": 0.0013,
+  "avg_queue_wait_seconds": 0.1046,
+  "cache_miss_seconds": 0.1113,
+  "cache_hit_seconds": 0.0576,
+  "cache_speedup": 1.9345,
+  "task_success_rate": 1.0,
+  "estimated_acceleration_ratio": 2.0
+}

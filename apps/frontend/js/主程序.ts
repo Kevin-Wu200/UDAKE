@@ -24,6 +24,7 @@ import { ExportEnhancer } from './utils/ExportEnhancer.js';
 import { I18n } from './utils/I18n.js';
 import { FormValidator } from './utils/FormValidator.js';
 import { KeyboardManager } from './utils/KeyboardManager.js';
+import { AccessibilityManager } from './utils/AccessibilityManager.js';
 import { HistoryManager } from './utils/HistoryManager.js';
 import { PerformanceMonitor } from './utils/PerformanceMonitor.js';
 import { SplashScreen } from './components/SplashScreen.js';
@@ -185,6 +186,8 @@ class App {
     private startupApiBaseUrl: string = resolveConfiguredApiBaseUrl();
     private startupBackendPort: number = 8000;
     private languageSwitcher: LanguageSwitcher | null = null;
+    private accessibilityManager: AccessibilityManager | null = null;
+    private lastAnnouncedProgressBucket: number = -1;
 
     // 工具
     private computationService: ComputationService;
@@ -210,6 +213,7 @@ class App {
             this.stateBridge?.stop();
             this.resourceOptimizationManager?.cleanup();
             this.computationService.cleanup();
+            this.accessibilityManager?.destroy();
         }, { once: true });
 
         // 初始化状态
@@ -364,6 +368,7 @@ class App {
                 this.initializeLanguageSwitcher();
                 this.bindEvents();
                 this.bindMobileEvents();
+                this.initializeAccessibility();
                 console.log('bindEvents 调用完成');
                 updateProgress(100);
             });
@@ -964,6 +969,24 @@ class App {
     }
 
     /**
+     * 初始化无障碍增强
+     */
+    private initializeAccessibility(): void {
+        if (this.accessibilityManager) {
+            this.accessibilityManager.refresh();
+            return;
+        }
+
+        this.accessibilityManager = new AccessibilityManager({
+            getMapView: () => (this.view as unknown as { getCenter?: () => [number, number] | { lng: number; lat: number }; setCenter?: (center: [number, number]) => void; getZoom?: () => number; setZoom?: (zoom: number) => void }) || null,
+            onShowShortcutHelp: () => {
+                KeyboardManager.toggleShortcutPanel();
+            }
+        });
+        this.accessibilityManager.init();
+    }
+
+    /**
      * 切换右侧侧边栏
      */
     private toggleRightSidebar(): void {
@@ -1463,6 +1486,8 @@ class App {
             LoadingManager.hide();
 
             this.showStatus('任务已启动', 'success');
+            this.accessibilityManager?.announce('插值任务已启动，正在后台计算。');
+            this.lastAnnouncedProgressBucket = -1;
             HistoryManager.record({
                 action: '开始插值',
                 type: 'kriging',
@@ -1520,12 +1545,20 @@ class App {
         if (status.status === 'completed') {
             this.taskPoller?.stop();
             this.showStatus('插值完成！', 'success');
+            this.accessibilityManager?.announce('插值任务已完成。');
             LoadingManager.show('正在加载结果...');
             await this.loadResults();
             LoadingManager.hide();
         } else if (status.status === 'failed') {
             this.taskPoller?.stop();
             this.showStatus(`任务失败: ${status.error}`, 'error');
+            this.accessibilityManager?.announce(`任务失败：${status.error || '未知错误'}`, 'assertive');
+        } else {
+            const progressBucket = Math.floor(status.progress / 25);
+            if (progressBucket > this.lastAnnouncedProgressBucket) {
+                this.lastAnnouncedProgressBucket = progressBucket;
+                this.accessibilityManager?.announce(`任务进度 ${Math.round(status.progress)}%`);
+            }
         }
     }
 
@@ -1652,6 +1685,7 @@ class App {
             statusDiv.textContent = message;
             statusDiv.className = `status-message ${type}`;
         }
+        this.accessibilityManager?.announce(message, type === 'error' ? 'assertive' : 'polite');
     }
 
     /**
@@ -1663,6 +1697,7 @@ class App {
             statusDiv.textContent = message;
             statusDiv.className = `status-message ${type}`;
         }
+        this.accessibilityManager?.announce(message, type === 'error' ? 'assertive' : 'polite');
     }
 
     /**
@@ -2152,6 +2187,7 @@ class App {
     private updateUIText(): void {
         I18n.applyToDOM(document);
         this.languageSwitcher?.render();
+        this.accessibilityManager?.refresh();
 
         // 更新标题
         const titleZh = document.querySelector('.title-zh');

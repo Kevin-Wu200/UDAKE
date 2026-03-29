@@ -10,6 +10,9 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@vue-flow/background": "^1.3.2",
+    "@vue-flow/controls": "^1.1.3",
+    "@vue-flow/core": "^1.48.2",
     "axios": "^1.13.0",
     "echarts": "^6.0.0",
     "element-plus": "^2.11.4",

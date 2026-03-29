@@ -9,6 +9,7 @@
       >
         <el-menu-item index="/dashboard">{{ t('dashboard') }}</el-menu-item>
         <el-menu-item index="/product-keys">{{ t('productKeys') }}</el-menu-item>
+        <el-menu-item index="/workflows">{{ t('workflowEngine') }}</el-menu-item>
         <el-menu-item index="/users">{{ t('users') }}</el-menu-item>
         <el-menu-item index="/audit-logs">{{ t('auditLogs') }}</el-menu-item>
       </el-menu>

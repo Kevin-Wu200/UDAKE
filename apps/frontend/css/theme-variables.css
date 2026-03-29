@@ -22,7 +22,7 @@
     /* 浅色模式文字 */
     --text-primary: #000000;
     --text-secondary: #6e6e73;
-    --text-tertiary: #8e8e93;
+    --text-tertiary: #5f6368;
 
     /* 边框和阴影 */
     --border-color: rgba(0, 0, 0, 0.06);
@@ -104,7 +104,7 @@
         /* 深色模式文字 - 优化对比度符合WCAG AA标准 */
         --text-primary: #ffffff;
         --text-secondary: #e5e5ea;
-        --text-tertiary: #aeaeb2;
+        --text-tertiary: #c7c7cc;
 
         /* 深色模式边框 */
         --border-color: rgba(255, 255, 255, 0.08);

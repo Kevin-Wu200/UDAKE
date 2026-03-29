@@ -87,6 +87,26 @@ export class FrontendIntegrationHub {
     }
 
     private bindToggle(section: HTMLElement, container: HTMLElement): void {
+        const titleButton = section.querySelector('.panel-title-toggle') as HTMLButtonElement | null;
+        if (titleButton) {
+            if (titleButton.getAttribute('data-toggle-bound') === 'true') {
+                return;
+            }
+
+            titleButton.innerHTML = '<span data-i18n="panel.frontendIntegration">前端功能集成补齐</span> ▸';
+            titleButton.setAttribute('aria-expanded', 'false');
+
+            titleButton.addEventListener('click', () => {
+                const isHidden = container.style.display === 'none';
+                container.style.display = isHidden ? 'block' : 'none';
+                titleButton.innerHTML = `<span data-i18n="panel.frontendIntegration">前端功能集成补齐</span> ${isHidden ? '▾' : '▸'}`;
+                titleButton.setAttribute('aria-expanded', String(isHidden));
+            });
+
+            titleButton.setAttribute('data-toggle-bound', 'true');
+            return;
+        }
+
         const title = section.querySelector('.panel-title') as HTMLElement | null;
         if (!title) {
             return;
