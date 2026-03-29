@@ -142,6 +142,14 @@ class Settings(BaseSettings):
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
     CACHE_MAX_SIZE: int = 1000
+    CACHE_MIN_SIZE: Optional[int] = None
+    CACHE_MAX_SIZE_LIMIT: Optional[int] = None
+    CACHE_SHARD_COUNT: int = 1
+    CACHE_EVICTION_POLICY: Literal["lru", "lfu", "adaptive"] = "adaptive"
+    CACHE_COMPRESSION_ENABLED: bool = True
+    CACHE_COMPRESSION_THRESHOLD: int = 2048
+    CACHE_AUTO_TUNE_ENABLED: bool = True
+    CACHE_TUNE_REQUEST_INTERVAL: int = 200
 
     # 认证安全策略
     AUTH_ENCRYPTION_KEY: Optional[str] = None
@@ -215,6 +223,9 @@ class Settings(BaseSettings):
         'AUTH_DB_LOG_SLOW_QUERY_MS',
         'REDIS_PORT',
         'CACHE_MAX_SIZE',
+        'CACHE_SHARD_COUNT',
+        'CACHE_COMPRESSION_THRESHOLD',
+        'CACHE_TUNE_REQUEST_INTERVAL',
         'AUTH_IP_AUTO_BAN_THRESHOLD',
         'AUTH_IP_AUTO_BAN_WINDOW_SECONDS',
         'AUTH_IP_AUTO_BAN_SECONDS',
@@ -234,6 +245,16 @@ class Settings(BaseSettings):
         if v < 0:
             raise ValueError(f'{v} must be non-negative')
         return v
+
+    @field_validator('CACHE_MIN_SIZE', 'CACHE_MAX_SIZE_LIMIT', mode='before')
+    @classmethod
+    def validate_optional_cache_bounds(cls, v):
+        if v is None or v == "":
+            return None
+        iv = int(v)
+        if iv <= 0:
+            raise ValueError(f'{iv} must be positive')
+        return iv
 
     @field_validator('ENVIRONMENT', mode='before')
     @classmethod
