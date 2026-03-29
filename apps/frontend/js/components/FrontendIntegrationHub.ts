@@ -1,6 +1,6 @@
 import { APIService } from '../services/API封装.js';
-import { ConfigurableApiPanel } from './integration/ConfigurableApiPanel.js';
 import { DataQualityPanel } from './integration/DataQualityPanel.js';
+import { HistorySnapshotPanel } from './integration/HistorySnapshotPanel.js';
 import { ModelEvaluationPanel } from './integration/ModelEvaluationPanel.js';
 import { UserValidationPanel } from './integration/UserValidationPanel.js';
 import { ModelFusionPanel } from './integration/ModelFusionPanel.js';
@@ -22,7 +22,11 @@ import { GeneralDataProcessingPanel } from './integration/GeneralDataProcessingP
 import { TaskQueuePanel } from './integration/TaskQueuePanel.js';
 import { GPUAccelerationPanel } from './integration/GPUAccelerationPanel.js';
 
-type PanelConstructor = new (apiService: APIService) => ConfigurableApiPanel;
+interface PanelMountable {
+    mount(container: HTMLElement): void;
+}
+
+type PanelConstructor = new (apiService: APIService) => PanelMountable;
 
 interface PanelDescriptor {
     id: string;
@@ -35,6 +39,7 @@ export class FrontendIntegrationHub {
 
     private readonly panelDescriptors: PanelDescriptor[] = [
         { id: 'data-quality', title: '数据质量管理', ctor: DataQualityPanel },
+        { id: 'history-snapshot', title: '历史快照管理', ctor: HistorySnapshotPanel },
         { id: 'model-evaluation', title: '模型评估与优化', ctor: ModelEvaluationPanel },
         { id: 'user-validation', title: '用户验证与自评估', ctor: UserValidationPanel },
         { id: 'model-fusion', title: '模型融合', ctor: ModelFusionPanel },
