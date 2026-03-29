@@ -1,0 +1,484 @@
+{
+  "version": "1.0.0",
+  "wizards": [
+    {
+      "id": "data-import",
+      "title": "数据导入向导",
+      "description": "指导完成导入格式选择、字段映射和质量检查。",
+      "help": {
+        "doc": "https://docs.udake.local/workflow/data-import",
+        "video": "https://video.udake.local/tutorials/data-import"
+      },
+      "steps": [
+        {
+          "id": "format",
+          "title": "选择导入格式",
+          "description": "根据原始数据来源选择最佳导入格式。",
+          "fields": [
+            {
+              "id": "dataFormat",
+              "label": "数据格式",
+              "type": "select",
+              "required": true,
+              "default": "geojson",
+              "options": [
+                { "label": "GeoJSON", "value": "geojson" },
+                { "label": "CSV", "value": "csv" },
+                { "label": "Shapefile", "value": "shp" }
+              ]
+            },
+            {
+              "id": "hasCoordinateHeader",
+              "label": "首行包含坐标字段名",
+              "type": "checkbox",
+              "default": true
+            }
+          ],
+          "recommendationRules": [
+            {
+              "field": "dataFormat",
+              "equals": "csv",
+              "text": "建议优先检查经纬度字段是否为 WGS84 坐标。"
+            }
+          ],
+          "tips": [
+            "先导入少量样本数据验证字段结构。",
+            "CSV 建议使用 UTF-8 编码避免中文乱码。"
+          ]
+        },
+        {
+          "id": "mapping",
+          "title": "字段映射",
+          "description": "映射经度、纬度和值字段。",
+          "fields": [
+            {
+              "id": "lngField",
+              "label": "经度字段",
+              "type": "text",
+              "required": true,
+              "default": "longitude",
+              "placeholder": "例如：lng"
+            },
+            {
+              "id": "latField",
+              "label": "纬度字段",
+              "type": "text",
+              "required": true,
+              "default": "latitude",
+              "placeholder": "例如：lat"
+            },
+            {
+              "id": "valueField",
+              "label": "观测值字段",
+              "type": "text",
+              "required": true,
+              "default": "value",
+              "placeholder": "例如：pm25"
+            }
+          ],
+          "tips": [
+            "确保观测值字段是数值型。",
+            "建议将异常值在导入前先清洗。"
+          ]
+        },
+        {
+          "id": "quality",
+          "title": "质量检查",
+          "description": "设置重复点处理与缺失值策略。",
+          "fields": [
+            {
+              "id": "duplicateStrategy",
+              "label": "重复点处理",
+              "type": "select",
+              "default": "average",
+              "options": [
+                { "label": "按均值合并", "value": "average" },
+                { "label": "保留最新", "value": "latest" },
+                { "label": "全部保留", "value": "keep-all" }
+              ]
+            },
+            {
+              "id": "missingStrategy",
+              "label": "缺失值策略",
+              "type": "select",
+              "default": "drop",
+              "options": [
+                { "label": "直接丢弃", "value": "drop" },
+                { "label": "中位数填充", "value": "median" },
+                { "label": "均值填充", "value": "mean" }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "sampling-optimization",
+      "title": "采样优化向导",
+      "description": "配置采样策略、区域和预算以快速形成可执行采样计划。",
+      "help": {
+        "doc": "https://docs.udake.local/workflow/sampling-optimization",
+        "video": "https://video.udake.local/tutorials/sampling-optimization"
+      },
+      "steps": [
+        {
+          "id": "strategy",
+          "title": "采样策略",
+          "description": "根据业务目标选择采样策略。",
+          "fields": [
+            {
+              "id": "strategy",
+              "label": "策略类型",
+              "type": "select",
+              "default": "uncertainty",
+              "required": true,
+              "options": [
+                { "label": "不确定性优先", "value": "uncertainty" },
+                { "label": "均匀覆盖", "value": "uniform" },
+                { "label": "风险优先", "value": "risk" }
+              ]
+            },
+            {
+              "id": "maxPoints",
+              "label": "最大采样点数",
+              "type": "number",
+              "required": true,
+              "default": 50,
+              "min": 5,
+              "max": 500,
+              "step": 1
+            }
+          ],
+          "recommendationRules": [
+            {
+              "field": "strategy",
+              "equals": "uncertainty",
+              "text": "建议在高方差区域增加点位密度。"
+            }
+          ]
+        },
+        {
+          "id": "region",
+          "title": "区域选择",
+          "description": "设置采样区域与缓冲范围。",
+          "fields": [
+            {
+              "id": "regionMode",
+              "label": "区域模式",
+              "type": "select",
+              "default": "current-view",
+              "options": [
+                { "label": "当前视图", "value": "current-view" },
+                { "label": "行政区边界", "value": "boundary" },
+                { "label": "手动绘制", "value": "draw" }
+              ]
+            },
+            {
+              "id": "bufferKm",
+              "label": "缓冲半径（km）",
+              "type": "number",
+              "default": 1,
+              "min": 0,
+              "max": 20,
+              "step": 0.5
+            }
+          ],
+          "tips": [
+            "边界模式下建议先检查边界坐标系。",
+            "手动绘制时避免自相交多边形。"
+          ]
+        },
+        {
+          "id": "constraints",
+          "title": "执行约束",
+          "description": "设置采样时长与预算边界。",
+          "fields": [
+            {
+              "id": "timeBudgetHours",
+              "label": "预计工时（小时）",
+              "type": "number",
+              "default": 8,
+              "min": 1,
+              "max": 72,
+              "step": 1
+            },
+            {
+              "id": "enableRouteOptimization",
+              "label": "启用路径优化",
+              "type": "checkbox",
+              "default": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "interpolation-analysis",
+      "title": "插值分析向导",
+      "description": "快速设定方法、变异函数和计算精度。",
+      "help": {
+        "doc": "https://docs.udake.local/workflow/interpolation-analysis",
+        "video": "https://video.udake.local/tutorials/interpolation-analysis"
+      },
+      "steps": [
+        {
+          "id": "method",
+          "title": "方法选择",
+          "description": "选择克里金方法与变异函数模型。",
+          "fields": [
+            {
+              "id": "krigingMethod",
+              "label": "克里金方法",
+              "type": "select",
+              "required": true,
+              "default": "ordinary",
+              "options": [
+                { "label": "普通克里金", "value": "ordinary" },
+                { "label": "泛克里金", "value": "universal" },
+                { "label": "分块克里金", "value": "block" }
+              ]
+            },
+            {
+              "id": "variogramModel",
+              "label": "变异函数",
+              "type": "select",
+              "required": true,
+              "default": "spherical",
+              "options": [
+                { "label": "球状模型", "value": "spherical" },
+                { "label": "指数模型", "value": "exponential" },
+                { "label": "高斯模型", "value": "gaussian" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "parameters",
+          "title": "参数设置",
+          "description": "设置网格分辨率、滞后数和范围值。",
+          "fields": [
+            {
+              "id": "gridResolution",
+              "label": "网格分辨率",
+              "type": "number",
+              "required": true,
+              "default": 120,
+              "min": 50,
+              "max": 500,
+              "step": 10
+            },
+            {
+              "id": "nlags",
+              "label": "滞后数",
+              "type": "number",
+              "default": 12,
+              "min": 6,
+              "max": 24,
+              "step": 1
+            },
+            {
+              "id": "range",
+              "label": "范围值",
+              "type": "number",
+              "default": 10,
+              "min": 1,
+              "max": 100,
+              "step": 1
+            }
+          ],
+          "tips": [
+            "分辨率越高计算耗时越长。",
+            "初次分析可先用较低分辨率验证流程。"
+          ]
+        },
+        {
+          "id": "execution",
+          "title": "执行选项",
+          "description": "确认开始任务前的检查项。",
+          "fields": [
+            {
+              "id": "autoStart",
+              "label": "完成后自动开始插值",
+              "type": "checkbox",
+              "default": true
+            }
+          ],
+          "recommendationRules": [
+            {
+              "context": "new-user",
+              "text": "建议先手动检查参数，再执行首次插值。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "result-export",
+      "title": "结果导出向导",
+      "description": "指导结果格式、样式与打包方式配置。",
+      "help": {
+        "doc": "https://docs.udake.local/workflow/result-export",
+        "video": "https://video.udake.local/tutorials/result-export"
+      },
+      "steps": [
+        {
+          "id": "target",
+          "title": "导出目标",
+          "description": "选择导出对象和文件格式。",
+          "fields": [
+            {
+              "id": "targetLayer",
+              "label": "导出图层",
+              "type": "select",
+              "required": true,
+              "default": "prediction",
+              "options": [
+                { "label": "预测结果", "value": "prediction" },
+                { "label": "方差结果", "value": "variance" }
+              ]
+            },
+            {
+              "id": "exportFormat",
+              "label": "文件格式",
+              "type": "select",
+              "required": true,
+              "default": "geojson",
+              "options": [
+                { "label": "GeoJSON", "value": "geojson" },
+                { "label": "Shapefile", "value": "shp" },
+                { "label": "GeoTIFF", "value": "tif" }
+              ]
+            }
+          ]
+        },
+        {
+          "id": "style",
+          "title": "样式配置",
+          "description": "配置颜色分级和精度。",
+          "fields": [
+            {
+              "id": "decimalPlaces",
+              "label": "小数位",
+              "type": "number",
+              "default": 3,
+              "min": 0,
+              "max": 8,
+              "step": 1
+            },
+            {
+              "id": "includeLegend",
+              "label": "附带图例信息",
+              "type": "checkbox",
+              "default": true
+            }
+          ]
+        },
+        {
+          "id": "delivery",
+          "title": "交付方式",
+          "description": "设置压缩和命名策略。",
+          "fields": [
+            {
+              "id": "zipPackage",
+              "label": "导出后自动打包 ZIP",
+              "type": "checkbox",
+              "default": true
+            },
+            {
+              "id": "filePrefix",
+              "label": "文件名前缀",
+              "type": "text",
+              "default": "udake_export",
+              "placeholder": "例如：project_a"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "mobile-collection",
+      "title": "移动端采集向导",
+      "description": "引导完成 GPS 设置、采集表单和同步策略。",
+      "help": {
+        "doc": "https://docs.udake.local/workflow/mobile-collection",
+        "video": "https://video.udake.local/tutorials/mobile-collection"
+      },
+      "steps": [
+        {
+          "id": "gps",
+          "title": "GPS 设置",
+          "description": "选择定位精度和采样间隔。",
+          "fields": [
+            {
+              "id": "accuracy",
+              "label": "定位精度",
+              "type": "select",
+              "default": "balanced",
+              "options": [
+                { "label": "高精度", "value": "high" },
+                { "label": "平衡", "value": "balanced" },
+                { "label": "省电", "value": "low" }
+              ]
+            },
+            {
+              "id": "sampleIntervalSec",
+              "label": "采样间隔（秒）",
+              "type": "number",
+              "default": 5,
+              "min": 1,
+              "max": 120,
+              "step": 1
+            }
+          ],
+          "tips": [
+            "高精度模式建议在电量充足时使用。",
+            "室内定位漂移较大，建议结合手动校正。"
+          ]
+        },
+        {
+          "id": "form",
+          "title": "采集表单",
+          "description": "确认必填字段和照片要求。",
+          "fields": [
+            {
+              "id": "requirePhoto",
+              "label": "要求上传现场照片",
+              "type": "checkbox",
+              "default": true
+            },
+            {
+              "id": "requiredNote",
+              "label": "备注字段必填",
+              "type": "checkbox",
+              "default": false
+            }
+          ]
+        },
+        {
+          "id": "sync",
+          "title": "同步策略",
+          "description": "选择实时同步或离线缓存后补传。",
+          "fields": [
+            {
+              "id": "syncMode",
+              "label": "同步模式",
+              "type": "select",
+              "default": "hybrid",
+              "options": [
+                { "label": "实时同步", "value": "realtime" },
+                { "label": "离线优先", "value": "offline-first" },
+                { "label": "混合模式", "value": "hybrid" }
+              ]
+            },
+            {
+              "id": "autoRetry",
+              "label": "失败自动重试",
+              "type": "checkbox",
+              "default": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

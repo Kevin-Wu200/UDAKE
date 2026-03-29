@@ -913,6 +913,24 @@ class App {
         this.eventBinder.bind(document, 'update-ui-text', () => {
             this.updateUIText();
         });
+
+        // 快捷操作栏事件
+        this.eventBinder.bind(document, 'quick-action-request', (e: Event) => {
+            const detail = (e as CustomEvent<{ actionId: string; command: string; source: string }>).detail;
+            if (!detail?.command) {
+                return;
+            }
+            this.handleQuickAction(detail.command);
+        });
+
+        // 向导完成事件
+        this.eventBinder.bind(document, 'wizard-completed', (e: Event) => {
+            const detail = (e as CustomEvent<{ wizardId: string; values: Record<string, string | number | boolean> }>).detail;
+            if (!detail?.wizardId) {
+                return;
+            }
+            this.handleWizardCompleted(detail.wizardId, detail.values || {});
+        });
     }
 
     /**
@@ -961,6 +979,165 @@ class App {
                 rightSidebar.classList.add('hidden');
                 sidebarToggle.classList.add('open');
                 sidebarToggle.setAttribute('aria-expanded', 'false');
+            }
+        }
+    }
+
+    private handleQuickAction(command: string): void {
+        if (command.startsWith('wizard-start:')) {
+            const wizardId = command.split(':')[1];
+            const components = this.componentInitializer.getComponentRegistry();
+            components.wizardEngine?.start(wizardId);
+            return;
+        }
+
+        const components = this.componentInitializer.getComponentRegistry();
+
+        switch (command) {
+            case 'new-project':
+                this.handleNewProject();
+                break;
+            case 'import-data': {
+                const fileInput = document.getElementById('file-input') as HTMLInputElement | null;
+                fileInput?.click();
+                break;
+            }
+            case 'start-kriging': {
+                const startBtn = document.getElementById('start-kriging-btn') as HTMLButtonElement | null;
+                if (startBtn && !startBtn.disabled) {
+                    startBtn.click();
+                }
+                break;
+            }
+            case 'export-geojson': {
+                const exportBtn = document.getElementById('export-prediction-geojson') as HTMLButtonElement | null;
+                const exportPanel = document.getElementById('export-panel');
+                if (exportBtn && exportPanel && exportPanel.style.display !== 'none') {
+                    exportBtn.click();
+                }
+                break;
+            }
+            case 'show-guide':
+                components.onboardingGuide.reset();
+                components.onboardingGuide.start();
+                break;
+            case 'history-undo':
+                void HistoryManager.undo();
+                break;
+            case 'history-redo':
+                void HistoryManager.redo();
+                break;
+            case 'open-wizard-center':
+                components.wizardEngine?.openWizardCenter();
+                break;
+            default:
+                console.warn('未知快捷操作:', command);
+        }
+    }
+
+    private handleWizardCompleted(
+        wizardId: string,
+        values: Record<string, string | number | boolean>
+    ): void {
+        if (wizardId === 'interpolation-analysis') {
+            this.applyInterpolationWizardValues(values);
+            const autoStart = Boolean(values.autoStart);
+            if (autoStart) {
+                const startBtn = document.getElementById('start-kriging-btn') as HTMLButtonElement | null;
+                if (startBtn && !startBtn.disabled) {
+                    startBtn.click();
+                }
+            }
+            return;
+        }
+
+        if (wizardId === 'result-export') {
+            this.applyExportWizardValues(values);
+            return;
+        }
+
+        const uploadStatus = document.getElementById('upload-status');
+        if (uploadStatus) {
+            uploadStatus.textContent = `向导 ${wizardId} 已完成，可继续执行下一步操作。`;
+        }
+    }
+
+    private applyInterpolationWizardValues(values: Record<string, string | number | boolean>): void {
+        const method = values.krigingMethod;
+        const variogram = values.variogramModel;
+        const gridResolution = values.gridResolution;
+        const nlags = values.nlags;
+        const range = values.range;
+
+        this.setSelectValue('kriging-method', method);
+        this.setSelectValue('variogram-model', variogram);
+        this.setNumberInputValue('grid-resolution', gridResolution, 'grid-resolution-slider', 'grid-resolution-value');
+        this.setNumberInputValue('nlags', nlags, 'nlags-slider', 'nlags-value');
+        this.setNumberInputValue('range', range, 'range-slider', 'range-value');
+    }
+
+    private applyExportWizardValues(values: Record<string, string | number | boolean>): void {
+        const targetLayer = values.targetLayer === 'variance' ? 'variance' : 'prediction';
+        const format = String(values.exportFormat || 'geojson');
+        const buttonId = `export-${targetLayer}-${format === 'geojson' ? 'geojson' : format === 'shp' ? 'shp' : 'tif'}`;
+        const exportButton = document.getElementById(buttonId) as HTMLButtonElement | null;
+
+        const exportStatus = document.getElementById('export-status');
+        if (exportStatus) {
+            exportStatus.textContent = `导出向导已完成：目标=${targetLayer}，格式=${format.toUpperCase()}。`;
+        }
+
+        if (exportButton) {
+            exportButton.click();
+        }
+    }
+
+    private setSelectValue(elementId: string, value: string | number | boolean | undefined): void {
+        if (value === undefined) {
+            return;
+        }
+        const select = document.getElementById(elementId) as HTMLSelectElement | null;
+        if (!select) {
+            return;
+        }
+        select.value = String(value);
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    private setNumberInputValue(
+        inputId: string,
+        value: string | number | boolean | undefined,
+        sliderId?: string,
+        displayId?: string
+    ): void {
+        if (value === undefined) {
+            return;
+        }
+        const numeric = Number(value);
+        if (Number.isNaN(numeric)) {
+            return;
+        }
+
+        const input = document.getElementById(inputId) as HTMLInputElement | null;
+        if (input) {
+            input.value = String(numeric);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        if (sliderId) {
+            const slider = document.getElementById(sliderId) as HTMLInputElement | null;
+            if (slider) {
+                slider.value = String(numeric);
+                slider.dispatchEvent(new Event('input', { bubbles: true }));
+                slider.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        if (displayId) {
+            const display = document.getElementById(displayId);
+            if (display) {
+                display.textContent = String(numeric);
             }
         }
     }

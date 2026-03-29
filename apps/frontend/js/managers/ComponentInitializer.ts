@@ -11,6 +11,9 @@ import { EnhancedSamplingRecommendationPanel } from '../components/EnhancedSampl
 import { InteractiveSamplingMarkers } from '../components/InteractiveSamplingMarkers.js';
 import { SamplingStrategySelector } from '../components/SamplingStrategySelector.js';
 import { OnboardingGuide } from '../components/OnboardingGuide.js';
+import { QuickActionBar } from '../components/QuickActionBar.js';
+import { SmartWizardEngine } from '../components/SmartWizardEngine.js';
+import { SmartRecommendationEngine } from '../components/SmartRecommendationEngine.js';
 import { PreferencesPanel } from '../components/PreferencesPanel.js';
 import { TemplateDownloader } from '../components/TemplateDownloader.js';
 import { IndustrySelector } from '../components/IndustrySelector.js';
@@ -30,6 +33,7 @@ import { MapEngineSwitcher } from '../components/MapEngineSwitcher';
 import { Map25DHeatmapController } from '../components/Map25DHeatmapController.js';
 import { TemplateStorageService } from '../services/TemplateStorageService.js';
 import { getMapProvider } from '../地图初始化.js';
+import workflowWizardConfig from '../../../../configs/workflow-wizards.json';
 import type { DeepLearningPanel } from '../components/DeepLearningPanel.js';
 
 // 导入类型
@@ -75,6 +79,9 @@ export interface ComponentRegistry {
     preferencesPanel: IPreferencesPanel | null;
     feedbackCollector: IFeedbackCollector | null;
     onboardingGuide: IOnboardingGuide;
+    quickActionBar: QuickActionBar | null;
+    wizardEngine: SmartWizardEngine | null;
+    recommendationEngine: SmartRecommendationEngine | null;
     cacheManagementPanel: any;
     offlineModeBanner: any;
     deepLearningPanel: DeepLearningPanel | null;
@@ -419,6 +426,30 @@ export class ComponentInitializer {
         onboardingGuide.autoStart();
         this.components.set('onboardingGuide', onboardingGuide);
 
+        const mapContainer = document.querySelector('.map-container') as HTMLElement | null;
+        if (mapContainer) {
+            const quickActionBar = new QuickActionBar();
+            quickActionBar.mount(mapContainer);
+            this.components.set('quickActionBar', quickActionBar);
+
+            const recommendationEngine = new SmartRecommendationEngine(
+                quickActionBar.getActions().map((action) => ({
+                    id: action.id,
+                    label: action.label,
+                    command: action.command
+                }))
+            );
+            recommendationEngine.mount(mapContainer);
+            this.components.set('recommendationEngine', recommendationEngine);
+        } else {
+            this.components.set('quickActionBar', null);
+            this.components.set('recommendationEngine', null);
+        }
+
+        const wizardEngine = new SmartWizardEngine(workflowWizardConfig as any);
+        wizardEngine.mount(document.body);
+        this.components.set('wizardEngine', wizardEngine);
+
         // 初始化偏好设置面板（延迟初始化）
         this.components.set('preferencesPanel', null);
 
@@ -524,6 +555,9 @@ export class ComponentInitializer {
             preferencesPanel: this.components.get('preferencesPanel'),
             feedbackCollector: this.components.get('feedbackCollector'),
             onboardingGuide: this.components.get('onboardingGuide'),
+            quickActionBar: this.components.get('quickActionBar'),
+            wizardEngine: this.components.get('wizardEngine'),
+            recommendationEngine: this.components.get('recommendationEngine'),
             cacheManagementPanel: this.components.get('cacheManagementPanel'),
             offlineModeBanner: this.components.get('offlineModeBanner'),
             deepLearningPanel: this.components.get('deepLearningPanel'),
