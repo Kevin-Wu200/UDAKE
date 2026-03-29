@@ -13,6 +13,7 @@ from .auth import get_auth_service
 from .auth.csrf import CSRFManager, CSRFValidationError
 from .auth.input_sanitizer import sanitize_payload
 from .config import settings
+from .services.数据安全服务 import get_data_security_service
 
 logger = logging.getLogger(__name__)
 _MUTATING_METHODS = {"POST", "PUT", "PATCH", "DELETE"}
@@ -32,7 +33,32 @@ def _extract_client_ip(request: Request) -> Optional[str]:
 
 async def security_guard_middleware(request: Request, call_next):
     service = get_auth_service()
+    security_service = get_data_security_service()
     ip_address = _extract_client_ip(request)
+    transport_scheme = (request.headers.get("x-forwarded-proto") or request.url.scheme or "").split(",", 1)[0].strip()
+    transport_host = (request.headers.get("x-forwarded-host") or request.headers.get("host") or "").strip()
+    transport_tls = request.headers.get("x-tls-version")
+    transport_result = security_service.validate_transport_security(
+        scheme=transport_scheme,
+        host=transport_host,
+        tls_version=transport_tls,
+    )
+    if settings.is_production and not transport_result.get("compliant", False):
+        logger.warning(
+            "blocked request due to insecure transport path=%s scheme=%s tls=%s",
+            request.url.path,
+            transport_scheme,
+            transport_tls,
+        )
+        return JSONResponse(
+            status_code=426,
+            content={
+                "success": False,
+                "message": "传输安全要求不满足：生产环境仅允许 TLS1.3 HTTPS 请求",
+                "data": transport_result,
+            },
+        )
+
     ip_check = service.ip_controller.check(ip_address)
     if not ip_check.allowed:
         logger.warning("blocked request from blacklisted ip=%s path=%s", ip_address, request.url.path)

@@ -29,7 +29,7 @@ from .config import settings
 from .security_middleware import security_guard_middleware
 from .startup_manager import StartupManager
 from .services.websocket_service import websocket_service
-from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 分布式计算接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口, 数据质量接口, GPU加速接口, 数据反馈接口, 主动学习接口, 用户验证与自评估接口, 移动端GPS接口, 历史对比与趋势分析接口
+from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 分布式计算接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口, 数据质量接口, 数据安全接口, GPU加速接口, 数据反馈接口, 主动学习接口, 用户验证与自评估接口, 移动端GPS接口, 历史对比与趋势分析接口
 from .api.app_download_api import router as download_router
 from .api.admin_api import router as admin_router
 from .api.auth_api import router as auth_router
@@ -132,6 +132,7 @@ app.include_router(模型融合接口.router, prefix="/api", tags=["模型融合
 app.include_router(项目管理接口.router, tags=["项目管理"])
 app.include_router(通用数据处理接口.router, prefix="/api", tags=["通用数据处理"])
 app.include_router(数据质量接口.router, prefix="/api", tags=["数据质量"])
+app.include_router(数据安全接口.router, prefix="/api", tags=["数据安全"])
 app.include_router(数据反馈接口.router, prefix="/api", tags=["数据反馈"])
 app.include_router(主动学习接口.router, prefix="/api", tags=["主动学习与半监督"])
 app.include_router(用户验证与自评估接口.router, prefix="/api", tags=["用户验证与模型自评估"])
