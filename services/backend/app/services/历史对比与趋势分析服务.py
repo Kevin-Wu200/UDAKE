@@ -176,6 +176,32 @@ class HistoryComparisonTrendService:
             metas = [self._parse_metadata(item) for item in sorted(index, key=lambda d: int(d["version"]))]
             return SnapshotListResponse(dataset_id=dataset_id, total_versions=len(metas), versions=metas)
 
+    def delete_snapshot(self, dataset_id: str, version: int) -> None:
+        """删除指定版本快照并更新索引"""
+        with self.lock:
+            index = self._load_index(dataset_id)
+            if not index:
+                raise ValueError(f"数据集 {dataset_id} 暂无历史版本")
+
+            target = next((item for item in index if int(item["version"]) == version), None)
+            if target is None:
+                raise ValueError(f"未找到数据集 {dataset_id} 的版本 {version}")
+
+            file_path = self._snapshot_path(dataset_id, target["file_name"])
+            if not file_path.exists():
+                raise ValueError(f"版本文件不存在: {target['file_name']}")
+
+            updated_index = [item for item in index if int(item["version"]) != version]
+            sorted_updated = sorted(updated_index, key=lambda item: int(item["version"]))
+
+            # 先更新索引，文件删除失败时回滚索引，避免留下无索引文件。
+            self._save_index(dataset_id, sorted_updated)
+            try:
+                file_path.unlink()
+            except OSError as exc:
+                self._save_index(dataset_id, index)
+                raise ValueError(f"删除快照文件失败: {exc}") from exc
+
     def get_snapshot_records(self, dataset_id: str, version: Optional[int] = None) -> Tuple[int, List[TimeSeriesRecord]]:
         """读取指定或最新版本记录"""
         with self.lock:

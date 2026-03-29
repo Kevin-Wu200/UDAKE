@@ -7,6 +7,8 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
@@ -206,3 +208,57 @@ def test_export_import_archive_and_report(tmp_path: Path) -> None:
     )
     assert archived.archived_count == 2
     assert archived.kept_count == 1
+
+
+def test_delete_snapshot_updates_index_and_file(tmp_path: Path) -> None:
+    service = HistoryComparisonTrendService(
+        storage_dir=tmp_path / "history",
+        report_dir=tmp_path / "reports",
+    )
+    service.create_snapshot(
+        SnapshotCreateRequest(
+            dataset_id="dataset_delete",
+            version_label="v1",
+            records=_build_records(10, base=3.0, slope=0.2),
+        )
+    )
+    service.create_snapshot(
+        SnapshotCreateRequest(
+            dataset_id="dataset_delete",
+            version_label="v2",
+            records=_build_records(10, base=4.0, slope=0.2),
+        )
+    )
+
+    v1_file = service.storage_dir / "dataset_delete" / "v0001.json.gz"
+    assert v1_file.exists()
+
+    service.delete_snapshot("dataset_delete", 1)
+
+    listing = service.list_snapshots("dataset_delete")
+    assert listing.total_versions == 1
+    assert listing.versions[0].version == 2
+    assert not v1_file.exists()
+
+    with pytest.raises(ValueError, match="未找到数据集 dataset_delete 的版本 999"):
+        service.delete_snapshot("dataset_delete", 999)
+
+
+def test_delete_snapshot_missing_file_raises_error(tmp_path: Path) -> None:
+    service = HistoryComparisonTrendService(
+        storage_dir=tmp_path / "history",
+        report_dir=tmp_path / "reports",
+    )
+    service.create_snapshot(
+        SnapshotCreateRequest(
+            dataset_id="dataset_missing_file",
+            version_label="v1",
+            records=_build_records(8, base=1.0, slope=0.1),
+        )
+    )
+
+    file_path = service.storage_dir / "dataset_missing_file" / "v0001.json.gz"
+    file_path.unlink()
+
+    with pytest.raises(ValueError, match="版本文件不存在: v0001.json.gz"):
+        service.delete_snapshot("dataset_missing_file", 1)

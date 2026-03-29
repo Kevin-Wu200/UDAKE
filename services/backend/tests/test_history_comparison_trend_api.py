@@ -149,3 +149,15 @@ def test_history_analysis_api_flow(client: TestClient) -> None:
     )
     assert archive.status_code == 200
     assert archive.json()["archived_count"] == 2
+
+    deleted = client.delete("/api/history-analysis/snapshots/api_dataset/1")
+    assert deleted.status_code == 200
+    assert deleted.json()["message"] == "快照删除成功"
+
+    listing_after_delete = client.get("/api/history-analysis/snapshots/api_dataset")
+    assert listing_after_delete.status_code == 200
+    assert listing_after_delete.json()["total_versions"] == 1
+    assert listing_after_delete.json()["versions"][0]["version"] == 2
+
+    delete_missing = client.delete("/api/history-analysis/snapshots/api_dataset/99")
+    assert delete_missing.status_code == 400

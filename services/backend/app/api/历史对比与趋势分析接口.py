@@ -48,6 +48,16 @@ async def list_snapshots(dataset_id: str):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@router.delete("/history-analysis/snapshots/{dataset_id}/{version}")
+async def delete_snapshot(dataset_id: str, version: int):
+    """删除指定版本的历史快照"""
+    try:
+        history_comparison_trend_service.delete_snapshot(dataset_id, version)
+        return {"message": "快照删除成功"}
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
 @router.post("/history-analysis/compare", response_model=VersionComparisonResponse)
 async def compare_versions(request: VersionComparisonRequest):
     """多版本差值对比 + 热力图矩阵"""
