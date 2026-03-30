@@ -74,6 +74,22 @@ def _wait_run_completed(client: TestClient, run_id: str, timeout: float = 5.0) -
     raise TimeoutError(f"run timeout: {run_id}")
 
 
+def _create_workflow_and_set_admin(client: TestClient, admin_user_id: str = "alice") -> str:
+    create_resp = client.post("/api/workflow", json={"definition": _basic_workflow_definition()})
+    assert create_resp.status_code == 200
+    workflow_id = create_resp.json()["workflow"]["workflow_id"]
+    collaborators_resp = client.patch(
+        f"/api/workflow/{workflow_id}/collaborators",
+        json={
+            "collaborators": [
+                {"user_id": admin_user_id, "role": "admin", "display_name": admin_user_id},
+            ]
+        },
+    )
+    assert collaborators_resp.status_code == 200
+    return workflow_id
+
+
 def test_workflow_health_and_template_library(client: TestClient) -> None:
     health = client.get("/api/workflow/health")
     assert health.status_code == 200
@@ -163,3 +179,175 @@ def test_version_rollback_schedule_and_recommendation(client: TestClient) -> Non
     perf_resp = client.get("/api/workflow/performance")
     assert perf_resp.status_code == 200
     assert perf_resp.json()["total_runs"] >= 1
+
+
+def test_team_invitation_and_permission_delegation(client: TestClient) -> None:
+    workflow_id = _create_workflow_and_set_admin(client, admin_user_id="alice")
+
+    team_resp = client.post(
+        "/api/workflow/teams",
+        json={"name": "协作团队A", "owner_user_id": "alice", "description": "测试团队"},
+    )
+    assert team_resp.status_code == 200
+    team_id = team_resp.json()["team"]["team_id"]
+
+    invite_resp = client.post(
+        "/api/workflow/invitations",
+        json={"team_id": team_id, "email": "bob@example.com", "role": "viewer", "invited_by": "alice"},
+    )
+    assert invite_resp.status_code == 200
+    invite_id = invite_resp.json()["invitation"]["invite_id"]
+
+    accept_resp = client.post(
+        f"/api/workflow/invitations/{invite_id}/accept",
+        json={"user_id": "bob", "display_name": "Bob"},
+    )
+    assert accept_resp.status_code == 200
+    assert accept_resp.json()["invitation"]["status"] == "accepted"
+
+    bind_resp = client.post(f"/api/workflow/{workflow_id}/teams", json={"team_id": team_id})
+    assert bind_resp.status_code == 200
+    assert team_id in bind_resp.json()["team_ids"]
+
+    bob_perm_before = client.get(f"/api/workflow/{workflow_id}/permissions/bob")
+    assert bob_perm_before.status_code == 200
+    assert "view_workflow" in bob_perm_before.json()["permissions"]
+    assert "edit_workflow" not in bob_perm_before.json()["permissions"]
+
+    delegation_resp = client.post(
+        f"/api/workflow/{workflow_id}/delegations",
+        json={
+            "from_user_id": "alice",
+            "to_user_id": "bob",
+            "permission": "edit_workflow",
+            "ttl_hours": 24,
+        },
+    )
+    assert delegation_resp.status_code == 200
+
+    bob_perm_after = client.get(f"/api/workflow/{workflow_id}/permissions/bob")
+    assert bob_perm_after.status_code == 200
+    assert "edit_workflow" in bob_perm_after.json()["permissions"]
+
+
+def test_collaboration_ot_conflict_comment_cursor_notification(client: TestClient) -> None:
+    workflow_id = _create_workflow_and_set_admin(client, admin_user_id="alice")
+    collaborators_resp = client.patch(
+        f"/api/workflow/{workflow_id}/collaborators",
+        json={
+            "collaborators": [
+                {"user_id": "alice", "role": "admin"},
+                {"user_id": "bob", "role": "editor"},
+                {"user_id": "charlie", "role": "commenter"},
+            ]
+        },
+    )
+    assert collaborators_resp.status_code == 200
+
+    op1 = client.post(
+        f"/api/workflow/{workflow_id}/collaboration/operations",
+        json={
+            "actor_id": "bob",
+            "base_revision": 0,
+            "operation_type": "set_node_param",
+            "data": {"node_id": "sample", "param_key": "step", "param_value": 3},
+        },
+    )
+    assert op1.status_code == 200
+    assert op1.json()["applied"] is True
+
+    op2 = client.post(
+        f"/api/workflow/{workflow_id}/collaboration/operations",
+        json={
+            "actor_id": "bob",
+            "base_revision": 0,
+            "operation_type": "set_node_param",
+            "conflict_strategy": "manual",
+            "data": {"node_id": "sample", "param_key": "step", "param_value": 5},
+        },
+    )
+    assert op2.status_code == 200
+    assert op2.json()["applied"] is False
+    conflict = op2.json()["conflict"]
+    assert conflict is not None
+
+    conflicts_resp = client.get(f"/api/workflow/{workflow_id}/collaboration/conflicts?unresolved_only=true")
+    assert conflicts_resp.status_code == 200
+    assert conflicts_resp.json()["count"] >= 1
+
+    resolve_resp = client.post(
+        f"/api/workflow/{workflow_id}/collaboration/conflicts/{conflict['conflict_id']}/resolve",
+        json={"resolver_user_id": "alice", "strategy": "custom", "override_value": 4},
+    )
+    assert resolve_resp.status_code == 200
+    assert resolve_resp.json()["conflict"]["status"] == "resolved"
+
+    cursor_resp = client.post(
+        f"/api/workflow/{workflow_id}/collaboration/cursors",
+        json={"user_id": "bob", "position": {"node_id": "sample", "x": 100, "y": 120}},
+    )
+    assert cursor_resp.status_code == 200
+
+    comment_resp = client.post(
+        f"/api/workflow/{workflow_id}/comments",
+        json={"user_id": "bob", "content": "请 @charlie 复核这个参数"},
+    )
+    assert comment_resp.status_code == 200
+    assert "charlie" in comment_resp.json()["comment"]["mentions"]
+
+    notif_resp = client.get(f"/api/workflow/{workflow_id}/notifications?user_id=charlie")
+    assert notif_resp.status_code == 200
+    assert notif_resp.json()["count"] >= 1
+    assert notif_resp.json()["notifications"][0]["event_type"] == "mention"
+
+    pref_set_resp = client.put(
+        f"/api/workflow/{workflow_id}/notifications/preferences",
+        json={
+            "user_id": "charlie",
+            "preferences": {"mention_only": True, "muted_event_types": ["comment_created"]},
+        },
+    )
+    assert pref_set_resp.status_code == 200
+    pref_get_resp = client.get(f"/api/workflow/{workflow_id}/notifications/preferences?user_id=charlie")
+    assert pref_get_resp.status_code == 200
+    assert pref_get_resp.json()["preferences"]["mention_only"] is True
+
+
+def test_share_export_social_and_collaboration_analytics(client: TestClient) -> None:
+    workflow_id = _create_workflow_and_set_admin(client, admin_user_id="alice")
+
+    share_resp = client.post(
+        f"/api/workflow/{workflow_id}/share-links",
+        json={"creator_user_id": "alice", "access_mode": "public", "expires_in_hours": 24},
+    )
+    assert share_resp.status_code == 200
+    share_link_id = share_resp.json()["share_link"]["share_link_id"]
+
+    access_resp = client.post(f"/api/workflow/share/{share_link_id}", json={})
+    assert access_resp.status_code == 200
+    assert access_resp.json()["workflow"]["workflow_id"] == workflow_id
+
+    export_resp = client.post(
+        f"/api/workflow/{workflow_id}/export-data",
+        json={"fmt": "csv", "share_link_id": share_link_id},
+    )
+    assert export_resp.status_code == 200
+    assert export_resp.json()["format"] == "csv"
+    assert export_resp.json()["size"] > 0
+
+    share_stats_resp = client.get(f"/api/workflow/{workflow_id}/share-stats")
+    assert share_stats_resp.status_code == 200
+    assert share_stats_resp.json()["total_views"] >= 1
+    assert share_stats_resp.json()["total_downloads"] >= 1
+
+    social_resp = client.post(
+        f"/api/workflow/{workflow_id}/social-share",
+        json={"share_link_id": share_link_id, "title": "测试分享"},
+    )
+    assert social_resp.status_code == 200
+    assert "x" in social_resp.json()["platform_links"]
+
+    analytics_resp = client.get(f"/api/workflow/{workflow_id}/collaboration/analytics")
+    assert analytics_resp.status_code == 200
+    assert analytics_resp.json()["analytics"]["share_views"] >= 1
+    assert analytics_resp.json()["analytics"]["share_downloads"] >= 1

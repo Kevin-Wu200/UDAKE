@@ -71,6 +71,22 @@ async def test_websocket_unsubscribe():
 
 
 @pytest.mark.asyncio
+async def test_websocket_subscribe_workflow():
+    """测试工作流订阅消息"""
+    client = TestClient(app)
+
+    with client.websocket_connect("/ws/test_client") as websocket:
+        websocket.send_json({
+            'type': 'subscribe_workflow',
+            'workflow_id': 'wf_test_1'
+        })
+
+        data = websocket.receive_json()
+        assert data['type'] == 'subscription_confirmed'
+        assert data['workflow_id'] == 'wf_test_1'
+
+
+@pytest.mark.asyncio
 async def test_websocket_service_connect():
     """测试 WebSocket 服务连接"""
     from fastapi import WebSocket
@@ -186,3 +202,35 @@ async def test_websocket_service_notify_task_update():
     assert mock_ws.messages[0]['type'] == 'task_update'
     assert mock_ws.messages[0]['task_id'] == 'test_task_1'
     assert mock_ws.messages[0]['data'] == update_data
+
+
+@pytest.mark.asyncio
+async def test_websocket_service_notify_workflow_run_update():
+    """测试工作流运行推送"""
+    class MockWebSocket:
+        async def accept(self):
+            self.accepted = True
+
+        async def send_json(self, message):
+            self.messages = getattr(self, 'messages', [])
+            self.messages.append(message)
+
+    mock_ws = MockWebSocket()
+    await websocket_service.connect(mock_ws, 'test_workflow_client_1')
+    await websocket_service.subscribe_to_workflow_run('test_workflow_client_1', 'run_1')
+
+    await websocket_service.notify_workflow_run_update(
+        run_id='run_1',
+        event='progress_update',
+        update={'progress': 66.7},
+        workflow_id='wf_1',
+        snapshot={'status': 'running', 'progress': 66.7},
+    )
+
+    assert len(mock_ws.messages) == 1
+    assert mock_ws.messages[0]['type'] == 'workflow_run_update'
+    assert mock_ws.messages[0]['event'] == 'progress_update'
+    assert mock_ws.messages[0]['run_id'] == 'run_1'
+    assert mock_ws.messages[0]['workflow_id'] == 'wf_1'
+    assert mock_ws.messages[0]['data']['progress'] == 66.7
+    assert mock_ws.messages[0]['snapshot']['status'] == 'running'

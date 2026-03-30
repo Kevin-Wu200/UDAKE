@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+import csv
+import io
+import json
+import re
 import threading
 import time
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Mapping, Optional
+from typing import Any, Dict, List, Mapping, Optional, Set
+from urllib.parse import quote_plus
 from uuid import uuid4
 
+from .websocket_service import websocket_service
 from ..workflow.engine import WorkflowEngine
 from ..workflow.schema import WorkflowValidationError, get_workflow_schema
 from ..workflow.templates import built_in_templates
@@ -16,6 +22,51 @@ from ..workflow.templates import built_in_templates
 
 class SmartWorkflowService:
     """智能工作流应用服务。"""
+
+    _ROLE_INHERITANCE: Dict[str, List[str]] = {
+        "guest": [],
+        "viewer": ["guest"],
+        "commenter": ["viewer"],
+        "editor": ["commenter"],
+        "admin": ["editor"],
+    }
+
+    _ROLE_PERMISSIONS: Dict[str, Set[str]] = {
+        "guest": {"view_workflow"},
+        "viewer": {"view_workflow", "update_cursor"},
+        "commenter": {"comment", "view_workflow", "update_cursor"},
+        "editor": {
+            "view_workflow",
+            "update_cursor",
+            "comment",
+            "edit_workflow",
+            "execute_workflow",
+            "create_share_link",
+            "export_data",
+        },
+        "admin": {
+            "view_workflow",
+            "update_cursor",
+            "comment",
+            "edit_workflow",
+            "execute_workflow",
+            "create_share_link",
+            "export_data",
+            "manage_share",
+            "manage_team",
+            "manage_collaborators",
+            "delegate_permission",
+            "resolve_conflict",
+        },
+    }
+
+    _DEFAULT_NOTIFICATION_PREFS: Dict[str, Any] = {
+        "in_app": True,
+        "email": False,
+        "realtime": True,
+        "mention_only": False,
+        "muted_event_types": [],
+    }
 
     def __init__(self, auto_start_scheduler: bool = True) -> None:
         self._lock = threading.RLock()
@@ -27,6 +78,10 @@ class SmartWorkflowService:
             item["template_id"]: item for item in built_in_templates()
         }
         self._schedules: Dict[str, Dict[str, Any]] = {}
+        self._teams: Dict[str, Dict[str, Any]] = {}
+        self._invitations: Dict[str, Dict[str, Any]] = {}
+        self._delegations: Dict[str, Dict[str, Any]] = {}
+        self._share_links: Dict[str, Dict[str, Any]] = {}
 
         self._metrics: Dict[str, Any] = {
             "total_runs": 0,
@@ -70,6 +125,8 @@ class SmartWorkflowService:
                 "template_count": len(self._templates),
                 "run_count": len(self._runs),
                 "schedule_count": len(self._schedules),
+                "team_count": len(self._teams),
+                "share_link_count": len(self._share_links),
                 "scheduler_running": self._running,
             }
 
@@ -78,6 +135,101 @@ class SmartWorkflowService:
 
     def list_node_types(self) -> Dict[str, Any]:
         return self._engine.list_node_types()
+
+    # -------- 内部工具 --------
+    def _now(self) -> datetime:
+        return datetime.now(timezone.utc)
+
+    def _now_iso(self) -> str:
+        return self._now().isoformat()
+
+    def _new_collab_state(self) -> Dict[str, Any]:
+        now = self._now_iso()
+        return {
+            "revision": 0,
+            "operation_log": [],
+            "operation_index": {},
+            "conflicts": [],
+            "cursors": {},
+            "comments": [],
+            "notifications": [],
+            "notification_preferences": {},
+            "team_ids": [],
+            "share_link_ids": [],
+            "param_revision": {},
+            "contributor_stats": {},
+            "analytics": {
+                "total_operations": 0,
+                "total_conflicts": 0,
+                "auto_resolved_conflicts": 0,
+                "manual_resolved_conflicts": 0,
+                "total_comments": 0,
+                "total_mentions": 0,
+                "share_views": 0,
+                "share_downloads": 0,
+            },
+            "last_activity_at": now,
+        }
+
+    def _role_permissions(self, role: str) -> Set[str]:
+        role_name = str(role or "guest").strip().lower()
+        if role_name not in self._ROLE_PERMISSIONS:
+            role_name = "guest"
+
+        inherited = set(self._ROLE_PERMISSIONS.get(role_name, set()))
+        for parent in self._ROLE_INHERITANCE.get(role_name, []):
+            inherited.update(self._role_permissions(parent))
+        return inherited
+
+    def _workflow_or_error(self, workflow_id: str) -> Dict[str, Any]:
+        workflow = self._workflows.get(workflow_id)
+        if not workflow:
+            raise KeyError(f"workflow '{workflow_id}' not found")
+        return workflow
+
+    def _find_node(self, definition: Dict[str, Any], node_id: str) -> Optional[Dict[str, Any]]:
+        nodes = definition.get("nodes") or []
+        return next((item for item in nodes if str(item.get("node_id")) == node_id), None)
+
+    def _sanitize_share_link(self, link: Mapping[str, Any]) -> Dict[str, Any]:
+        result = deepcopy(dict(link))
+        result.pop("password", None)
+        return result
+
+    def _notify(
+        self,
+        workflow: Dict[str, Any],
+        user_id: str,
+        event_type: str,
+        message: str,
+        payload: Optional[Mapping[str, Any]] = None,
+    ) -> Optional[Dict[str, Any]]:
+        state = workflow["collab_state"]
+        prefs = deepcopy(state["notification_preferences"].get(user_id) or self._DEFAULT_NOTIFICATION_PREFS)
+        muted = {str(item) for item in prefs.get("muted_event_types") or []}
+        if event_type in muted:
+            return None
+        if prefs.get("mention_only", False) and event_type != "mention":
+            return None
+
+        notification = {
+            "notification_id": f"ntf_{uuid4().hex[:12]}",
+            "user_id": user_id,
+            "event_type": event_type,
+            "message": message,
+            "payload": deepcopy(dict(payload or {})),
+            "read": False,
+            "created_at": self._now_iso(),
+            "channels": {
+                "in_app": bool(prefs.get("in_app", True)),
+                "email": bool(prefs.get("email", False)),
+                "realtime": bool(prefs.get("realtime", True)),
+            },
+        }
+        state["notifications"].append(notification)
+        if len(state["notifications"]) > 2000:
+            state["notifications"] = state["notifications"][-2000:]
+        return notification
 
     # -------- 工作流定义与版本 --------
     def validate_definition(self, payload: Mapping[str, Any]) -> Dict[str, Any]:
@@ -115,6 +267,7 @@ class SmartWorkflowService:
                     }
                 ],
                 "collaborators": [],
+                "collab_state": self._new_collab_state(),
             }
             self._workflows[workflow_id] = record
             return deepcopy(record)
@@ -173,8 +326,21 @@ class SmartWorkflowService:
 
     def delete_workflow(self, workflow_id: str) -> None:
         with self._lock:
-            if workflow_id not in self._workflows:
+            current = self._workflows.get(workflow_id)
+            if not current:
                 raise KeyError(f"workflow '{workflow_id}' not found")
+            collab_state = current.get("collab_state") or {}
+            for link_id in list(collab_state.get("share_link_ids") or []):
+                self._share_links.pop(str(link_id), None)
+
+            stale_delegations = [
+                delegation_id
+                for delegation_id, item in self._delegations.items()
+                if str(item.get("workflow_id")) == workflow_id
+            ]
+            for delegation_id in stale_delegations:
+                del self._delegations[delegation_id]
+
             del self._workflows[workflow_id]
 
             # 清理相关调度
@@ -248,9 +414,1103 @@ class SmartWorkflowService:
             current = self._workflows.get(workflow_id)
             if not current:
                 raise KeyError(f"workflow '{workflow_id}' not found")
-            current["collaborators"] = deepcopy(collaborators)
+            normalized: List[Dict[str, Any]] = []
+            for item in collaborators:
+                role = str(item.get("role") or "viewer").strip().lower()
+                if role not in self._ROLE_PERMISSIONS:
+                    role = "viewer"
+                user_id = str(item.get("user_id") or "").strip()
+                team_id = str(item.get("team_id") or "").strip()
+                if not user_id and not team_id:
+                    continue
+                normalized_item = {
+                    "role": role,
+                    "display_name": str(item.get("display_name") or ""),
+                }
+                if user_id:
+                    normalized_item["user_id"] = user_id
+                if team_id:
+                    normalized_item["team_id"] = team_id
+                normalized.append(normalized_item)
+
+            current["collaborators"] = normalized
             current["updated_at"] = datetime.now(timezone.utc).isoformat()
             return deepcopy(current)
+
+    # -------- 团队、邀请、权限 --------
+    def create_team(self, name: str, owner_user_id: str, description: str = "") -> Dict[str, Any]:
+        team_name = str(name or "").strip()
+        owner_id = str(owner_user_id or "").strip()
+        if not team_name:
+            raise ValueError("team name 不能为空")
+        if not owner_id:
+            raise ValueError("owner_user_id 不能为空")
+
+        with self._lock:
+            team_id = f"team_{uuid4().hex[:10]}"
+            now = self._now_iso()
+            team = {
+                "team_id": team_id,
+                "name": team_name,
+                "description": str(description or ""),
+                "owner_user_id": owner_id,
+                "members": {
+                    owner_id: {
+                        "user_id": owner_id,
+                        "role": "admin",
+                        "display_name": "",
+                        "joined_at": now,
+                        "invited_via": "owner",
+                    }
+                },
+                "created_at": now,
+                "updated_at": now,
+            }
+            self._teams[team_id] = team
+            return deepcopy(team)
+
+    def list_teams(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        uid = str(user_id or "").strip()
+        with self._lock:
+            teams = list(self._teams.values())
+        if uid:
+            teams = [item for item in teams if uid in (item.get("members") or {})]
+        return [
+            {
+                "team_id": item["team_id"],
+                "name": item["name"],
+                "description": item.get("description", ""),
+                "owner_user_id": item.get("owner_user_id"),
+                "member_count": len(item.get("members") or {}),
+                "created_at": item.get("created_at"),
+                "updated_at": item.get("updated_at"),
+            }
+            for item in teams
+        ]
+
+    def add_team_member(
+        self,
+        team_id: str,
+        user_id: str,
+        role: str = "viewer",
+        display_name: str = "",
+        invited_via: str = "manual",
+    ) -> Dict[str, Any]:
+        uid = str(user_id or "").strip()
+        if not uid:
+            raise ValueError("user_id 不能为空")
+        role_name = str(role or "viewer").strip().lower()
+        if role_name not in self._ROLE_PERMISSIONS:
+            role_name = "viewer"
+
+        with self._lock:
+            team = self._teams.get(team_id)
+            if not team:
+                raise KeyError(f"team '{team_id}' not found")
+            team["members"][uid] = {
+                "user_id": uid,
+                "role": role_name,
+                "display_name": str(display_name or ""),
+                "joined_at": self._now_iso(),
+                "invited_via": invited_via,
+            }
+            team["updated_at"] = self._now_iso()
+            return deepcopy(team)
+
+    def remove_team_member(self, team_id: str, user_id: str) -> Dict[str, Any]:
+        uid = str(user_id or "").strip()
+        with self._lock:
+            team = self._teams.get(team_id)
+            if not team:
+                raise KeyError(f"team '{team_id}' not found")
+            if uid == team.get("owner_user_id"):
+                raise ValueError("不能移除团队拥有者")
+            team["members"].pop(uid, None)
+            team["updated_at"] = self._now_iso()
+            return deepcopy(team)
+
+    def bind_team_to_workflow(self, workflow_id: str, team_id: str) -> Dict[str, Any]:
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            if team_id not in self._teams:
+                raise KeyError(f"team '{team_id}' not found")
+
+            state = workflow["collab_state"]
+            existing = [str(item) for item in state.get("team_ids") or []]
+            if team_id not in existing:
+                existing.append(team_id)
+            state["team_ids"] = existing
+            workflow["updated_at"] = self._now_iso()
+            state["last_activity_at"] = workflow["updated_at"]
+            return {"workflow_id": workflow_id, "team_ids": deepcopy(existing)}
+
+    def create_invitation(
+        self,
+        team_id: str,
+        email: str,
+        role: str = "viewer",
+        invited_by: str = "system",
+        ttl_hours: int = 72,
+    ) -> Dict[str, Any]:
+        invite_email = str(email or "").strip().lower()
+        if not invite_email or "@" not in invite_email:
+            raise ValueError("email 格式不正确")
+        role_name = str(role or "viewer").strip().lower()
+        if role_name not in self._ROLE_PERMISSIONS:
+            role_name = "viewer"
+        ttl = max(1, min(int(ttl_hours), 24 * 30))
+
+        with self._lock:
+            team = self._teams.get(team_id)
+            if not team:
+                raise KeyError(f"team '{team_id}' not found")
+
+            invite_id = f"inv_{uuid4().hex[:14]}"
+            invitation = {
+                "invite_id": invite_id,
+                "team_id": team_id,
+                "email": invite_email,
+                "role": role_name,
+                "invited_by": str(invited_by or "system"),
+                "status": "pending",
+                "created_at": self._now_iso(),
+                "expires_at": (self._now() + timedelta(hours=ttl)).isoformat(),
+                "accepted_by": None,
+                "accepted_at": None,
+            }
+            self._invitations[invite_id] = invitation
+            return deepcopy(invitation)
+
+    def list_invitations(self, team_id: Optional[str] = None, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        desired_status = str(status or "").strip().lower()
+        with self._lock:
+            items = list(self._invitations.values())
+        if team_id:
+            items = [item for item in items if item.get("team_id") == team_id]
+        if desired_status:
+            items = [item for item in items if str(item.get("status", "")).lower() == desired_status]
+        items.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
+        return [deepcopy(item) for item in items]
+
+    def accept_invitation(self, invite_id: str, user_id: str, display_name: str = "") -> Dict[str, Any]:
+        uid = str(user_id or "").strip()
+        if not uid:
+            raise ValueError("user_id 不能为空")
+
+        with self._lock:
+            invitation = self._invitations.get(invite_id)
+            if not invitation:
+                raise KeyError(f"invitation '{invite_id}' not found")
+            if invitation.get("status") != "pending":
+                raise ValueError("邀请已失效或已处理")
+            expires_at = datetime.fromisoformat(str(invitation["expires_at"]))
+            if expires_at < self._now():
+                invitation["status"] = "expired"
+                raise ValueError("邀请已过期")
+
+            team_id = str(invitation["team_id"])
+            team = self._teams.get(team_id)
+            if not team:
+                raise KeyError(f"team '{team_id}' not found")
+
+            team["members"][uid] = {
+                "user_id": uid,
+                "role": invitation["role"],
+                "display_name": str(display_name or ""),
+                "joined_at": self._now_iso(),
+                "invited_via": invite_id,
+            }
+            team["updated_at"] = self._now_iso()
+            invitation["status"] = "accepted"
+            invitation["accepted_by"] = uid
+            invitation["accepted_at"] = self._now_iso()
+
+            return {
+                "invitation": deepcopy(invitation),
+                "team": {
+                    "team_id": team["team_id"],
+                    "name": team["name"],
+                    "member_count": len(team["members"]),
+                },
+            }
+
+    def create_permission_delegation(
+        self,
+        workflow_id: str,
+        from_user_id: str,
+        to_user_id: str,
+        permission: str,
+        ttl_hours: int = 24,
+    ) -> Dict[str, Any]:
+        perm = str(permission or "").strip()
+        if not perm:
+            raise ValueError("permission 不能为空")
+        from_uid = str(from_user_id or "").strip()
+        to_uid = str(to_user_id or "").strip()
+        if not from_uid or not to_uid:
+            raise ValueError("from_user_id/to_user_id 不能为空")
+
+        with self._lock:
+            if not self.has_permission(workflow_id, from_uid, "delegate_permission"):
+                raise PermissionError("无权限委托")
+            delegation_id = f"dlg_{uuid4().hex[:12]}"
+            delegation = {
+                "delegation_id": delegation_id,
+                "workflow_id": workflow_id,
+                "from_user_id": from_uid,
+                "to_user_id": to_uid,
+                "permission": perm,
+                "status": "active",
+                "created_at": self._now_iso(),
+                "expires_at": (self._now() + timedelta(hours=max(1, int(ttl_hours)))).isoformat(),
+            }
+            self._delegations[delegation_id] = delegation
+            return deepcopy(delegation)
+
+    def revoke_permission_delegation(self, delegation_id: str) -> Dict[str, Any]:
+        with self._lock:
+            delegation = self._delegations.get(delegation_id)
+            if not delegation:
+                raise KeyError(f"delegation '{delegation_id}' not found")
+            delegation["status"] = "revoked"
+            delegation["revoked_at"] = self._now_iso()
+            return deepcopy(delegation)
+
+    def list_permission_delegations(
+        self,
+        workflow_id: str,
+        user_id: Optional[str] = None,
+        active_only: bool = True,
+    ) -> List[Dict[str, Any]]:
+        uid = str(user_id or "").strip()
+        now = self._now()
+        with self._lock:
+            items = [item for item in self._delegations.values() if item.get("workflow_id") == workflow_id]
+
+        filtered: List[Dict[str, Any]] = []
+        for item in items:
+            expired = datetime.fromisoformat(str(item["expires_at"])) < now
+            status = str(item.get("status", "active"))
+            if active_only and (status != "active" or expired):
+                continue
+            if uid and uid not in {str(item.get("from_user_id")), str(item.get("to_user_id"))}:
+                continue
+            filtered.append(deepcopy(item))
+
+        filtered.sort(key=lambda it: str(it.get("created_at", "")), reverse=True)
+        return filtered
+
+    def get_effective_permissions(self, workflow_id: str, user_id: str) -> Dict[str, Any]:
+        uid = str(user_id or "").strip()
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            role_names: Set[str] = set()
+
+            for item in workflow.get("collaborators") or []:
+                if str(item.get("user_id") or "") == uid:
+                    role_names.add(str(item.get("role") or "viewer"))
+
+            state = workflow.get("collab_state") or {}
+            team_ids = [str(item) for item in state.get("team_ids") or []]
+            for team_id in team_ids:
+                team = self._teams.get(team_id)
+                if not team:
+                    continue
+                member = (team.get("members") or {}).get(uid)
+                if member:
+                    role_names.add(str(member.get("role") or "viewer"))
+
+            if not role_names:
+                role_names.add("guest")
+
+            permissions: Set[str] = set()
+            for role_name in role_names:
+                permissions.update(self._role_permissions(role_name))
+
+            now = self._now()
+            delegated_permissions: List[str] = []
+            for item in self._delegations.values():
+                if item.get("workflow_id") != workflow_id:
+                    continue
+                if item.get("to_user_id") != uid:
+                    continue
+                if item.get("status") != "active":
+                    continue
+                if datetime.fromisoformat(str(item["expires_at"])) < now:
+                    continue
+                delegated_permissions.append(str(item.get("permission")))
+                permissions.add(str(item.get("permission")))
+
+            return {
+                "workflow_id": workflow_id,
+                "user_id": uid,
+                "roles": sorted(role_names),
+                "permissions": sorted(permissions),
+                "delegated_permissions": sorted(set(delegated_permissions)),
+            }
+
+    def has_permission(self, workflow_id: str, user_id: str, permission: str) -> bool:
+        perms = self.get_effective_permissions(workflow_id, user_id)
+        return str(permission) in set(perms.get("permissions") or [])
+
+    # -------- 协作编辑（OT + 冲突）--------
+    def apply_collaboration_operation(self, workflow_id: str, payload: Mapping[str, Any]) -> Dict[str, Any]:
+        actor_id = str(payload.get("actor_id") or "").strip()
+        if not actor_id:
+            raise ValueError("actor_id 不能为空")
+        if not self.has_permission(workflow_id, actor_id, "edit_workflow"):
+            raise PermissionError("无权限编辑工作流")
+
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            state = workflow["collab_state"]
+            operation_id = str(payload.get("operation_id") or f"op_{uuid4().hex[:12]}")
+            current_revision = int(state.get("revision") or 0)
+            base_revision = int(payload.get("base_revision", current_revision))
+            operation_type = str(payload.get("operation_type") or "").strip()
+            if not operation_type:
+                raise ValueError("operation_type 不能为空")
+
+            operation_index = state.get("operation_index") or {}
+            if operation_id in operation_index:
+                return {
+                    "workflow_id": workflow_id,
+                    "operation_id": operation_id,
+                    "revision": int(operation_index[operation_id]),
+                    "deduplicated": True,
+                }
+
+            conflict_strategy = str(payload.get("conflict_strategy") or "last_write_wins").strip().lower()
+            working = deepcopy(workflow["current"])
+            now = self._now_iso()
+            conflict_item: Optional[Dict[str, Any]] = None
+            applied = False
+            op_data = deepcopy(dict(payload.get("data") or {}))
+
+            if operation_type == "set_node_param":
+                node_id = str(op_data.get("node_id") or "").strip()
+                param_key = str(op_data.get("param_key") or "").strip()
+                param_value = deepcopy(op_data.get("param_value"))
+                if not node_id or not param_key:
+                    raise ValueError("set_node_param 需要 node_id 与 param_key")
+
+                node = self._find_node(working, node_id)
+                if not node:
+                    raise KeyError(f"node '{node_id}' not found")
+                node.setdefault("params", {})
+
+                touch_key = f"{node_id}.{param_key}"
+                last_touch_revision = int((state.get("param_revision") or {}).get(touch_key, 0))
+                existing_value = deepcopy(node["params"].get(param_key))
+                has_conflict = base_revision < last_touch_revision and existing_value != param_value
+                if has_conflict:
+                    conflict_item = {
+                        "conflict_id": f"wf_conflict_{uuid4().hex[:12]}",
+                        "workflow_id": workflow_id,
+                        "operation_id": operation_id,
+                        "operation_type": operation_type,
+                        "actor_id": actor_id,
+                        "base_revision": base_revision,
+                        "current_revision": current_revision,
+                        "status": "open",
+                        "strategy": conflict_strategy,
+                        "target": {"node_id": node_id, "param_key": param_key},
+                        "server_value": existing_value,
+                        "incoming_value": param_value,
+                        "created_at": now,
+                        "resolved_at": None,
+                        "resolved_by": None,
+                    }
+                    state["conflicts"].append(conflict_item)
+                    state["analytics"]["total_conflicts"] += 1
+                    if conflict_strategy != "manual":
+                        node["params"][param_key] = deepcopy(param_value)
+                        conflict_item["status"] = "resolved"
+                        conflict_item["resolved_at"] = now
+                        conflict_item["resolved_by"] = "auto"
+                        state["analytics"]["auto_resolved_conflicts"] += 1
+                        applied = True
+                else:
+                    node["params"][param_key] = deepcopy(param_value)
+                    applied = True
+
+                if applied:
+                    state.setdefault("param_revision", {})[touch_key] = current_revision + 1
+
+            elif operation_type == "set_metadata":
+                metadata_key = str(op_data.get("key") or "").strip()
+                if not metadata_key:
+                    raise ValueError("set_metadata 需要 key")
+                working.setdefault("metadata", {})
+                working["metadata"][metadata_key] = deepcopy(op_data.get("value"))
+                applied = True
+
+            elif operation_type == "add_node":
+                node = deepcopy(op_data.get("node"))
+                if not isinstance(node, Mapping):
+                    raise ValueError("add_node 需要 node 对象")
+                node_id = str(node.get("node_id") or "").strip()
+                if not node_id:
+                    raise ValueError("node.node_id 不能为空")
+                if self._find_node(working, node_id):
+                    raise ValueError(f"node '{node_id}' 已存在")
+                working.setdefault("nodes", []).append(dict(node))
+                applied = True
+
+            elif operation_type == "remove_node":
+                node_id = str(op_data.get("node_id") or "").strip()
+                if not node_id:
+                    raise ValueError("remove_node 需要 node_id")
+                nodes = [item for item in working.get("nodes") or [] if str(item.get("node_id")) != node_id]
+                if len(nodes) == len(working.get("nodes") or []):
+                    raise KeyError(f"node '{node_id}' not found")
+                working["nodes"] = nodes
+                working["edges"] = [
+                    item
+                    for item in working.get("edges") or []
+                    if str(item.get("source")) != node_id and str(item.get("target")) != node_id
+                ]
+                applied = True
+
+            elif operation_type == "add_edge":
+                edge = deepcopy(op_data.get("edge"))
+                if not isinstance(edge, Mapping):
+                    raise ValueError("add_edge 需要 edge 对象")
+                source = str(edge.get("source") or "").strip()
+                target = str(edge.get("target") or "").strip()
+                if not source or not target:
+                    raise ValueError("edge.source 与 edge.target 不能为空")
+                if not self._find_node(working, source) or not self._find_node(working, target):
+                    raise KeyError("add_edge 的 source/target 节点不存在")
+                exists = any(
+                    str(item.get("source")) == source and str(item.get("target")) == target
+                    for item in working.get("edges") or []
+                )
+                if not exists:
+                    working.setdefault("edges", []).append(dict(edge))
+                applied = True
+
+            elif operation_type == "remove_edge":
+                source = str(op_data.get("source") or "").strip()
+                target = str(op_data.get("target") or "").strip()
+                if not source or not target:
+                    raise ValueError("remove_edge 需要 source 与 target")
+                before_count = len(working.get("edges") or [])
+                working["edges"] = [
+                    item
+                    for item in working.get("edges") or []
+                    if not (str(item.get("source")) == source and str(item.get("target")) == target)
+                ]
+                applied = before_count != len(working.get("edges") or [])
+
+            else:
+                raise ValueError(f"不支持的 operation_type: {operation_type}")
+
+            if applied:
+                normalized = self._engine.validate_definition(working)
+                normalized["version"] = int(workflow["current"]["version"])
+                workflow["current"] = normalized
+                workflow["name"] = normalized["name"]
+                workflow["description"] = normalized.get("description", "")
+
+            new_revision = current_revision + 1
+            state["revision"] = new_revision
+            state["analytics"]["total_operations"] += 1
+            state["last_activity_at"] = now
+            operation_entry = {
+                "operation_id": operation_id,
+                "actor_id": actor_id,
+                "base_revision": base_revision,
+                "revision": new_revision,
+                "operation_type": operation_type,
+                "data": op_data,
+                "applied": applied,
+                "conflict_id": conflict_item.get("conflict_id") if conflict_item else None,
+                "created_at": now,
+            }
+            state["operation_log"].append(operation_entry)
+            if len(state["operation_log"]) > 5000:
+                state["operation_log"] = state["operation_log"][-5000:]
+            state.setdefault("operation_index", {})[operation_id] = new_revision
+            state.setdefault("contributor_stats", {}).setdefault(actor_id, {"operations": 0, "comments": 0})
+            state["contributor_stats"][actor_id]["operations"] += 1
+            workflow["updated_at"] = now
+
+            return {
+                "workflow_id": workflow_id,
+                "operation_id": operation_id,
+                "revision": new_revision,
+                "applied": applied,
+                "conflict": deepcopy(conflict_item) if conflict_item else None,
+            }
+
+    def list_collaboration_conflicts(self, workflow_id: str, unresolved_only: bool = False) -> Dict[str, Any]:
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            conflicts = deepcopy(workflow["collab_state"].get("conflicts") or [])
+        if unresolved_only:
+            conflicts = [item for item in conflicts if item.get("status") != "resolved"]
+        conflicts.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
+        return {"workflow_id": workflow_id, "conflicts": conflicts, "count": len(conflicts)}
+
+    def resolve_collaboration_conflict(
+        self,
+        workflow_id: str,
+        conflict_id: str,
+        resolver_user_id: str,
+        strategy: str = "server_wins",
+        override_value: Any = None,
+    ) -> Dict[str, Any]:
+        resolver = str(resolver_user_id or "").strip()
+        if not resolver:
+            raise ValueError("resolver_user_id 不能为空")
+        if not self.has_permission(workflow_id, resolver, "resolve_conflict"):
+            raise PermissionError("无权限处理冲突")
+
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            state = workflow["collab_state"]
+            conflicts = state.get("conflicts") or []
+            conflict = next((item for item in conflicts if str(item.get("conflict_id")) == conflict_id), None)
+            if not conflict:
+                raise KeyError(f"conflict '{conflict_id}' not found")
+            if conflict.get("status") == "resolved":
+                return deepcopy(conflict)
+
+            if str(conflict.get("operation_type")) != "set_node_param":
+                conflict["status"] = "resolved"
+                conflict["resolved_by"] = resolver
+                conflict["resolved_at"] = self._now_iso()
+                state["analytics"]["manual_resolved_conflicts"] += 1
+                return deepcopy(conflict)
+
+            target = conflict.get("target") or {}
+            node_id = str(target.get("node_id") or "")
+            param_key = str(target.get("param_key") or "")
+            working = deepcopy(workflow["current"])
+            node = self._find_node(working, node_id)
+            if not node:
+                raise KeyError(f"node '{node_id}' not found")
+            node.setdefault("params", {})
+
+            strategy_name = str(strategy or "server_wins").strip().lower()
+            if strategy_name == "server_wins":
+                final_value = deepcopy(conflict.get("server_value"))
+            elif strategy_name == "incoming_wins":
+                final_value = deepcopy(conflict.get("incoming_value"))
+            elif strategy_name == "custom":
+                final_value = deepcopy(override_value)
+            else:
+                raise ValueError("strategy 仅支持 server_wins / incoming_wins / custom")
+
+            node["params"][param_key] = final_value
+            normalized = self._engine.validate_definition(working)
+            normalized["version"] = int(workflow["current"]["version"])
+            workflow["current"] = normalized
+
+            state["revision"] = int(state.get("revision") or 0) + 1
+            state.setdefault("param_revision", {})[f"{node_id}.{param_key}"] = int(state["revision"])
+            conflict["status"] = "resolved"
+            conflict["resolved_by"] = resolver
+            conflict["resolved_at"] = self._now_iso()
+            conflict["resolution_strategy"] = strategy_name
+            conflict["resolved_value"] = final_value
+            state["analytics"]["manual_resolved_conflicts"] += 1
+            workflow["updated_at"] = self._now_iso()
+            return deepcopy(conflict)
+
+    def update_collaboration_cursor(
+        self,
+        workflow_id: str,
+        user_id: str,
+        position: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        uid = str(user_id or "").strip()
+        if not uid:
+            raise ValueError("user_id 不能为空")
+        if not self.has_permission(workflow_id, uid, "update_cursor"):
+            raise PermissionError("无权限更新协作光标")
+
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            state = workflow["collab_state"]
+            cursor_payload = {
+                "user_id": uid,
+                "node_id": str(position.get("node_id") or ""),
+                "x": float(position.get("x", 0.0)),
+                "y": float(position.get("y", 0.0)),
+                "selection": list(position.get("selection") or []),
+                "updated_at": self._now_iso(),
+            }
+            state.setdefault("cursors", {})[uid] = cursor_payload
+            state["last_activity_at"] = cursor_payload["updated_at"]
+            return {"workflow_id": workflow_id, "cursor": deepcopy(cursor_payload)}
+
+    def list_collaboration_cursors(self, workflow_id: str, active_seconds: int = 30) -> Dict[str, Any]:
+        ttl = max(1, min(int(active_seconds), 3600))
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            cursors = deepcopy(workflow["collab_state"].get("cursors") or {})
+        now = self._now()
+        active: List[Dict[str, Any]] = []
+        for item in cursors.values():
+            updated_at = datetime.fromisoformat(str(item.get("updated_at")))
+            if (now - updated_at).total_seconds() <= ttl:
+                active.append(item)
+        return {"workflow_id": workflow_id, "cursors": active, "count": len(active)}
+
+    # -------- 评论、提及、通知偏好 --------
+    def add_comment(
+        self,
+        workflow_id: str,
+        user_id: str,
+        content: str,
+        parent_comment_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        uid = str(user_id or "").strip()
+        text = str(content or "").strip()
+        if not uid or not text:
+            raise ValueError("user_id 与 content 不能为空")
+        if not self.has_permission(workflow_id, uid, "comment"):
+            raise PermissionError("无权限评论")
+
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            state = workflow["collab_state"]
+            comment = {
+                "comment_id": f"cmt_{uuid4().hex[:12]}",
+                "workflow_id": workflow_id,
+                "user_id": uid,
+                "content": text,
+                "parent_comment_id": str(parent_comment_id or ""),
+                "mentions": [],
+                "created_at": self._now_iso(),
+            }
+            mentions = sorted(set(re.findall(r"@([A-Za-z0-9_.-]+)", text)))
+            comment["mentions"] = mentions
+            state.setdefault("comments", []).append(comment)
+            state["analytics"]["total_comments"] += 1
+            state["analytics"]["total_mentions"] += len(mentions)
+            state.setdefault("contributor_stats", {}).setdefault(uid, {"operations": 0, "comments": 0})
+            state["contributor_stats"][uid]["comments"] += 1
+            state["last_activity_at"] = comment["created_at"]
+
+            for mentioned_user in mentions:
+                self._notify(
+                    workflow=workflow,
+                    user_id=mentioned_user,
+                    event_type="mention",
+                    message=f"{uid} 在评论中提及了你",
+                    payload={"workflow_id": workflow_id, "comment_id": comment["comment_id"]},
+                )
+            return deepcopy(comment)
+
+    def list_comments(self, workflow_id: str, limit: int = 200) -> Dict[str, Any]:
+        max_items = max(1, min(int(limit), 1000))
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            comments = deepcopy(workflow["collab_state"].get("comments") or [])
+        comments.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
+        trimmed = comments[:max_items]
+        return {"workflow_id": workflow_id, "comments": trimmed, "count": len(trimmed)}
+
+    def set_notification_preferences(
+        self,
+        workflow_id: str,
+        user_id: str,
+        preferences: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        uid = str(user_id or "").strip()
+        if not uid:
+            raise ValueError("user_id 不能为空")
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            state = workflow["collab_state"]
+            prefs = deepcopy(self._DEFAULT_NOTIFICATION_PREFS)
+            prefs.update(deepcopy(dict(preferences or {})))
+            muted = prefs.get("muted_event_types") or []
+            prefs["muted_event_types"] = sorted({str(item) for item in muted if str(item).strip()})
+            state.setdefault("notification_preferences", {})[uid] = prefs
+            return {"workflow_id": workflow_id, "user_id": uid, "preferences": deepcopy(prefs)}
+
+    def get_notification_preferences(self, workflow_id: str, user_id: str) -> Dict[str, Any]:
+        uid = str(user_id or "").strip()
+        if not uid:
+            raise ValueError("user_id 不能为空")
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            prefs = deepcopy(
+                workflow["collab_state"].get("notification_preferences", {}).get(uid) or self._DEFAULT_NOTIFICATION_PREFS
+            )
+        return {"workflow_id": workflow_id, "user_id": uid, "preferences": prefs}
+
+    def list_notifications(self, workflow_id: str, user_id: str, unread_only: bool = False, limit: int = 100) -> Dict[str, Any]:
+        uid = str(user_id or "").strip()
+        max_items = max(1, min(int(limit), 500))
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            notifications = [
+                deepcopy(item)
+                for item in workflow["collab_state"].get("notifications") or []
+                if str(item.get("user_id")) == uid
+            ]
+        if unread_only:
+            notifications = [item for item in notifications if not bool(item.get("read", False))]
+        notifications.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
+        trimmed = notifications[:max_items]
+        return {"workflow_id": workflow_id, "user_id": uid, "notifications": trimmed, "count": len(trimmed)}
+
+    def mark_notification_read(self, workflow_id: str, user_id: str, notification_id: str) -> Dict[str, Any]:
+        uid = str(user_id or "").strip()
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            state = workflow["collab_state"]
+            matched = next(
+                (
+                    item
+                    for item in state.get("notifications") or []
+                    if str(item.get("notification_id")) == notification_id and str(item.get("user_id")) == uid
+                ),
+                None,
+            )
+            if not matched:
+                raise KeyError(f"notification '{notification_id}' not found")
+            matched["read"] = True
+            matched["read_at"] = self._now_iso()
+            return deepcopy(matched)
+
+    # -------- 分享、导出、社交 --------
+    def create_share_link(
+        self,
+        workflow_id: str,
+        creator_user_id: str,
+        access_mode: str = "public",
+        password: str = "",
+        expires_in_hours: int = 24 * 7,
+    ) -> Dict[str, Any]:
+        creator = str(creator_user_id or "").strip()
+        if not creator:
+            raise ValueError("creator_user_id 不能为空")
+        if not self.has_permission(workflow_id, creator, "create_share_link"):
+            raise PermissionError("无权限创建分享链接")
+
+        mode = str(access_mode or "public").strip().lower()
+        if mode not in {"public", "private", "password"}:
+            raise ValueError("access_mode 仅支持 public/private/password")
+        if mode == "password" and not str(password or "").strip():
+            raise ValueError("password 访问模式需要密码")
+        ttl = max(1, min(int(expires_in_hours), 24 * 90))
+
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            link_id = f"shr_{uuid4().hex[:14]}"
+            record = {
+                "share_link_id": link_id,
+                "workflow_id": workflow_id,
+                "created_by": creator,
+                "access_mode": mode,
+                "password": str(password or ""),
+                "created_at": self._now_iso(),
+                "expires_at": (self._now() + timedelta(hours=ttl)).isoformat(),
+                "revoked": False,
+                "stats": {"views": 0, "downloads": 0},
+                "share_url": f"/api/workflow/share/{link_id}",
+            }
+            self._share_links[link_id] = record
+            state = workflow["collab_state"]
+            share_ids = [str(item) for item in state.get("share_link_ids") or []]
+            if link_id not in share_ids:
+                share_ids.append(link_id)
+            state["share_link_ids"] = share_ids
+            workflow["updated_at"] = self._now_iso()
+            return self._sanitize_share_link(record)
+
+    def list_share_links(self, workflow_id: str) -> Dict[str, Any]:
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            share_ids = [str(item) for item in workflow["collab_state"].get("share_link_ids") or []]
+            links = [
+                self._sanitize_share_link(self._share_links[item])
+                for item in share_ids
+                if item in self._share_links
+            ]
+        links.sort(key=lambda item: str(item.get("created_at", "")), reverse=True)
+        return {"workflow_id": workflow_id, "links": links, "count": len(links)}
+
+    def access_share_link(self, share_link_id: str, password: str = "", viewer_user_id: str = "") -> Dict[str, Any]:
+        with self._lock:
+            link = self._share_links.get(share_link_id)
+            if not link:
+                raise KeyError(f"share link '{share_link_id}' not found")
+            if bool(link.get("revoked")):
+                raise PermissionError("分享链接已撤销")
+            if datetime.fromisoformat(str(link["expires_at"])) < self._now():
+                raise PermissionError("分享链接已过期")
+
+            mode = str(link.get("access_mode", "public"))
+            workflow_id = str(link["workflow_id"])
+            if mode == "password" and str(link.get("password")) != str(password):
+                raise PermissionError("分享密码错误")
+            if mode == "private":
+                uid = str(viewer_user_id or "").strip()
+                if not uid or not self.has_permission(workflow_id, uid, "view_workflow"):
+                    raise PermissionError("该链接为私有分享，无访问权限")
+
+            workflow = self._workflow_or_error(workflow_id)
+            link["stats"]["views"] = int(link.get("stats", {}).get("views", 0)) + 1
+            workflow["collab_state"]["analytics"]["share_views"] += 1
+            return {
+                "share_link": self._sanitize_share_link(link),
+                "workflow": {
+                    "workflow_id": workflow["workflow_id"],
+                    "name": workflow["name"],
+                    "description": workflow["description"],
+                    "definition": deepcopy(workflow["current"]),
+                },
+            }
+
+    def revoke_share_link(self, workflow_id: str, share_link_id: str, operator_user_id: str) -> Dict[str, Any]:
+        operator = str(operator_user_id or "").strip()
+        if not self.has_permission(workflow_id, operator, "manage_share"):
+            raise PermissionError("无权限撤销分享链接")
+        with self._lock:
+            link = self._share_links.get(share_link_id)
+            if not link or str(link.get("workflow_id")) != workflow_id:
+                raise KeyError(f"share link '{share_link_id}' not found")
+            link["revoked"] = True
+            link["revoked_by"] = operator
+            link["revoked_at"] = self._now_iso()
+            return self._sanitize_share_link(link)
+
+    def export_workflow_data(
+        self,
+        workflow_id: str,
+        fmt: str = "json",
+        share_link_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        format_name = str(fmt or "json").strip().lower()
+        if format_name not in {"json", "csv"}:
+            raise ValueError("fmt 仅支持 json/csv")
+
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            definition = deepcopy(workflow["current"])
+            if format_name == "json":
+                content = json.dumps(definition, ensure_ascii=False, indent=2)
+                mime = "application/json"
+                filename = f"{workflow_id}.json"
+            else:
+                buffer = io.StringIO()
+                writer = csv.writer(buffer)
+                writer.writerow(["section", "id", "name_or_type", "source", "target", "params"])
+                for node in definition.get("nodes") or []:
+                    writer.writerow(
+                        [
+                            "node",
+                            node.get("node_id"),
+                            node.get("node_type"),
+                            "",
+                            "",
+                            json.dumps(node.get("params") or {}, ensure_ascii=False),
+                        ]
+                    )
+                for edge in definition.get("edges") or []:
+                    writer.writerow(
+                        [
+                            "edge",
+                            "",
+                            "",
+                            edge.get("source"),
+                            edge.get("target"),
+                            json.dumps({"condition": edge.get("condition")}, ensure_ascii=False),
+                        ]
+                    )
+                content = buffer.getvalue()
+                mime = "text/csv"
+                filename = f"{workflow_id}.csv"
+
+            if share_link_id:
+                link = self._share_links.get(share_link_id)
+                if link and str(link.get("workflow_id")) == workflow_id:
+                    link["stats"]["downloads"] = int(link.get("stats", {}).get("downloads", 0)) + 1
+                    workflow["collab_state"]["analytics"]["share_downloads"] += 1
+
+            return {
+                "workflow_id": workflow_id,
+                "format": format_name,
+                "filename": filename,
+                "mime_type": mime,
+                "content": content,
+                "size": len(content.encode("utf-8")),
+            }
+
+    def get_share_statistics(self, workflow_id: str) -> Dict[str, Any]:
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            share_ids = [str(item) for item in workflow["collab_state"].get("share_link_ids") or []]
+            links = [self._share_links[item] for item in share_ids if item in self._share_links]
+            total_views = sum(int(item.get("stats", {}).get("views", 0)) for item in links)
+            total_downloads = sum(int(item.get("stats", {}).get("downloads", 0)) for item in links)
+            return {
+                "workflow_id": workflow_id,
+                "total_links": len(links),
+                "total_views": total_views,
+                "total_downloads": total_downloads,
+                "links": [self._sanitize_share_link(item) for item in links],
+            }
+
+    def generate_social_share_links(
+        self,
+        workflow_id: str,
+        share_link_id: str,
+        title: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            link = self._share_links.get(share_link_id)
+            if not link or str(link.get("workflow_id")) != workflow_id:
+                raise KeyError(f"share link '{share_link_id}' not found")
+
+            share_url = str(link.get("share_url"))
+            share_title = str(title or f"查看工作流：{workflow['name']}")
+            encoded_url = quote_plus(share_url)
+            encoded_title = quote_plus(share_title)
+            return {
+                "workflow_id": workflow_id,
+                "share_link_id": share_link_id,
+                "platform_links": {
+                    "x": f"https://x.com/intent/tweet?url={encoded_url}&text={encoded_title}",
+                    "linkedin": f"https://www.linkedin.com/sharing/share-offsite/?url={encoded_url}",
+                    "weibo": f"https://service.weibo.com/share/share.php?url={encoded_url}&title={encoded_title}",
+                    "wechat": f"weixin://dl/business/?t={encoded_url}",
+                },
+            }
+
+    # -------- 协作分析 --------
+    def get_collaboration_analytics(self, workflow_id: str) -> Dict[str, Any]:
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            state = workflow["collab_state"]
+            analytics = deepcopy(state.get("analytics") or {})
+            total_conflicts = int(analytics.get("total_conflicts", 0))
+            resolved_conflicts = int(analytics.get("auto_resolved_conflicts", 0)) + int(
+                analytics.get("manual_resolved_conflicts", 0)
+            )
+            resolution_rate = round((resolved_conflicts / total_conflicts) * 100, 2) if total_conflicts else 100.0
+            cursors = state.get("cursors") or {}
+            now = self._now()
+            active_users = 0
+            for cursor in cursors.values():
+                try:
+                    updated_at = datetime.fromisoformat(str(cursor.get("updated_at")))
+                except Exception:  # pylint: disable=broad-except
+                    continue
+                if (now - updated_at).total_seconds() <= 300:
+                    active_users += 1
+
+            contributor_stats = [
+                {"user_id": uid, **deepcopy(stats)}
+                for uid, stats in (state.get("contributor_stats") or {}).items()
+            ]
+            contributor_stats.sort(
+                key=lambda item: (int(item.get("operations", 0)), int(item.get("comments", 0))),
+                reverse=True,
+            )
+            return {
+                "workflow_id": workflow_id,
+                "revision": int(state.get("revision", 0)),
+                "active_collaborators_5m": active_users,
+                "conflict_resolution_rate": resolution_rate,
+                "analytics": analytics,
+                "top_contributors": contributor_stats[:10],
+                "updated_at": self._now_iso(),
+            }
+
+    def _build_run_snapshot(self, run: Mapping[str, Any]) -> Dict[str, Any]:
+        status = run.get("status")
+        return {
+            "run_id": run.get("run_id"),
+            "workflow_id": run.get("workflow_id"),
+            "status": status,
+            "progress": run.get("progress"),
+            "error": run.get("error"),
+            "started_at": run.get("started_at"),
+            "ended_at": run.get("ended_at"),
+            "duration_ms": run.get("duration_ms"),
+            "node_status_counts": {
+                "running": sum(1 for item in (run.get("node_statuses") or {}).values() if item == "running"),
+                "completed": sum(1 for item in (run.get("node_statuses") or {}).values() if item == "completed"),
+                "failed": sum(1 for item in (run.get("node_statuses") or {}).values() if item == "failed"),
+                "skipped": sum(1 for item in (run.get("node_statuses") or {}).values() if item == "skipped"),
+            },
+            "logs_count": len(run.get("logs") or []),
+        }
+
+    def _apply_run_event(self, run: Dict[str, Any], event: str, payload: Mapping[str, Any]) -> None:
+        if event == "run_started":
+            run["status"] = "running"
+            run["started_at"] = str(payload.get("started_at") or run.get("started_at") or self._now_iso())
+            run["progress"] = float(payload.get("progress", run.get("progress", 0.0)) or 0.0)
+        elif event == "progress_update":
+            run["progress"] = float(payload.get("progress", run.get("progress", 0.0)) or 0.0)
+        elif event in {"node_started", "node_completed", "node_failed", "node_retry", "node_skipped"}:
+            node_id = str(payload.get("node_id") or "")
+            if node_id:
+                if event == "node_started":
+                    run.setdefault("node_statuses", {})[node_id] = "running"
+                elif event == "node_completed":
+                    run.setdefault("node_statuses", {})[node_id] = "completed"
+                elif event == "node_failed":
+                    run.setdefault("node_statuses", {})[node_id] = "failed"
+                elif event == "node_skipped":
+                    run.setdefault("node_statuses", {})[node_id] = "skipped"
+
+            attempt = payload.get("attempt")
+            if node_id and attempt is not None:
+                try:
+                    run.setdefault("node_attempts", {})[node_id] = int(attempt)
+                except (TypeError, ValueError):
+                    pass
+
+            duration = payload.get("duration_ms")
+            if node_id and duration is not None:
+                try:
+                    run.setdefault("node_timings_ms", {})[node_id] = float(duration)
+                except (TypeError, ValueError):
+                    pass
+
+            log_item = payload.get("log")
+            if isinstance(log_item, Mapping):
+                logs = run.setdefault("logs", [])
+                logs.append(deepcopy(dict(log_item)))
+                if len(logs) > 5000:
+                    del logs[:-5000]
+
+        elif event in {"run_completed", "run_failed"}:
+            run["status"] = "completed" if event == "run_completed" else "failed"
+            run["ended_at"] = str(payload.get("ended_at") or self._now_iso())
+            run["duration_ms"] = payload.get("duration_ms")
+            run["progress"] = float(payload.get("progress", run.get("progress", 100.0)) or 0.0)
+            run["error"] = payload.get("error")
+            summary = payload.get("summary")
+            if isinstance(summary, Mapping):
+                run["summary"] = deepcopy(dict(summary))
+
+    def _emit_workflow_run_event(
+        self,
+        workflow_id: str,
+        run_id: str,
+        event: str,
+        update: Mapping[str, Any],
+        snapshot: Optional[Mapping[str, Any]] = None,
+    ) -> None:
+        websocket_service.dispatch_workflow_run_update(
+            run_id=run_id,
+            event=event,
+            update=deepcopy(dict(update)),
+            workflow_id=workflow_id,
+            snapshot=deepcopy(dict(snapshot or {})),
+        )
 
     # -------- 执行与监控 --------
     def execute_workflow(
@@ -307,6 +1567,13 @@ class SmartWorkflowService:
 
         with self._lock:
             self._runs[run_id] = placeholder
+        self._emit_workflow_run_event(
+            workflow_id=workflow_id,
+            run_id=run_id,
+            event="run_queued",
+            update={"status": "queued", "progress": 0.0},
+            snapshot=self._build_run_snapshot(placeholder),
+        )
 
         thread = threading.Thread(
             target=self._execute_async,
@@ -332,14 +1599,32 @@ class SmartWorkflowService:
         trigger: str,
         debug: bool,
     ) -> None:
+        workflow_id = str(definition.get("workflow_id") or "")
+
+        def _on_engine_event(event: str, payload: Dict[str, Any]) -> None:
+            snapshot: Dict[str, Any] = {}
+            with self._lock:
+                current = self._runs.get(run_id)
+                if current:
+                    self._apply_run_event(current, event, payload)
+                    snapshot = self._build_run_snapshot(current)
+            self._emit_workflow_run_event(
+                workflow_id=workflow_id,
+                run_id=run_id,
+                event=event,
+                update=payload,
+                snapshot=snapshot,
+            )
+
         try:
             result = self._engine.execute(
                 definition=definition,
                 input_variables=input_variables,
                 trigger=trigger,
                 debug=debug,
+                run_id=run_id,
+                event_callback=_on_engine_event,
             )
-            result["run_id"] = run_id
         except Exception as exc:  # pylint: disable=broad-except
             now = datetime.now(timezone.utc).isoformat()
             result = {
@@ -373,9 +1658,34 @@ class SmartWorkflowService:
                     "skipped_nodes": 0,
                 },
             }
+            self._emit_workflow_run_event(
+                workflow_id=workflow_id,
+                run_id=run_id,
+                event="run_failed",
+                update={
+                    "error": str(exc),
+                    "status": "failed",
+                    "ended_at": now,
+                    "duration_ms": 0.0,
+                    "progress": 100.0,
+                },
+                snapshot=self._build_run_snapshot(result),
+            )
 
         with self._lock:
             self._runs[run_id] = deepcopy(result)
+            final_snapshot = self._build_run_snapshot(result)
+        self._emit_workflow_run_event(
+            workflow_id=workflow_id,
+            run_id=run_id,
+            event="run_finalized",
+            update={
+                "status": result.get("status"),
+                "progress": result.get("progress"),
+                "ended_at": result.get("ended_at"),
+            },
+            snapshot=final_snapshot,
+        )
         self._update_metrics(result)
 
     def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:

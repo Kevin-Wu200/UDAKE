@@ -47,6 +47,10 @@ export class WorkflowRealtimeService {
 
   private started = false;
 
+  private subscribedWorkflowId = '';
+
+  private subscribedRunId = '';
+
   start() {
     this.started = true;
     this.connect();
@@ -66,6 +70,52 @@ export class WorkflowRealtimeService {
     return () => {
       this.listeners.delete(handler);
     };
+  }
+
+  setWorkflowSubscription(workflowId?: string | null) {
+    const next = (workflowId || '').trim();
+    if (next === this.subscribedWorkflowId) {
+      return;
+    }
+
+    const prev = this.subscribedWorkflowId;
+    this.subscribedWorkflowId = next;
+
+    if (prev) {
+      this.send({
+        type: 'unsubscribe_workflow',
+        workflow_id: prev
+      });
+    }
+    if (next) {
+      this.send({
+        type: 'subscribe_workflow',
+        workflow_id: next
+      });
+    }
+  }
+
+  setRunSubscription(runId?: string | null) {
+    const next = (runId || '').trim();
+    if (next === this.subscribedRunId) {
+      return;
+    }
+
+    const prev = this.subscribedRunId;
+    this.subscribedRunId = next;
+
+    if (prev) {
+      this.send({
+        type: 'unsubscribe_workflow_run',
+        run_id: prev
+      });
+    }
+    if (next) {
+      this.send({
+        type: 'subscribe_workflow_run',
+        run_id: next
+      });
+    }
   }
 
   notify(type: string, payload: Record<string, unknown>, raw: unknown) {
@@ -99,6 +149,7 @@ export class WorkflowRealtimeService {
 
     this.socket.onopen = () => {
       this.clearReconnectTimer();
+      this.syncSubscriptions();
       this.startHeartbeat();
       this.notify('connected', { client_id: this.clientId }, null);
     };
@@ -127,18 +178,35 @@ export class WorkflowRealtimeService {
   private startHeartbeat() {
     this.clearHeartbeatTimer();
     this.heartbeatTimer = window.setInterval(() => {
-      if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-        return;
-      }
-      this.socket.send(
-        JSON.stringify({
-          type: 'ping',
-          data: {
-            ts: Date.now()
-          }
-        })
-      );
+      this.send({
+        type: 'ping',
+        data: {
+          ts: Date.now()
+        }
+      });
     }, 20_000);
+  }
+
+  private syncSubscriptions() {
+    if (this.subscribedWorkflowId) {
+      this.send({
+        type: 'subscribe_workflow',
+        workflow_id: this.subscribedWorkflowId
+      });
+    }
+    if (this.subscribedRunId) {
+      this.send({
+        type: 'subscribe_workflow_run',
+        run_id: this.subscribedRunId
+      });
+    }
+  }
+
+  private send(payload: Record<string, unknown>) {
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      return;
+    }
+    this.socket.send(JSON.stringify(payload));
   }
 
   private scheduleReconnect() {

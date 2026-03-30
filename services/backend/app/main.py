@@ -250,6 +250,70 @@ async def handle_websocket_message(client_id: str, message: dict):
             'task_id': task_id
         }, client_id)
 
+    elif message_type == 'subscribe_workflow':
+        workflow_id = message.get('workflow_id') or message_data.get('workflow_id')
+        if not workflow_id:
+            await websocket_service.send_personal_message({
+                'type': 'error',
+                'message': 'workflow_id is required',
+                'message_id': message_id
+            }, client_id)
+            return
+        await websocket_service.subscribe_to_workflow(client_id, workflow_id)
+        await websocket_service.send_personal_message({
+            'type': 'subscription_confirmed',
+            'workflow_id': workflow_id,
+            'message_id': message_id
+        }, client_id)
+
+    elif message_type == 'unsubscribe_workflow':
+        workflow_id = message.get('workflow_id') or message_data.get('workflow_id')
+        if not workflow_id:
+            await websocket_service.send_personal_message({
+                'type': 'error',
+                'message': 'workflow_id is required',
+                'message_id': message_id
+            }, client_id)
+            return
+        await websocket_service.unsubscribe_from_workflow(client_id, workflow_id)
+        await websocket_service.send_personal_message({
+            'type': 'unsubscription_confirmed',
+            'workflow_id': workflow_id,
+            'message_id': message_id
+        }, client_id)
+
+    elif message_type == 'subscribe_workflow_run':
+        run_id = message.get('run_id') or message_data.get('run_id')
+        if not run_id:
+            await websocket_service.send_personal_message({
+                'type': 'error',
+                'message': 'run_id is required',
+                'message_id': message_id
+            }, client_id)
+            return
+        await websocket_service.subscribe_to_workflow_run(client_id, run_id)
+        await websocket_service.send_personal_message({
+            'type': 'subscription_confirmed',
+            'run_id': run_id,
+            'message_id': message_id
+        }, client_id)
+
+    elif message_type == 'unsubscribe_workflow_run':
+        run_id = message.get('run_id') or message_data.get('run_id')
+        if not run_id:
+            await websocket_service.send_personal_message({
+                'type': 'error',
+                'message': 'run_id is required',
+                'message_id': message_id
+            }, client_id)
+            return
+        await websocket_service.unsubscribe_from_workflow_run(client_id, run_id)
+        await websocket_service.send_personal_message({
+            'type': 'unsubscription_confirmed',
+            'run_id': run_id,
+            'message_id': message_id
+        }, client_id)
+
     elif message_type == 'subscribe_gps_project':
         project_id = message.get('project_id') or message_data.get('project_id') or 'default_mobile_project'
         await websocket_service.subscribe_to_project(client_id, project_id)

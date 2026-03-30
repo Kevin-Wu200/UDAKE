@@ -15,6 +15,7 @@ from .expression import evaluate_condition, resolve_value, safe_eval_bool
 from .schema import WorkflowValidationError, get_node_param_rules, validate_and_normalize_definition
 
 NodeHandler = Callable[[Mapping[str, Any], MutableMapping[str, Any], List[Any], int], Any]
+ExecutionEventCallback = Callable[[str, Dict[str, Any]], None]
 
 
 class WorkflowEngine:
@@ -59,14 +60,16 @@ class WorkflowEngine:
         input_variables: Optional[Mapping[str, Any]] = None,
         trigger: str = "manual",
         debug: bool = False,
+        run_id: Optional[str] = None,
+        event_callback: Optional[ExecutionEventCallback] = None,
     ) -> Dict[str, Any]:
         normalized = self.validate_definition(definition)
 
-        run_id = f"run_{uuid4().hex[:12]}"
+        resolved_run_id = run_id or f"run_{uuid4().hex[:12]}"
         start_time = time.perf_counter()
 
         run_context: Dict[str, Any] = {
-            "run_id": run_id,
+            "run_id": resolved_run_id,
             "workflow_id": normalized["workflow_id"],
             "workflow_version": normalized["version"],
             "trigger": trigger,
@@ -88,6 +91,18 @@ class WorkflowEngine:
 
         if input_variables:
             run_context["variables"].update(deepcopy(dict(input_variables)))
+        self._emit_event(
+            event_callback,
+            "run_started",
+            {
+                "run_id": run_context["run_id"],
+                "workflow_id": run_context["workflow_id"],
+                "workflow_version": run_context["workflow_version"],
+                "trigger": run_context["trigger"],
+                "started_at": run_context["started_at"],
+                "status": run_context["status"],
+            },
+        )
 
         nodes: List[Dict[str, Any]] = deepcopy(normalized["nodes"])
         edges: List[Dict[str, Any]] = deepcopy(normalized["edges"])
@@ -128,6 +143,7 @@ class WorkflowEngine:
                         run_context,
                         node_id,
                         "branch_not_selected",
+                        event_callback=event_callback,
                     )
                     pending.remove(node_id)
                     progressed = True
@@ -139,6 +155,7 @@ class WorkflowEngine:
                         run_context,
                         node_id,
                         "upstream_failed",
+                        event_callback=event_callback,
                     )
                     pending.remove(node_id)
                     progressed = True
@@ -146,7 +163,7 @@ class WorkflowEngine:
 
                 node = node_map[node_id]
                 if not node.get("enabled", True):
-                    self._mark_node_skipped(run_context, node_id, "node_disabled")
+                    self._mark_node_skipped(run_context, node_id, "node_disabled", event_callback=event_callback)
                     pending.remove(node_id)
                     progressed = True
                     continue
@@ -160,6 +177,7 @@ class WorkflowEngine:
                         run_context=run_context,
                         upstream_values=upstream_values,
                         upstream_map=upstream_map,
+                        event_callback=event_callback,
                     )
                     run_context["node_outputs"][node_id] = result
                     run_context["node_statuses"][node_id] = "completed"
@@ -176,20 +194,37 @@ class WorkflowEngine:
                 except Exception as exc:  # pylint: disable=broad-except
                     run_context["node_statuses"][node_id] = "failed"
                     run_context["error"] = f"节点 {node_id} 执行失败: {exc}"
-                    run_context["logs"].append(
-                        {
+                    latest_log = run_context["logs"][-1] if run_context["logs"] else None
+                    if not latest_log or latest_log.get("event") != "node_failed" or latest_log.get("node_id") != node_id:
+                        failure_log = {
                             "ts": datetime.now(timezone.utc).isoformat(),
                             "node_id": node_id,
                             "event": "node_failed",
                             "message": str(exc),
                         }
-                    )
+                        run_context["logs"].append(failure_log)
+                        self._emit_event(
+                            event_callback,
+                            "node_failed",
+                            {
+                                "run_id": run_context["run_id"],
+                                "workflow_id": run_context["workflow_id"],
+                                "node_id": node_id,
+                                "error": str(exc),
+                                "log": deepcopy(failure_log),
+                            },
+                        )
 
                     if fail_fast:
                         for remaining in list(pending):
                             if remaining == node_id:
                                 continue
-                            self._mark_node_skipped(run_context, remaining, "cancelled_due_to_failure")
+                            self._mark_node_skipped(
+                                run_context,
+                                remaining,
+                                "cancelled_due_to_failure",
+                                event_callback=event_callback,
+                            )
                             pending.remove(remaining)
                         pending.remove(node_id)
                         progressed = True
@@ -197,7 +232,7 @@ class WorkflowEngine:
 
                 pending.remove(node_id)
                 progressed = True
-                self._refresh_progress(run_context, total_nodes=len(nodes))
+                self._refresh_progress(run_context, total_nodes=len(nodes), event_callback=event_callback)
 
             if not progressed:
                 unresolved = ", ".join(sorted(pending))
@@ -217,6 +252,21 @@ class WorkflowEngine:
             "failed_nodes": sum(1 for status in run_context["node_statuses"].values() if status == "failed"),
             "skipped_nodes": sum(1 for status in run_context["node_statuses"].values() if status == "skipped"),
         }
+        terminal_event = "run_completed" if run_context["status"] == "completed" else "run_failed"
+        self._emit_event(
+            event_callback,
+            terminal_event,
+            {
+                "run_id": run_context["run_id"],
+                "workflow_id": run_context["workflow_id"],
+                "status": run_context["status"],
+                "ended_at": run_context["ended_at"],
+                "duration_ms": run_context["duration_ms"],
+                "progress": run_context["progress"],
+                "error": run_context.get("error"),
+                "summary": deepcopy(run_context["summary"]),
+            },
+        )
 
         return run_context
 
@@ -226,6 +276,7 @@ class WorkflowEngine:
         run_context: MutableMapping[str, Any],
         upstream_values: List[Any],
         upstream_map: Mapping[str, Any],
+        event_callback: Optional[ExecutionEventCallback] = None,
     ) -> Any:
         node_id = node["node_id"]
         node_type = node.get("node_type") or ""
@@ -240,6 +291,19 @@ class WorkflowEngine:
             attempt += 1
             node_start = time.perf_counter()
             run_context["node_attempts"][node_id] = attempt
+            run_context["node_statuses"][node_id] = "running"
+            self._emit_event(
+                event_callback,
+                "node_started",
+                {
+                    "run_id": run_context["run_id"],
+                    "workflow_id": run_context["workflow_id"],
+                    "node_id": node_id,
+                    "node_type": node_type,
+                    "attempt": attempt,
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                },
+            )
 
             scope = {
                 "variables": run_context["variables"],
@@ -257,29 +321,53 @@ class WorkflowEngine:
                 result = handler(node, scope, upstream_values, attempt)
                 duration_ms = round((time.perf_counter() - node_start) * 1000, 3)
                 run_context["node_timings_ms"][node_id] = duration_ms
-                run_context["logs"].append(
+                completed_log = {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "node_id": node_id,
+                    "event": "node_completed",
+                    "attempt": attempt,
+                    "duration_ms": duration_ms,
+                }
+                run_context["logs"].append(completed_log)
+                self._emit_event(
+                    event_callback,
+                    "node_completed",
                     {
-                        "ts": datetime.now(timezone.utc).isoformat(),
+                        "run_id": run_context["run_id"],
+                        "workflow_id": run_context["workflow_id"],
                         "node_id": node_id,
-                        "event": "node_completed",
                         "attempt": attempt,
                         "duration_ms": duration_ms,
-                    }
+                        "log": deepcopy(completed_log),
+                    },
                 )
                 return result
 
             except Exception as exc:  # pylint: disable=broad-except
                 duration_ms = round((time.perf_counter() - node_start) * 1000, 3)
                 run_context["node_timings_ms"][node_id] = duration_ms
-                run_context["logs"].append(
+                log_event = "node_retry" if attempt <= max_retries else "node_failed"
+                failed_log = {
+                    "ts": datetime.now(timezone.utc).isoformat(),
+                    "node_id": node_id,
+                    "event": log_event,
+                    "attempt": attempt,
+                    "duration_ms": duration_ms,
+                    "message": str(exc),
+                }
+                run_context["logs"].append(failed_log)
+                self._emit_event(
+                    event_callback,
+                    log_event,
                     {
-                        "ts": datetime.now(timezone.utc).isoformat(),
+                        "run_id": run_context["run_id"],
+                        "workflow_id": run_context["workflow_id"],
                         "node_id": node_id,
-                        "event": "node_retry" if attempt <= max_retries else "node_failed",
                         "attempt": attempt,
                         "duration_ms": duration_ms,
-                        "message": str(exc),
-                    }
+                        "error": str(exc),
+                        "log": deepcopy(failed_log),
+                    },
                 )
 
                 if attempt > max_retries:
@@ -301,26 +389,69 @@ class WorkflowEngine:
 
         raise ValueError(f"未找到节点处理器: {node_type}")
 
-    @staticmethod
-    def _refresh_progress(run_context: MutableMapping[str, Any], total_nodes: int) -> None:
+    def _refresh_progress(
+        self,
+        run_context: MutableMapping[str, Any],
+        total_nodes: int,
+        event_callback: Optional[ExecutionEventCallback] = None,
+    ) -> None:
         finished = sum(
             1
             for status in run_context["node_statuses"].values()
             if status in {"completed", "failed", "skipped"}
         )
         run_context["progress"] = round((finished / total_nodes) * 100.0, 2) if total_nodes > 0 else 100.0
+        self._emit_event(
+            event_callback,
+            "progress_update",
+            {
+                "run_id": run_context["run_id"],
+                "workflow_id": run_context["workflow_id"],
+                "progress": run_context["progress"],
+                "finished_nodes": finished,
+                "total_nodes": total_nodes,
+            },
+        )
+
+    def _mark_node_skipped(
+        self,
+        run_context: MutableMapping[str, Any],
+        node_id: str,
+        reason: str,
+        event_callback: Optional[ExecutionEventCallback] = None,
+    ) -> None:
+        run_context["node_statuses"][node_id] = "skipped"
+        skipped_log = {
+            "ts": datetime.now(timezone.utc).isoformat(),
+            "node_id": node_id,
+            "event": "node_skipped",
+            "reason": reason,
+        }
+        run_context["logs"].append(skipped_log)
+        self._emit_event(
+            event_callback,
+            "node_skipped",
+            {
+                "run_id": run_context["run_id"],
+                "workflow_id": run_context["workflow_id"],
+                "node_id": node_id,
+                "reason": reason,
+                "log": deepcopy(skipped_log),
+            },
+        )
 
     @staticmethod
-    def _mark_node_skipped(run_context: MutableMapping[str, Any], node_id: str, reason: str) -> None:
-        run_context["node_statuses"][node_id] = "skipped"
-        run_context["logs"].append(
-            {
-                "ts": datetime.now(timezone.utc).isoformat(),
-                "node_id": node_id,
-                "event": "node_skipped",
-                "reason": reason,
-            }
-        )
+    def _emit_event(
+        event_callback: Optional[ExecutionEventCallback],
+        event: str,
+        payload: Dict[str, Any],
+    ) -> None:
+        if not event_callback:
+            return
+        try:
+            event_callback(event, deepcopy(payload))
+        except Exception:
+            pass
 
     def _evaluate_edge_condition(self, edge_condition: str, node_output: Any, run_context: Mapping[str, Any]) -> bool:
         condition = (edge_condition or "always").strip().lower()

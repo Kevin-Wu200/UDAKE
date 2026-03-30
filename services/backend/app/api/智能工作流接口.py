@@ -73,11 +73,106 @@ class ScheduleCreateRequest(BaseModel):
     trigger_payload: Dict[str, Any] = Field(default_factory=dict)
 
 
+class TeamCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    owner_user_id: str = Field(..., min_length=1, max_length=80)
+    description: str = Field(default="", max_length=500)
+
+
+class TeamMemberRequest(BaseModel):
+    user_id: str = Field(..., min_length=1, max_length=80)
+    role: str = Field(default="viewer", max_length=40)
+    display_name: str = Field(default="", max_length=120)
+
+
+class TeamBindRequest(BaseModel):
+    team_id: str = Field(..., min_length=1, max_length=80)
+
+
+class InviteCreateRequest(BaseModel):
+    team_id: str = Field(..., min_length=1, max_length=80)
+    email: str = Field(..., min_length=3, max_length=255)
+    role: str = Field(default="viewer", max_length=40)
+    invited_by: str = Field(default="system", max_length=80)
+    ttl_hours: int = Field(default=72, ge=1, le=24 * 30)
+
+
+class InviteAcceptRequest(BaseModel):
+    user_id: str = Field(..., min_length=1, max_length=80)
+    display_name: str = Field(default="", max_length=120)
+
+
+class DelegationCreateRequest(BaseModel):
+    from_user_id: str = Field(..., min_length=1, max_length=80)
+    to_user_id: str = Field(..., min_length=1, max_length=80)
+    permission: str = Field(..., min_length=1, max_length=80)
+    ttl_hours: int = Field(default=24, ge=1, le=24 * 30)
+
+
+class NotificationPreferenceRequest(BaseModel):
+    user_id: str = Field(..., min_length=1, max_length=80)
+    preferences: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CommentCreateRequest(BaseModel):
+    user_id: str = Field(..., min_length=1, max_length=80)
+    content: str = Field(..., min_length=1, max_length=1000)
+    parent_comment_id: Optional[str] = Field(default=None, max_length=80)
+
+
+class CursorUpdateRequest(BaseModel):
+    user_id: str = Field(..., min_length=1, max_length=80)
+    position: Dict[str, Any] = Field(default_factory=dict)
+
+
+class CollaborationOperationRequest(BaseModel):
+    actor_id: str = Field(..., min_length=1, max_length=80)
+    operation_id: Optional[str] = Field(default=None, max_length=80)
+    base_revision: int = Field(default=0, ge=0)
+    operation_type: str = Field(..., min_length=1, max_length=60)
+    conflict_strategy: str = Field(default="last_write_wins", max_length=40)
+    data: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ConflictResolveRequest(BaseModel):
+    resolver_user_id: str = Field(..., min_length=1, max_length=80)
+    strategy: str = Field(default="server_wins", max_length=40)
+    override_value: Any = None
+
+
+class ShareLinkCreateRequest(BaseModel):
+    creator_user_id: str = Field(..., min_length=1, max_length=80)
+    access_mode: str = Field(default="public", max_length=40)
+    password: str = Field(default="", max_length=120)
+    expires_in_hours: int = Field(default=24 * 7, ge=1, le=24 * 90)
+
+
+class ShareAccessRequest(BaseModel):
+    password: str = Field(default="", max_length=120)
+    viewer_user_id: str = Field(default="", max_length=80)
+
+
+class ShareRevokeRequest(BaseModel):
+    operator_user_id: str = Field(..., min_length=1, max_length=80)
+
+
+class WorkflowExportDataRequest(BaseModel):
+    fmt: str = Field(default="json", max_length=20)
+    share_link_id: Optional[str] = Field(default=None, max_length=80)
+
+
+class SocialShareRequest(BaseModel):
+    share_link_id: str = Field(..., min_length=1, max_length=80)
+    title: Optional[str] = Field(default=None, max_length=200)
+
+
 def _handle_error(exc: Exception) -> None:
     if isinstance(exc, WorkflowValidationError):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     if isinstance(exc, ValueError):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if isinstance(exc, PermissionError):
+        raise HTTPException(status_code=403, detail=str(exc)) from exc
     if isinstance(exc, KeyError):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     raise HTTPException(status_code=500, detail=str(exc)) from exc
@@ -166,6 +261,371 @@ async def update_collaborators(workflow_id: str, payload: CollaboratorUpdateRequ
             "collaborators": item.get("collaborators", []),
             "count": len(item.get("collaborators", [])),
         }
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/teams")
+async def create_team(payload: TeamCreateRequest) -> Dict[str, Any]:
+    try:
+        team = smart_workflow_service.create_team(
+            name=payload.name,
+            owner_user_id=payload.owner_user_id,
+            description=payload.description,
+        )
+        return {"team": team}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/teams")
+async def list_teams(user_id: Optional[str] = Query(default=None)) -> Dict[str, Any]:
+    items = smart_workflow_service.list_teams(user_id=user_id)
+    return {"teams": items, "count": len(items)}
+
+
+@router.post("/workflow/teams/{team_id}/members")
+async def add_team_member(team_id: str, payload: TeamMemberRequest) -> Dict[str, Any]:
+    try:
+        team = smart_workflow_service.add_team_member(
+            team_id=team_id,
+            user_id=payload.user_id,
+            role=payload.role,
+            display_name=payload.display_name,
+        )
+        return {"team": team}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.delete("/workflow/teams/{team_id}/members/{user_id}")
+async def remove_team_member(team_id: str, user_id: str) -> Dict[str, Any]:
+    try:
+        team = smart_workflow_service.remove_team_member(team_id=team_id, user_id=user_id)
+        return {"team": team}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/{workflow_id}/teams")
+async def bind_team(workflow_id: str, payload: TeamBindRequest) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.bind_team_to_workflow(workflow_id=workflow_id, team_id=payload.team_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/invitations")
+async def create_team_invitation(payload: InviteCreateRequest) -> Dict[str, Any]:
+    try:
+        invitation = smart_workflow_service.create_invitation(
+            team_id=payload.team_id,
+            email=payload.email,
+            role=payload.role,
+            invited_by=payload.invited_by,
+            ttl_hours=payload.ttl_hours,
+        )
+        return {"invitation": invitation}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/invitations")
+async def list_team_invitations(
+    team_id: Optional[str] = Query(default=None),
+    status: Optional[str] = Query(default=None),
+) -> Dict[str, Any]:
+    items = smart_workflow_service.list_invitations(team_id=team_id, status=status)
+    return {"invitations": items, "count": len(items)}
+
+
+@router.post("/workflow/invitations/{invite_id}/accept")
+async def accept_team_invitation(invite_id: str, payload: InviteAcceptRequest) -> Dict[str, Any]:
+    try:
+        result = smart_workflow_service.accept_invitation(
+            invite_id=invite_id,
+            user_id=payload.user_id,
+            display_name=payload.display_name,
+        )
+        return result
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/permissions/{user_id}")
+async def get_workflow_permissions(workflow_id: str, user_id: str) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.get_effective_permissions(workflow_id=workflow_id, user_id=user_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/{workflow_id}/delegations")
+async def create_workflow_delegation(workflow_id: str, payload: DelegationCreateRequest) -> Dict[str, Any]:
+    try:
+        delegation = smart_workflow_service.create_permission_delegation(
+            workflow_id=workflow_id,
+            from_user_id=payload.from_user_id,
+            to_user_id=payload.to_user_id,
+            permission=payload.permission,
+            ttl_hours=payload.ttl_hours,
+        )
+        return {"delegation": delegation}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/delegations")
+async def list_workflow_delegations(
+    workflow_id: str,
+    user_id: Optional[str] = Query(default=None),
+    active_only: bool = Query(default=True),
+) -> Dict[str, Any]:
+    items = smart_workflow_service.list_permission_delegations(
+        workflow_id=workflow_id,
+        user_id=user_id,
+        active_only=active_only,
+    )
+    return {"delegations": items, "count": len(items)}
+
+
+@router.post("/workflow/delegations/{delegation_id}/revoke")
+async def revoke_workflow_delegation(delegation_id: str) -> Dict[str, Any]:
+    try:
+        delegation = smart_workflow_service.revoke_permission_delegation(delegation_id=delegation_id)
+        return {"delegation": delegation}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/{workflow_id}/collaboration/operations")
+async def apply_collaboration_operation(workflow_id: str, payload: CollaborationOperationRequest) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.apply_collaboration_operation(workflow_id=workflow_id, payload=payload.model_dump())
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/collaboration/conflicts")
+async def list_collaboration_conflicts(
+    workflow_id: str,
+    unresolved_only: bool = Query(default=False),
+) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.list_collaboration_conflicts(
+            workflow_id=workflow_id,
+            unresolved_only=unresolved_only,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/{workflow_id}/collaboration/conflicts/{conflict_id}/resolve")
+async def resolve_collaboration_conflict(
+    workflow_id: str,
+    conflict_id: str,
+    payload: ConflictResolveRequest,
+) -> Dict[str, Any]:
+    try:
+        conflict = smart_workflow_service.resolve_collaboration_conflict(
+            workflow_id=workflow_id,
+            conflict_id=conflict_id,
+            resolver_user_id=payload.resolver_user_id,
+            strategy=payload.strategy,
+            override_value=payload.override_value,
+        )
+        return {"conflict": conflict}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/{workflow_id}/collaboration/cursors")
+async def update_collaboration_cursor(workflow_id: str, payload: CursorUpdateRequest) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.update_collaboration_cursor(
+            workflow_id=workflow_id,
+            user_id=payload.user_id,
+            position=payload.position,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/collaboration/cursors")
+async def list_collaboration_cursors(
+    workflow_id: str,
+    active_seconds: int = Query(default=30, ge=1, le=3600),
+) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.list_collaboration_cursors(
+            workflow_id=workflow_id,
+            active_seconds=active_seconds,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/{workflow_id}/comments")
+async def create_comment(workflow_id: str, payload: CommentCreateRequest) -> Dict[str, Any]:
+    try:
+        comment = smart_workflow_service.add_comment(
+            workflow_id=workflow_id,
+            user_id=payload.user_id,
+            content=payload.content,
+            parent_comment_id=payload.parent_comment_id,
+        )
+        return {"comment": comment}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/comments")
+async def list_comments(workflow_id: str, limit: int = Query(default=200, ge=1, le=1000)) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.list_comments(workflow_id=workflow_id, limit=limit)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.put("/workflow/{workflow_id}/notifications/preferences")
+async def set_notification_preferences(workflow_id: str, payload: NotificationPreferenceRequest) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.set_notification_preferences(
+            workflow_id=workflow_id,
+            user_id=payload.user_id,
+            preferences=payload.preferences,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/notifications/preferences")
+async def get_notification_preferences(workflow_id: str, user_id: str = Query(..., min_length=1)) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.get_notification_preferences(workflow_id=workflow_id, user_id=user_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/notifications")
+async def list_notifications(
+    workflow_id: str,
+    user_id: str = Query(..., min_length=1),
+    unread_only: bool = Query(default=False),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.list_notifications(
+            workflow_id=workflow_id,
+            user_id=user_id,
+            unread_only=unread_only,
+            limit=limit,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/{workflow_id}/notifications/{notification_id}/read")
+async def mark_notification_read(
+    workflow_id: str,
+    notification_id: str,
+    user_id: str = Query(..., min_length=1),
+) -> Dict[str, Any]:
+    try:
+        notification = smart_workflow_service.mark_notification_read(
+            workflow_id=workflow_id,
+            user_id=user_id,
+            notification_id=notification_id,
+        )
+        return {"notification": notification}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/{workflow_id}/share-links")
+async def create_share_link(workflow_id: str, payload: ShareLinkCreateRequest) -> Dict[str, Any]:
+    try:
+        share_link = smart_workflow_service.create_share_link(
+            workflow_id=workflow_id,
+            creator_user_id=payload.creator_user_id,
+            access_mode=payload.access_mode,
+            password=payload.password,
+            expires_in_hours=payload.expires_in_hours,
+        )
+        return {"share_link": share_link}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/share-links")
+async def list_share_links(workflow_id: str) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.list_share_links(workflow_id=workflow_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/share/{share_link_id}")
+async def access_share_link(share_link_id: str, payload: ShareAccessRequest) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.access_share_link(
+            share_link_id=share_link_id,
+            password=payload.password,
+            viewer_user_id=payload.viewer_user_id,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/{workflow_id}/share-links/{share_link_id}/revoke")
+async def revoke_share_link(workflow_id: str, share_link_id: str, payload: ShareRevokeRequest) -> Dict[str, Any]:
+    try:
+        share_link = smart_workflow_service.revoke_share_link(
+            workflow_id=workflow_id,
+            share_link_id=share_link_id,
+            operator_user_id=payload.operator_user_id,
+        )
+        return {"share_link": share_link}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/share-stats")
+async def get_share_stats(workflow_id: str) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.get_share_statistics(workflow_id=workflow_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/{workflow_id}/export-data")
+async def export_workflow_data(workflow_id: str, payload: WorkflowExportDataRequest) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.export_workflow_data(
+            workflow_id=workflow_id,
+            fmt=payload.fmt,
+            share_link_id=payload.share_link_id,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/{workflow_id}/social-share")
+async def social_share(workflow_id: str, payload: SocialShareRequest) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.generate_social_share_links(
+            workflow_id=workflow_id,
+            share_link_id=payload.share_link_id,
+            title=payload.title,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/collaboration/analytics")
+async def collaboration_analytics(workflow_id: str) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.get_collaboration_analytics(workflow_id=workflow_id)
     except Exception as exc:  # pylint: disable=broad-except
         _handle_error(exc)
 

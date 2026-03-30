@@ -65,7 +65,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, markRaw, onBeforeUnmount, onMounted, reactive, ref, shallowRef, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import {
@@ -109,8 +109,8 @@ const flowId = 'workflow-editor-canvas';
 const { fitView } = useVueFlow({ id: flowId });
 
 const loading = ref(false);
-const nodes = ref<Node<WorkflowCanvasNodeData>[]>([]);
-const edges = ref<Edge[]>([]);
+const nodes = shallowRef<Node<WorkflowCanvasNodeData>[]>([]);
+const edges = shallowRef<Edge[]>([]);
 const selectedNode = ref<Node<WorkflowCanvasNodeData> | null>(null);
 const availableNodeTypes = ref<string[]>([]);
 const activeRunId = ref('');
@@ -123,13 +123,13 @@ const meta = reactive({
   version: 1
 });
 
-const nodeTypes = {
+const nodeTypes = markRaw({
   workflowNode: WorkflowNode
-};
+});
 
-const edgeTypes = {
+const edgeTypes = markRaw({
   workflowEdge: WorkflowEdge
-};
+});
 
 const defaultNodeTypeByKind: Record<WorkflowNodeKind, string> = {
   input: 'input.constant',
@@ -148,6 +148,13 @@ const normalizeNodeData = (node: Node<WorkflowCanvasNodeData>): WorkflowCanvasNo
     enabled: node.data?.enabled !== false,
     params: node.data?.params || {}
   };
+};
+
+const syncSelectedNode = () => {
+  if (!selectedNode.value) {
+    return;
+  }
+  selectedNode.value = nodes.value.find((node) => node.id === selectedNode.value?.id) || null;
 };
 
 const routeWorkflowId = computed(() => {
@@ -467,6 +474,7 @@ const applyAutoLayout = () => {
     }));
   });
 
+  syncSelectedNode();
   fitCanvasView();
 };
 
@@ -619,12 +627,8 @@ watch(
 watch(
   nodes,
   () => {
-    if (!selectedNode.value) {
-      return;
-    }
-    selectedNode.value = nodes.value.find((node) => node.id === selectedNode.value?.id) || null;
-  },
-  { deep: true }
+    syncSelectedNode();
+  }
 );
 
 onMounted(() => {

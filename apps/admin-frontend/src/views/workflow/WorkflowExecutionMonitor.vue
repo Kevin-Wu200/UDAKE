@@ -65,6 +65,8 @@ const wsConnected = ref(false);
 
 let pollTimer: number | null = null;
 let unsubscribeRealtime: (() => void) | null = null;
+let pollIntervalMs = 3_000;
+let refreshQueued = false;
 
 const progressStatus = computed(() => {
   if (!selectedRun.value) {
@@ -104,6 +106,7 @@ const refresh = async () => {
     runs.value = [];
     selectedRun.value = null;
     logs.value = [];
+    workflowRealtimeService.setRunSubscription('');
     return;
   }
 
@@ -114,6 +117,7 @@ const refresh = async () => {
   if (!targetRunId) {
     selectedRun.value = null;
     logs.value = [];
+    workflowRealtimeService.setRunSubscription('');
     return;
   }
 
@@ -123,6 +127,7 @@ const refresh = async () => {
 const loadRunDetail = async (runId: string) => {
   const detail = await workflowService.getRun(runId);
   selectedRun.value = detail;
+  workflowRealtimeService.setRunSubscription(detail.run_id);
   const logResult = await workflowService.getRunLogs(runId);
   logs.value = logResult.logs;
 };
@@ -135,7 +140,7 @@ const startPolling = () => {
   stopPolling();
   pollTimer = window.setInterval(() => {
     void refresh();
-  }, 3_000);
+  }, pollIntervalMs);
 };
 
 const stopPolling = () => {
@@ -145,25 +150,59 @@ const stopPolling = () => {
   }
 };
 
+const restartPolling = (intervalMs: number) => {
+  pollIntervalMs = intervalMs;
+  startPolling();
+};
+
+const queueRefresh = () => {
+  if (refreshQueued) {
+    return;
+  }
+  refreshQueued = true;
+  window.setTimeout(() => {
+    refreshQueued = false;
+    void refresh();
+  }, 120);
+};
+
 watch(
   () => props.workflowId,
   () => {
+    workflowRealtimeService.setWorkflowSubscription(props.workflowId);
+    workflowRealtimeService.setRunSubscription('');
     void refresh();
   }
 );
 
 onMounted(() => {
   workflowRealtimeService.start();
+  workflowRealtimeService.setWorkflowSubscription(props.workflowId);
+  if (props.initialRunId) {
+    workflowRealtimeService.setRunSubscription(props.initialRunId);
+  }
+
   unsubscribeRealtime = workflowRealtimeService.subscribe((event) => {
     if (event.type === 'connected') {
       wsConnected.value = true;
+      restartPolling(10_000);
       return;
     }
     if (event.type === 'disconnected' || event.type === 'error') {
       wsConnected.value = false;
+      restartPolling(3_000);
       return;
     }
-    void refresh();
+
+    if (event.type === 'workflow_run_update' || event.type === 'workflow_update') {
+      const eventWorkflowId = typeof event.payload.workflow_id === 'string' ? event.payload.workflow_id : '';
+      if (!eventWorkflowId || eventWorkflowId === props.workflowId) {
+        queueRefresh();
+      }
+      return;
+    }
+
+    queueRefresh();
   });
 
   void refresh();
@@ -172,6 +211,8 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   stopPolling();
+  workflowRealtimeService.setRunSubscription('');
+  workflowRealtimeService.setWorkflowSubscription('');
   workflowRealtimeService.stop();
   unsubscribeRealtime?.();
   unsubscribeRealtime = null;
