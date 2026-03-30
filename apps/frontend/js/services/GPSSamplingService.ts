@@ -25,8 +25,16 @@ export interface GPSCollectOptions {
   minAccuracy?: number;
 }
 
+export interface GPSBatchCollectOptions extends GPSCollectOptions {
+  targetCount: number;
+  intervalMs?: number;
+  lowPowerMode?: boolean;
+  minDistanceMeters?: number;
+}
+
 export class GPSSamplingService {
   private static instance: GPSSamplingService;
+  private lastCollectedLocation: { latitude: number; longitude: number } | null = null;
 
   public static getInstance(): GPSSamplingService {
     if (!GPSSamplingService.instance) {
@@ -58,6 +66,39 @@ export class GPSSamplingService {
     }
 
     return sample;
+  }
+
+  public async collectBatchSamples(options: GPSBatchCollectOptions): Promise<GPSSamplingPoint[]> {
+    const targetCount = Math.max(1, Math.min(5000, Math.floor(options.targetCount || 1)));
+    const intervalMs = Math.max(500, Math.floor(options.intervalMs ?? (options.lowPowerMode ? 6000 : 2000)));
+    const minDistanceMeters = Math.max(0, Math.floor(options.minDistanceMeters ?? (options.lowPowerMode ? 8 : 2)));
+    const minAccuracy = options.lowPowerMode ? Math.max(options.minAccuracy ?? 80, 50) : options.minAccuracy;
+
+    const collected: GPSSamplingPoint[] = [];
+    for (let i = 0; i < targetCount; i += 1) {
+      const location = await locationService.getCurrentLocation();
+      if (!locationService.isValidLocation(location)) {
+        continue;
+      }
+      if (typeof minAccuracy === 'number' && location.accuracy > minAccuracy) {
+        continue;
+      }
+      const sample = this.buildSample(location, options);
+      if (this.shouldKeepBatchPoint(sample, minDistanceMeters)) {
+        collected.push(sample);
+      }
+      if (i < targetCount - 1) {
+        await new Promise((resolve) => setTimeout(resolve, intervalMs));
+      }
+    }
+
+    if (collected.length > 0) {
+      await OfflineManager.saveGPSSamples(collected);
+      if (OfflineManager.isOnline) {
+        await gpsSyncService.syncSamples(collected, { adaptive: true, diffSync: true });
+      }
+    }
+    return collected;
   }
 
   public async getSamples(projectId: string, limit: number = 200): Promise<GPSSamplingPoint[]> {
@@ -196,6 +237,22 @@ export class GPSSamplingService {
       version: 1,
       source: 'mobile'
     };
+  }
+
+  private shouldKeepBatchPoint(sample: GPSSamplingPoint, minDistanceMeters: number): boolean {
+    if (!this.lastCollectedLocation) {
+      this.lastCollectedLocation = { latitude: sample.latitude, longitude: sample.longitude };
+      return true;
+    }
+    const distance = locationService.calculateDistance(this.lastCollectedLocation, {
+      latitude: sample.latitude,
+      longitude: sample.longitude
+    });
+    if (distance < minDistanceMeters) {
+      return false;
+    }
+    this.lastCollectedLocation = { latitude: sample.latitude, longitude: sample.longitude };
+    return true;
   }
 }
 

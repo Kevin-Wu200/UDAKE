@@ -33,6 +33,11 @@ export class TrackManager {
   // 传感器数据
   private lastAccelerometer: AccelerometerData | null = null;
   private lastOrientation: OrientationData | null = null;
+  private locationListener: ((location: LocationData) => void) | null = null;
+  private flushTimer: number | null = null;
+  private minPointDistanceMeters = 3;
+  private minPointIntervalMs = 1500;
+  private lastAcceptedPointTime = 0;
 
   private constructor() {
     this.initializeSensorListeners();
@@ -47,6 +52,18 @@ export class TrackManager {
       TrackManager.instance = new TrackManager();
     }
     return TrackManager.instance;
+  }
+
+  public setSamplingOptimization(options: {
+    minPointDistanceMeters?: number;
+    minPointIntervalMs?: number;
+  }): void {
+    if (typeof options.minPointDistanceMeters === 'number') {
+      this.minPointDistanceMeters = Math.max(0, options.minPointDistanceMeters);
+    }
+    if (typeof options.minPointIntervalMs === 'number') {
+      this.minPointIntervalMs = Math.max(200, options.minPointIntervalMs);
+    }
   }
 
   /**
@@ -149,9 +166,13 @@ export class TrackManager {
     }
 
     // 添加位置监听器
-    locationService.addLocationListener((location) => {
+    if (this.locationListener) {
+      locationService.removeLocationListener(this.locationListener);
+    }
+    this.locationListener = (location) => {
       this.addTrackPoint(location);
-    });
+    };
+    locationService.addLocationListener(this.locationListener);
 
     return track;
   }
@@ -187,11 +208,20 @@ export class TrackManager {
     });
 
     // 停止位置监听
+    if (this.locationListener) {
+      locationService.removeLocationListener(this.locationListener);
+      this.locationListener = null;
+    }
     await locationService.stopWatch();
 
     // 清理
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
+    }
     this.currentTrack = null;
     this.pointBuffer = [];
+    this.lastAcceptedPointTime = 0;
   }
 
   /**
@@ -199,6 +229,9 @@ export class TrackManager {
    */
   private addTrackPoint(location: LocationData): void {
     if (!this.currentTrack) {
+      return;
+    }
+    if (!this.shouldAcceptLocation(location)) {
       return;
     }
 
@@ -211,10 +244,13 @@ export class TrackManager {
     };
 
     this.pointBuffer.push(trackPoint);
+    this.lastAcceptedPointTime = trackPoint.timestamp;
 
     // 缓冲区满时刷新
     if (this.pointBuffer.length >= this.BUFFER_SIZE) {
       this.flushBuffer();
+    } else {
+      this.scheduleDeferredFlush();
     }
 
     // 通知监听器
@@ -227,12 +263,42 @@ export class TrackManager {
     });
   }
 
+  private shouldAcceptLocation(location: LocationData): boolean {
+    const now = Date.now();
+    if (this.lastAcceptedPointTime > 0 && now - this.lastAcceptedPointTime < this.minPointIntervalMs) {
+      return false;
+    }
+
+    const track = this.currentTrack;
+    const lastPoint = this.pointBuffer[this.pointBuffer.length - 1]
+      || (track?.points.length ? track.points[track.points.length - 1] : null);
+    if (!lastPoint) {
+      return true;
+    }
+    const distance = locationService.calculateDistance(lastPoint.location, location);
+    return distance >= this.minPointDistanceMeters;
+  }
+
+  private scheduleDeferredFlush(): void {
+    if (this.flushTimer) {
+      return;
+    }
+    this.flushTimer = window.setTimeout(() => {
+      this.flushTimer = null;
+      void this.flushBuffer();
+    }, 2000);
+  }
+
   /**
    * 刷新缓冲区
    */
   private async flushBuffer(): Promise<void> {
     if (!this.currentTrack || this.pointBuffer.length === 0) {
       return;
+    }
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
     }
 
     this.currentTrack.points.push(...this.pointBuffer);
@@ -541,6 +607,14 @@ ${track.points
   public dispose(): void {
     if (this.currentTrack) {
       this.stopRecording();
+    }
+    if (this.locationListener) {
+      locationService.removeLocationListener(this.locationListener);
+      this.locationListener = null;
+    }
+    if (this.flushTimer) {
+      clearTimeout(this.flushTimer);
+      this.flushTimer = null;
     }
 
     this.trackUpdateListeners.clear();

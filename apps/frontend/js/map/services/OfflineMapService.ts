@@ -44,6 +44,27 @@ export interface OfflineMapStorageStats {
   misses: number;
 }
 
+export interface OfflineMapVersionMeta {
+  version: string;
+  baseVersion?: string;
+  schemaVersion: number;
+  mapEngine: string;
+  manifestHash: string;
+  compatibleVersions: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface OfflineMapUpdateSchedule {
+  id: string;
+  regionId: string;
+  intervalMinutes: number;
+  enabled: boolean;
+  nextRunAt: number;
+  lastRunAt?: number;
+  latestTargetVersion?: string;
+}
+
 interface TileRecord {
   id: string;
   z: number;
@@ -54,6 +75,7 @@ interface TileRecord {
   contentType: string;
   sizeBytes: number;
   sourceUrl: string;
+  contentHash?: string;
   createdAt: number;
   lastAccessedAt: number;
   hitCount: number;
@@ -66,6 +88,7 @@ interface TileMetaRecord {
   y: number;
   version: string;
   sizeBytes: number;
+  contentHash?: string;
   createdAt: number;
   lastAccessedAt: number;
   hitCount: number;
@@ -81,19 +104,24 @@ interface InternalDownloadTask {
   failed: number;
   onProgress?: (progress: OfflineMapDownloadProgress) => void;
   running: boolean;
+  lastActivityAt: number;
 }
 
 const DB_NAME = 'udake_offline_map';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORES = {
   tiles: 'tiles',
   tileMeta: 'tileMeta',
   regions: 'regions',
-  settings: 'settings'
+  settings: 'settings',
+  versionMeta: 'versionMeta',
+  updateSchedules: 'updateSchedules'
 } as const;
 
 const SETTING_MAX_BYTES = 'storage_limit_bytes';
 const SETTING_TOTAL_BYTES = 'storage_total_bytes';
+const SETTING_MEMORY_GUARD = 'memory_guard_enabled';
+const UPDATE_SCHEDULER_INTERVAL_MS = 30 * 1000;
 
 const DEFAULT_TILE_TEMPLATE = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const DEFAULT_MAX_STORAGE_BYTES = 512 * 1024 * 1024;
@@ -143,9 +171,13 @@ export class OfflineMapService {
     enableAutoCleanup: true
   });
   private tasks: Map<string, InternalDownloadTask> = new Map();
+  private updateSchedules: Map<string, OfflineMapUpdateSchedule> = new Map();
+  private pendingLazyLoads: Set<string> = new Set();
   private memoryHits = 0;
   private diskHits = 0;
   private misses = 0;
+  private schedulerTimer: number | null = null;
+  private memoryGuardTimer: number | null = null;
 
   static getInstance(): OfflineMapService {
     if (!OfflineMapService.instance) {
@@ -166,6 +198,12 @@ export class OfflineMapService {
 
     const totalBytes = await this.computeTotalBytesFromMeta();
     await this.setSettingNumber(SETTING_TOTAL_BYTES, totalBytes);
+
+    const guardEnabled = await this.getSettingNumber(SETTING_MEMORY_GUARD, 1);
+    await this.setSettingNumber(SETTING_MEMORY_GUARD, guardEnabled > 0 ? 1 : 0);
+    await this.restoreSchedulesFromStorage();
+    this.startScheduler();
+    this.startMemoryGuard();
   }
 
   async createRegionDownloadTask(
@@ -212,7 +250,8 @@ export class OfflineMapService {
       downloaded: 0,
       failed: 0,
       onProgress,
-      running: false
+      running: false,
+      lastActivityAt: nowTs()
     };
     this.tasks.set(id, task);
 
@@ -229,6 +268,7 @@ export class OfflineMapService {
       return false;
     }
     task.state = 'paused';
+    task.lastActivityAt = nowTs();
     this.emitTaskProgress(task);
     void this.updateRegionProgress(task);
     return true;
@@ -247,6 +287,7 @@ export class OfflineMapService {
 
     task.state = 'downloading';
     task.running = false;
+    task.lastActivityAt = nowTs();
     void this.processTask(task, region.tileTemplate, region.version);
     return true;
   }
@@ -277,6 +318,131 @@ export class OfflineMapService {
     await this.init();
     const rows = await this.getAll<OfflineMapRegion>(STORES.regions);
     return rows.sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+
+  async upsertVersionMeta(input: Omit<OfflineMapVersionMeta, 'createdAt' | 'updatedAt'>): Promise<OfflineMapVersionMeta> {
+    await this.init();
+    const existed = await this.get<OfflineMapVersionMeta>(STORES.versionMeta, input.version);
+    const now = nowTs();
+    const row: OfflineMapVersionMeta = {
+      ...input,
+      compatibleVersions: Array.from(new Set(input.compatibleVersions || [])),
+      createdAt: existed?.createdAt || now,
+      updatedAt: now
+    };
+    await this.put(STORES.versionMeta, row);
+    return row;
+  }
+
+  async getVersionMeta(version: string): Promise<OfflineMapVersionMeta | null> {
+    await this.init();
+    const row = await this.get<OfflineMapVersionMeta>(STORES.versionMeta, version);
+    return row || null;
+  }
+
+  async checkVersionCompatibility(currentVersion: string, targetVersion: string): Promise<{ compatible: boolean; reason: string }> {
+    await this.init();
+    if (currentVersion === targetVersion) {
+      return { compatible: true, reason: 'same_version' };
+    }
+    const targetMeta = await this.getVersionMeta(targetVersion);
+    if (!targetMeta) {
+      return { compatible: true, reason: 'target_meta_missing_allow' };
+    }
+    if ((targetMeta.compatibleVersions || []).includes(currentVersion)) {
+      return { compatible: true, reason: 'declared_compatible' };
+    }
+    if (targetMeta.baseVersion && targetMeta.baseVersion === currentVersion) {
+      return { compatible: true, reason: 'direct_base_version' };
+    }
+    return { compatible: false, reason: 'incompatible_version' };
+  }
+
+  async scheduleRegionUpdate(regionId: string, intervalMinutes: number, latestTargetVersion?: string): Promise<OfflineMapUpdateSchedule> {
+    await this.init();
+    const safeMinutes = Math.max(5, Math.floor(intervalMinutes));
+    const existing = Array.from(this.updateSchedules.values()).find(item => item.regionId === regionId);
+    const now = nowTs();
+    const schedule: OfflineMapUpdateSchedule = {
+      id: existing?.id || `map_schedule_${now}_${Math.random().toString(36).slice(2, 7)}`,
+      regionId,
+      intervalMinutes: safeMinutes,
+      enabled: true,
+      nextRunAt: now + safeMinutes * 60 * 1000,
+      lastRunAt: existing?.lastRunAt,
+      latestTargetVersion: latestTargetVersion || existing?.latestTargetVersion
+    };
+    this.updateSchedules.set(schedule.id, schedule);
+    await this.put(STORES.updateSchedules, schedule);
+    return schedule;
+  }
+
+  async listUpdateSchedules(): Promise<OfflineMapUpdateSchedule[]> {
+    await this.init();
+    return Array.from(this.updateSchedules.values()).sort((a, b) => a.nextRunAt - b.nextRunAt);
+  }
+
+  async cancelRegionUpdateSchedule(scheduleId: string): Promise<boolean> {
+    await this.init();
+    const current = this.updateSchedules.get(scheduleId);
+    if (!current) {
+      return false;
+    }
+    const disabled = { ...current, enabled: false, nextRunAt: Number.MAX_SAFE_INTEGER };
+    this.updateSchedules.set(scheduleId, disabled);
+    await this.put(STORES.updateSchedules, disabled);
+    return true;
+  }
+
+  async prefetchViewportTiles(
+    regionId: string,
+    viewportBbox: [number, number, number, number],
+    zoom: number,
+    limit: number = 120
+  ): Promise<{ loaded: number; missed: number }> {
+    await this.init();
+    const region = await this.getRegion(regionId);
+    if (!region) {
+      return { loaded: 0, missed: 0 };
+    }
+    const tiles = this.generateTiles(viewportBbox, zoom, zoom).slice(0, Math.max(1, limit));
+    let loaded = 0;
+    let missed = 0;
+    for (const tile of tiles) {
+      const row = await this.getTile(tile, region.version);
+      if (row) {
+        loaded += 1;
+      } else {
+        missed += 1;
+      }
+    }
+    return { loaded, missed };
+  }
+
+  async lazyLoadTile(regionId: string, tile: TileCoordinate): Promise<Blob | null> {
+    await this.init();
+    const region = await this.getRegion(regionId);
+    if (!region) {
+      return null;
+    }
+    const key = buildTileKey(region.version, tile);
+    const existed = await this.getTile(tile, region.version);
+    if (existed) {
+      return existed;
+    }
+    if (this.pendingLazyLoads.has(key)) {
+      return null;
+    }
+    this.pendingLazyLoads.add(key);
+    try {
+      const downloaded = await this.downloadAndStoreTile(tile, region.tileTemplate, region.version, true);
+      if (!downloaded) {
+        return null;
+      }
+      return this.getTile(tile, region.version);
+    } finally {
+      this.pendingLazyLoads.delete(key);
+    }
   }
 
   async getTile(tile: TileCoordinate, version: string = 'v1'): Promise<Blob | null> {
@@ -335,6 +501,36 @@ export class OfflineMapService {
     };
   }
 
+  async detectChangedTiles(
+    regionId: string,
+    latestVersion: string,
+    remoteManifest: Array<TileCoordinate & { contentHash?: string }>
+  ): Promise<{ changedTiles: TileCoordinate[]; unchangedCount: number }> {
+    await this.init();
+    const region = await this.getRegion(regionId);
+    if (!region || remoteManifest.length === 0) {
+      return { changedTiles: [], unchangedCount: 0 };
+    }
+    const changedTiles: TileCoordinate[] = [];
+    let unchangedCount = 0;
+    for (const item of remoteManifest) {
+      const key = buildTileKey(latestVersion, item);
+      const meta = await this.get<TileMetaRecord>(STORES.tileMeta, key);
+      const remoteHash = item.contentHash || '';
+      if (!meta) {
+        changedTiles.push({ z: item.z, x: item.x, y: item.y });
+        continue;
+      }
+      const localHash = meta.contentHash || '';
+      if (remoteHash && localHash && remoteHash === localHash) {
+        unchangedCount += 1;
+      } else {
+        changedTiles.push({ z: item.z, x: item.x, y: item.y });
+      }
+    }
+    return { changedTiles, unchangedCount };
+  }
+
   async applyIncrementalUpdate(
     regionId: string,
     changedTiles: TileCoordinate[],
@@ -345,6 +541,11 @@ export class OfflineMapService {
     const region = await this.getRegion(regionId);
     if (!region || changedTiles.length === 0) {
       return { updated: 0, failed: 0 };
+    }
+
+    const compatibility = await this.checkVersionCompatibility(region.version, latestVersion);
+    if (!compatibility.compatible) {
+      throw new Error(`离线地图版本不兼容: ${compatibility.reason}`);
     }
 
     let updated = 0;
@@ -416,6 +617,7 @@ export class OfflineMapService {
     task.running = true;
     try {
       while (task.currentIndex < task.queue.length && task.state === 'downloading') {
+        task.lastActivityAt = nowTs();
         const batch = task.queue.slice(task.currentIndex, task.currentIndex + CONCURRENT_DOWNLOADS);
         const results = await Promise.all(batch.map(tile => this.downloadAndStoreTile(tile, tileTemplate, version)));
 
@@ -434,6 +636,7 @@ export class OfflineMapService {
 
       if (task.state === 'downloading' && task.currentIndex >= task.queue.length) {
         task.state = task.failed > 0 ? 'failed' : 'completed';
+        task.lastActivityAt = nowTs();
         this.emitTaskProgress(task);
         await this.updateRegionProgress(task);
       }
@@ -498,6 +701,7 @@ export class OfflineMapService {
       }
       const blob = await response.blob();
       const sizeBytes = blob.size || 0;
+      const contentHash = await this.computeBlobFingerprint(blob);
 
       await this.ensureStorageSpace(sizeBytes);
 
@@ -511,6 +715,7 @@ export class OfflineMapService {
         contentType: blob.type || 'image/png',
         sizeBytes,
         sourceUrl: url,
+        contentHash,
         createdAt: nowTs(),
         lastAccessedAt: nowTs(),
         hitCount: 0
@@ -523,6 +728,7 @@ export class OfflineMapService {
         y: tile.y,
         version,
         sizeBytes,
+        contentHash,
         createdAt: record.createdAt,
         lastAccessedAt: record.lastAccessedAt,
         hitCount: 0
@@ -610,13 +816,23 @@ export class OfflineMapService {
           db.createObjectStore(STORES.tiles, { keyPath: 'id' });
         }
         if (!db.objectStoreNames.contains(STORES.tileMeta)) {
-          db.createObjectStore(STORES.tileMeta, { keyPath: 'id' });
+          const tileMetaStore = db.createObjectStore(STORES.tileMeta, { keyPath: 'id' });
+          tileMetaStore.createIndex('version', 'version', { unique: false });
+          tileMetaStore.createIndex('lastAccessedAt', 'lastAccessedAt', { unique: false });
         }
         if (!db.objectStoreNames.contains(STORES.regions)) {
           db.createObjectStore(STORES.regions, { keyPath: 'id' });
         }
         if (!db.objectStoreNames.contains(STORES.settings)) {
           db.createObjectStore(STORES.settings, { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains(STORES.versionMeta)) {
+          db.createObjectStore(STORES.versionMeta, { keyPath: 'version' });
+        }
+        if (!db.objectStoreNames.contains(STORES.updateSchedules)) {
+          const scheduleStore = db.createObjectStore(STORES.updateSchedules, { keyPath: 'id' });
+          scheduleStore.createIndex('regionId', 'regionId', { unique: false });
+          scheduleStore.createIndex('nextRunAt', 'nextRunAt', { unique: false });
         }
       };
 
@@ -684,6 +900,113 @@ export class OfflineMapService {
   private async computeTotalBytesFromMeta(): Promise<number> {
     const rows = await this.getAll<TileMetaRecord>(STORES.tileMeta);
     return rows.reduce((sum, row) => sum + (row.sizeBytes || 0), 0);
+  }
+
+  private async computeBlobFingerprint(blob: Blob): Promise<string> {
+    try {
+      const buffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(buffer);
+      let hash = 2166136261;
+      for (let i = 0; i < bytes.length; i += 1) {
+        hash ^= bytes[i];
+        hash += (hash << 1) + (hash << 4) + (hash << 7) + (hash << 8) + (hash << 24);
+      }
+      return `fp_${(hash >>> 0).toString(16)}`;
+    } catch {
+      return `fp_${nowTs().toString(16)}`;
+    }
+  }
+
+  private async restoreSchedulesFromStorage(): Promise<void> {
+    const rows = await this.getAll<OfflineMapUpdateSchedule>(STORES.updateSchedules);
+    this.updateSchedules.clear();
+    rows.forEach((row) => {
+      this.updateSchedules.set(row.id, row);
+    });
+  }
+
+  private startScheduler(): void {
+    const userAgent = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent.toLowerCase() : '';
+    if (userAgent.includes('jsdom')) {
+      return;
+    }
+    if (this.schedulerTimer) {
+      clearInterval(this.schedulerTimer);
+    }
+    this.schedulerTimer = window.setInterval(() => {
+      void this.runScheduledUpdates();
+    }, UPDATE_SCHEDULER_INTERVAL_MS);
+  }
+
+  private startMemoryGuard(): void {
+    const userAgent = (typeof navigator !== 'undefined' && navigator.userAgent) ? navigator.userAgent.toLowerCase() : '';
+    if (userAgent.includes('jsdom')) {
+      return;
+    }
+    if (this.memoryGuardTimer) {
+      clearInterval(this.memoryGuardTimer);
+    }
+    this.memoryGuardTimer = window.setInterval(() => {
+      void this.performMemoryGuard();
+    }, 60 * 1000);
+  }
+
+  private async runScheduledUpdates(): Promise<void> {
+    const now = nowTs();
+    const schedules = Array.from(this.updateSchedules.values()).filter(item => item.enabled && item.nextRunAt <= now);
+    for (const schedule of schedules) {
+      const region = await this.getRegion(schedule.regionId);
+      if (!region) {
+        continue;
+      }
+      schedule.lastRunAt = now;
+      schedule.nextRunAt = now + schedule.intervalMinutes * 60 * 1000;
+      this.updateSchedules.set(schedule.id, schedule);
+      await this.put(STORES.updateSchedules, schedule);
+
+      if (schedule.latestTargetVersion && schedule.latestTargetVersion !== region.version) {
+        const tiles = this.generateTiles(region.bbox, region.minZoom, region.maxZoom).slice(0, 400);
+        void this.applyIncrementalUpdate(region.id, tiles, schedule.latestTargetVersion);
+      } else {
+        // 对外抛出事件，允许业务层按需拉取更新清单
+        if (typeof document !== 'undefined') {
+          document.dispatchEvent(new CustomEvent('offline-map-update-due', { detail: { regionId: region.id } }));
+        }
+      }
+    }
+  }
+
+  private async performMemoryGuard(): Promise<void> {
+    const guardEnabled = await this.getSettingNumber(SETTING_MEMORY_GUARD, 1);
+    if (guardEnabled <= 0) {
+      return;
+    }
+    const cacheSize = this.memoryCache.size();
+    if (cacheSize > 1800) {
+      this.memoryCache.evict();
+    }
+    const now = nowTs();
+    Array.from(this.tasks.entries()).forEach(([taskId, task]) => {
+      const idleMs = now - task.lastActivityAt;
+      if (task.state !== 'downloading' && idleMs > 10 * 60 * 1000) {
+        this.tasks.delete(taskId);
+      }
+    });
+  }
+
+  dispose(): void {
+    if (this.schedulerTimer) {
+      clearInterval(this.schedulerTimer);
+      this.schedulerTimer = null;
+    }
+    if (this.memoryGuardTimer) {
+      clearInterval(this.memoryGuardTimer);
+      this.memoryGuardTimer = null;
+    }
+    this.pendingLazyLoads.clear();
+    this.tasks.clear();
+    this.updateSchedules.clear();
+    this.memoryCache.destroy();
   }
 }
 

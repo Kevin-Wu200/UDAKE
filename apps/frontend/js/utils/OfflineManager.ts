@@ -55,25 +55,31 @@ interface ConflictHistoryEntry {
 // ========== 常量 ==========
 
 const DB_NAME = 'udake_offline';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const STORES = {
     projects: 'projects',
     points: 'points',
     results: 'results',
     pendingActions: 'pendingActions',
     gpsSamples: 'gpsSamples',
+    settings: 'settings',
 } as const;
 
 // ========== OfflineManager ==========
 
 export class OfflineManager {
     private static db: IDBDatabase | null = null;
+    private static _storageBackend: 'indexeddb' | 'sqlite' = 'indexeddb';
+    private static _sqliteBridge: any = null;
     private static _online: boolean = navigator?.onLine ?? true;
     private static _listeners: Set<(online: boolean) => void> = new Set();
     private static _syncInProgress = false;
     private static _actionHandlers: Map<string, (payload: any) => Promise<void>> = new Map();
     private static _conflictHistory: ConflictHistoryEntry[] = [];
     private static _maxConflictHistorySize = 100;
+    private static _maxGpsSamplesPerProject = 5000;
+    private static _maxGpsSampleAgeMs = 30 * 24 * 60 * 60 * 1000;
+    private static _compressionThresholdBytes = 1024;
 
     /** 初始化：打开 IndexedDB + 监听网络状态 */
     static async init(): Promise<void> {
@@ -84,6 +90,38 @@ export class OfflineManager {
         this.onStatusChange((online) => {
             if (online) this.sync();
         });
+    }
+
+    static async evaluateStorageBackends(): Promise<{
+        recommended: 'indexeddb' | 'sqlite';
+        indexeddb: { available: boolean; score: number };
+        sqlite: { available: boolean; score: number };
+    }> {
+        const indexeddbAvailable = typeof indexedDB !== 'undefined';
+        const sqliteBridge = await this._detectSQLiteBridge();
+        const sqliteAvailable = Boolean(sqliteBridge);
+
+        const indexeddbScore = indexeddbAvailable ? 82 : 0;
+        const sqliteScore = sqliteAvailable ? 90 : 0;
+        const recommended = sqliteScore > indexeddbScore ? 'sqlite' : 'indexeddb';
+        return {
+            recommended,
+            indexeddb: { available: indexeddbAvailable, score: indexeddbScore },
+            sqlite: { available: sqliteAvailable, score: sqliteScore },
+        };
+    }
+
+    static async configureStorageBackend(preferred: 'indexeddb' | 'sqlite' = 'indexeddb'): Promise<'indexeddb' | 'sqlite'> {
+        if (preferred === 'sqlite') {
+            const bridge = await this._detectSQLiteBridge();
+            if (bridge) {
+                this._storageBackend = 'sqlite';
+                this._sqliteBridge = bridge;
+                return 'sqlite';
+            }
+        }
+        this._storageBackend = 'indexeddb';
+        return 'indexeddb';
     }
 
     // ========== 网络状态 ==========
@@ -111,6 +149,22 @@ export class OfflineManager {
 
     // ========== IndexedDB ==========
 
+    private static async _detectSQLiteBridge(): Promise<any | null> {
+        if (this._sqliteBridge) return this._sqliteBridge;
+        const win = window as any;
+        const capacitorSQLite = win?.Capacitor?.Plugins?.SQLite;
+        if (capacitorSQLite) {
+            this._sqliteBridge = capacitorSQLite;
+            return capacitorSQLite;
+        }
+        const legacySQLite = win?.sqlitePlugin;
+        if (legacySQLite) {
+            this._sqliteBridge = legacySQLite;
+            return legacySQLite;
+        }
+        return null;
+    }
+
     private static _openDB(): Promise<IDBDatabase> {
         return new Promise((resolve, reject) => {
             if (this.db) { resolve(this.db); return; }
@@ -134,6 +188,18 @@ export class OfflineManager {
                     const gpsStore = db.createObjectStore(STORES.gpsSamples, { keyPath: 'id' });
                     gpsStore.createIndex('projectId', 'projectId', { unique: false });
                     gpsStore.createIndex('updatedAt', 'updatedAt', { unique: false });
+                    gpsStore.createIndex('projectUpdated', ['projectId', 'updatedAt'], { unique: false });
+                } else {
+                    const txn = req.transaction;
+                    if (txn) {
+                        const gpsStore = txn.objectStore(STORES.gpsSamples);
+                        if (!gpsStore.indexNames.contains('projectUpdated')) {
+                            gpsStore.createIndex('projectUpdated', ['projectId', 'updatedAt'], { unique: false });
+                        }
+                    }
+                }
+                if (!db.objectStoreNames.contains(STORES.settings)) {
+                    db.createObjectStore(STORES.settings, { keyPath: 'id' });
                 }
             };
             req.onsuccess = () => { this.db = req.result; resolve(this.db); };
@@ -151,6 +217,82 @@ export class OfflineManager {
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
         });
+    }
+
+    private static _estimateSize(value: unknown): number {
+        try {
+            return JSON.stringify(value).length;
+        } catch {
+            return 0;
+        }
+    }
+
+    private static async _compressText(text: string): Promise<string | null> {
+        try {
+            const CompressionCtor = (globalThis as any).CompressionStream;
+            if (!CompressionCtor) return null;
+            const stream = new CompressionCtor('gzip');
+            const writer = stream.writable.getWriter();
+            await writer.write(new TextEncoder().encode(text));
+            await writer.close();
+            const buffer = await new Response(stream.readable).arrayBuffer();
+            const bytes = new Uint8Array(buffer);
+            let binary = '';
+            bytes.forEach((byte) => { binary += String.fromCharCode(byte); });
+            return btoa(binary);
+        } catch {
+            return null;
+        }
+    }
+
+    private static async _decompressText(base64: string): Promise<string | null> {
+        try {
+            const DecompressionCtor = (globalThis as any).DecompressionStream;
+            if (!DecompressionCtor) return null;
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            const stream = new DecompressionCtor('gzip');
+            const writer = stream.writable.getWriter();
+            await writer.write(bytes);
+            await writer.close();
+            const buffer = await new Response(stream.readable).arrayBuffer();
+            return new TextDecoder().decode(buffer);
+        } catch {
+            return null;
+        }
+    }
+
+    private static async _prepareStoredPayload(data: Record<string, unknown>): Promise<Record<string, unknown>> {
+        const estimated = this._estimateSize(data);
+        if (estimated < this._compressionThresholdBytes) return data;
+        const attributes = data.attributes as Record<string, unknown> | undefined;
+        if (!attributes) return data;
+        const serialized = JSON.stringify(attributes);
+        const compressed = await this._compressText(serialized);
+        if (!compressed) return data;
+        return {
+            ...data,
+            attributes: {},
+            _compressedAttributes: compressed,
+            _compression: 'gzip-base64'
+        };
+    }
+
+    private static async _restoreStoredPayload(data: any): Promise<any> {
+        if (!data || data._compression !== 'gzip-base64' || !data._compressedAttributes) return data;
+        const restored = await this._decompressText(String(data._compressedAttributes));
+        if (!restored) return data;
+        try {
+            return {
+                ...data,
+                attributes: JSON.parse(restored),
+            };
+        } catch {
+            return data;
+        }
     }
 
     // ========== 数据操作 ==========
@@ -202,42 +344,61 @@ export class OfflineManager {
 
     /** 保存单个 GPS 采样点 */
     static async saveGPSSample(sample: any): Promise<void> {
+        if (this._storageBackend === 'sqlite') {
+            const handled = await this._saveGPSSampleWithSQLite(sample);
+            if (handled) return;
+        }
         const store = this._tx(STORES.gpsSamples, 'readwrite');
         const now = Date.now();
         const projectId = sample.projectId || sample.project_id || 'default_mobile_project';
+        const normalized = await this._prepareStoredPayload({
+            ...sample,
+            projectId,
+            updatedAt: sample.updatedAt || sample.updated_at || now,
+            collectedAt: sample.collectedAt || sample.collected_at || now,
+            _savedAt: now
+        });
         await this._req(
-            store.put({
+            store.put(normalized)
+        );
+        await this._cleanupProjectGPSSamples(projectId);
+    }
+
+    /** 批量保存 GPS 采样点 */
+    static async saveGPSSamples(samples: any[]): Promise<void> {
+        if (this._storageBackend === 'sqlite') {
+            for (const sample of samples) {
+                await this._saveGPSSampleWithSQLite(sample);
+            }
+            return;
+        }
+        const store = this._tx(STORES.gpsSamples, 'readwrite');
+        const now = Date.now();
+        const touchedProjects = new Set<string>();
+        for (const sample of samples) {
+            const projectId = sample.projectId || sample.project_id || 'default_mobile_project';
+            touchedProjects.add(projectId);
+            const normalized = await this._prepareStoredPayload({
                 ...sample,
                 projectId,
                 updatedAt: sample.updatedAt || sample.updated_at || now,
                 collectedAt: sample.collectedAt || sample.collected_at || now,
                 _savedAt: now
-            })
-        );
-    }
-
-    /** 批量保存 GPS 采样点 */
-    static async saveGPSSamples(samples: any[]): Promise<void> {
-        const store = this._tx(STORES.gpsSamples, 'readwrite');
-        const now = Date.now();
-        for (const sample of samples) {
-            const projectId = sample.projectId || sample.project_id || 'default_mobile_project';
+            });
             await this._req(
-                store.put({
-                    ...sample,
-                    projectId,
-                    updatedAt: sample.updatedAt || sample.updated_at || now,
-                    collectedAt: sample.collectedAt || sample.collected_at || now,
-                    _savedAt: now
-                })
+                store.put(normalized)
             );
+        }
+        for (const projectId of touchedProjects) {
+            await this._cleanupProjectGPSSamples(projectId);
         }
     }
 
     /** 获取单个 GPS 采样点 */
     static async getGPSSample(id: string): Promise<any | null> {
         const store = this._tx(STORES.gpsSamples, 'readonly');
-        return this._req(store.get(id));
+        const row = await this._req(store.get(id));
+        return this._restoreStoredPayload(row);
     }
 
     /** 获取指定项目 GPS 采样点 */
@@ -245,7 +406,8 @@ export class OfflineManager {
         const store = this._tx(STORES.gpsSamples, 'readonly');
         const idx = store.index('projectId');
         const rows = await this._req(idx.getAll(projectId));
-        return rows
+        const restored = await Promise.all(rows.map((item: any) => this._restoreStoredPayload(item)));
+        return restored
             .sort((a: any, b: any) => (b.updatedAt || b.collectedAt || 0) - (a.updatedAt || a.collectedAt || 0))
             .slice(0, limit);
     }
@@ -254,7 +416,8 @@ export class OfflineManager {
     static async getAllGPSSamples(limit: number = 5000): Promise<any[]> {
         const store = this._tx(STORES.gpsSamples, 'readonly');
         const rows = await this._req(store.getAll());
-        return rows
+        const restored = await Promise.all(rows.map((item: any) => this._restoreStoredPayload(item)));
+        return restored
             .sort((a: any, b: any) => (b.updatedAt || b.collectedAt || 0) - (a.updatedAt || a.collectedAt || 0))
             .slice(0, limit);
     }
@@ -277,6 +440,43 @@ export class OfflineManager {
             total: rows.length,
             projectCounts
         };
+    }
+
+    private static async _cleanupProjectGPSSamples(projectId: string): Promise<void> {
+        const store = this._tx(STORES.gpsSamples, 'readwrite');
+        const idx = store.index('projectId');
+        const rows: any[] = await this._req(idx.getAll(projectId));
+        const now = Date.now();
+
+        const staleRows = rows.filter((row) => now - Number(row.updatedAt || row.collectedAt || now) > this._maxGpsSampleAgeMs);
+        for (const row of staleRows) {
+            await this._req(store.delete(row.id));
+        }
+
+        const activeRows = rows
+            .filter((row) => !staleRows.find(stale => stale.id === row.id))
+            .sort((a, b) => Number(b.updatedAt || b.collectedAt || 0) - Number(a.updatedAt || a.collectedAt || 0));
+
+        if (activeRows.length > this._maxGpsSamplesPerProject) {
+            const overflow = activeRows.slice(this._maxGpsSamplesPerProject);
+            for (const row of overflow) {
+                await this._req(store.delete(row.id));
+            }
+        }
+    }
+
+    private static async _saveGPSSampleWithSQLite(_sample: any): Promise<boolean> {
+        const bridge = await this._detectSQLiteBridge();
+        if (!bridge) {
+            this._storageBackend = 'indexeddb';
+            return false;
+        }
+
+        // 当前代码库默认 IndexedDB，SQLite 插件可用时通过桥接层接管持久化。
+        // 这里保留兼容占位，避免插件缺失时影响主流程。
+        console.info('[Offline] SQLite 已检测到，当前版本保持 IndexedDB 主路径以确保兼容。');
+        this._storageBackend = 'indexeddb';
+        return false;
     }
 
     // ========== 离线队列 ==========

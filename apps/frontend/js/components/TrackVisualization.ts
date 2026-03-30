@@ -14,6 +14,11 @@ export class TrackVisualization {
   private trackLayer: any; // 轨迹图层
   private trackMarkers: Map<string, any> = new Map(); // 轨迹标记
   private currentTrackPolyline: any = null; // 当前轨迹线
+  private updateListener: ((track: Track) => void) | null = null;
+  private startListener: ((track: Track) => void) | null = null;
+  private endListener: ((track: Track) => void) | null = null;
+  private renderTimer: number | null = null;
+  private maxRenderablePoints = 2000;
 
   constructor(map: any) {
     this.map = map;
@@ -39,19 +44,22 @@ export class TrackVisualization {
    */
   private initializeListeners(): void {
     // 轨迹更新监听
-    trackManager.addTrackUpdateListener((track) => {
+    this.updateListener = (track) => {
       this.updateCurrentTrack(track);
-    });
+    };
+    trackManager.addTrackUpdateListener(this.updateListener);
 
     // 轨迹开始监听
-    trackManager.addTrackStartListener((track) => {
+    this.startListener = (track) => {
       this.onTrackStart(track);
-    });
+    };
+    trackManager.addTrackStartListener(this.startListener);
 
     // 轨迹结束监听
-    trackManager.addTrackEndListener((track) => {
+    this.endListener = (track) => {
       this.onTrackEnd(track);
-    });
+    };
+    trackManager.addTrackEndListener(this.endListener);
   }
 
   /**
@@ -85,10 +93,19 @@ export class TrackVisualization {
     if (!this.currentTrackPolyline || track.points.length === 0) {
       return;
     }
+    if (this.renderTimer) {
+      return;
+    }
+    this.renderTimer = window.setTimeout(() => {
+      this.renderTimer = null;
+      this.renderCurrentTrack(track);
+    }, 120);
+  }
 
+  private renderCurrentTrack(track: Track): void {
     // 更新轨迹线
     if (typeof AMap !== 'undefined') {
-      const path = track.points.map((point) => [
+      const path = this.simplifyPath(track.points).map((point) => [
         point.location.longitude,
         point.location.latitude,
       ]);
@@ -98,6 +115,22 @@ export class TrackVisualization {
     // 添加最新点的标记
     const lastPoint = track.points[track.points.length - 1];
     this.addTrackMarker(track.id, lastPoint);
+  }
+
+  private simplifyPath(points: TrackPoint[]): TrackPoint[] {
+    if (points.length <= this.maxRenderablePoints) {
+      return points;
+    }
+    const step = Math.ceil(points.length / this.maxRenderablePoints);
+    const sampled: TrackPoint[] = [];
+    for (let i = 0; i < points.length; i += step) {
+      sampled.push(points[i]);
+    }
+    const last = points[points.length - 1];
+    if (sampled[sampled.length - 1] !== last) {
+      sampled.push(last);
+    }
+    return sampled;
   }
 
   /**
@@ -196,18 +229,20 @@ export class TrackVisualization {
   /**
    * 显示轨迹
    */
-  public showTrack(trackId: string): void {
+  public showTrack(trackId: string, clearPrevious: boolean = true): void {
     const track = trackManager.getTrack(trackId);
     if (!track || track.points.length === 0) {
       return;
     }
 
     // 清除之前的轨迹
-    this.clearTrack();
+    if (clearPrevious) {
+      this.clearTrack();
+    }
 
     // 创建轨迹线
     if (typeof AMap !== 'undefined') {
-      const path = track.points.map((point) => [
+      const path = this.simplifyPath(track.points).map((point) => [
         point.location.longitude,
         point.location.latitude,
       ]);
@@ -304,9 +339,10 @@ export class TrackVisualization {
    * 显示所有轨迹
    */
   public showAllTracks(): void {
+    this.clearTrack();
     const tracks = trackManager.getAllTracks();
     tracks.forEach((track) => {
-      this.showTrack(track.id);
+      this.showTrack(track.id, false);
     });
   }
 
@@ -327,6 +363,22 @@ export class TrackVisualization {
    * 清理资源
    */
   public dispose(): void {
+    if (this.updateListener) {
+      trackManager.removeTrackUpdateListener(this.updateListener);
+      this.updateListener = null;
+    }
+    if (this.startListener) {
+      trackManager.removeTrackStartListener(this.startListener);
+      this.startListener = null;
+    }
+    if (this.endListener) {
+      trackManager.removeTrackEndListener(this.endListener);
+      this.endListener = null;
+    }
+    if (this.renderTimer) {
+      clearTimeout(this.renderTimer);
+      this.renderTimer = null;
+    }
     this.clearTrack();
     if (this.trackLayer) {
       this.map.remove(this.trackLayer);

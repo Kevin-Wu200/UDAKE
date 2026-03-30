@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { offlineMapService, __offlineMapInternals } from '../apps/frontend/js/map/services/OfflineMapService';
 import { calculateBackoffDelay } from '../apps/frontend/js/services/GPSSyncService';
+import { gpsSyncService } from '../apps/frontend/js/services/GPSSyncService';
+import { OfflineManager } from '../apps/frontend/js/utils/OfflineManager.js';
 
 describe('GPS前端能力测试', () => {
   beforeEach(() => {
@@ -66,5 +68,61 @@ describe('GPS前端能力测试', () => {
     expect(d5).toBeLessThanOrEqual(60000);
 
     randomSpy.mockRestore();
+  });
+
+  it('应支持自适应批量同步与传输统计', async () => {
+    const samples = Array.from({ length: 25 }, (_, i) => ({
+      id: `s-${i}`,
+      projectId: 'proj-a',
+      latitude: 39.9 + i * 0.00001,
+      longitude: 116.4 + i * 0.00001,
+      accuracy: 2,
+      updatedAt: Date.now() + i,
+      collectedAt: Date.now() + i
+    }));
+
+    global.fetch = vi.fn(async () => ({ ok: true, json: async () => ({ success: true }) }));
+    const result = await gpsSyncService.syncSamples(samples, { forceHttp: true, adaptive: true });
+
+    expect(result.success).toBeGreaterThan(0);
+    expect(result.batches).toBeGreaterThan(0);
+    expect(global.fetch).toHaveBeenCalled();
+  });
+
+  it('离线地图应支持版本元数据与更新调度', async () => {
+    await offlineMapService.init();
+    const regionId = await offlineMapService.createRegionDownloadTask({
+      name: '调度区域',
+      bbox: [116.407, 39.903, 116.408, 39.904],
+      minZoom: 15,
+      maxZoom: 15,
+      version: 'v1',
+      tileTemplate: 'https://a.example.com/{z}/{x}/{y}.png'
+    });
+
+    const meta = await offlineMapService.upsertVersionMeta({
+      version: 'v2',
+      baseVersion: 'v1',
+      schemaVersion: 1,
+      mapEngine: 'osm',
+      manifestHash: 'm1',
+      compatibleVersions: ['v1']
+    });
+    expect(meta.version).toBe('v2');
+
+    const compatibility = await offlineMapService.checkVersionCompatibility('v1', 'v2');
+    expect(compatibility.compatible).toBe(true);
+
+    const schedule = await offlineMapService.scheduleRegionUpdate(regionId, 5, 'v2');
+    expect(schedule.enabled).toBe(true);
+    const schedules = await offlineMapService.listUpdateSchedules();
+    expect(schedules.length).toBeGreaterThan(0);
+  });
+
+  it('应支持 IndexedDB/SQLite 方案评估', async () => {
+    const result = await OfflineManager.evaluateStorageBackends();
+    expect(['indexeddb', 'sqlite']).toContain(result.recommended);
+    expect(typeof result.indexeddb.available).toBe('boolean');
+    expect(typeof result.sqlite.available).toBe('boolean');
   });
 });

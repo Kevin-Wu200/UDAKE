@@ -31,7 +31,28 @@ interface BatchSyncPayload {
   strategy: 'client-wins' | 'server-wins' | 'latest-wins' | 'manual';
   samples: Array<Record<string, any>>;
   message_id?: string;
+  enable_adaptive_batch?: boolean;
+  network_rtt_ms?: number;
+  network_bandwidth_kbps?: number;
+  enable_diff_sync?: boolean;
+  diff_base_fingerprint?: string;
+  rate_limit_kbps?: number;
 }
+
+interface NetworkProfile {
+  rttMs: number;
+  bandwidthKbps: number;
+}
+
+interface BatchSyncOptions {
+  strategy?: BatchSyncPayload['strategy'];
+  adaptive?: boolean;
+  forceHttp?: boolean;
+  diffSync?: boolean;
+  rateLimitKbps?: number;
+}
+
+type CompressionAlgorithm = 'gzip' | 'deflate' | 'br';
 
 const RECONNECT_BASE_DELAY_MS = 3000;
 const RECONNECT_MAX_DELAY_MS = 60000;
@@ -40,6 +61,8 @@ const ACK_RETRY_BASE_DELAY_MS = 4000;
 const ACK_RETRY_MAX_ATTEMPTS = 3;
 const COMPRESSION_THRESHOLD_BYTES = 1024;
 const MESSAGE_DEDUP_WINDOW_MS = 5 * 60 * 1000;
+const ADAPTIVE_BATCH_MIN = 100;
+const ADAPTIVE_BATCH_MAX = 2000;
 
 export function calculateBackoffDelay(
   attempt: number,
@@ -301,6 +324,78 @@ export class GPSSyncService {
     }
   }
 
+  public async syncSamples(samples: any[], options: BatchSyncOptions = {}): Promise<{ success: number; failed: number; batches: number }> {
+    if (!Array.isArray(samples) || samples.length === 0) {
+      return { success: 0, failed: 0, batches: 0 };
+    }
+
+    const profile = this.estimateNetworkProfile();
+    const normalized = samples
+      .filter(item => item && typeof item === 'object')
+      .map(item => this.buildIncrementalPayload(this.normalizeSampleForServer(item)));
+    if (normalized.length === 0) {
+      return { success: 0, failed: samples.length, batches: 0 };
+    }
+
+    const batchSize = options.adaptive !== false
+      ? this.recommendBatchSize(profile, normalized.length)
+      : Math.min(ADAPTIVE_BATCH_MAX, Math.max(1, normalized.length));
+    const apiBase = resolveRuntimeApiBaseUrl();
+
+    let success = 0;
+    let failed = 0;
+    let batches = 0;
+
+    for (let start = 0; start < normalized.length; start += batchSize) {
+      const chunk = normalized.slice(start, start + batchSize);
+      batches += 1;
+      const payload: BatchSyncPayload = {
+        client_id: this.clientId,
+        project_id: chunk[0]?.project_id || this.projectId,
+        strategy: options.strategy || 'latest-wins',
+        samples: this.optimizeBatchPayload(chunk),
+        message_id: `gps_batch_${Date.now()}_${this.messageSeq++}`,
+        enable_adaptive_batch: options.adaptive !== false,
+        network_rtt_ms: profile.rttMs,
+        network_bandwidth_kbps: profile.bandwidthKbps,
+        enable_diff_sync: options.diffSync !== false,
+        diff_base_fingerprint: this.computeRabinFingerprint(chunk),
+        rate_limit_kbps: options.rateLimitKbps
+      };
+
+      try {
+        if (!options.forceHttp && this.websocket && this.websocket.readyState === WebSocket.OPEN) {
+          const ok = await this.sendMessage('gps_batch_upsert', payload, true);
+          if (ok) {
+            success += chunk.length;
+            continue;
+          }
+        }
+
+        const requestBody = await this.createHttpRequestBody(payload);
+        const response = await fetch(`${apiBase}/mobile-gps/sync/batch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(requestBody)
+        });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+        success += chunk.length;
+      } catch (error) {
+        console.warn('[GPSSync] 批量同步失败:', error);
+        failed += chunk.length;
+      }
+    }
+
+    if (success > 0) {
+      this.markSyncSuccess();
+    } else if (failed > 0) {
+      this.updateStatus('error', `批量同步失败: ${failed}/${normalized.length}`);
+    }
+    return { success, failed, batches };
+  }
+
   public dispose(): void {
     this.enabled = false;
     this.stopHeartbeat();
@@ -405,6 +500,103 @@ export class GPSSyncService {
     };
   }
 
+  private estimateNetworkProfile(): NetworkProfile {
+    const rttMs = Math.max(60, this.avgRttMs ?? 300);
+    const packetLoss = this.getPacketLossRate();
+    const healthFactor = Math.max(0.2, 1 - packetLoss);
+    const baselineKbps = 4096;
+    const bandwidthKbps = Math.max(256, Math.round((baselineKbps / (rttMs / 200)) * healthFactor));
+    return { rttMs, bandwidthKbps };
+  }
+
+  private recommendBatchSize(profile: NetworkProfile, total: number): number {
+    let batch = 1000;
+    if (profile.rttMs > 1500) {
+      batch = 200;
+    } else if (profile.rttMs > 900) {
+      batch = 350;
+    } else if (profile.rttMs > 500) {
+      batch = 500;
+    }
+
+    if (profile.bandwidthKbps < 512) {
+      batch = Math.min(batch, 200);
+    } else if (profile.bandwidthKbps < 1024) {
+      batch = Math.min(batch, 350);
+    } else if (profile.bandwidthKbps > 5000) {
+      batch = Math.max(batch, 1400);
+    }
+
+    return Math.max(ADAPTIVE_BATCH_MIN, Math.min(ADAPTIVE_BATCH_MAX, Math.min(total, batch)));
+  }
+
+  private optimizeBatchPayload(samples: Array<Record<string, any>>): Array<Record<string, any>> {
+    if (samples.length < 2) {
+      return samples;
+    }
+    const deltaEncoded = this.deltaEncodeCoordinates(samples);
+    const dictionaryResult = this.compressAttributesDictionary(deltaEncoded);
+    return dictionaryResult.records.map((item) => ({
+      ...item,
+      _dict_keys: dictionaryResult.dictionary
+    }));
+  }
+
+  private deltaEncodeCoordinates(samples: Array<Record<string, any>>): Array<Record<string, any>> {
+    let previousLat: number | null = null;
+    let previousLng: number | null = null;
+    return samples.map((sample, index) => {
+      const lat = Number(sample.latitude);
+      const lng = Number(sample.longitude);
+      const scaledLat = Math.round(lat * 1e6);
+      const scaledLng = Math.round(lng * 1e6);
+      if (index === 0 || previousLat === null || previousLng === null) {
+        previousLat = scaledLat;
+        previousLng = scaledLng;
+        return { ...sample, _coord_encoding: 'absolute', latitude: lat, longitude: lng };
+      }
+
+      const deltaLat = scaledLat - previousLat;
+      const deltaLng = scaledLng - previousLng;
+      previousLat = scaledLat;
+      previousLng = scaledLng;
+      return {
+        ...sample,
+        _coord_encoding: 'delta',
+        latitude_delta: deltaLat,
+        longitude_delta: deltaLng,
+        latitude: lat,
+        longitude: lng
+      };
+    });
+  }
+
+  private compressAttributesDictionary(samples: Array<Record<string, any>>): {
+    dictionary: string[];
+    records: Array<Record<string, any>>;
+  } {
+    const dictionarySet = new Set<string>();
+    samples.forEach((sample) => {
+      const attributes = sample.attributes || {};
+      Object.keys(attributes).forEach(key => dictionarySet.add(key));
+    });
+    const dictionary = Array.from(dictionarySet);
+    const keyIndexMap = new Map<string, number>(dictionary.map((key, index) => [key, index]));
+    const records = samples.map((sample) => {
+      const attributes = sample.attributes || {};
+      const packedAttributes: Record<string, any> = {};
+      Object.keys(attributes).forEach((key) => {
+        const idx = keyIndexMap.get(key);
+        packedAttributes[String(idx)] = attributes[key];
+      });
+      return {
+        ...sample,
+        attributes: packedAttributes
+      };
+    });
+    return { dictionary, records };
+  }
+
   private buildIncrementalPayload(sample: Record<string, any>): Record<string, any> {
     const sampleId = String(sample.id || `gps_${Date.now()}`);
     const key = `${sample.project_id || this.projectId}:${sampleId}`;
@@ -423,8 +615,20 @@ export class GPSSyncService {
       ...sample,
       id: sampleId,
       changed_fields: changedFields,
-      fingerprint
+      fingerprint,
+      fingerprint_rabin: this.computeRabinFingerprint(sample)
     };
+  }
+
+  private computeRabinFingerprint(payload: unknown): string {
+    const text = JSON.stringify(payload);
+    const mod = 2 ** 31 - 1;
+    const base = 257;
+    let acc = 0;
+    for (let i = 0; i < text.length; i += 1) {
+      acc = (acc * base + text.charCodeAt(i) + 1) % mod;
+    }
+    return `rb_${acc.toString(16)}`;
   }
 
   private simpleFingerprint(input: string): string {
@@ -489,7 +693,8 @@ export class GPSSyncService {
       return raw;
     }
 
-    const compressed = await this.tryCompressToBase64(raw, 'gzip');
+    const algorithm = this.selectCompressionAlgorithm(raw, 'websocket');
+    const compressed = await this.tryCompressToBase64(raw, algorithm);
     if (!compressed) {
       return raw;
     }
@@ -500,7 +705,7 @@ export class GPSSyncService {
       timestamp: payload.timestamp,
       data: {
         original_type: type,
-        compression: 'gzip',
+        compression: algorithm,
         encoding: 'base64',
         payload: compressed,
         original_size: raw.length
@@ -508,7 +713,17 @@ export class GPSSyncService {
     });
   }
 
-  private async tryCompressToBase64(input: string, algorithm: 'gzip' | 'deflate' = 'gzip'): Promise<string | null> {
+  private selectCompressionAlgorithm(raw: string, channel: 'websocket' | 'http'): CompressionAlgorithm {
+    if (channel === 'http' && raw.length > 64 * 1024) {
+      return 'br';
+    }
+    if (raw.length > 16 * 1024) {
+      return 'gzip';
+    }
+    return 'deflate';
+  }
+
+  private async tryCompressToBase64(input: string, algorithm: CompressionAlgorithm = 'gzip'): Promise<string | null> {
     try {
       const CompressionCtor = (globalThis as any).CompressionStream;
       if (!CompressionCtor) {
@@ -527,7 +742,7 @@ export class GPSSyncService {
     }
   }
 
-  private async tryDecompressFromBase64(base64: string, algorithm: 'gzip' | 'deflate' = 'gzip'): Promise<string | null> {
+  private async tryDecompressFromBase64(base64: string, algorithm: CompressionAlgorithm = 'gzip'): Promise<string | null> {
     try {
       const DecompressionCtor = (globalThis as any).DecompressionStream;
       if (!DecompressionCtor) {
@@ -780,16 +995,24 @@ export class GPSSyncService {
       return payload;
     }
 
-    const compressed = await this.tryCompressToBase64(serialized, 'gzip');
+    const algorithm = this.selectCompressionAlgorithm(serialized, 'http');
+    const compressed = await this.tryCompressToBase64(serialized, algorithm);
     if (!compressed) {
       return payload;
     }
 
     return {
       message_id: payload.message_id,
-      compression: 'gzip',
+      compression: algorithm === 'br' ? 'brotli' : algorithm,
       encoding: 'base64',
-      compressed_payload: compressed
+      compressed_payload: compressed,
+      batch_size: payload.samples.length,
+      enable_adaptive_batch: payload.enable_adaptive_batch,
+      network_rtt_ms: payload.network_rtt_ms,
+      network_bandwidth_kbps: payload.network_bandwidth_kbps,
+      enable_diff_sync: payload.enable_diff_sync,
+      diff_base_fingerprint: payload.diff_base_fingerprint,
+      rate_limit_kbps: payload.rate_limit_kbps
     };
   }
 }
