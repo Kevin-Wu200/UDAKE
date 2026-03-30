@@ -1816,7 +1816,7 @@ class App {
             this.layerManager = new LayerManager(mapAdapter);
             this.componentInitializer.updateMapContext({
                 layerManager: this.layerManager,
-                view: this.view
+                view: this.view ?? undefined
             });
 
             if (currentCenter && currentZoom) {
@@ -1865,7 +1865,7 @@ class App {
                 this.layerManager = new LayerManager(rollbackAdapter);
                 this.componentInitializer.updateMapContext({
                     layerManager: this.layerManager,
-                    view: this.view
+                    view: this.view ?? undefined
                 });
 
                 if (currentCenter && currentZoom !== null) {

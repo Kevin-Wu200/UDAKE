@@ -6,6 +6,14 @@
 import { trackManager } from '../services/TrackManager';
 import type { Track, TrackPoint } from '../types/sensor';
 
+export interface TrackRenderPerformance {
+  fps: number;
+  renderedPoints: number;
+  totalPoints: number;
+  lodLevel: 'high' | 'medium' | 'low';
+  lastRenderDurationMs: number;
+}
+
 /**
  * 轨迹可视化类
  */
@@ -18,7 +26,16 @@ export class TrackVisualization {
   private startListener: ((track: Track) => void) | null = null;
   private endListener: ((track: Track) => void) | null = null;
   private renderTimer: number | null = null;
-  private maxRenderablePoints = 2000;
+  private maxRenderablePoints = 4000;
+  private fpsSamples: number[] = [];
+  private lastRenderTick = 0;
+  private renderPerformance: TrackRenderPerformance = {
+    fps: 60,
+    renderedPoints: 0,
+    totalPoints: 0,
+    lodLevel: 'high',
+    lastRenderDurationMs: 0,
+  };
 
   constructor(map: any) {
     this.map = map;
@@ -103,34 +120,176 @@ export class TrackVisualization {
   }
 
   private renderCurrentTrack(track: Track): void {
+    const renderStartedAt = performance.now();
+    const visiblePoints = this.getVisiblePoints(track.points);
+    const { points: lodPoints, lodLevel } = this.applyLOD(visiblePoints);
+
     // 更新轨迹线
     if (typeof AMap !== 'undefined') {
-      const path = this.simplifyPath(track.points).map((point) => [
+      const path = this.simplifyPath(lodPoints).map((point) => [
         point.location.longitude,
         point.location.latitude,
       ]);
-      this.currentTrackPolyline.setPath(path);
+      this.renderPathInChunks(path);
+      this.renderPerformance.renderedPoints = path.length;
+      this.renderPerformance.totalPoints = track.points.length;
+      this.renderPerformance.lodLevel = lodLevel;
     }
 
     // 添加最新点的标记
     const lastPoint = track.points[track.points.length - 1];
     this.addTrackMarker(track.id, lastPoint);
+    this.updateRenderPerformance(performance.now() - renderStartedAt);
   }
 
   private simplifyPath(points: TrackPoint[]): TrackPoint[] {
-    if (points.length <= this.maxRenderablePoints) {
-      return points;
+    const zoom = Number(this.map?.getZoom?.() ?? 16);
+    if (points.length > 20000) {
+      const step = Math.ceil(points.length / this.maxRenderablePoints);
+      return points.filter((_, index) => index % step === 0);
     }
-    const step = Math.ceil(points.length / this.maxRenderablePoints);
+
+    const baseTolerance = zoom >= 17 ? 0.00003 : zoom >= 14 ? 0.00008 : 0.0002;
+    const simplified = this.douglasPeucker(points, baseTolerance);
+
+    if (simplified.length <= this.maxRenderablePoints) {
+      return simplified;
+    }
+    const step = Math.ceil(simplified.length / this.maxRenderablePoints);
     const sampled: TrackPoint[] = [];
-    for (let i = 0; i < points.length; i += step) {
-      sampled.push(points[i]);
+    for (let i = 0; i < simplified.length; i += step) {
+      sampled.push(simplified[i]);
     }
-    const last = points[points.length - 1];
+    const last = simplified[simplified.length - 1];
     if (sampled[sampled.length - 1] !== last) {
       sampled.push(last);
     }
     return sampled;
+  }
+
+  private renderPathInChunks(path: number[][]): void {
+    if (!this.currentTrackPolyline) {
+      return;
+    }
+    if (path.length <= 600) {
+      this.currentTrackPolyline.setPath(path);
+      return;
+    }
+
+    const merged: number[][] = [];
+    let cursor = 0;
+    const flush = () => {
+      const nextChunk = path.slice(cursor, cursor + 600);
+      merged.push(...nextChunk);
+      this.currentTrackPolyline.setPath(merged);
+      cursor += 600;
+      if (cursor < path.length) {
+        requestAnimationFrame(flush);
+      }
+    };
+    requestAnimationFrame(flush);
+  }
+
+  private getVisiblePoints(points: TrackPoint[]): TrackPoint[] {
+    const bounds = this.map?.getBounds?.();
+    if (!bounds || typeof bounds.contains !== 'function') {
+      return points;
+    }
+
+    const visible = points.filter((point) => {
+      try {
+        return bounds.contains([point.location.longitude, point.location.latitude]);
+      } catch {
+        return true;
+      }
+    });
+    if (visible.length === 0) {
+      return points;
+    }
+    return visible;
+  }
+
+  private applyLOD(points: TrackPoint[]): { points: TrackPoint[]; lodLevel: 'high' | 'medium' | 'low' } {
+    const zoom = Number(this.map?.getZoom?.() ?? 16);
+    if (zoom >= 17) {
+      return { points, lodLevel: 'high' };
+    }
+
+    if (zoom >= 14) {
+      const step = Math.max(1, Math.floor(points.length / 5000));
+      return {
+        points: step <= 1 ? points : points.filter((_, index) => index % step === 0),
+        lodLevel: 'medium'
+      };
+    }
+
+    const step = Math.max(2, Math.floor(points.length / 1500));
+    return {
+      points: points.filter((_, index) => index % step === 0),
+      lodLevel: 'low'
+    };
+  }
+
+  private douglasPeucker(points: TrackPoint[], tolerance: number): TrackPoint[] {
+    if (points.length <= 2) {
+      return points;
+    }
+
+    let maxDistance = 0;
+    let splitIndex = 0;
+    const start = points[0];
+    const end = points[points.length - 1];
+
+    for (let i = 1; i < points.length - 1; i++) {
+      const distance = this.perpendicularDistance(points[i], start, end);
+      if (distance > maxDistance) {
+        maxDistance = distance;
+        splitIndex = i;
+      }
+    }
+
+    if (maxDistance <= tolerance) {
+      return [start, end];
+    }
+
+    const left = this.douglasPeucker(points.slice(0, splitIndex + 1), tolerance);
+    const right = this.douglasPeucker(points.slice(splitIndex), tolerance);
+    return left.slice(0, -1).concat(right);
+  }
+
+  private perpendicularDistance(point: TrackPoint, lineStart: TrackPoint, lineEnd: TrackPoint): number {
+    const x = point.location.longitude;
+    const y = point.location.latitude;
+    const x1 = lineStart.location.longitude;
+    const y1 = lineStart.location.latitude;
+    const x2 = lineEnd.location.longitude;
+    const y2 = lineEnd.location.latitude;
+
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    if (dx === 0 && dy === 0) {
+      return Math.hypot(x - x1, y - y1);
+    }
+
+    const numerator = Math.abs(dy * x - dx * y + x2 * y1 - y2 * x1);
+    const denominator = Math.sqrt(dx * dx + dy * dy);
+    return numerator / denominator;
+  }
+
+  private updateRenderPerformance(lastRenderDurationMs: number): void {
+    const now = performance.now();
+    if (this.lastRenderTick > 0) {
+      const delta = now - this.lastRenderTick;
+      const fps = delta > 0 ? 1000 / delta : 60;
+      this.fpsSamples.push(fps);
+      if (this.fpsSamples.length > 30) {
+        this.fpsSamples.shift();
+      }
+      const avgFps = this.fpsSamples.reduce((sum, value) => sum + value, 0) / this.fpsSamples.length;
+      this.renderPerformance.fps = Math.round(avgFps);
+    }
+    this.lastRenderTick = now;
+    this.renderPerformance.lastRenderDurationMs = Number(lastRenderDurationMs.toFixed(2));
   }
 
   /**
@@ -357,6 +516,10 @@ export class TrackVisualization {
         console.log('导出轨迹图片:', trackId);
       });
     }
+  }
+
+  public getRenderPerformance(): TrackRenderPerformance {
+    return { ...this.renderPerformance };
   }
 
   /**

@@ -120,6 +120,36 @@ class MobileGPSService:
                 batch_size = min(2000, batch_size + 400)
         return max(100, min(2000, batch_size))
 
+    def build_storage_sync_hint(
+        self,
+        *,
+        storage_backend: str = "indexeddb",
+        query_avg_ms: Optional[float] = None,
+        queue_depth: int = 0,
+    ) -> Dict[str, Any]:
+        backend = str(storage_backend or "indexeddb").strip().lower()
+        normalized_backend = "sqlite" if backend == "sqlite" else "indexeddb"
+        avg_ms = float(query_avg_ms) if query_avg_ms is not None else 0.0
+
+        if normalized_backend == "sqlite":
+            base_batch = 1200
+            max_parallel = 4
+        else:
+            base_batch = 700
+            max_parallel = 2
+
+        if avg_ms > 30:
+            base_batch = max(200, int(base_batch * 0.7))
+        if int(queue_depth) > 20000:
+            max_parallel += 1
+
+        return {
+            "storage_backend": normalized_backend,
+            "recommended_batch_size": max(100, min(2000, int(base_batch))),
+            "recommended_parallel_sync": max(1, min(6, int(max_parallel))),
+            "query_avg_ms": round(avg_ms, 2),
+        }
+
     def upsert_samples(
         self,
         client_id: str,
@@ -295,6 +325,12 @@ class MobileGPSService:
             success=True,
         )
 
+        storage_hint = self.build_storage_sync_hint(
+            storage_backend="sqlite" if adaptive_batch else "indexeddb",
+            query_avg_ms=(1000 / effective_kbps) if effective_kbps > 0 else None,
+            queue_depth=len(self.samples),
+        )
+
         return {
             "applied": len(applied),
             "skipped": len(skipped),
@@ -308,6 +344,7 @@ class MobileGPSService:
             "pipeline_batches": pipeline_batches,
             "effective_kbps": effective_kbps,
             "dataset_fingerprint": dataset_fp,
+            "storage_sync_hint": storage_hint,
         }
 
     def get_samples(

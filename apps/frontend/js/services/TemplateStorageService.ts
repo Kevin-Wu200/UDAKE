@@ -203,6 +203,10 @@ export class TemplateStorageService {
         return `${basePath.replace(/\/+$/, '')}/${filename.replace(/^\/+/, '')}`;
     }
 
+    private static resolveDirectory(target: AndroidStorageTarget): Directory {
+        return target.directory ?? Directory.Documents;
+    }
+
     public static getPreferredStoragePath(): string {
         return `${PREFERRED_ABSOLUTE_DIR}/`;
     }
@@ -264,7 +268,10 @@ export class TemplateStorageService {
 
         let uri: string | undefined;
         try {
-            const uriResult = await Filesystem.getUri({ path, directory: target.directory });
+            const uriResult = await Filesystem.getUri({
+                path,
+                directory: this.resolveDirectory(target)
+            });
             uri = uriResult.uri;
         } catch {
             uri = undefined;
@@ -349,7 +356,7 @@ export class TemplateStorageService {
         try {
             const result = await Filesystem.getUri({
                 path: target.basePath,
-                directory: target.directory
+                directory: this.resolveDirectory(target)
             });
             uri = result.uri;
         } catch {
@@ -380,7 +387,7 @@ export class TemplateStorageService {
         try {
             const result = await Filesystem.getUri({
                 path,
-                directory: target.directory
+                directory: this.resolveDirectory(target)
             });
             window.open(result.uri, '_system') || window.open(result.uri, '_blank');
             return true;

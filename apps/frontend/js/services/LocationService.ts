@@ -6,6 +6,36 @@
 import type { LocationData, LocationWatchOptions } from '../types/sensor';
 import { sensorManager } from './SensorManager';
 
+type BatteryEventName = 'levelchange' | 'chargingchange' | 'dischargingtimechange';
+
+interface BatteryManagerLike extends EventTarget {
+  level: number;
+  charging: boolean;
+  chargingTime: number;
+  dischargingTime: number;
+}
+
+export interface BatteryStatus {
+  supported: boolean;
+  level: number | null;
+  charging: boolean | null;
+  chargingTime: number | null;
+  dischargingTime: number | null;
+  estimatedDischargeMinutes: number | null;
+  sampledAt: number;
+}
+
+export interface BatteryOptimizationProfile {
+  strategy: 'high-accuracy' | 'balanced' | 'power-saving';
+  watchOptions: LocationWatchOptions;
+  expectedBatteryConsumption8h: number;
+}
+
+export interface BatteryUsageSample {
+  timestamp: number;
+  level: number;
+}
+
 /**
  * 位置服务类
  */
@@ -27,6 +57,13 @@ export class LocationService {
     enableHighAccuracy: true,
     timeout: 10000,
     distanceFilter: 10,
+  };
+
+  private batteryManager: BatteryManagerLike | null = null;
+  private batteryMonitoringActive = false;
+  private batteryListeners: Set<(status: BatteryStatus) => void> = new Set();
+  private batteryEventHandler = () => {
+    this.emitBatteryStatus();
   };
 
   private constructor() {}
@@ -84,6 +121,9 @@ export class LocationService {
       return true;
     }
 
+    const profile = await this.getOptimizedWatchProfile(this.lastLocation?.speed ?? null);
+    this.configure(profile.watchOptions);
+
     const success = await sensorManager.startLocationWatch((data) => {
       this.lastLocation = data;
       this.notifyLocationListeners(data);
@@ -106,6 +146,165 @@ export class LocationService {
 
     await sensorManager.stopLocationWatch();
     this.isWatching = false;
+  }
+
+  /**
+   * 是否支持电池 API
+   */
+  public isBatteryApiSupported(): boolean {
+    if (typeof navigator === 'undefined') {
+      return false;
+    }
+    return typeof (navigator as Navigator & { getBattery?: () => Promise<BatteryManagerLike> }).getBattery === 'function';
+  }
+
+  /**
+   * 获取当前电池状态
+   */
+  public async getBatteryStatus(): Promise<BatteryStatus> {
+    const manager = await this.resolveBatteryManager();
+    const now = Date.now();
+    if (!manager) {
+      return {
+        supported: false,
+        level: null,
+        charging: null,
+        chargingTime: null,
+        dischargingTime: null,
+        estimatedDischargeMinutes: null,
+        sampledAt: now
+      };
+    }
+
+    const dischargingTime = Number.isFinite(manager.dischargingTime) ? manager.dischargingTime : null;
+    return {
+      supported: true,
+      level: Number(manager.level),
+      charging: manager.charging,
+      chargingTime: Number.isFinite(manager.chargingTime) ? manager.chargingTime : null,
+      dischargingTime,
+      estimatedDischargeMinutes: dischargingTime ? Math.round(dischargingTime / 60) : null,
+      sampledAt: now
+    };
+  }
+
+  /**
+   * 启动电池监控
+   */
+  public async startBatteryMonitoring(): Promise<boolean> {
+    const manager = await this.resolveBatteryManager();
+    if (!manager) {
+      return false;
+    }
+
+    if (this.batteryMonitoringActive) {
+      return true;
+    }
+
+    const events: BatteryEventName[] = ['levelchange', 'chargingchange', 'dischargingtimechange'];
+    events.forEach((eventName) => manager.addEventListener(eventName, this.batteryEventHandler));
+    this.batteryMonitoringActive = true;
+    await this.emitBatteryStatus();
+    return true;
+  }
+
+  /**
+   * 停止电池监控
+   */
+  public stopBatteryMonitoring(): void {
+    if (!this.batteryMonitoringActive || !this.batteryManager) {
+      return;
+    }
+    const events: BatteryEventName[] = ['levelchange', 'chargingchange', 'dischargingtimechange'];
+    events.forEach((eventName) => this.batteryManager?.removeEventListener(eventName, this.batteryEventHandler));
+    this.batteryMonitoringActive = false;
+  }
+
+  public addBatteryListener(listener: (status: BatteryStatus) => void): () => void {
+    this.batteryListeners.add(listener);
+    this.emitBatteryStatus();
+    return () => {
+      this.batteryListeners.delete(listener);
+    };
+  }
+
+  public removeBatteryListener(listener: (status: BatteryStatus) => void): void {
+    this.batteryListeners.delete(listener);
+  }
+
+  /**
+   * 基于电池状态和速度返回建议采样配置
+   */
+  public async getOptimizedWatchProfile(speedMetersPerSecond?: number | null): Promise<BatteryOptimizationProfile> {
+    const batteryStatus = await this.getBatteryStatus();
+    const speed = Number(speedMetersPerSecond ?? 0);
+    const lowBattery = batteryStatus.supported
+      && batteryStatus.charging === false
+      && typeof batteryStatus.level === 'number'
+      && batteryStatus.level <= 0.2;
+    const stationary = speed > 0 && speed <= 0.8;
+
+    if (lowBattery) {
+      return {
+        strategy: 'power-saving',
+        watchOptions: {
+          enableHighAccuracy: false,
+          timeout: 15000,
+          distanceFilter: 25
+        },
+        expectedBatteryConsumption8h: 18
+      };
+    }
+
+    if (stationary) {
+      return {
+        strategy: 'balanced',
+        watchOptions: {
+          enableHighAccuracy: false,
+          timeout: 12000,
+          distanceFilter: 12
+        },
+        expectedBatteryConsumption8h: 24
+      };
+    }
+
+    return {
+      strategy: 'high-accuracy',
+      watchOptions: {
+        enableHighAccuracy: true,
+        timeout: 8000,
+        distanceFilter: 6
+      },
+      expectedBatteryConsumption8h: 29
+    };
+  }
+
+  public async optimizeSamplingByBattery(speedMetersPerSecond?: number | null): Promise<BatteryOptimizationProfile> {
+    const profile = await this.getOptimizedWatchProfile(speedMetersPerSecond);
+    this.configure(profile.watchOptions);
+    return profile;
+  }
+
+  /**
+   * 根据历史采样估算固定时长下的耗电百分比
+   */
+  public estimateBatteryConsumption(samples: BatteryUsageSample[], durationHours = 8): number {
+    if (samples.length < 2) {
+      return 0;
+    }
+    const valid = samples
+      .filter((sample) => Number.isFinite(sample.level) && Number.isFinite(sample.timestamp))
+      .sort((a, b) => a.timestamp - b.timestamp);
+    if (valid.length < 2) {
+      return 0;
+    }
+
+    const first = valid[0];
+    const last = valid[valid.length - 1];
+    const elapsedHours = Math.max(0.1, (last.timestamp - first.timestamp) / (1000 * 60 * 60));
+    const consumed = Math.max(0, (first.level - last.level) * 100);
+    const normalized = (consumed / elapsedHours) * durationHours;
+    return Number(Math.max(0, Math.min(100, normalized)).toFixed(2));
   }
 
   /**
@@ -255,8 +454,43 @@ export class LocationService {
    */
   public dispose(): void {
     this.stopWatch();
+    this.stopBatteryMonitoring();
     this.locationListeners.clear();
+    this.batteryListeners.clear();
     this.errorListeners.clear();
+  }
+
+  private async resolveBatteryManager(): Promise<BatteryManagerLike | null> {
+    if (this.batteryManager) {
+      return this.batteryManager;
+    }
+    if (!this.isBatteryApiSupported()) {
+      return null;
+    }
+    try {
+      const getBattery = (navigator as Navigator & { getBattery?: () => Promise<BatteryManagerLike> }).getBattery;
+      if (!getBattery) {
+        return null;
+      }
+      this.batteryManager = await getBattery.call(navigator);
+      return this.batteryManager;
+    } catch {
+      return null;
+    }
+  }
+
+  private async emitBatteryStatus(): Promise<void> {
+    if (this.batteryListeners.size === 0) {
+      return;
+    }
+    const status = await this.getBatteryStatus();
+    this.batteryListeners.forEach((listener) => {
+      try {
+        listener(status);
+      } catch (error) {
+        console.error('电池监听器错误:', error);
+      }
+    });
   }
 }
 

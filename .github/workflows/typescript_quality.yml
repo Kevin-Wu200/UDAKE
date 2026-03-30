@@ -1,0 +1,44 @@
+name: TypeScript Quality
+
+on:
+  push:
+    paths:
+      - 'apps/frontend/**'
+      - 'configs/tsconfig.json'
+      - 'scripts/type-completeness-check.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/typescript_quality.yml'
+  pull_request:
+    paths:
+      - 'apps/frontend/**'
+      - 'configs/tsconfig.json'
+      - 'scripts/type-completeness-check.js'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/typescript_quality.yml'
+
+jobs:
+  typecheck:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      TYPE_COMPLETENESS_THRESHOLD: '80'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --prefer-offline
+
+      - name: Run strict typecheck
+        run: npm run typecheck
+
+      - name: Run type completeness check
+        run: npm run typecheck:completeness

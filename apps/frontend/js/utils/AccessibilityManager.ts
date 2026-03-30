@@ -396,14 +396,22 @@ export class AccessibilityManager {
         let startX = 0;
         let startY = 0;
 
-        mapContainer.addEventListener('touchstart', (event: TouchEvent) => {
-            const touch = event.changedTouches[0];
+        mapContainer.addEventListener('touchstart', (event: Event) => {
+            const touchEvent = event as TouchEvent;
+            if (!touchEvent.changedTouches || touchEvent.changedTouches.length === 0) {
+                return;
+            }
+            const touch = touchEvent.changedTouches[0];
             startX = touch.clientX;
             startY = touch.clientY;
         }, { passive: true });
 
-        mapContainer.addEventListener('touchend', (event: TouchEvent) => {
-            const touch = event.changedTouches[0];
+        mapContainer.addEventListener('touchend', (event: Event) => {
+            const touchEvent = event as TouchEvent;
+            if (!touchEvent.changedTouches || touchEvent.changedTouches.length === 0) {
+                return;
+            }
+            const touch = touchEvent.changedTouches[0];
             const deltaX = touch.clientX - startX;
             const deltaY = touch.clientY - startY;
             if (Math.abs(deltaX) < 80 || Math.abs(deltaY) > 48) {
