@@ -1,6 +1,7 @@
 import type { HistorySnapshotMetadata, HistoryTrendPayload } from '../../services/API封装.js';
 import { APIService } from '../../services/API封装.js';
 import notificationManager from '../NotificationManager.js';
+import { ConfirmDialog } from '../ConfirmDialog.js';
 
 interface TrendPoint {
     timestamp: string;
@@ -128,10 +129,54 @@ interface ForecastModelResult {
     evaluation: ForecastEvaluation;
 }
 
+interface ReportTemplateItem {
+    id: string;
+    name: string;
+    description: string;
+    preview: string;
+    builtIn: boolean;
+    content?: string;
+}
+
+interface ReportConfigState {
+    reportTitle: string;
+    fromVersion: number;
+    toVersion: number;
+    analysisType: 'compare' | 'trend' | 'forecast';
+    chartType: 'line' | 'bar' | 'area';
+    outputFormat: 'pdf' | 'html' | 'word';
+    metrics: string[];
+}
+
+interface ReportHistoryRecord {
+    id: string;
+    datasetId: string;
+    versionFrom: number;
+    versionTo: number;
+    title: string;
+    templateId: string;
+    templateName: string;
+    analysisType: string;
+    outputFormat: 'pdf' | 'html' | 'word';
+    generatedAt: string;
+    content: string;
+}
+
+interface DownloadHistoryRecord {
+    id: string;
+    reportId: string;
+    format: 'pdf' | 'html' | 'word';
+    fileName: string;
+    createdAt: string;
+}
+
 const LAST_DATASET_KEY = 'udake_history_snapshot_last_dataset_id';
 const WARNING_THRESHOLD_KEY = 'udake_history_anomaly_warning_threshold';
 const WARNING_HISTORY_KEY = 'udake_history_anomaly_warning_history';
 const SUBSCRIPTION_KEY = 'udake_history_anomaly_subscription';
+const REPORT_HISTORY_KEY = 'udake_history_analysis_report_history';
+const REPORT_DOWNLOAD_HISTORY_KEY = 'udake_history_analysis_report_download_history';
+const REPORT_TEMPLATE_KEY = 'udake_history_analysis_report_templates';
 
 export class HistoryTrendAnalysisPanel {
     private root: HTMLElement | null = null;
@@ -164,6 +209,8 @@ export class HistoryTrendAnalysisPanel {
     private sortSelect: HTMLSelectElement | null = null;
     private modelCompareHost: HTMLElement | null = null;
     private modelVisibilityHost: HTMLElement | null = null;
+    private reportHistorySummaryHost: HTMLElement | null = null;
+    private reportDownloadSummaryHost: HTMLElement | null = null;
 
     private linearChartHost: HTMLElement | null = null;
     private fftChartHost: HTMLElement | null = null;
@@ -175,6 +222,7 @@ export class HistoryTrendAnalysisPanel {
     private anomalyMapChart: EChartInstance | null = null;
     private anomalySeriesChart: EChartInstance | null = null;
     private anomalyTrendChart: EChartInstance | null = null;
+    private reportPreviewChart: EChartInstance | null = null;
 
     private snapshots: HistorySnapshotMetadata[] = [];
     private trendResult: TrendAnalysisResult | null = null;
@@ -191,6 +239,15 @@ export class HistoryTrendAnalysisPanel {
     private currentTimeSeries: TrendPoint[] = [];
     private modelResults: ForecastModelResult[] = [];
     private activeModelKeys: Set<string> = new Set(['server']);
+    private reportTemplates: ReportTemplateItem[] = [];
+    private reportHistory: ReportHistoryRecord[] = [];
+    private reportDownloadHistory: DownloadHistoryRecord[] = [];
+
+    private reportDialogOverlay: HTMLElement | null = null;
+    private reportCurrentConfig: ReportConfigState | null = null;
+    private reportPreviewZoom = 1;
+    private reportPreviewPage: 'summary' | 'metrics' | 'full' = 'summary';
+    private reportLatestRecord: ReportHistoryRecord | null = null;
 
     constructor(private readonly apiService: APIService) {}
 
@@ -258,6 +315,7 @@ export class HistoryTrendAnalysisPanel {
                 <div class="integration-actions">
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="load-versions">加载版本</button>
                     <button type="button" class="btn btn-primary integration-action-btn" data-action="analyze">执行趋势分析</button>
+                    <button type="button" class="btn btn-primary integration-action-btn" data-action="open-report-dialog">报告生成与导出</button>
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-forecast-csv">导出预测 CSV</button>
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-chart-png">导出图表 PNG</button>
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-report-pdf">导出预测报告（PDF）</button>
@@ -266,6 +324,14 @@ export class HistoryTrendAnalysisPanel {
             </section>
 
             <div class="status-message" data-role="history-trend-status"></div>
+
+            <section class="history-trend-card">
+                <h4>报告历史与下载记录</h4>
+                <div class="history-trend-main-grid">
+                    <div data-role="report-history-summary"></div>
+                    <div data-role="report-download-summary"></div>
+                </div>
+            </section>
 
             <section class="history-trend-card">
                 <h4>趋势统计指标面板</h4>
@@ -417,6 +483,8 @@ export class HistoryTrendAnalysisPanel {
         this.sortSelect = this.root.querySelector('[data-role="anomaly-sort"]');
         this.modelCompareHost = this.root.querySelector('[data-role="model-compare"]');
         this.modelVisibilityHost = this.root.querySelector('[data-role="model-visibility"]');
+        this.reportHistorySummaryHost = this.root.querySelector('[data-role="report-history-summary"]');
+        this.reportDownloadSummaryHost = this.root.querySelector('[data-role="report-download-summary"]');
 
         this.linearChartHost = this.root.querySelector('[data-role="linear-chart"]');
         this.fftChartHost = this.root.querySelector('[data-role="fft-chart"]');
@@ -459,6 +527,11 @@ export class HistoryTrendAnalysisPanel {
                 return;
             }
 
+            if (action === 'open-report-dialog') {
+                this.openReportDialog();
+                return;
+            }
+
             if (action === 'export-chart-png') {
                 this.exportChartPng();
                 return;
@@ -495,6 +568,23 @@ export class HistoryTrendAnalysisPanel {
                 if (Number.isFinite(index) && index >= 0) {
                     this.focusAnomaly(index);
                 }
+                return;
+            }
+
+            if (action === 'report-history-regenerate') {
+                const reportId = actionEl.getAttribute('data-report-id') || '';
+                if (reportId) {
+                    this.regenerateReportFromHistory(reportId);
+                }
+                return;
+            }
+
+            if (action === 'report-history-delete') {
+                const reportId = actionEl.getAttribute('data-report-id') || '';
+                if (reportId) {
+                    void this.deleteReportHistoryRecord(reportId);
+                }
+                return;
             }
         });
 
@@ -525,11 +615,15 @@ export class HistoryTrendAnalysisPanel {
         this.renderVersionOptions();
         this.warningHistory = this.readWarningHistory();
         this.subscriptionConfig = this.readSubscriptionConfig();
+        this.reportTemplates = this.readReportTemplates();
+        this.reportHistory = this.readReportHistory();
+        this.reportDownloadHistory = this.readDownloadHistory();
         const storedThreshold = Number(this.readStorage(WARNING_THRESHOLD_KEY) || '5');
         if (this.warningThresholdInput && Number.isFinite(storedThreshold) && storedThreshold >= 1) {
             this.warningThresholdInput.value = String(Math.floor(storedThreshold));
         }
         this.renderSubscription();
+        this.renderReportSummaries();
     }
 
     private async handleLoadVersions(): Promise<void> {
@@ -1836,6 +1930,854 @@ export class HistoryTrendAnalysisPanel {
         await this.exportReportPdf();
     }
 
+    private openReportDialog(): void {
+        if (!this.root) {
+            return;
+        }
+        if (!this.trendResult) {
+            this.updateStatus('请先执行趋势分析，再生成报告。', 'error');
+            return;
+        }
+        if (!this.reportDialogOverlay) {
+            this.reportDialogOverlay = document.createElement('div');
+            this.reportDialogOverlay.className = 'modal-overlay history-report-dialog-overlay';
+            this.reportDialogOverlay.innerHTML = this.buildReportDialogHtml();
+            this.bindReportDialogEvents();
+            document.body.appendChild(this.reportDialogOverlay);
+        }
+        this.renderReportDialog();
+        requestAnimationFrame(() => this.reportDialogOverlay?.classList.add('modal-show'));
+    }
+
+    private closeReportDialog(): void {
+        if (!this.reportDialogOverlay) {
+            return;
+        }
+        this.reportDialogOverlay.classList.remove('modal-show');
+        setTimeout(() => {
+            this.reportDialogOverlay?.remove();
+            this.reportDialogOverlay = null;
+            this.reportPreviewChart?.dispose();
+            this.reportPreviewChart = null;
+        }, 180);
+    }
+
+    private buildReportDialogHtml(): string {
+        return `
+            <div class="modal-content history-report-dialog">
+                <h2 class="modal-title">历史分析报告生成与导出</h2>
+                <div class="history-report-grid">
+                    <section class="history-report-section">
+                        <h4>模板与参数</h4>
+                        <div class="integration-field">
+                            <label class="integration-field-label" for="history-report-template">报告模板</label>
+                            <select id="history-report-template" class="select integration-input"></select>
+                        </div>
+                        <div class="history-report-template-preview" data-role="report-template-preview"></div>
+                        <div class="history-report-template-actions">
+                            <input id="history-report-template-file" type="file" accept=".txt,.md,.html,.json" class="input integration-input">
+                            <button type="button" class="btn btn-secondary" data-action="report-template-upload">上传自定义模板</button>
+                            <button type="button" class="btn btn-secondary" data-action="report-template-delete">删除当前自定义模板</button>
+                        </div>
+
+                        <div class="history-trend-param-grid">
+                            <div class="integration-field">
+                                <label class="integration-field-label" for="history-report-title">报告标题</label>
+                                <input id="history-report-title" class="input integration-input" type="text" placeholder="请输入报告标题">
+                            </div>
+                            <div class="integration-field">
+                                <label class="integration-field-label" for="history-report-from">起始版本</label>
+                                <select id="history-report-from" class="select integration-input"></select>
+                            </div>
+                            <div class="integration-field">
+                                <label class="integration-field-label" for="history-report-to">结束版本</label>
+                                <select id="history-report-to" class="select integration-input"></select>
+                            </div>
+                            <div class="integration-field">
+                                <label class="integration-field-label" for="history-report-analysis">分析类型</label>
+                                <select id="history-report-analysis" class="select integration-input">
+                                    <option value="compare">对比分析</option>
+                                    <option value="trend" selected>趋势分析</option>
+                                    <option value="forecast">预测分析</option>
+                                </select>
+                            </div>
+                            <div class="integration-field">
+                                <label class="integration-field-label" for="history-report-chart">图表类型</label>
+                                <select id="history-report-chart" class="select integration-input">
+                                    <option value="line" selected>折线图</option>
+                                    <option value="bar">柱状图</option>
+                                    <option value="area">面积图</option>
+                                </select>
+                            </div>
+                            <div class="integration-field">
+                                <label class="integration-field-label" for="history-report-format">输出格式</label>
+                                <select id="history-report-format" class="select integration-input">
+                                    <option value="pdf" selected>PDF</option>
+                                    <option value="html">HTML</option>
+                                    <option value="word">Word</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="history-report-metric-group" data-role="report-metrics-group"></div>
+
+                        <div class="history-report-progress">
+                            <div class="history-report-progress-bar"><div class="history-report-progress-fill" data-role="report-progress-fill"></div></div>
+                            <span data-role="report-progress-text">等待生成</span>
+                        </div>
+                        <div class="integration-actions">
+                            <button type="button" class="btn btn-primary" data-action="report-generate">生成报告</button>
+                            <button type="button" class="btn btn-secondary" data-action="report-download-current">下载当前格式</button>
+                            <button type="button" class="btn btn-secondary" data-action="report-download-batch">批量下载(PDF/HTML/Word)</button>
+                        </div>
+                    </section>
+
+                    <section class="history-report-section">
+                        <h4>报告预览</h4>
+                        <div class="history-report-preview-controls">
+                            <select class="select integration-input" data-role="report-preview-page">
+                                <option value="summary">摘要页</option>
+                                <option value="metrics">指标页</option>
+                                <option value="full">正文页</option>
+                            </select>
+                            <label class="history-report-zoom-label">缩放
+                                <input type="range" min="0.8" max="1.8" step="0.1" value="1" data-role="report-preview-zoom">
+                            </label>
+                        </div>
+                        <div class="history-report-preview-wrap">
+                            <div class="history-report-preview-content" data-role="report-preview-content"></div>
+                        </div>
+                        <div class="history-report-preview-chart" data-role="report-preview-chart"></div>
+                    </section>
+                </div>
+
+                <section class="history-report-section">
+                    <h4>报告生成历史</h4>
+                    <div data-role="report-history-list"></div>
+                </section>
+                <section class="history-report-section">
+                    <h4>下载历史</h4>
+                    <div class="integration-actions">
+                        <button type="button" class="btn btn-secondary" data-action="report-download-history-clear">清空下载历史</button>
+                    </div>
+                    <div data-role="report-download-history-list"></div>
+                </section>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" data-action="report-dialog-close">关闭</button>
+                </div>
+            </div>
+        `;
+    }
+
+    private bindReportDialogEvents(): void {
+        if (!this.reportDialogOverlay) {
+            return;
+        }
+        this.reportDialogOverlay.addEventListener('click', async (event: MouseEvent) => {
+            const target = event.target as HTMLElement | null;
+            if (!target) {
+                return;
+            }
+            if (target === this.reportDialogOverlay) {
+                this.closeReportDialog();
+                return;
+            }
+            const actionEl = target.closest('[data-action]') as HTMLElement | null;
+            const action = actionEl?.getAttribute('data-action') || '';
+            if (!action) {
+                return;
+            }
+            if (action === 'report-dialog-close') {
+                this.closeReportDialog();
+                return;
+            }
+            if (action === 'report-template-upload') {
+                await this.uploadReportTemplate();
+                return;
+            }
+            if (action === 'report-template-delete') {
+                await this.deleteCurrentTemplate();
+                return;
+            }
+            if (action === 'report-generate') {
+                await this.handleGenerateReportFromDialog();
+                return;
+            }
+            if (action === 'report-download-current') {
+                await this.downloadCurrentReport(false);
+                return;
+            }
+            if (action === 'report-download-batch') {
+                await this.downloadCurrentReport(true);
+                return;
+            }
+            if (action === 'report-history-open') {
+                const reportId = actionEl?.getAttribute('data-report-id') || '';
+                this.openReportFromHistory(reportId);
+                return;
+            }
+            if (action === 'report-history-regenerate') {
+                const reportId = actionEl?.getAttribute('data-report-id') || '';
+                this.regenerateReportFromHistory(reportId);
+                return;
+            }
+            if (action === 'report-history-delete') {
+                const reportId = actionEl?.getAttribute('data-report-id') || '';
+                await this.deleteReportHistoryRecord(reportId);
+                return;
+            }
+            if (action === 'report-download-history-clear') {
+                this.reportDownloadHistory = [];
+                this.writeStorage(REPORT_DOWNLOAD_HISTORY_KEY, JSON.stringify(this.reportDownloadHistory));
+                this.renderReportDownloadHistory();
+                this.renderReportSummaries();
+            }
+        });
+
+        this.reportDialogOverlay.addEventListener('change', () => {
+            this.reportCurrentConfig = this.readReportConfigFromDialog();
+            this.renderTemplatePreview();
+            this.renderReportPreview();
+        });
+        this.reportDialogOverlay.addEventListener('input', () => {
+            this.reportCurrentConfig = this.readReportConfigFromDialog();
+            this.renderReportPreview();
+        });
+    }
+
+    private renderReportDialog(): void {
+        if (!this.reportDialogOverlay || !this.trendResult) {
+            return;
+        }
+        const templateSelect = this.reportDialogOverlay.querySelector('#history-report-template') as HTMLSelectElement | null;
+        if (templateSelect) {
+            templateSelect.innerHTML = this.reportTemplates
+                .map(item => `<option value="${this.escapeHtml(item.id)}">${this.escapeHtml(item.name)}${item.builtIn ? '（内置）' : ''}</option>`)
+                .join('');
+        }
+
+        const fromSelect = this.reportDialogOverlay.querySelector('#history-report-from') as HTMLSelectElement | null;
+        const toSelect = this.reportDialogOverlay.querySelector('#history-report-to') as HTMLSelectElement | null;
+        const versions = this.snapshots.length > 0 ? this.snapshots.map(item => item.version) : [Math.max(1, this.trendResult.version - 1), this.trendResult.version];
+        const options = Array.from(new Set(versions)).sort((a, b) => a - b).map(item => `<option value="${item}">v${item}</option>`).join('');
+        if (fromSelect) {
+            fromSelect.innerHTML = options;
+            fromSelect.value = String(Math.max(1, this.trendResult.version - 1));
+        }
+        if (toSelect) {
+            toSelect.innerHTML = options;
+            toSelect.value = String(this.trendResult.version);
+        }
+
+        const titleInput = this.reportDialogOverlay.querySelector('#history-report-title') as HTMLInputElement | null;
+        if (titleInput) {
+            titleInput.value = `${this.trendResult.dataset_id} 历史分析报告 v${this.trendResult.version}`;
+        }
+
+        const metricHost = this.reportDialogOverlay.querySelector('[data-role="report-metrics-group"]');
+        if (metricHost) {
+            metricHost.innerHTML = `
+                <label><input type="checkbox" data-role="report-metric" value="accuracy" checked> 准确率</label>
+                <label><input type="checkbox" data-role="report-metric" value="rmse" checked> RMSE</label>
+                <label><input type="checkbox" data-role="report-metric" value="mae" checked> MAE</label>
+                <label><input type="checkbox" data-role="report-metric" value="mape" checked> MAPE</label>
+                <label><input type="checkbox" data-role="report-metric" value="r2" checked> R²</label>
+                <label><input type="checkbox" data-role="report-metric" value="anomaly_count" checked> 异常点数量</label>
+            `;
+        }
+
+        this.reportCurrentConfig = this.readReportConfigFromDialog();
+        this.renderTemplatePreview();
+        this.renderReportPreview();
+        this.renderReportHistoryList();
+        this.renderReportDownloadHistory();
+        this.setReportProgress(0, '等待生成');
+    }
+
+    private readReportConfigFromDialog(): ReportConfigState | null {
+        if (!this.reportDialogOverlay || !this.trendResult) {
+            return null;
+        }
+        const title = (this.reportDialogOverlay.querySelector('#history-report-title') as HTMLInputElement | null)?.value.trim() || '';
+        const fromVersion = Number((this.reportDialogOverlay.querySelector('#history-report-from') as HTMLSelectElement | null)?.value || this.trendResult.version);
+        const toVersion = Number((this.reportDialogOverlay.querySelector('#history-report-to') as HTMLSelectElement | null)?.value || this.trendResult.version);
+        const analysisTypeRaw = (this.reportDialogOverlay.querySelector('#history-report-analysis') as HTMLSelectElement | null)?.value || 'trend';
+        const chartTypeRaw = (this.reportDialogOverlay.querySelector('#history-report-chart') as HTMLSelectElement | null)?.value || 'line';
+        const outputFormatRaw = (this.reportDialogOverlay.querySelector('#history-report-format') as HTMLSelectElement | null)?.value || 'pdf';
+        const metrics = Array.from(this.reportDialogOverlay.querySelectorAll('[data-role="report-metric"]'))
+            .filter(node => (node as HTMLInputElement).checked)
+            .map(node => (node as HTMLInputElement).value);
+
+        return {
+            reportTitle: title || `${this.trendResult.dataset_id} 历史分析报告`,
+            fromVersion: Math.max(1, Math.floor(fromVersion)),
+            toVersion: Math.max(1, Math.floor(toVersion)),
+            analysisType: analysisTypeRaw === 'compare' || analysisTypeRaw === 'forecast' ? analysisTypeRaw : 'trend',
+            chartType: chartTypeRaw === 'bar' || chartTypeRaw === 'area' ? chartTypeRaw : 'line',
+            outputFormat: outputFormatRaw === 'html' || outputFormatRaw === 'word' ? outputFormatRaw : 'pdf',
+            metrics
+        };
+    }
+
+    private renderTemplatePreview(): void {
+        if (!this.reportDialogOverlay) {
+            return;
+        }
+        const host = this.reportDialogOverlay.querySelector('[data-role="report-template-preview"]');
+        const templateId = (this.reportDialogOverlay.querySelector('#history-report-template') as HTMLSelectElement | null)?.value || '';
+        const template = this.reportTemplates.find(item => item.id === templateId) || this.reportTemplates[0];
+        if (!host || !template) {
+            return;
+        }
+        host.innerHTML = `<strong>${this.escapeHtml(template.name)}</strong><p>${this.escapeHtml(template.description)}</p><p class="history-trend-hint">${this.escapeHtml(template.preview)}</p>`;
+    }
+
+    private renderReportPreview(): void {
+        if (!this.reportDialogOverlay || !this.trendResult || !this.reportCurrentConfig) {
+            return;
+        }
+        const zoom = Number((this.reportDialogOverlay.querySelector('[data-role="report-preview-zoom"]') as HTMLInputElement | null)?.value || '1');
+        this.reportPreviewZoom = Number.isFinite(zoom) ? zoom : 1;
+        const pageRaw = (this.reportDialogOverlay.querySelector('[data-role="report-preview-page"]') as HTMLSelectElement | null)?.value || 'summary';
+        this.reportPreviewPage = pageRaw === 'metrics' || pageRaw === 'full' ? pageRaw : 'summary';
+
+        const host = this.reportDialogOverlay.querySelector('[data-role="report-preview-content"]') as HTMLElement | null;
+        if (!host) {
+            return;
+        }
+        const metricsHtml = this.buildReportMetricsHtml(this.reportCurrentConfig.metrics);
+        const summaryHtml = `
+            <h3>${this.escapeHtml(this.reportCurrentConfig.reportTitle)}</h3>
+            <p>数据集：${this.escapeHtml(this.trendResult.dataset_id)}，版本范围：v${this.reportCurrentConfig.fromVersion} - v${this.reportCurrentConfig.toVersion}</p>
+            <p>分析类型：${this.getReportAnalysisTypeLabel(this.reportCurrentConfig.analysisType)}，输出格式：${this.reportCurrentConfig.outputFormat.toUpperCase()}</p>
+        `;
+        const fullHtml = `
+            <h4>分析结论</h4>
+            <p>趋势方向：${this.getDirectionLabel(this.trendResult.linear_trend.direction)}，斜率 ${this.trendResult.linear_trend.slope.toFixed(6)}，异常点 ${this.trendResult.anomalies.length} 个。</p>
+            <p>预测准确率 ${this.trendResult.evaluation.accuracy.toFixed(2)}%，建议结合高危异常做进一步排查。</p>
+        `;
+        const content = this.reportPreviewPage === 'summary' ? summaryHtml : this.reportPreviewPage === 'metrics' ? metricsHtml : fullHtml;
+        host.style.transform = `scale(${this.reportPreviewZoom})`;
+        host.style.transformOrigin = 'top left';
+        host.innerHTML = content;
+        this.renderReportPreviewChart();
+    }
+
+    private renderReportPreviewChart(): void {
+        if (!this.reportDialogOverlay || !this.trendResult) {
+            return;
+        }
+        const host = this.reportDialogOverlay.querySelector('[data-role="report-preview-chart"]') as HTMLElement | null;
+        const echarts = this.getEcharts();
+        if (!host) {
+            return;
+        }
+        if (!echarts) {
+            host.innerHTML = '<div class="history-empty">未加载 ECharts，无法展示交互式预览图表。</div>';
+            return;
+        }
+        if (!this.reportPreviewChart) {
+            this.reportPreviewChart = echarts.init(host);
+        }
+        const chartType = this.reportCurrentConfig?.chartType || 'line';
+        const labels = this.trendResult.forecast.map(item => this.formatDateLabel(item.timestamp));
+        const values = this.trendResult.forecast.map(item => item.predicted_value);
+        this.reportPreviewChart.setOption({
+            tooltip: { trigger: 'axis' },
+            grid: { left: 40, right: 16, top: 16, bottom: 32 },
+            xAxis: { type: 'category', data: labels },
+            yAxis: { type: 'value', scale: true },
+            series: [{
+                type: chartType === 'area' ? 'line' : chartType,
+                data: values,
+                smooth: true,
+                areaStyle: chartType === 'area' ? { color: 'rgba(37,99,235,0.18)' } : undefined,
+                itemStyle: { color: '#2563eb' }
+            }]
+        }, { notMerge: true });
+    }
+
+    private async handleGenerateReportFromDialog(): Promise<void> {
+        if (!this.trendResult || !this.reportDialogOverlay) {
+            return;
+        }
+        const config = this.readReportConfigFromDialog();
+        if (!config) {
+            return;
+        }
+        if (config.fromVersion > config.toVersion) {
+            this.updateStatus('报告版本范围无效：起始版本不能大于结束版本。', 'error');
+            return;
+        }
+        const templateId = (this.reportDialogOverlay.querySelector('#history-report-template') as HTMLSelectElement | null)?.value || '';
+        const template = this.reportTemplates.find(item => item.id === templateId) || this.reportTemplates[0];
+        try {
+            this.setReportProgress(20, '准备生成报告...');
+            const report = await this.apiService.generateHistoryAnalysisReport({
+                dataset_id: this.trendResult.dataset_id,
+                from_version: config.fromVersion,
+                to_version: config.toVersion,
+                forecast_horizon: this.trendResult.forecast.length
+            });
+            this.setReportProgress(80, '后端报告已返回，正在整理...');
+            const rawContent = this.asString(report.report) || this.asString(report.content) || '';
+            const record: ReportHistoryRecord = {
+                id: `report-${Date.now()}`,
+                datasetId: this.trendResult.dataset_id,
+                versionFrom: config.fromVersion,
+                versionTo: config.toVersion,
+                title: config.reportTitle,
+                templateId: template?.id || 'default',
+                templateName: template?.name || '标准模板',
+                analysisType: config.analysisType,
+                outputFormat: config.outputFormat,
+                generatedAt: new Date().toISOString(),
+                content: rawContent || `${config.reportTitle}\n\n${this.buildPlainTextMetrics(config.metrics)}`
+            };
+            this.reportHistory = [record, ...this.reportHistory].slice(0, 60);
+            this.writeStorage(REPORT_HISTORY_KEY, JSON.stringify(this.reportHistory));
+            this.reportLatestRecord = record;
+            this.setReportProgress(100, '报告生成完成');
+            this.renderReportHistoryList();
+            this.renderReportSummaries();
+            this.renderReportPreview();
+            this.updateStatus(`报告生成完成：${record.title}`, 'success');
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '报告生成失败';
+            this.setReportProgress(0, '生成失败');
+            this.updateStatus(message, 'error');
+        }
+    }
+
+    private async uploadReportTemplate(): Promise<void> {
+        if (!this.reportDialogOverlay) {
+            return;
+        }
+        const input = this.reportDialogOverlay.querySelector('#history-report-template-file') as HTMLInputElement | null;
+        const file = input?.files?.[0];
+        if (!file) {
+            this.updateStatus('请先选择模板文件。', 'error');
+            return;
+        }
+        const content = await file.text();
+        const name = file.name.replace(/\.[^.]+$/, '');
+        const record: ReportTemplateItem = {
+            id: `custom-${Date.now()}`,
+            name: name || '自定义模板',
+            description: `来自文件 ${file.name}`,
+            preview: content.slice(0, 120),
+            builtIn: false,
+            content
+        };
+        this.reportTemplates = [...this.reportTemplates, record];
+        this.writeStorage(REPORT_TEMPLATE_KEY, JSON.stringify(this.reportTemplates.filter(item => !item.builtIn)));
+        this.renderReportDialog();
+        const select = this.reportDialogOverlay.querySelector('#history-report-template') as HTMLSelectElement | null;
+        if (select) {
+            select.value = record.id;
+        }
+        this.renderTemplatePreview();
+        this.updateStatus(`模板上传成功：${record.name}`, 'success');
+    }
+
+    private async deleteCurrentTemplate(): Promise<void> {
+        if (!this.reportDialogOverlay) {
+            return;
+        }
+        const select = this.reportDialogOverlay.querySelector('#history-report-template') as HTMLSelectElement | null;
+        const templateId = select?.value || '';
+        const template = this.reportTemplates.find(item => item.id === templateId);
+        if (!template) {
+            return;
+        }
+        if (template.builtIn) {
+            this.updateStatus('内置模板不支持删除。', 'error');
+            return;
+        }
+        const confirmed = await ConfirmDialog.confirmDanger({
+            title: '删除模板',
+            message: `确认删除模板「${template.name}」吗？`
+        });
+        if (!confirmed) {
+            return;
+        }
+        this.reportTemplates = this.reportTemplates.filter(item => item.id !== template.id);
+        this.writeStorage(REPORT_TEMPLATE_KEY, JSON.stringify(this.reportTemplates.filter(item => !item.builtIn)));
+        this.renderReportDialog();
+        this.updateStatus('模板已删除。', 'success');
+    }
+
+    private async downloadCurrentReport(batch: boolean): Promise<void> {
+        const record = this.reportLatestRecord || this.reportHistory[0];
+        if (!record) {
+            this.updateStatus('请先生成报告后再下载。', 'error');
+            return;
+        }
+        const config = this.readReportConfigFromDialog() || this.reportCurrentConfig;
+        const formats: Array<'pdf' | 'html' | 'word'> = batch ? ['pdf', 'html', 'word'] : [config?.outputFormat || record.outputFormat];
+        for (let index = 0; index < formats.length; index += 1) {
+            const format = formats[index];
+            const percent = Math.round(((index + 1) / formats.length) * 100);
+            this.setReportProgress(percent, `下载 ${format.toUpperCase()}...`);
+            await this.downloadReportByFormat(record, format);
+        }
+        this.setReportProgress(100, '下载完成');
+        this.renderReportDownloadHistory();
+        this.renderReportSummaries();
+    }
+
+    private async downloadReportByFormat(record: ReportHistoryRecord, format: 'pdf' | 'html' | 'word'): Promise<void> {
+        const safeTitle = record.title.replace(/[^\w\-一-龥]+/g, '_');
+        const fileBase = `${safeTitle}_${record.datasetId}_v${record.versionTo}`;
+        if (format === 'pdf') {
+            const html = this.buildReportDocumentHtml(record);
+            const printWindow = window.open('', '_blank', 'width=1080,height=760');
+            if (!printWindow) {
+                throw new Error('浏览器拦截了弹窗，无法导出 PDF。');
+            }
+            printWindow.document.write(html);
+            printWindow.document.close();
+            printWindow.focus();
+            printWindow.print();
+            this.appendDownloadHistory(record.id, 'pdf', `${fileBase}.pdf`);
+            return;
+        }
+        const html = this.buildReportDocumentHtml(record);
+        if (format === 'html') {
+            this.downloadFile(`${fileBase}.html`, html, 'text/html;charset=utf-8');
+            this.appendDownloadHistory(record.id, 'html', `${fileBase}.html`);
+            return;
+        }
+        this.downloadFile(`${fileBase}.doc`, html, 'application/msword;charset=utf-8');
+        this.appendDownloadHistory(record.id, 'word', `${fileBase}.doc`);
+    }
+
+    private buildReportDocumentHtml(record: ReportHistoryRecord): string {
+        return `
+            <html>
+            <head>
+                <title>${this.escapeHtml(record.title)}</title>
+                <style>
+                    body{font-family:Arial,sans-serif;padding:24px;color:#111827;line-height:1.7}
+                    h1,h2,h3{margin:0 0 10px}
+                    .meta{color:#4b5563;font-size:13px}
+                    .card{border:1px solid #e5e7eb;border-radius:8px;padding:10px;margin-bottom:10px}
+                    pre{white-space:pre-wrap;background:#f8fafc;border:1px solid #e5e7eb;padding:10px;border-radius:8px}
+                </style>
+            </head>
+            <body>
+                <h1>${this.escapeHtml(record.title)}</h1>
+                <p class="meta">数据集：${this.escapeHtml(record.datasetId)} | 版本范围：v${record.versionFrom} - v${record.versionTo} | 模板：${this.escapeHtml(record.templateName)}</p>
+                <p class="meta">分析类型：${this.getReportAnalysisTypeLabel(record.analysisType)} | 生成时间：${this.formatDateTimeLabel(record.generatedAt)}</p>
+                <div class="card">
+                    <h3>核心指标</h3>
+                    ${this.buildReportMetricsHtml(['accuracy', 'rmse', 'mae', 'mape', 'r2', 'anomaly_count'])}
+                </div>
+                <div class="card">
+                    <h3>报告正文</h3>
+                    <pre>${this.escapeHtml(record.content || '暂无正文')}</pre>
+                </div>
+            </body>
+            </html>
+        `;
+    }
+
+    private buildReportMetricsHtml(metrics: string[]): string {
+        if (!this.trendResult) {
+            return '<p>暂无指标数据</p>';
+        }
+        const map: Record<string, string> = {
+            accuracy: `准确率：${this.trendResult.evaluation.accuracy.toFixed(2)}%`,
+            rmse: `RMSE：${(this.trendResult.evaluation.rmse || 0).toFixed(4)}`,
+            mae: `MAE：${this.trendResult.evaluation.mae.toFixed(4)}`,
+            mape: `MAPE：${this.trendResult.evaluation.mape.toFixed(2)}%`,
+            r2: `R²：${this.trendResult.evaluation.r2.toFixed(4)}`,
+            anomaly_count: `异常点数量：${this.trendResult.anomalies.length}`
+        };
+        return `<ul>${metrics.map(item => `<li>${this.escapeHtml(map[item] || item)}</li>`).join('')}</ul>`;
+    }
+
+    private buildPlainTextMetrics(metrics: string[]): string {
+        const html = this.buildReportMetricsHtml(metrics);
+        return html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+    }
+
+    private setReportProgress(percent: number, text: string): void {
+        if (!this.reportDialogOverlay) {
+            return;
+        }
+        const fill = this.reportDialogOverlay.querySelector('[data-role="report-progress-fill"]') as HTMLElement | null;
+        const textEl = this.reportDialogOverlay.querySelector('[data-role="report-progress-text"]') as HTMLElement | null;
+        if (fill) {
+            fill.style.width = `${Math.max(0, Math.min(100, percent))}%`;
+        }
+        if (textEl) {
+            textEl.textContent = text;
+        }
+    }
+
+    private renderReportHistoryList(): void {
+        if (!this.reportDialogOverlay) {
+            return;
+        }
+        const host = this.reportDialogOverlay.querySelector('[data-role="report-history-list"]');
+        if (!host) {
+            return;
+        }
+        if (this.reportHistory.length === 0) {
+            host.innerHTML = '<div class="history-empty">暂无报告生成历史。</div>';
+            return;
+        }
+        const rows = this.reportHistory.slice(0, 12).map(item => `
+            <tr>
+                <td>${this.escapeHtml(item.title)}</td>
+                <td>${this.escapeHtml(item.datasetId)}</td>
+                <td>v${item.versionFrom} - v${item.versionTo}</td>
+                <td>${this.getReportAnalysisTypeLabel(item.analysisType)}</td>
+                <td>${item.outputFormat.toUpperCase()}</td>
+                <td>${this.escapeHtml(this.formatDateTimeLabel(item.generatedAt))}</td>
+                <td>
+                    <button type="button" class="history-link-btn" data-action="report-history-open" data-report-id="${item.id}">预览</button>
+                    <button type="button" class="history-link-btn" data-action="report-history-regenerate" data-report-id="${item.id}">重生成</button>
+                    <button type="button" class="history-link-btn" data-action="report-history-delete" data-report-id="${item.id}">删除</button>
+                </td>
+            </tr>
+        `).join('');
+        host.innerHTML = `
+            <div class="history-trend-anomaly-table-wrap">
+                <table class="history-table history-trend-anomaly-table">
+                    <thead>
+                        <tr><th>标题</th><th>数据集</th><th>版本范围</th><th>类型</th><th>格式</th><th>时间</th><th>操作</th></tr>
+                    </thead>
+                    <tbody>${rows}</tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    private renderReportDownloadHistory(): void {
+        if (!this.reportDialogOverlay) {
+            return;
+        }
+        const host = this.reportDialogOverlay.querySelector('[data-role="report-download-history-list"]');
+        if (!host) {
+            return;
+        }
+        if (this.reportDownloadHistory.length === 0) {
+            host.innerHTML = '<div class="history-empty">暂无下载历史。</div>';
+            return;
+        }
+        const list = this.reportDownloadHistory.slice(0, 16).map(item => (
+            `<li>${this.formatDateTimeLabel(item.createdAt)} | ${item.format.toUpperCase()} | ${this.escapeHtml(item.fileName)}</li>`
+        )).join('');
+        host.innerHTML = `<ul>${list}</ul>`;
+    }
+
+    private renderReportSummaries(): void {
+        if (this.reportHistorySummaryHost) {
+            if (this.reportHistory.length === 0) {
+                this.reportHistorySummaryHost.innerHTML = '<div class="history-empty">暂无报告生成历史。</div>';
+            } else {
+                const rows = this.reportHistory.slice(0, 5).map(item => (
+                    `<li>${this.escapeHtml(item.title)} | ${this.formatDateTimeLabel(item.generatedAt)} | <button type="button" class="history-link-btn" data-action="report-history-regenerate" data-report-id="${item.id}">重生成</button> <button type="button" class="history-link-btn" data-action="report-history-delete" data-report-id="${item.id}">删除</button></li>`
+                )).join('');
+                this.reportHistorySummaryHost.innerHTML = `<h5>最近报告</h5><ul>${rows}</ul>`;
+            }
+        }
+        if (this.reportDownloadSummaryHost) {
+            if (this.reportDownloadHistory.length === 0) {
+                this.reportDownloadSummaryHost.innerHTML = '<div class="history-empty">暂无下载历史。</div>';
+            } else {
+                const rows = this.reportDownloadHistory.slice(0, 5).map(item => (
+                    `<li>${this.formatDateTimeLabel(item.createdAt)} | ${item.format.toUpperCase()} | ${this.escapeHtml(item.fileName)}</li>`
+                )).join('');
+                this.reportDownloadSummaryHost.innerHTML = `<h5>最近下载</h5><ul>${rows}</ul>`;
+            }
+        }
+    }
+
+    private openReportFromHistory(reportId: string): void {
+        const record = this.reportHistory.find(item => item.id === reportId);
+        if (!record || !this.reportDialogOverlay) {
+            return;
+        }
+        this.reportLatestRecord = record;
+        const titleInput = this.reportDialogOverlay.querySelector('#history-report-title') as HTMLInputElement | null;
+        const fromSelect = this.reportDialogOverlay.querySelector('#history-report-from') as HTMLSelectElement | null;
+        const toSelect = this.reportDialogOverlay.querySelector('#history-report-to') as HTMLSelectElement | null;
+        const formatSelect = this.reportDialogOverlay.querySelector('#history-report-format') as HTMLSelectElement | null;
+        const analysisSelect = this.reportDialogOverlay.querySelector('#history-report-analysis') as HTMLSelectElement | null;
+        if (titleInput) {
+            titleInput.value = record.title;
+        }
+        if (fromSelect) {
+            fromSelect.value = String(record.versionFrom);
+        }
+        if (toSelect) {
+            toSelect.value = String(record.versionTo);
+        }
+        if (formatSelect) {
+            formatSelect.value = record.outputFormat;
+        }
+        if (analysisSelect) {
+            analysisSelect.value = record.analysisType;
+        }
+        this.reportCurrentConfig = this.readReportConfigFromDialog();
+        this.renderReportPreview();
+        this.setReportProgress(100, `已载入历史报告：${record.title}`);
+    }
+
+    private regenerateReportFromHistory(reportId: string): void {
+        const record = this.reportHistory.find(item => item.id === reportId);
+        if (!record) {
+            return;
+        }
+        this.openReportDialog();
+        this.openReportFromHistory(reportId);
+        void this.handleGenerateReportFromDialog();
+    }
+
+    private async deleteReportHistoryRecord(reportId: string): Promise<void> {
+        const record = this.reportHistory.find(item => item.id === reportId);
+        if (!record) {
+            return;
+        }
+        const confirmed = await ConfirmDialog.confirmDanger({
+            title: '删除报告历史',
+            message: `确认删除报告「${record.title}」吗？`
+        });
+        if (!confirmed) {
+            return;
+        }
+        this.reportHistory = this.reportHistory.filter(item => item.id !== reportId);
+        this.writeStorage(REPORT_HISTORY_KEY, JSON.stringify(this.reportHistory));
+        this.renderReportSummaries();
+        this.renderReportHistoryList();
+        this.updateStatus(`已删除报告：${record.title}`, 'success');
+    }
+
+    private appendDownloadHistory(reportId: string, format: 'pdf' | 'html' | 'word', fileName: string): void {
+        const record: DownloadHistoryRecord = {
+            id: `download-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+            reportId,
+            format,
+            fileName,
+            createdAt: new Date().toISOString()
+        };
+        this.reportDownloadHistory = [record, ...this.reportDownloadHistory].slice(0, 100);
+        this.writeStorage(REPORT_DOWNLOAD_HISTORY_KEY, JSON.stringify(this.reportDownloadHistory));
+    }
+
+    private readReportTemplates(): ReportTemplateItem[] {
+        const builtIn: ReportTemplateItem[] = [
+            { id: 'default', name: '标准模板', description: '通用报告模板，包含摘要、指标和结论。', preview: '适用于常规历史趋势与预测结果汇报。', builtIn: true },
+            { id: 'compare', name: '版本对比模板', description: '突出版本差异和异常变化。', preview: '侧重 from/to 版本对比和变化统计。', builtIn: true },
+            { id: 'executive', name: '管理层简报模板', description: '突出关键结论和建议。', preview: '面向管理层，信息高度压缩。', builtIn: true }
+        ];
+        const raw = this.readStorage(REPORT_TEMPLATE_KEY);
+        if (!raw) {
+            return builtIn;
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) {
+                return builtIn;
+            }
+            const custom = parsed
+                .filter(item => item && typeof item === 'object')
+                .map(item => {
+                    const row = item as Record<string, unknown>;
+                    return {
+                        id: this.asString(row.id) || '',
+                        name: this.asString(row.name) || '自定义模板',
+                        description: this.asString(row.description) || '自定义模板',
+                        preview: this.asString(row.preview) || '',
+                        builtIn: false,
+                        content: this.asString(row.content) || ''
+                    };
+                })
+                .filter(item => item.id);
+            return [...builtIn, ...custom];
+        } catch {
+            return builtIn;
+        }
+    }
+
+    private readReportHistory(): ReportHistoryRecord[] {
+        const raw = this.readStorage(REPORT_HISTORY_KEY);
+        if (!raw) {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+            return parsed
+                .filter(item => item && typeof item === 'object')
+                .map(item => {
+                    const row = item as Record<string, unknown>;
+                    const formatRaw = this.asString(row.outputFormat);
+                    const format: 'pdf' | 'html' | 'word' = formatRaw === 'html' || formatRaw === 'word' ? formatRaw : 'pdf';
+                    return {
+                        id: this.asString(row.id) || '',
+                        datasetId: this.asString(row.datasetId) || '',
+                        versionFrom: this.asNumber(row.versionFrom) || 1,
+                        versionTo: this.asNumber(row.versionTo) || 1,
+                        title: this.asString(row.title) || '未命名报告',
+                        templateId: this.asString(row.templateId) || 'default',
+                        templateName: this.asString(row.templateName) || '标准模板',
+                        analysisType: this.asString(row.analysisType) || 'trend',
+                        outputFormat: format,
+                        generatedAt: this.asString(row.generatedAt) || '',
+                        content: this.asString(row.content) || ''
+                    };
+                })
+                .filter(item => item.id && item.datasetId);
+        } catch {
+            return [];
+        }
+    }
+
+    private readDownloadHistory(): DownloadHistoryRecord[] {
+        const raw = this.readStorage(REPORT_DOWNLOAD_HISTORY_KEY);
+        if (!raw) {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+            return parsed
+                .filter(item => item && typeof item === 'object')
+                .map(item => {
+                    const row = item as Record<string, unknown>;
+                    const formatRaw = this.asString(row.format);
+                    const format: 'pdf' | 'html' | 'word' = formatRaw === 'html' || formatRaw === 'word' ? formatRaw : 'pdf';
+                    return {
+                        id: this.asString(row.id) || '',
+                        reportId: this.asString(row.reportId) || '',
+                        format,
+                        fileName: this.asString(row.fileName) || '',
+                        createdAt: this.asString(row.createdAt) || ''
+                    };
+                })
+                .filter(item => item.id);
+        } catch {
+            return [];
+        }
+    }
+
+    private getReportAnalysisTypeLabel(type: string): string {
+        if (type === 'compare') {
+            return '对比分析';
+        }
+        if (type === 'forecast') {
+            return '预测分析';
+        }
+        return '趋势分析';
+    }
+
     private downloadFile(fileName: string, content: string, mimeType: string): void {
         const blob = new Blob([content], { type: mimeType });
         const url = URL.createObjectURL(blob);
@@ -1916,6 +2858,14 @@ export class HistoryTrendAnalysisPanel {
 
         if (this.modelCompareHost) {
             this.modelCompareHost.innerHTML = '<div class="history-empty">执行趋势分析后展示模型性能对比。</div>';
+        }
+
+        if (this.reportHistorySummaryHost) {
+            this.reportHistorySummaryHost.innerHTML = '<div class="history-empty">暂无报告生成历史。</div>';
+        }
+
+        if (this.reportDownloadSummaryHost) {
+            this.reportDownloadSummaryHost.innerHTML = '<div class="history-empty">暂无下载历史。</div>';
         }
     }
 
