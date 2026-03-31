@@ -166,6 +166,12 @@ class SocialShareRequest(BaseModel):
     title: Optional[str] = Field(default=None, max_length=200)
 
 
+class CacheInvalidateRequest(BaseModel):
+    key: Optional[str] = Field(default=None, max_length=200)
+    pattern: Optional[str] = Field(default=None, max_length=200)
+    workflow_id: Optional[str] = Field(default=None, max_length=120)
+
+
 def _handle_error(exc: Exception) -> None:
     if isinstance(exc, WorkflowValidationError):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -181,6 +187,20 @@ def _handle_error(exc: Exception) -> None:
 @router.get("/workflow/health")
 async def workflow_health() -> Dict[str, Any]:
     return smart_workflow_service.health_snapshot()
+
+
+@router.get("/workflow/cache/metrics")
+async def workflow_cache_metrics() -> Dict[str, Any]:
+    return smart_workflow_service.get_cache_metrics()
+
+
+@router.post("/workflow/cache/invalidate")
+async def workflow_cache_invalidate(payload: CacheInvalidateRequest) -> Dict[str, Any]:
+    return smart_workflow_service.invalidate_cache(
+        key=payload.key,
+        pattern=payload.pattern,
+        workflow_id=payload.workflow_id,
+    )
 
 
 @router.get("/workflow/schema")
@@ -461,6 +481,14 @@ async def list_collaboration_cursors(
             workflow_id=workflow_id,
             active_seconds=active_seconds,
         )
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/online-users")
+async def list_online_users(workflow_id: str) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.list_online_users(workflow_id=workflow_id)
     except Exception as exc:  # pylint: disable=broad-except
         _handle_error(exc)
 

@@ -287,6 +287,9 @@ def test_collaboration_ot_conflict_comment_cursor_notification(client: TestClien
         json={"user_id": "bob", "position": {"node_id": "sample", "x": 100, "y": 120}},
     )
     assert cursor_resp.status_code == 200
+    online_users_resp = client.get(f"/api/workflow/{workflow_id}/online-users")
+    assert online_users_resp.status_code == 200
+    assert online_users_resp.json()["count"] >= 1
 
     comment_resp = client.post(
         f"/api/workflow/{workflow_id}/comments",
@@ -351,3 +354,12 @@ def test_share_export_social_and_collaboration_analytics(client: TestClient) -> 
     assert analytics_resp.status_code == 200
     assert analytics_resp.json()["analytics"]["share_views"] >= 1
     assert analytics_resp.json()["analytics"]["share_downloads"] >= 1
+
+    cache_metrics_resp = client.get("/api/workflow/cache/metrics")
+    assert cache_metrics_resp.status_code == 200
+    assert "hit_rate" in cache_metrics_resp.json()
+    invalidate_resp = client.post(
+        "/api/workflow/cache/invalidate",
+        json={"workflow_id": workflow_id, "pattern": f"user_permissions:*:{workflow_id}"},
+    )
+    assert invalidate_resp.status_code == 200

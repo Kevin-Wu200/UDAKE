@@ -15,6 +15,8 @@ from urllib.parse import quote_plus
 from uuid import uuid4
 
 from .websocket_service import websocket_service
+from .workflow_redis_cache import WorkflowRedisCacheManager
+from ..config import settings
 from ..workflow.engine import WorkflowEngine
 from ..workflow.schema import WorkflowValidationError, get_workflow_schema
 from ..workflow.templates import built_in_templates
@@ -22,6 +24,12 @@ from ..workflow.templates import built_in_templates
 
 class SmartWorkflowService:
     """智能工作流应用服务。"""
+
+    _WORKFLOW_CACHE_TTL = 3600
+    _PERMISSION_CACHE_TTL = 1800
+    _CURSOR_CACHE_TTL = 300
+    _ONLINE_USERS_CACHE_TTL = 120
+    _SHARE_STATS_CACHE_TTL = 86400
 
     _ROLE_INHERITANCE: Dict[str, List[str]] = {
         "guest": [],
@@ -68,9 +76,14 @@ class SmartWorkflowService:
         "muted_event_types": [],
     }
 
-    def __init__(self, auto_start_scheduler: bool = True) -> None:
+    def __init__(
+        self,
+        auto_start_scheduler: bool = True,
+        cache_manager: Optional[WorkflowRedisCacheManager] = None,
+    ) -> None:
         self._lock = threading.RLock()
         self._engine = WorkflowEngine()
+        self._cache = cache_manager or WorkflowRedisCacheManager.from_settings(settings)
 
         self._workflows: Dict[str, Dict[str, Any]] = {}
         self._runs: Dict[str, Dict[str, Any]] = {}
@@ -118,6 +131,7 @@ class SmartWorkflowService:
     # -------- 运行健康与元数据 --------
     def health_snapshot(self) -> Dict[str, Any]:
         with self._lock:
+            cache_metrics = self._cache.get_metrics()
             return {
                 "status": "healthy",
                 "module": "smart_workflow",
@@ -128,6 +142,11 @@ class SmartWorkflowService:
                 "team_count": len(self._teams),
                 "share_link_count": len(self._share_links),
                 "scheduler_running": self._running,
+                "cache": {
+                    "healthy": bool(cache_metrics.get("healthy", False)),
+                    "backend": cache_metrics.get("memory", {}).get("backend", "unknown"),
+                    "hit_rate": cache_metrics.get("hit_rate", 0.0),
+                },
             }
 
     def get_schema(self) -> Dict[str, Any]:
@@ -170,6 +189,65 @@ class SmartWorkflowService:
             },
             "last_activity_at": now,
         }
+
+    def _cache_key_workflow(self, workflow_id: str) -> str:
+        return f"workflow:{workflow_id}"
+
+    def _cache_key_permissions(self, user_id: str, workflow_id: str) -> str:
+        return f"user_permissions:{user_id}:{workflow_id}"
+
+    def _cache_key_cursor(self, workflow_id: str) -> str:
+        return f"cursor:{workflow_id}"
+
+    def _cache_key_online_users(self, workflow_id: str) -> str:
+        return f"online_users:{workflow_id}"
+
+    def _cache_key_share_stats(self, share_token: str) -> str:
+        return f"share_stats:{share_token}"
+
+    def _invalidate_workflow_related_cache(self, workflow_id: str) -> None:
+        self._cache.invalidate_cascade(
+            root_key=self._cache_key_workflow(workflow_id),
+            related_patterns=[
+                self._cache_key_permissions("*", workflow_id),
+                self._cache_key_cursor(workflow_id),
+                self._cache_key_online_users(workflow_id),
+            ],
+        )
+
+    def _invalidate_permission_cache(self, workflow_id: str) -> None:
+        if not workflow_id:
+            return
+        self._cache.delete_pattern(self._cache_key_permissions("*", workflow_id))
+
+    def _invalidate_team_permission_cache(self, team_id: str) -> None:
+        if not team_id:
+            return
+        for workflow_id, workflow in self._workflows.items():
+            state = workflow.get("collab_state") or {}
+            if team_id in {str(item) for item in state.get("team_ids") or []}:
+                self._invalidate_permission_cache(workflow_id)
+
+    def _refresh_online_users_cache(self, workflow_id: str, cursors: Mapping[str, Any]) -> None:
+        now = self._now()
+        online_users: List[Dict[str, Any]] = []
+        for cursor in cursors.values():
+            try:
+                updated_at = datetime.fromisoformat(str(cursor.get("updated_at")))
+            except Exception:  # pylint: disable=broad-except
+                continue
+            if (now - updated_at).total_seconds() <= self._ONLINE_USERS_CACHE_TTL:
+                online_users.append(
+                    {
+                        "user_id": str(cursor.get("user_id") or ""),
+                        "updated_at": str(cursor.get("updated_at") or ""),
+                    }
+                )
+        self._cache.set(
+            self._cache_key_online_users(workflow_id),
+            {"workflow_id": workflow_id, "users": online_users, "count": len(online_users)},
+            ttl=self._ONLINE_USERS_CACHE_TTL,
+        )
 
     def _role_permissions(self, role: str) -> Set[str]:
         role_name = str(role or "guest").strip().lower()
@@ -270,6 +348,7 @@ class SmartWorkflowService:
                 "collab_state": self._new_collab_state(),
             }
             self._workflows[workflow_id] = record
+            self._cache.set(self._cache_key_workflow(workflow_id), record, ttl=self._WORKFLOW_CACHE_TTL)
             return deepcopy(record)
 
     def list_workflows(self) -> List[Dict[str, Any]]:
@@ -288,11 +367,17 @@ class SmartWorkflowService:
             ]
 
     def get_workflow(self, workflow_id: str) -> Optional[Dict[str, Any]]:
+        cache_key = self._cache_key_workflow(workflow_id)
+        cached = self._cache.get(cache_key)
+        if isinstance(cached, dict):
+            return deepcopy(cached)
         with self._lock:
             item = self._workflows.get(workflow_id)
             if not item:
                 return None
-            return deepcopy(item)
+            copied = deepcopy(item)
+            self._cache.set(cache_key, copied, ttl=self._WORKFLOW_CACHE_TTL)
+            return copied
 
     def update_workflow(self, workflow_id: str, updates: Mapping[str, Any], note: str = "update") -> Dict[str, Any]:
         with self._lock:
@@ -322,6 +407,8 @@ class SmartWorkflowService:
                     "definition": deepcopy(normalized),
                 }
             )
+            self._invalidate_workflow_related_cache(workflow_id)
+            self._cache.set(self._cache_key_workflow(workflow_id), current, ttl=self._WORKFLOW_CACHE_TTL)
             return deepcopy(current)
 
     def delete_workflow(self, workflow_id: str) -> None:
@@ -347,6 +434,7 @@ class SmartWorkflowService:
             schedule_ids = [sid for sid, schedule in self._schedules.items() if schedule["workflow_id"] == workflow_id]
             for sid in schedule_ids:
                 del self._schedules[sid]
+            self._invalidate_workflow_related_cache(workflow_id)
 
     def list_versions(self, workflow_id: str) -> List[Dict[str, Any]]:
         with self._lock:
@@ -387,6 +475,8 @@ class SmartWorkflowService:
                     "definition": deepcopy(restored),
                 }
             )
+            self._invalidate_workflow_related_cache(workflow_id)
+            self._cache.set(self._cache_key_workflow(workflow_id), current, ttl=self._WORKFLOW_CACHE_TTL)
             return deepcopy(current)
 
     def export_workflow(self, workflow_id: str) -> Dict[str, Any]:
@@ -435,6 +525,8 @@ class SmartWorkflowService:
 
             current["collaborators"] = normalized
             current["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._invalidate_permission_cache(workflow_id)
+            self._cache.set(self._cache_key_workflow(workflow_id), current, ttl=self._WORKFLOW_CACHE_TTL)
             return deepcopy(current)
 
     # -------- 团队、邀请、权限 --------
@@ -515,6 +607,7 @@ class SmartWorkflowService:
                 "invited_via": invited_via,
             }
             team["updated_at"] = self._now_iso()
+            self._invalidate_team_permission_cache(team_id)
             return deepcopy(team)
 
     def remove_team_member(self, team_id: str, user_id: str) -> Dict[str, Any]:
@@ -527,6 +620,7 @@ class SmartWorkflowService:
                 raise ValueError("不能移除团队拥有者")
             team["members"].pop(uid, None)
             team["updated_at"] = self._now_iso()
+            self._invalidate_team_permission_cache(team_id)
             return deepcopy(team)
 
     def bind_team_to_workflow(self, workflow_id: str, team_id: str) -> Dict[str, Any]:
@@ -542,6 +636,8 @@ class SmartWorkflowService:
             state["team_ids"] = existing
             workflow["updated_at"] = self._now_iso()
             state["last_activity_at"] = workflow["updated_at"]
+            self._invalidate_permission_cache(workflow_id)
+            self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
             return {"workflow_id": workflow_id, "team_ids": deepcopy(existing)}
 
     def create_invitation(
@@ -624,6 +720,7 @@ class SmartWorkflowService:
             invitation["status"] = "accepted"
             invitation["accepted_by"] = uid
             invitation["accepted_at"] = self._now_iso()
+            self._invalidate_team_permission_cache(team_id)
 
             return {
                 "invitation": deepcopy(invitation),
@@ -665,6 +762,7 @@ class SmartWorkflowService:
                 "expires_at": (self._now() + timedelta(hours=max(1, int(ttl_hours)))).isoformat(),
             }
             self._delegations[delegation_id] = delegation
+            self._invalidate_permission_cache(workflow_id)
             return deepcopy(delegation)
 
     def revoke_permission_delegation(self, delegation_id: str) -> Dict[str, Any]:
@@ -674,6 +772,7 @@ class SmartWorkflowService:
                 raise KeyError(f"delegation '{delegation_id}' not found")
             delegation["status"] = "revoked"
             delegation["revoked_at"] = self._now_iso()
+            self._invalidate_permission_cache(str(delegation.get("workflow_id") or ""))
             return deepcopy(delegation)
 
     def list_permission_delegations(
@@ -702,6 +801,11 @@ class SmartWorkflowService:
 
     def get_effective_permissions(self, workflow_id: str, user_id: str) -> Dict[str, Any]:
         uid = str(user_id or "").strip()
+        cache_key = self._cache_key_permissions(uid, workflow_id)
+        cached = self._cache.get(cache_key)
+        if isinstance(cached, dict):
+            return deepcopy(cached)
+
         with self._lock:
             workflow = self._workflow_or_error(workflow_id)
             role_names: Set[str] = set()
@@ -741,17 +845,38 @@ class SmartWorkflowService:
                 delegated_permissions.append(str(item.get("permission")))
                 permissions.add(str(item.get("permission")))
 
-            return {
+            result = {
                 "workflow_id": workflow_id,
                 "user_id": uid,
                 "roles": sorted(role_names),
                 "permissions": sorted(permissions),
                 "delegated_permissions": sorted(set(delegated_permissions)),
             }
+            self._cache.set(cache_key, result, ttl=self._PERMISSION_CACHE_TTL)
+            return result
 
     def has_permission(self, workflow_id: str, user_id: str, permission: str) -> bool:
         perms = self.get_effective_permissions(workflow_id, user_id)
         return str(permission) in set(perms.get("permissions") or [])
+
+    def get_cache_metrics(self) -> Dict[str, Any]:
+        return self._cache.get_metrics()
+
+    def invalidate_cache(
+        self,
+        *,
+        key: Optional[str] = None,
+        pattern: Optional[str] = None,
+        workflow_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        deleted = 0
+        if key:
+            deleted += 1 if self._cache.delete(str(key)) else 0
+        if pattern:
+            deleted += self._cache.delete_pattern(str(pattern))
+        if workflow_id:
+            self._invalidate_workflow_related_cache(str(workflow_id))
+        return {"deleted": deleted, "key": key, "pattern": pattern, "workflow_id": workflow_id}
 
     # -------- 协作编辑（OT + 冲突）--------
     def apply_collaboration_operation(self, workflow_id: str, payload: Mapping[str, Any]) -> Dict[str, Any]:
@@ -935,6 +1060,7 @@ class SmartWorkflowService:
             state.setdefault("contributor_stats", {}).setdefault(actor_id, {"operations": 0, "comments": 0})
             state["contributor_stats"][actor_id]["operations"] += 1
             workflow["updated_at"] = now
+            self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
 
             return {
                 "workflow_id": workflow_id,
@@ -1017,6 +1143,7 @@ class SmartWorkflowService:
             conflict["resolved_value"] = final_value
             state["analytics"]["manual_resolved_conflicts"] += 1
             workflow["updated_at"] = self._now_iso()
+            self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
             return deepcopy(conflict)
 
     def update_collaboration_cursor(
@@ -1044,20 +1171,42 @@ class SmartWorkflowService:
             }
             state.setdefault("cursors", {})[uid] = cursor_payload
             state["last_activity_at"] = cursor_payload["updated_at"]
+            self._cache.set(self._cache_key_cursor(workflow_id), state.get("cursors") or {}, ttl=self._CURSOR_CACHE_TTL)
+            self._refresh_online_users_cache(workflow_id, state.get("cursors") or {})
             return {"workflow_id": workflow_id, "cursor": deepcopy(cursor_payload)}
 
     def list_collaboration_cursors(self, workflow_id: str, active_seconds: int = 30) -> Dict[str, Any]:
         ttl = max(1, min(int(active_seconds), 3600))
-        with self._lock:
-            workflow = self._workflow_or_error(workflow_id)
-            cursors = deepcopy(workflow["collab_state"].get("cursors") or {})
+        cached = self._cache.get(self._cache_key_cursor(workflow_id))
+        if isinstance(cached, dict):
+            cursors = deepcopy(cached)
+        else:
+            with self._lock:
+                workflow = self._workflow_or_error(workflow_id)
+                cursors = deepcopy(workflow["collab_state"].get("cursors") or {})
+            self._cache.set(self._cache_key_cursor(workflow_id), cursors, ttl=self._CURSOR_CACHE_TTL)
+
         now = self._now()
         active: List[Dict[str, Any]] = []
         for item in cursors.values():
             updated_at = datetime.fromisoformat(str(item.get("updated_at")))
             if (now - updated_at).total_seconds() <= ttl:
                 active.append(item)
+        self._refresh_online_users_cache(workflow_id, cursors)
         return {"workflow_id": workflow_id, "cursors": active, "count": len(active)}
+
+    def list_online_users(self, workflow_id: str) -> Dict[str, Any]:
+        cached = self._cache.get(self._cache_key_online_users(workflow_id))
+        if isinstance(cached, dict):
+            return deepcopy(cached)
+        cursors = self.list_collaboration_cursors(workflow_id, active_seconds=self._ONLINE_USERS_CACHE_TTL)
+        users = [
+            {"user_id": str(item.get("user_id") or ""), "updated_at": str(item.get("updated_at") or "")}
+            for item in cursors.get("cursors") or []
+        ]
+        payload = {"workflow_id": workflow_id, "users": users, "count": len(users)}
+        self._cache.set(self._cache_key_online_users(workflow_id), payload, ttl=self._ONLINE_USERS_CACHE_TTL)
+        return payload
 
     # -------- 评论、提及、通知偏好 --------
     def add_comment(
@@ -1217,12 +1366,18 @@ class SmartWorkflowService:
                 "share_url": f"/api/workflow/share/{link_id}",
             }
             self._share_links[link_id] = record
+            self._cache.set(
+                self._cache_key_share_stats(link_id),
+                {"views": 0, "downloads": 0, "last_aggregated_at": self._now_iso()},
+                ttl=self._SHARE_STATS_CACHE_TTL,
+            )
             state = workflow["collab_state"]
             share_ids = [str(item) for item in state.get("share_link_ids") or []]
             if link_id not in share_ids:
                 share_ids.append(link_id)
             state["share_link_ids"] = share_ids
             workflow["updated_at"] = self._now_iso()
+            self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
             return self._sanitize_share_link(record)
 
     def list_share_links(self, workflow_id: str) -> Dict[str, Any]:
@@ -1259,6 +1414,11 @@ class SmartWorkflowService:
             workflow = self._workflow_or_error(workflow_id)
             link["stats"]["views"] = int(link.get("stats", {}).get("views", 0)) + 1
             workflow["collab_state"]["analytics"]["share_views"] += 1
+            cache_stats_key = self._cache_key_share_stats(share_link_id)
+            stats_payload = self._cache.get(cache_stats_key) or {"views": 0, "downloads": 0}
+            stats_payload["views"] = int(stats_payload.get("views", 0)) + 1
+            stats_payload["last_view_at"] = self._now_iso()
+            self._cache.set(cache_stats_key, stats_payload, ttl=self._SHARE_STATS_CACHE_TTL)
             return {
                 "share_link": self._sanitize_share_link(link),
                 "workflow": {
@@ -1334,6 +1494,11 @@ class SmartWorkflowService:
                 if link and str(link.get("workflow_id")) == workflow_id:
                     link["stats"]["downloads"] = int(link.get("stats", {}).get("downloads", 0)) + 1
                     workflow["collab_state"]["analytics"]["share_downloads"] += 1
+                    cache_stats_key = self._cache_key_share_stats(share_link_id)
+                    stats_payload = self._cache.get(cache_stats_key) or {"views": 0, "downloads": 0}
+                    stats_payload["downloads"] = int(stats_payload.get("downloads", 0)) + 1
+                    stats_payload["last_download_at"] = self._now_iso()
+                    self._cache.set(cache_stats_key, stats_payload, ttl=self._SHARE_STATS_CACHE_TTL)
 
             return {
                 "workflow_id": workflow_id,
@@ -1349,8 +1514,20 @@ class SmartWorkflowService:
             workflow = self._workflow_or_error(workflow_id)
             share_ids = [str(item) for item in workflow["collab_state"].get("share_link_ids") or []]
             links = [self._share_links[item] for item in share_ids if item in self._share_links]
-            total_views = sum(int(item.get("stats", {}).get("views", 0)) for item in links)
-            total_downloads = sum(int(item.get("stats", {}).get("downloads", 0)) for item in links)
+            total_views = 0
+            total_downloads = 0
+            for item in links:
+                link_id = str(item.get("share_link_id") or "")
+                cached_stats = self._cache.get(self._cache_key_share_stats(link_id)) or {}
+                cached_views = int(cached_stats.get("views", 0))
+                cached_downloads = int(cached_stats.get("downloads", 0))
+                persisted_views = int(item.get("stats", {}).get("views", 0))
+                persisted_downloads = int(item.get("stats", {}).get("downloads", 0))
+                item.setdefault("stats", {})
+                item["stats"]["views"] = max(persisted_views, cached_views)
+                item["stats"]["downloads"] = max(persisted_downloads, cached_downloads)
+                total_views += int(item["stats"]["views"])
+                total_downloads += int(item["stats"]["downloads"])
             return {
                 "workflow_id": workflow_id,
                 "total_links": len(links),

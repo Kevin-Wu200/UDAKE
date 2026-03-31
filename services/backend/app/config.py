@@ -141,6 +141,12 @@ class Settings(BaseSettings):
     REDIS_HOST: str = "127.0.0.1"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
+    WORKFLOW_REDIS_POOL_SIZE: int = 20
+    WORKFLOW_REDIS_TIMEOUT_SECONDS: int = 5
+    WORKFLOW_REDIS_RETRY_TIMES: int = 3
+    WORKFLOW_REDIS_STRICT: bool = False
+    WORKFLOW_REDIS_CLUSTER_ENABLED: bool = False
+    WORKFLOW_REDIS_CLUSTER_NODES: Union[str, List[str]] = "[]"
     CACHE_MAX_SIZE: int = 1000
     CACHE_MIN_SIZE: Optional[int] = None
     CACHE_MAX_SIZE_LIMIT: Optional[int] = None
@@ -205,7 +211,7 @@ class Settings(BaseSettings):
                 return [139.767125, 35.681236]
         return v
 
-    @field_validator('FEEDBACK_FALLBACK_KEYS', 'FEEDBACK_MASK_FIELDS', mode='before')
+    @field_validator('FEEDBACK_FALLBACK_KEYS', 'FEEDBACK_MASK_FIELDS', 'WORKFLOW_REDIS_CLUSTER_NODES', mode='before')
     @classmethod
     def parse_feedback_lists(cls, v):
         return _parse_json_or_csv_list(v)
@@ -222,6 +228,9 @@ class Settings(BaseSettings):
         'AUTH_DB_POOL_RECYCLE',
         'AUTH_DB_LOG_SLOW_QUERY_MS',
         'REDIS_PORT',
+        'WORKFLOW_REDIS_POOL_SIZE',
+        'WORKFLOW_REDIS_TIMEOUT_SECONDS',
+        'WORKFLOW_REDIS_RETRY_TIMES',
         'CACHE_MAX_SIZE',
         'CACHE_SHARD_COUNT',
         'CACHE_COMPRESSION_THRESHOLD',
@@ -244,6 +253,13 @@ class Settings(BaseSettings):
     def validate_non_negative_int(cls, v):
         if v < 0:
             raise ValueError(f'{v} must be non-negative')
+        return v
+
+    @field_validator('WORKFLOW_REDIS_POOL_SIZE')
+    @classmethod
+    def validate_workflow_redis_pool_size(cls, v):
+        if v < 10 or v > 20:
+            raise ValueError('WORKFLOW_REDIS_POOL_SIZE must be between 10 and 20')
         return v
 
     @field_validator('CACHE_MIN_SIZE', 'CACHE_MAX_SIZE_LIMIT', mode='before')
