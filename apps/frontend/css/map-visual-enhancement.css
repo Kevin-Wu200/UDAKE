@@ -153,7 +153,12 @@
     color: #1f2937;
 }
 
-.dark .map-toolbar .toolbar-btn,
+.dark .map-toolbar .toolbar-btn {
+    background: rgba(17, 24, 39, 0.88);
+    color: #e5e7eb;
+    border-color: rgba(255, 255, 255, 0.18);
+}
+
 @media (prefers-color-scheme: dark) {
     .map-toolbar .toolbar-btn {
         background: rgba(17, 24, 39, 0.88);
