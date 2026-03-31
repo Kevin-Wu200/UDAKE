@@ -79,4 +79,25 @@ describe('轨迹渲染性能优化', () => {
     expect(perf.fps).toBeGreaterThan(0);
     expect(perf.lastRenderDurationMs).toBeCloseTo(14.2, 1);
   });
+
+  it('低缩放级别下应进行轨迹点聚合', () => {
+    visualization = new TrackVisualization({
+      ...mapStub,
+      getZoom: () => 12
+    });
+
+    const base = buildTrackPoint(0);
+    const points = Array.from({ length: 3000 }, (_, index) => ({
+      ...buildTrackPoint(index),
+      location: {
+        ...base.location,
+        latitude: base.location.latitude + (index % 40) * 0.000001,
+        longitude: base.location.longitude + (index % 40) * 0.000001
+      }
+    }));
+
+    const aggregated = visualization['aggregateNearbyPoints'](points);
+    expect(aggregated.length).toBeLessThan(points.length);
+    expect(aggregated.length).toBeGreaterThan(1);
+  });
 });

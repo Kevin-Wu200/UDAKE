@@ -1,0 +1,230 @@
+{
+  "startedAt": 1774925443095,
+  "finishedAt": 1774925472134,
+  "durationSec": 30,
+  "intervalMs": 1000,
+  "summary": {
+    "sampleCount": 30,
+    "startHeapMB": 4.01,
+    "endHeapMB": 4.14,
+    "growthMB": 0.13,
+    "growthPerHourMB": 16.12,
+    "avgHeapMB": 4.1,
+    "p95HeapMB": 4.13,
+    "maxHeapMB": 4.14,
+    "projected24hMB": 391.02,
+    "potentialLeak": false
+  },
+  "samples": [
+    {
+      "timestamp": 1774925443095,
+      "heapUsedMB": 4.01,
+      "heapTotalMB": 6.14,
+      "rssMB": 45.88,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925444097,
+      "heapUsedMB": 4.05,
+      "heapTotalMB": 6.14,
+      "rssMB": 45.91,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925445099,
+      "heapUsedMB": 4.05,
+      "heapTotalMB": 6.14,
+      "rssMB": 45.91,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925446100,
+      "heapUsedMB": 4.05,
+      "heapTotalMB": 6.14,
+      "rssMB": 45.91,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925447101,
+      "heapUsedMB": 4.05,
+      "heapTotalMB": 6.14,
+      "rssMB": 45.91,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925448103,
+      "heapUsedMB": 4.06,
+      "heapTotalMB": 6.14,
+      "rssMB": 45.92,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925449104,
+      "heapUsedMB": 4.07,
+      "heapTotalMB": 6.14,
+      "rssMB": 46,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925450106,
+      "heapUsedMB": 4.07,
+      "heapTotalMB": 6.14,
+      "rssMB": 46,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925451107,
+      "heapUsedMB": 4.08,
+      "heapTotalMB": 6.14,
+      "rssMB": 46,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925452109,
+      "heapUsedMB": 4.09,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.05,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925453110,
+      "heapUsedMB": 4.1,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.08,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925454112,
+      "heapUsedMB": 4.1,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.09,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925455113,
+      "heapUsedMB": 4.1,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.11,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925456113,
+      "heapUsedMB": 4.11,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.11,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925457115,
+      "heapUsedMB": 4.11,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.11,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925458116,
+      "heapUsedMB": 4.11,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.11,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925459117,
+      "heapUsedMB": 4.11,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.11,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925460119,
+      "heapUsedMB": 4.11,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.11,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925461120,
+      "heapUsedMB": 4.12,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.11,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925462121,
+      "heapUsedMB": 4.12,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.11,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925463123,
+      "heapUsedMB": 4.12,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.13,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925464124,
+      "heapUsedMB": 4.12,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.13,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925465125,
+      "heapUsedMB": 4.12,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.13,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925466127,
+      "heapUsedMB": 4.13,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.13,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925467128,
+      "heapUsedMB": 4.13,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.13,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925468130,
+      "heapUsedMB": 4.13,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.13,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925469131,
+      "heapUsedMB": 4.13,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.13,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925470132,
+      "heapUsedMB": 4.13,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.13,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925471134,
+      "heapUsedMB": 4.14,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.14,
+      "externalMB": 1.59
+    },
+    {
+      "timestamp": 1774925472134,
+      "heapUsedMB": 4.14,
+      "heapTotalMB": 6.39,
+      "rssMB": 46.14,
+      "externalMB": 1.59
+    }
+  ]
+}

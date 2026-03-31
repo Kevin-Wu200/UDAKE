@@ -1,0 +1,716 @@
+{
+  "config": {
+    "configFile": "/Users/wuchenkai/UDAKE/configs/playwright.config.ts",
+    "rootDir": "/Users/wuchenkai/UDAKE/tests/e2e",
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": null,
+    "globalTeardown": null,
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 3
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/wuchenkai/UDAKE/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/wuchenkai/UDAKE/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/wuchenkai/UDAKE/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "firefox",
+        "name": "firefox",
+        "testDir": "/Users/wuchenkai/UDAKE/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/wuchenkai/UDAKE/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "webkit",
+        "name": "webkit",
+        "testDir": "/Users/wuchenkai/UDAKE/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/wuchenkai/UDAKE/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "Mobile Chrome",
+        "name": "Mobile Chrome",
+        "testDir": "/Users/wuchenkai/UDAKE/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      },
+      {
+        "outputDir": "/Users/wuchenkai/UDAKE/test-results",
+        "repeatEach": 1,
+        "retries": 0,
+        "metadata": {
+          "actualWorkers": 3
+        },
+        "id": "Mobile Safari",
+        "name": "Mobile Safari",
+        "testDir": "/Users/wuchenkai/UDAKE/tests/e2e",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.@(spec|test).?(c|m)[jt]s?(x)"
+        ],
+        "timeout": 30000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "html",
+        {
+          "outputFolder": "../playwright-report"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "../test-results.json"
+        }
+      ],
+      [
+        "list",
+        null
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "runAgents": "none",
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.58.2",
+    "workers": 5,
+    "webServer": {
+      "command": "npm run dev",
+      "url": "http://localhost:5173",
+      "reuseExistingServer": true,
+      "timeout": 120000
+    }
+  },
+  "suites": [
+    {
+      "title": "workflow-editor.test.ts",
+      "file": "workflow-editor.test.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "工作流编辑器专项E2E",
+          "file": "workflow-editor.test.ts",
+          "line": 130,
+          "column": 6,
+          "specs": [
+            {
+              "title": "应该能够校验并保存工作流",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 5658,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: '校验' })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: '校验' })\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: '校验' })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: '校验' })\u001b[22m\n\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts:136:60",
+                        "location": {
+                          "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                          "column": 60,
+                          "line": 136
+                        },
+                        "snippet": "  134 |     await page.goto('/#/workflows/editor');\n  135 |\n> 136 |     await expect(page.getByRole('button', { name: '校验' })).toBeVisible();\n      |                                                            ^\n  137 |     await expect(page.getByRole('button', { name: '保存' })).toBeVisible();\n  138 |\n  139 |     await page.getByRole('button', { name: '校验' }).click();"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                            "column": 60,
+                            "line": 136
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('button', { name: '校验' })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('button', { name: '校验' })\u001b[22m\n\n\n  134 |     await page.goto('/#/workflows/editor');\n  135 |\n> 136 |     await expect(page.getByRole('button', { name: '校验' })).toBeVisible();\n      |                                                            ^\n  137 |     await expect(page.getByRole('button', { name: '保存' })).toBeVisible();\n  138 |\n  139 |     await page.getByRole('button', { name: '校验' }).click();\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts:136:60"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-31T02:24:06.508Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够校验并保存工作流-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够校验并保存工作流-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够校验并保存工作流-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                        "column": 60,
+                        "line": 136
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "54ffd8241e2ed16661c0-6ea5dff28b05fd2c997c",
+              "file": "workflow-editor.test.ts",
+              "line": 131,
+              "column": 7
+            },
+            {
+              "title": "应该能够添加节点并触发自动布局",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 10409,
+                      "error": {
+                        "message": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '添加节点' })\u001b[22m\n",
+                        "stack": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '添加节点' })\u001b[22m\n\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts:153:54",
+                        "location": {
+                          "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                          "column": 54,
+                          "line": 153
+                        },
+                        "snippet": "  151 |     await page.goto('/#/workflows/editor');\n  152 |\n> 153 |     await page.getByRole('button', { name: '添加节点' }).click();\n      |                                                      ^\n  154 |     await page.getByText('处理节点').click();\n  155 |\n  156 |     await page.getByRole('button', { name: '自动布局' }).click();"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                            "column": 54,
+                            "line": 153
+                          },
+                          "message": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '添加节点' })\u001b[22m\n\n\n  151 |     await page.goto('/#/workflows/editor');\n  152 |\n> 153 |     await page.getByRole('button', { name: '添加节点' }).click();\n      |                                                      ^\n  154 |     await page.getByText('处理节点').click();\n  155 |\n  156 |     await page.getByRole('button', { name: '自动布局' }).click();\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts:153:54"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-31T02:24:14.087Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够添加节点并触发自动布局-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够添加节点并触发自动布局-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够添加节点并触发自动布局-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                        "column": 54,
+                        "line": 153
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "54ffd8241e2ed16661c0-36e6998e112a26e985cf",
+              "file": "workflow-editor.test.ts",
+              "line": 148,
+              "column": 7
+            },
+            {
+              "title": "应该能够复制并删除节点",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 10243,
+                      "error": {
+                        "message": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText('input_1').first()\u001b[22m\n",
+                        "stack": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText('input_1').first()\u001b[22m\n\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts:165:45",
+                        "location": {
+                          "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                          "column": 45,
+                          "line": 165
+                        },
+                        "snippet": "  163 |     await page.goto('/#/workflows/editor');\n  164 |\n> 165 |     await page.getByText('input_1').first().click();\n      |                                             ^\n  166 |     await page.getByRole('button', { name: '复制节点' }).click();\n  167 |     await expect(page.getByText('input_1_复制')).toBeVisible();\n  168 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                            "column": 45,
+                            "line": 165
+                          },
+                          "message": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByText('input_1').first()\u001b[22m\n\n\n  163 |     await page.goto('/#/workflows/editor');\n  164 |\n> 165 |     await page.getByText('input_1').first().click();\n      |                                             ^\n  166 |     await page.getByRole('button', { name: '复制节点' }).click();\n  167 |     await expect(page.getByText('input_1_复制')).toBeVisible();\n  168 |\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts:165:45"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-31T02:24:25.174Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够复制并删除节点-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够复制并删除节点-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够复制并删除节点-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                        "column": 45,
+                        "line": 165
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "54ffd8241e2ed16661c0-88f741c58e8ce4e1da67",
+              "file": "workflow-editor.test.ts",
+              "line": 160,
+              "column": 7
+            },
+            {
+              "title": "应该能够导入和导出工作流定义",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 5389,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveValue\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByPlaceholder('工作流名称')\nExpected: \u001b[32m\"导入流程A\"\u001b[39m\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toHaveValue\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByPlaceholder('工作流名称')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveValue\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByPlaceholder('工作流名称')\nExpected: \u001b[32m\"导入流程A\"\u001b[39m\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toHaveValue\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByPlaceholder('工作流名称')\u001b[22m\n\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts:201:50",
+                        "location": {
+                          "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                          "column": 50,
+                          "line": 201
+                        },
+                        "snippet": "  199 |     });\n  200 |\n> 201 |     await expect(page.getByPlaceholder('工作流名称')).toHaveValue('导入流程A');\n      |                                                  ^\n  202 |\n  203 |     await page.getByRole('button', { name: '保存' }).click();\n  204 |     await expect.poll(() => state.createCalls).toBeGreaterThan(0);"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                            "column": 50,
+                            "line": 201
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoHaveValue\u001b[2m(\u001b[22m\u001b[32mexpected\u001b[39m\u001b[2m)\u001b[22m failed\n\nLocator: getByPlaceholder('工作流名称')\nExpected: \u001b[32m\"导入流程A\"\u001b[39m\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toHaveValue\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByPlaceholder('工作流名称')\u001b[22m\n\n\n  199 |     });\n  200 |\n> 201 |     await expect(page.getByPlaceholder('工作流名称')).toHaveValue('导入流程A');\n      |                                                  ^\n  202 |\n  203 |     await page.getByRole('button', { name: '保存' }).click();\n  204 |     await expect.poll(() => state.createCalls).toBeGreaterThan(0);\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts:201:50"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-31T02:24:36.119Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够导入和导出工作流定义-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够导入和导出工作流定义-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-editor-工作流编辑器专项E2E-应该能够导入和导出工作流定义-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-editor.test.ts",
+                        "column": 50,
+                        "line": 201
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "54ffd8241e2ed16661c0-e100dedace2c04583b02",
+              "file": "workflow-editor.test.ts",
+              "line": 174,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "workflow-execution.test.ts",
+      "file": "workflow-execution.test.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "工作流执行专项E2E",
+          "file": "workflow-execution.test.ts",
+          "line": 214,
+          "column": 6,
+          "specs": [
+            {
+              "title": "应该能够触发执行并查看监控结果",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "failed",
+                      "duration": 10478,
+                      "error": {
+                        "message": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '保存' })\u001b[22m\n\u001b[2m    - locator resolved to <button id=\"save-params\" class=\"btn-small\">保存参数</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <div class=\"splash-screen splash-hidden\">…</div> intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <rect width=\"100%\" height=\"100%\" fill=\"rgba(0,0,0,0.5)\" mask=\"url(#onboarding-mask)\"></rect> from <div class=\"onboarding-overlay\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <rect width=\"100%\" height=\"100%\" fill=\"rgba(0,0,0,0.5)\" mask=\"url(#onboarding-mask)\"></rect> from <div class=\"onboarding-overlay\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    7 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <rect width=\"100%\" height=\"100%\" fill=\"rgba(0,0,0,0.5)\" mask=\"url(#onboarding-mask)\"></rect> from <div class=\"onboarding-overlay\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n",
+                        "stack": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '保存' })\u001b[22m\n\u001b[2m    - locator resolved to <button id=\"save-params\" class=\"btn-small\">保存参数</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <div class=\"splash-screen splash-hidden\">…</div> intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <rect width=\"100%\" height=\"100%\" fill=\"rgba(0,0,0,0.5)\" mask=\"url(#onboarding-mask)\"></rect> from <div class=\"onboarding-overlay\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <rect width=\"100%\" height=\"100%\" fill=\"rgba(0,0,0,0.5)\" mask=\"url(#onboarding-mask)\"></rect> from <div class=\"onboarding-overlay\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    7 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <rect width=\"100%\" height=\"100%\" fill=\"rgba(0,0,0,0.5)\" mask=\"url(#onboarding-mask)\"></rect> from <div class=\"onboarding-overlay\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-execution.test.ts:220:52",
+                        "location": {
+                          "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-execution.test.ts",
+                          "column": 52,
+                          "line": 220
+                        },
+                        "snippet": "  218 |     await page.goto('/#/workflows/editor');\n  219 |\n> 220 |     await page.getByRole('button', { name: '保存' }).click();\n      |                                                    ^\n  221 |     await expect.poll(() => state.createCalls).toBeGreaterThan(0);\n  222 |\n  223 |     await page.getByRole('button', { name: '执行' }).click();"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-execution.test.ts",
+                            "column": 52,
+                            "line": 220
+                          },
+                          "message": "TimeoutError: locator.click: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: '保存' })\u001b[22m\n\u001b[2m    - locator resolved to <button id=\"save-params\" class=\"btn-small\">保存参数</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <div class=\"splash-screen splash-hidden\">…</div> intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m    - element is visible, enabled and stable\u001b[22m\n\u001b[2m    - scrolling into view if needed\u001b[22m\n\u001b[2m    - done scrolling\u001b[22m\n\u001b[2m    - <rect width=\"100%\" height=\"100%\" fill=\"rgba(0,0,0,0.5)\" mask=\"url(#onboarding-mask)\"></rect> from <div class=\"onboarding-overlay\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m  - retrying click action\u001b[22m\n\u001b[2m    - waiting 20ms\u001b[22m\n\u001b[2m    2 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <rect width=\"100%\" height=\"100%\" fill=\"rgba(0,0,0,0.5)\" mask=\"url(#onboarding-mask)\"></rect> from <div class=\"onboarding-overlay\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 100ms\u001b[22m\n\u001b[2m    7 × waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m      - element is visible, enabled and stable\u001b[22m\n\u001b[2m      - scrolling into view if needed\u001b[22m\n\u001b[2m      - done scrolling\u001b[22m\n\u001b[2m      - <rect width=\"100%\" height=\"100%\" fill=\"rgba(0,0,0,0.5)\" mask=\"url(#onboarding-mask)\"></rect> from <div class=\"onboarding-overlay\">…</div> subtree intercepts pointer events\u001b[22m\n\u001b[2m    - retrying click action\u001b[22m\n\u001b[2m      - waiting 500ms\u001b[22m\n\n\n  218 |     await page.goto('/#/workflows/editor');\n  219 |\n> 220 |     await page.getByRole('button', { name: '保存' }).click();\n      |                                                    ^\n  221 |     await expect.poll(() => state.createCalls).toBeGreaterThan(0);\n  222 |\n  223 |     await page.getByRole('button', { name: '执行' }).click();\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-execution.test.ts:220:52"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-31T02:24:06.507Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-execution-工作流执行专项E2E-应该能够触发执行并查看监控结果-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-execution-工作流执行专项E2E-应该能够触发执行并查看监控结果-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-execution-工作流执行专项E2E-应该能够触发执行并查看监控结果-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-execution.test.ts",
+                        "column": 52,
+                        "line": 220
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "8b3d96d0e08581553c47-bc33f946824a030f2351",
+              "file": "workflow-execution.test.ts",
+              "line": 215,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "workflow-templates.test.ts",
+      "file": "workflow-templates.test.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "工作流模板专项E2E",
+          "file": "workflow-templates.test.ts",
+          "line": 200,
+          "column": 6,
+          "specs": [
+            {
+              "title": "应该能够浏览模板并应用到编辑器",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 5660,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('数据清洗模板')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('数据清洗模板')\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('数据清洗模板')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('数据清洗模板')\u001b[22m\n\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-templates.test.ts:206:44",
+                        "location": {
+                          "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-templates.test.ts",
+                          "column": 44,
+                          "line": 206
+                        },
+                        "snippet": "  204 |     await page.goto('/#/workflows/editor');\n  205 |\n> 206 |     await expect(page.getByText('数据清洗模板')).toBeVisible();\n      |                                            ^\n  207 |     await page.getByRole('button', { name: '应用' }).first().click();\n  208 |\n  209 |     await expect(page.getByPlaceholder('工作流名称')).toHaveValue(/数据清洗模板_编辑副本/);"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-templates.test.ts",
+                            "column": 44,
+                            "line": 206
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByText('数据清洗模板')\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByText('数据清洗模板')\u001b[22m\n\n\n  204 |     await page.goto('/#/workflows/editor');\n  205 |\n> 206 |     await expect(page.getByText('数据清洗模板')).toBeVisible();\n      |                                            ^\n  207 |     await page.getByRole('button', { name: '应用' }).first().click();\n  208 |\n  209 |     await expect(page.getByPlaceholder('工作流名称')).toHaveValue(/数据清洗模板_编辑副本/);\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-templates.test.ts:206:44"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-31T02:24:06.507Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-templates-工作流模板专项E2E-应该能够浏览模板并应用到编辑器-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-templates-工作流模板专项E2E-应该能够浏览模板并应用到编辑器-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-templates-工作流模板专项E2E-应该能够浏览模板并应用到编辑器-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-templates.test.ts",
+                        "column": 44,
+                        "line": 206
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "92316ce3b77ff094dab6-f927a72289f51efa713a",
+              "file": "workflow-templates.test.ts",
+              "line": 201,
+              "column": 7
+            },
+            {
+              "title": "应该能够请求模板推荐并实例化模板",
+              "ok": false,
+              "tags": [],
+              "tests": [
+                {
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 2,
+                      "status": "failed",
+                      "duration": 10411,
+                      "error": {
+                        "message": "TimeoutError: locator.fill: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByPlaceholder('推荐标签（逗号分隔）')\u001b[22m\n",
+                        "stack": "TimeoutError: locator.fill: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByPlaceholder('推荐标签（逗号分隔）')\u001b[22m\n\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-templates.test.ts:217:47",
+                        "location": {
+                          "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-templates.test.ts",
+                          "column": 47,
+                          "line": 217
+                        },
+                        "snippet": "  215 |     await page.goto('/#/workflows/editor');\n  216 |\n> 217 |     await page.getByPlaceholder('推荐标签（逗号分隔）').fill('采样,插值');\n      |                                               ^\n  218 |     await page.getByRole('button', { name: '推荐' }).click();\n  219 |     await expect.poll(() => state.recommendationCalls).toBeGreaterThan(0);\n  220 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-templates.test.ts",
+                            "column": 47,
+                            "line": 217
+                          },
+                          "message": "TimeoutError: locator.fill: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByPlaceholder('推荐标签（逗号分隔）')\u001b[22m\n\n\n  215 |     await page.goto('/#/workflows/editor');\n  216 |\n> 217 |     await page.getByPlaceholder('推荐标签（逗号分隔）').fill('采样,插值');\n      |                                               ^\n  218 |     await page.getByRole('button', { name: '推荐' }).click();\n  219 |     await expect.poll(() => state.recommendationCalls).toBeGreaterThan(0);\n  220 |\n    at /Users/wuchenkai/UDAKE/tests/e2e/workflow-templates.test.ts:217:47"
+                        }
+                      ],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-03-31T02:24:14.091Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-templates-工作流模板专项E2E-应该能够请求模板推荐并实例化模板-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-templates-工作流模板专项E2E-应该能够请求模板推荐并实例化模板-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/wuchenkai/UDAKE/test-results/workflow-templates-工作流模板专项E2E-应该能够请求模板推荐并实例化模板-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/wuchenkai/UDAKE/tests/e2e/workflow-templates.test.ts",
+                        "column": 47,
+                        "line": 217
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "92316ce3b77ff094dab6-d1ecf6fadb110688569f",
+              "file": "workflow-templates.test.ts",
+              "line": 212,
+              "column": 7
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-03-31T02:24:05.328Z",
+    "duration": 36477.736000000004,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 7,
+    "flaky": 0
+  }
+}

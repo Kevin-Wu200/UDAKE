@@ -1,0 +1,39 @@
+{
+  "generatedAt": "2026-03-31T02:49:23.254Z",
+  "durationHours": 8,
+  "sampleMinutes": 5,
+  "summary": {
+    "passed": true,
+    "scenarioCount": 3,
+    "maxMeasuredConsumption8h": 24
+  },
+  "results": [
+    {
+      "name": "城市步行",
+      "strategy": "balanced",
+      "expectedBatteryConsumption8h": 24,
+      "measuredBatteryConsumption8h": 24,
+      "passed": true,
+      "threshold": 30,
+      "samples": 97
+    },
+    {
+      "name": "静止后台",
+      "strategy": "power-saving",
+      "expectedBatteryConsumption8h": 20,
+      "measuredBatteryConsumption8h": 20,
+      "passed": true,
+      "threshold": 30,
+      "samples": 97
+    },
+    {
+      "name": "低电量应急",
+      "strategy": "power-saving",
+      "expectedBatteryConsumption8h": 17.6,
+      "measuredBatteryConsumption8h": 17.6,
+      "passed": true,
+      "threshold": 30,
+      "samples": 97
+    }
+  ]
+}

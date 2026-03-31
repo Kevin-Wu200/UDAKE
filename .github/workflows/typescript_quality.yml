@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CI: true
-      TYPE_COMPLETENESS_THRESHOLD: '80'
+      TYPE_COMPLETENESS_THRESHOLD: '85'
     steps:
       - name: Checkout
         uses: actions/checkout@v4

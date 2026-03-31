@@ -63,6 +63,7 @@ describe('DatabaseService', () => {
 
   it('SQLite 模式应可读写并输出查询性能统计', async () => {
     const memoryRows = new Map<string, any>();
+    const metaRows = new Map<string, string>();
     const fakeConn = {
       open: vi.fn(async () => undefined),
       run: vi.fn(async (sql: string, values: any[]) => {
@@ -95,8 +96,15 @@ describe('DatabaseService', () => {
             memoryRows.set(String(values[0]), row);
           }
         }
+        if (/INSERT OR REPLACE INTO db_meta/i.test(sql)) {
+          metaRows.set(String(values[0]), String(values[1]));
+        }
       }),
       query: vi.fn(async (sql: string, values: any[]) => {
+        if (/FROM db_meta/i.test(sql)) {
+          const value = metaRows.get(String(values[0]));
+          return { values: value ? [{ value }] : [] };
+        }
         if (/WHERE id = \?/i.test(sql)) {
           const row = memoryRows.get(String(values[0]));
           return { values: row ? [row] : [] };
@@ -150,6 +158,9 @@ describe('DatabaseService', () => {
     const perf = databaseService.getQueryPerformanceSummary();
     expect(perf.backend).toBe('sqlite');
     expect(perf.count).toBeGreaterThan(0);
+
+    const schemaVersion = await databaseService.getSchemaVersion();
+    expect(schemaVersion).toBeGreaterThanOrEqual(2);
   });
 
   it('应支持数据库到服务端的同步标记', async () => {

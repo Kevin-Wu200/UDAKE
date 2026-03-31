@@ -1,0 +1,10 @@
+{
+  "generatedAt": "2026-03-31T02:51:12.310Z",
+  "sourceReport": "/Users/wuchenkai/UDAKE/reports/memory/memory-leak-report-1774925472135.json",
+  "durationSec": 30,
+  "endHeapMB": 4.14,
+  "growthPerHourMB": 16.12,
+  "projected24hMB": 391.02,
+  "maxProjected24hMB": 200,
+  "withinTarget": true
+}

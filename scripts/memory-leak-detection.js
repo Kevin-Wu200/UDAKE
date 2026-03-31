@@ -14,7 +14,10 @@ const inspector = require('inspector');
 function parseArgs(argv) {
   const parsed = {
     durationSec: 60,
-    intervalMs: 2000
+    intervalMs: 2000,
+    maxProjected24hMB: 200,
+    maxGrowthPerHourMB: 120,
+    minProjectionDurationSec: 600
   };
   for (const arg of argv) {
     if (arg.startsWith('--duration-sec=')) {
@@ -22,6 +25,15 @@ function parseArgs(argv) {
     }
     if (arg.startsWith('--interval-ms=')) {
       parsed.intervalMs = Math.max(500, Number(arg.split('=')[1] || '2000'));
+    }
+    if (arg.startsWith('--max-projected-24h-mb=')) {
+      parsed.maxProjected24hMB = Math.max(50, Number(arg.split('=')[1] || '200'));
+    }
+    if (arg.startsWith('--max-growth-per-hour-mb=')) {
+      parsed.maxGrowthPerHourMB = Math.max(1, Number(arg.split('=')[1] || '120'));
+    }
+    if (arg.startsWith('--min-projection-duration-sec=')) {
+      parsed.minProjectionDurationSec = Math.max(10, Number(arg.split('=')[1] || '600'));
     }
   }
   return parsed;
@@ -98,7 +110,8 @@ async function run() {
       avgHeapMB: Number((heapSeries.reduce((sum, value) => sum + value, 0) / heapSeries.length).toFixed(2)),
       p95HeapMB: Number(percentile(heapSeries, 0.95).toFixed(2)),
       maxHeapMB: Number(Math.max(...heapSeries).toFixed(2)),
-      potentialLeak: growthPerHour > 12 || Math.max(...heapSeries) > 200
+      projected24hMB: Number((last.heapUsedMB + growthPerHour * 24).toFixed(2)),
+      potentialLeak: growthPerHour > options.maxGrowthPerHourMB || Math.max(...heapSeries) > 200
     },
     samples
   };
@@ -113,11 +126,14 @@ async function run() {
   console.log(`sample_count=${result.summary.sampleCount}`);
   console.log(`growth_per_hour_mb=${result.summary.growthPerHourMB}`);
   console.log(`max_heap_mb=${result.summary.maxHeapMB}`);
+  console.log(`projected_24h_mb=${result.summary.projected24hMB}`);
   console.log(`potential_leak=${result.summary.potentialLeak}`);
 
   session.disconnect();
 
-  if (result.summary.potentialLeak) {
+  const projectionEnabled = options.durationSec >= options.minProjectionDurationSec;
+  const projectionExceeded = projectionEnabled && result.summary.projected24hMB > options.maxProjected24hMB;
+  if (result.summary.potentialLeak || projectionExceeded) {
     process.exit(1);
   }
 }

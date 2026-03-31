@@ -1,0 +1,73 @@
+name: Realtime Sync Quality
+
+on:
+  push:
+    paths:
+      - 'apps/frontend/js/services/LocationService.ts'
+      - 'apps/frontend/js/services/DatabaseService.ts'
+      - 'apps/frontend/js/components/TrackVisualization.ts'
+      - 'apps/frontend/js/map/services/NavigationService.ts'
+      - 'apps/frontend/js/utils/MemoryMonitor.ts'
+      - 'scripts/gps-battery-8h-test.js'
+      - 'scripts/track-render-benchmark.js'
+      - 'scripts/navigation-stability-test.js'
+      - 'scripts/memory-leak-detection.js'
+      - 'scripts/memory-trend-analysis.js'
+      - 'tests/gps-performance.test.js'
+      - 'tests/map-performance.test.js'
+      - 'tests/track-render-benchmark.test.js'
+      - 'tests/navigation.test.js'
+      - 'tests/memory-monitor.test.ts'
+      - 'tests/database-service.test.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/realtime_sync_quality.yml'
+  pull_request:
+    paths:
+      - 'apps/frontend/js/services/LocationService.ts'
+      - 'apps/frontend/js/services/DatabaseService.ts'
+      - 'apps/frontend/js/components/TrackVisualization.ts'
+      - 'apps/frontend/js/map/services/NavigationService.ts'
+      - 'apps/frontend/js/utils/MemoryMonitor.ts'
+      - 'scripts/gps-battery-8h-test.js'
+      - 'scripts/track-render-benchmark.js'
+      - 'scripts/navigation-stability-test.js'
+      - 'scripts/memory-leak-detection.js'
+      - 'scripts/memory-trend-analysis.js'
+      - 'tests/gps-performance.test.js'
+      - 'tests/map-performance.test.js'
+      - 'tests/track-render-benchmark.test.js'
+      - 'tests/navigation.test.js'
+      - 'tests/memory-monitor.test.ts'
+      - 'tests/database-service.test.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/realtime_sync_quality.yml'
+
+jobs:
+  realtime-sync-quality:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+      TYPE_COMPLETENESS_THRESHOLD: '85'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --prefer-offline
+
+      - name: Type completeness check
+        run: npm run typecheck:completeness
+
+      - name: Run realtime sync tests
+        run: npx vitest --config configs/vitest.config.js --run tests/gps-performance.test.js tests/map-performance.test.js tests/track-render-benchmark.test.js tests/navigation.test.js tests/memory-monitor.test.ts tests/database-service.test.ts
+
+      - name: Run benchmark and stability scripts
+        run: npm run realtime-sync:verify

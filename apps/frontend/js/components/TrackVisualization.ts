@@ -123,10 +123,11 @@ export class TrackVisualization {
     const renderStartedAt = performance.now();
     const visiblePoints = this.getVisiblePoints(track.points);
     const { points: lodPoints, lodLevel } = this.applyLOD(visiblePoints);
+    const aggregatedPoints = this.aggregateNearbyPoints(lodPoints);
 
     // 更新轨迹线
     if (typeof AMap !== 'undefined') {
-      const path = this.simplifyPath(lodPoints).map((point) => [
+      const path = this.simplifyPath(aggregatedPoints).map((point) => [
         point.location.longitude,
         point.location.latitude,
       ]);
@@ -228,6 +229,38 @@ export class TrackVisualization {
       points: points.filter((_, index) => index % step === 0),
       lodLevel: 'low'
     };
+  }
+
+  private aggregateNearbyPoints(points: TrackPoint[]): TrackPoint[] {
+    if (points.length < 3) {
+      return points;
+    }
+
+    const zoom = Number(this.map?.getZoom?.() ?? 16);
+    if (zoom >= 16) {
+      return points;
+    }
+
+    const precision = zoom >= 14 ? 5 : 4;
+    const grouped = new Map<string, TrackPoint>();
+    for (const point of points) {
+      const latKey = point.location.latitude.toFixed(precision);
+      const lngKey = point.location.longitude.toFixed(precision);
+      const key = `${latKey}:${lngKey}`;
+      const existing = grouped.get(key);
+      if (!existing || point.timestamp > existing.timestamp) {
+        grouped.set(key, point);
+      }
+    }
+
+    const aggregated = Array.from(grouped.values()).sort((a, b) => a.timestamp - b.timestamp);
+    if (aggregated.length >= 2 && aggregated.length < points.length) {
+      return aggregated;
+    }
+    if (aggregated.length === 1 && points.length >= 2) {
+      return [points[0], points[points.length - 1]];
+    }
+    return points;
   }
 
   private douglasPeucker(points: TrackPoint[], tolerance: number): TrackPoint[] {

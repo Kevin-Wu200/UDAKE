@@ -96,7 +96,7 @@ for (const file of files) {
 const denominator = Math.max(1, typedHints + anyHints + tsIgnoreHints);
 const completeness = ((typedHints - anyHints * 1.5 - tsIgnoreHints * 2) / denominator) * 100;
 const rounded = Math.max(0, Math.min(100, Number(completeness.toFixed(2))));
-const threshold = Number(process.env.TYPE_COMPLETENESS_THRESHOLD || '80');
+const threshold = Number(process.env.TYPE_COMPLETENESS_THRESHOLD || '85');
 const strictFlagCheck = checkStrictFlags();
 
 console.log('[type-completeness]');

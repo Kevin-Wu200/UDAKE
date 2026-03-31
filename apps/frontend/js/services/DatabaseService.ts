@@ -44,6 +44,8 @@ export interface QueryPerformanceSummary {
 
 const SQLITE_DB_NAME = 'udake_mobile_gps';
 const SQLITE_TABLE = 'gps_samples';
+const SQLITE_META_TABLE = 'db_meta';
+const SQLITE_SCHEMA_VERSION = 2;
 const INDEXEDDB_DB_NAME = 'udake_mobile_gps';
 const INDEXEDDB_STORE = 'gpsSamples';
 const LEGACY_DB_NAME = 'udake_offline';
@@ -57,42 +59,51 @@ function isBrowser(): boolean {
   return typeof window !== 'undefined';
 }
 
-function normalizeSample(sample: any): DatabaseGPSSample {
+function toRecord(value: unknown): Record<string, unknown> {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
+function normalizeSample(sample: unknown): DatabaseGPSSample {
+  const raw = toRecord(sample);
   const now = nowMs();
   return {
-    id: String(sample.id || `gps_${now}_${Math.random().toString(36).slice(2, 8)}`),
-    projectId: String(sample.projectId || sample.project_id || 'default_mobile_project'),
-    latitude: Number(sample.latitude),
-    longitude: Number(sample.longitude),
-    accuracy: Number(sample.accuracy || 0),
-    altitude: sample.altitude ?? null,
-    speed: sample.speed ?? null,
-    heading: sample.heading ?? null,
-    attributes: (sample.attributes && typeof sample.attributes === 'object' && !Array.isArray(sample.attributes))
-      ? sample.attributes
+    id: String(raw.id || `gps_${now}_${Math.random().toString(36).slice(2, 8)}`),
+    projectId: String(raw.projectId || raw.project_id || 'default_mobile_project'),
+    latitude: Number(raw.latitude),
+    longitude: Number(raw.longitude),
+    accuracy: Number(raw.accuracy || 0),
+    altitude: raw.altitude ?? null,
+    speed: raw.speed ?? null,
+    heading: raw.heading ?? null,
+    attributes: (raw.attributes && typeof raw.attributes === 'object' && !Array.isArray(raw.attributes))
+      ? (raw.attributes as Record<string, unknown>)
       : {},
-    collectedAt: Number(sample.collectedAt || sample.collected_at || now),
-    updatedAt: Number(sample.updatedAt || sample.updated_at || now),
-    version: Number(sample.version || 1),
-    source: sample.source === 'web' ? 'web' : 'mobile',
-    synced: Boolean(sample.synced)
+    collectedAt: Number(raw.collectedAt || raw.collected_at || now),
+    updatedAt: Number(raw.updatedAt || raw.updated_at || now),
+    version: Number(raw.version || 1),
+    source: raw.source === 'web' ? 'web' : 'mobile',
+    synced: Boolean(raw.synced)
   };
 }
 
-function extractRows<T>(result: any): T[] {
+function extractRows<T>(result: unknown): T[] {
+  const raw = toRecord(result);
   if (!result) {
     return [];
   }
-  if (Array.isArray(result.values)) {
-    return result.values as T[];
+  if (Array.isArray(raw.values)) {
+    return raw.values as T[];
   }
-  if (Array.isArray(result.rows)) {
-    return result.rows as T[];
+  if (Array.isArray(raw.rows)) {
+    return raw.rows as T[];
   }
-  if (result.rows && typeof result.rows.item === 'function' && typeof result.rows.length === 'number') {
+  const rowSource = raw.rows as { item?: (index: number) => T; length?: number } | undefined;
+  if (rowSource && typeof rowSource.item === 'function' && typeof rowSource.length === 'number') {
     const rows: T[] = [];
-    for (let i = 0; i < result.rows.length; i += 1) {
-      rows.push(result.rows.item(i));
+    for (let i = 0; i < rowSource.length; i += 1) {
+      rows.push(rowSource.item(i));
     }
     return rows;
   }
@@ -138,6 +149,15 @@ export class DatabaseService {
 
   public getBackend(): StorageBackend {
     return this.backend;
+  }
+
+  public async getSchemaVersion(): Promise<number> {
+    if (this.backend !== 'sqlite') {
+      return 0;
+    }
+    await this.ensureSQLiteConnection();
+    await this.ensureSQLiteMetaTable();
+    return this.readSQLiteSchemaVersion();
   }
 
   public async migrateLegacyIndexedDBToSQLite(): Promise<MigrationSummary> {
@@ -343,32 +363,8 @@ export class DatabaseService {
 
   private async ensureSQLiteReady(): Promise<void> {
     await this.ensureSQLiteConnection();
-    await this.sqliteRun(
-      `CREATE TABLE IF NOT EXISTS ${SQLITE_TABLE} (
-        id TEXT PRIMARY KEY NOT NULL,
-        project_id TEXT NOT NULL,
-        latitude REAL NOT NULL,
-        longitude REAL NOT NULL,
-        accuracy REAL NOT NULL,
-        altitude REAL,
-        speed REAL,
-        heading REAL,
-        attributes TEXT,
-        collected_at INTEGER NOT NULL,
-        updated_at INTEGER NOT NULL,
-        version INTEGER NOT NULL,
-        source TEXT NOT NULL,
-        synced INTEGER NOT NULL DEFAULT 0
-      )`,
-      [],
-      'sqlite:createTable'
-    );
-    await this.sqliteRun(
-      `CREATE INDEX IF NOT EXISTS idx_${SQLITE_TABLE}_project_updated
-        ON ${SQLITE_TABLE} (project_id, updated_at DESC)`,
-      [],
-      'sqlite:createIndex'
-    );
+    await this.ensureSQLiteMetaTable();
+    await this.runSQLiteMigrations();
   }
 
   private async ensureSQLiteConnection(): Promise<void> {
@@ -659,6 +655,80 @@ export class DatabaseService {
     } catch (error) {
       console.warn('[DatabaseService] IndexedDB delete 失败，已清理内存副本:', error);
     }
+  }
+
+  private async ensureSQLiteMetaTable(): Promise<void> {
+    await this.sqliteRun(
+      `CREATE TABLE IF NOT EXISTS ${SQLITE_META_TABLE} (
+        key TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL
+      )`,
+      [],
+      'sqlite:createMetaTable'
+    );
+  }
+
+  private async runSQLiteMigrations(): Promise<void> {
+    const currentVersion = await this.readSQLiteSchemaVersion();
+    if (currentVersion < 1) {
+      await this.sqliteRun(
+        `CREATE TABLE IF NOT EXISTS ${SQLITE_TABLE} (
+          id TEXT PRIMARY KEY NOT NULL,
+          project_id TEXT NOT NULL,
+          latitude REAL NOT NULL,
+          longitude REAL NOT NULL,
+          accuracy REAL NOT NULL,
+          altitude REAL,
+          speed REAL,
+          heading REAL,
+          attributes TEXT,
+          collected_at INTEGER NOT NULL,
+          updated_at INTEGER NOT NULL,
+          version INTEGER NOT NULL,
+          source TEXT NOT NULL,
+          synced INTEGER NOT NULL DEFAULT 0
+        )`,
+        [],
+        'sqlite:migration:v1:createTable'
+      );
+      await this.sqliteRun(
+        `CREATE INDEX IF NOT EXISTS idx_${SQLITE_TABLE}_project_updated
+          ON ${SQLITE_TABLE} (project_id, updated_at DESC)`,
+        [],
+        'sqlite:migration:v1:createProjectUpdatedIndex'
+      );
+    }
+
+    if (currentVersion < 2) {
+      await this.sqliteRun(
+        `CREATE INDEX IF NOT EXISTS idx_${SQLITE_TABLE}_synced_updated
+          ON ${SQLITE_TABLE} (synced, updated_at DESC)`,
+        [],
+        'sqlite:migration:v2:createSyncedUpdatedIndex'
+      );
+    }
+
+    if (currentVersion < SQLITE_SCHEMA_VERSION) {
+      await this.writeSQLiteSchemaVersion(SQLITE_SCHEMA_VERSION);
+    }
+  }
+
+  private async readSQLiteSchemaVersion(): Promise<number> {
+    const rows = await this.sqliteQuery<{ value: string }>(
+      `SELECT value FROM ${SQLITE_META_TABLE} WHERE key = ? LIMIT 1`,
+      ['schema_version'],
+      'sqlite:readSchemaVersion'
+    );
+    const version = Number(rows[0]?.value || 0);
+    return Number.isFinite(version) ? Math.max(0, Math.floor(version)) : 0;
+  }
+
+  private async writeSQLiteSchemaVersion(version: number): Promise<void> {
+    await this.sqliteRun(
+      `INSERT OR REPLACE INTO ${SQLITE_META_TABLE} (key, value) VALUES (?, ?)`,
+      ['schema_version', String(version)],
+      'sqlite:writeSchemaVersion'
+    );
   }
 
   private readLegacySamples(): Promise<any[]> {

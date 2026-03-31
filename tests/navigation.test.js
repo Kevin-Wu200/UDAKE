@@ -68,4 +68,42 @@ describe('导航功能测试', () => {
     const elapsedMs = Date.now() - startedAt;
     expect(elapsedMs).toBeLessThan(2000);
   });
+
+  it('应通过长时间导航稳定性测试与准确率校验', async () => {
+    const start = [113.2644, 23.1291];
+    const end = [113.3244, 23.1091];
+    const rounds = 120;
+    let success = 0;
+
+    for (let i = 0; i < rounds; i += 1) {
+      const route = await service.planRoute('walking', start, end, {
+        forceOffline: true,
+        enableVoice: false,
+        disableCache: true
+      });
+      const hasValidGeometry = route.polyline.length >= 2
+        && route.start[0] === start[0]
+        && route.start[1] === start[1]
+        && route.end[0] === end[0]
+        && route.end[1] === end[1];
+      if (hasValidGeometry && route.distanceMeters > 0 && route.steps.length > 0) {
+        success += 1;
+      }
+    }
+
+    const accuracy = (success / rounds) * 100;
+    expect(accuracy).toBeGreaterThanOrEqual(95);
+  });
+
+  it('应支持多路线对比（时长差异符合预期）', async () => {
+    const start = [116.35, 39.9];
+    const end = [116.45, 39.95];
+
+    const driving = await service.planRoute('driving', start, end, { forceOffline: true, enableVoice: false });
+    const cycling = await service.planRoute('cycling', start, end, { forceOffline: true, enableVoice: false });
+    const walking = await service.planRoute('walking', start, end, { forceOffline: true, enableVoice: false });
+
+    expect(driving.durationSeconds).toBeLessThan(cycling.durationSeconds);
+    expect(cycling.durationSeconds).toBeLessThan(walking.durationSeconds);
+  });
 });
