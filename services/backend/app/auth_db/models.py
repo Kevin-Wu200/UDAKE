@@ -342,3 +342,243 @@ class RateLimit(Base):
         Index("ix_rate_limits_scope", "scope"),
         Index("ix_rate_limits_endpoint", "endpoint"),
     )
+
+
+class Workflow(Base):
+    __tablename__ = "workflows"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    definition: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+    owner_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+
+    __table_args__ = (
+        Index("ix_workflows_owner_id", "owner_id"),
+        Index("ix_workflows_is_public", "is_public"),
+        Index("ix_workflows_created_at", "created_at"),
+    )
+
+
+class WorkflowVersion(Base):
+    __tablename__ = "workflow_versions"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    workflow_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    version_number: Mapped[int] = mapped_column(Integer, nullable=False)
+    definition: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    created_by_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("workflow_id", "version_number", name="uq_workflow_versions_workflow_version"),
+        Index("ix_workflow_versions_workflow_id", "workflow_id"),
+        Index("ix_workflow_versions_version_number", "version_number"),
+    )
+
+
+class Team(Base):
+    __tablename__ = "teams"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[Optional[str]] = mapped_column(String(1024), nullable=True)
+    created_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    owner_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    __table_args__ = (Index("ix_teams_owner_id", "owner_id"),)
+
+
+class TeamMember(Base):
+    __tablename__ = "team_members"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    team_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("teams.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    role: Mapped[str] = mapped_column(String(32), nullable=False, server_default=text("'member'"))
+    joined_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("team_id", "user_id", name="uq_team_members_team_user"),
+        CheckConstraint("role IN ('owner', 'admin', 'member', 'viewer')", name="ck_team_members_role_enum"),
+        Index("ix_team_members_team_id", "team_id"),
+        Index("ix_team_members_user_id", "user_id"),
+    )
+
+
+class Invitation(Base):
+    __tablename__ = "invitations"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    team_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("teams.id", ondelete="CASCADE"), nullable=True
+    )
+    workflow_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=True
+    )
+    invited_by_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    invitee_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    token: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'pending'"))
+    expires_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("token", name="uq_invitations_token"),
+        CheckConstraint("(team_id IS NOT NULL) OR (workflow_id IS NOT NULL)", name="ck_invitations_target_not_null"),
+        CheckConstraint("status IN ('pending', 'accepted', 'declined', 'expired')", name="ck_invitations_status_enum"),
+        Index("ix_invitations_team_id", "team_id"),
+        Index("ix_invitations_workflow_id", "workflow_id"),
+        Index("ix_invitations_token", "token"),
+        Index("ix_invitations_status", "status"),
+    )
+
+
+class Delegation(Base):
+    __tablename__ = "delegations"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    workflow_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    delegator_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    delegate_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    permissions: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    granted_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    expires_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    __table_args__ = (
+        CheckConstraint("delegator_id <> delegate_id", name="ck_delegations_no_self_delegate"),
+        Index("ix_delegations_workflow_id", "workflow_id"),
+        Index("ix_delegations_delegator_id", "delegator_id"),
+        Index("ix_delegations_delegate_id", "delegate_id"),
+    )
+
+
+class ShareLink(Base):
+    __tablename__ = "share_links"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    workflow_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    created_by_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    token: Mapped[str] = mapped_column(String(128), nullable=False)
+    access_mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'read'"))
+    password: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    expires_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
+    access_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+
+    __table_args__ = (
+        UniqueConstraint("token", name="uq_share_links_token"),
+        CheckConstraint("access_mode IN ('read', 'comment', 'edit')", name="ck_share_links_access_mode_enum"),
+        CheckConstraint("access_count >= 0", name="ck_share_links_access_count_non_negative"),
+        Index("ix_share_links_workflow_id", "workflow_id"),
+        Index("ix_share_links_token", "token"),
+    )
+
+
+class Comment(Base):
+    __tablename__ = "comments"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    workflow_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    parent_id: Mapped[Optional[int]] = mapped_column(BigInteger, ForeignKey("comments.id", ondelete="CASCADE"))
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    content: Mapped[str] = mapped_column(String(4000), nullable=False)
+    created_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint("length(content) > 0", name="ck_comments_content_not_empty"),
+        Index("ix_comments_workflow_id", "workflow_id"),
+        Index("ix_comments_parent_id", "parent_id"),
+        Index("ix_comments_user_id", "user_id"),
+    )
+
+
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    notification_type: Mapped[str] = mapped_column("type", String(64), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    content: Mapped[str] = mapped_column(String(4000), nullable=False)
+    is_read: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    created_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    reference_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+
+    __table_args__ = (
+        Index("ix_notifications_user_id", "user_id"),
+        Index("ix_notifications_is_read", "is_read"),
+        Index("ix_notifications_type", "type"),
+    )
+
+
+class CollaborationOperation(Base):
+    __tablename__ = "collaboration_operations"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    workflow_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    operation_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    operation_data: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    created_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_collaboration_operations_workflow_id", "workflow_id"),
+        Index("ix_collaboration_operations_user_id", "user_id"),
+        Index("ix_collaboration_operations_created_at", "created_at"),
+    )
+
+
+class CollaborationCursor(Base):
+    __tablename__ = "collaboration_cursors"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    workflow_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    cursor_position: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    color: Mapped[str] = mapped_column(String(32), nullable=False)
+    last_updated: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("workflow_id", "user_id", name="uq_collaboration_cursors_workflow_user"),
+        Index("ix_collaboration_cursors_workflow_id", "workflow_id"),
+        Index("ix_collaboration_cursors_user_id", "user_id"),
+    )
+
+
+class CollaborationConflict(Base):
+    __tablename__ = "collaboration_conflicts"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    workflow_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    conflict_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    conflict_data: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    resolved: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
+    created_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    __table_args__ = (
+        Index("ix_collaboration_conflicts_workflow_id", "workflow_id"),
+        Index("ix_collaboration_conflicts_user_id", "user_id"),
+        Index("ix_collaboration_conflicts_resolved", "resolved"),
+    )

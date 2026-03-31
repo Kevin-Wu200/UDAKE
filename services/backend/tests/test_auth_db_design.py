@@ -13,14 +13,26 @@ from app.auth_db.database import build_engine_options, create_auth_engine, ping_
 from app.auth_db.models import (
     AuditLog,
     Base,
+    CollaborationConflict,
+    CollaborationCursor,
+    CollaborationOperation,
+    Comment,
     Company,
+    Delegation,
     EmailChangeRequest,
     EmailVerificationCode,
+    Invitation,
+    Notification,
     PasswordHistory,
     ProductKey,
     RateLimit,
+    ShareLink,
+    Team,
+    TeamMember,
     User,
     UserDevice,
+    Workflow,
+    WorkflowVersion,
 )
 from app.config import settings
 
@@ -219,3 +231,196 @@ def test_company_model_and_audit_operation_type(sqlite_engine):
 
 def test_ping_database(sqlite_engine):
     assert ping_database(sqlite_engine) is True
+
+
+def test_collaboration_and_sharing_tables(sqlite_engine):
+    now = datetime.now(timezone.utc)
+    with Session(sqlite_engine) as session:
+        owner = User(
+            id=10,
+            username="owner",
+            email="owner@example.com",
+            password_hash="hash_owner",
+            role="user",
+            status="active",
+        )
+        editor = User(
+            id=11,
+            username="editor",
+            email="editor@example.com",
+            password_hash="hash_editor",
+            role="user",
+            status="active",
+        )
+        session.add_all([owner, editor])
+        session.flush()
+
+        workflow = Workflow(
+            id=1,
+            name="主流程",
+            description="协作流程",
+            definition={"nodes": [], "edges": []},
+            owner_id=owner.id,
+            is_public=False,
+        )
+        team = Team(
+            id=1,
+            name="研发团队",
+            description="核心成员",
+            owner_id=owner.id,
+        )
+        session.add_all([workflow, team])
+        session.flush()
+
+        session.add_all(
+            [
+                WorkflowVersion(
+                    id=1,
+                    workflow_id=workflow.id,
+                    version_number=1,
+                    definition={"nodes": [{"id": "n1"}], "edges": []},
+                    created_by_id=owner.id,
+                ),
+                TeamMember(
+                    id=1,
+                    team_id=team.id,
+                    user_id=editor.id,
+                    role="member",
+                ),
+                Invitation(
+                    id=1,
+                    team_id=team.id,
+                    workflow_id=workflow.id,
+                    invited_by_id=owner.id,
+                    invitee_email="newuser@example.com",
+                    token="invite-token-001",
+                    status="pending",
+                    expires_at=now + timedelta(days=2),
+                ),
+                Delegation(
+                    id=1,
+                    workflow_id=workflow.id,
+                    delegator_id=owner.id,
+                    delegate_id=editor.id,
+                    permissions={"can_edit": True, "can_share": True},
+                    expires_at=now + timedelta(days=1),
+                ),
+                ShareLink(
+                    id=1,
+                    workflow_id=workflow.id,
+                    created_by_id=owner.id,
+                    token="share-token-001",
+                    access_mode="edit",
+                    password="secret",
+                    expires_at=now + timedelta(hours=6),
+                    access_count=0,
+                ),
+                Comment(
+                    id=1,
+                    workflow_id=workflow.id,
+                    parent_id=None,
+                    user_id=editor.id,
+                    content="第一条评论",
+                ),
+                Notification(
+                    id=1,
+                    user_id=editor.id,
+                    notification_type="workflow_shared",
+                    title="收到新分享",
+                    content="你被授予编辑权限",
+                    is_read=False,
+                    reference_id=workflow.id,
+                ),
+                CollaborationOperation(
+                    id=1,
+                    workflow_id=workflow.id,
+                    user_id=editor.id,
+                    operation_type="node_move",
+                    operation_data={"node_id": "n1", "x": 120, "y": 80},
+                ),
+                CollaborationCursor(
+                    id=1,
+                    workflow_id=workflow.id,
+                    user_id=editor.id,
+                    cursor_position={"node_id": "n1"},
+                    color="#00AA88",
+                ),
+                CollaborationConflict(
+                    id=1,
+                    workflow_id=workflow.id,
+                    user_id=editor.id,
+                    conflict_type="edit_collision",
+                    conflict_data={"field": "name"},
+                    resolved=False,
+                ),
+            ]
+        )
+        session.commit()
+
+    with Session(sqlite_engine) as session:
+        assert session.query(Workflow).count() == 1
+        assert session.query(WorkflowVersion).count() == 1
+        assert session.query(Team).count() == 1
+        assert session.query(TeamMember).count() == 1
+        assert session.query(Invitation).filter_by(status="pending").count() == 1
+        assert session.query(Delegation).count() == 1
+        assert session.query(ShareLink).filter_by(access_mode="edit").count() == 1
+        assert session.query(Comment).count() == 1
+        assert session.query(Notification).filter_by(notification_type="workflow_shared").count() == 1
+        assert session.query(CollaborationOperation).count() == 1
+        assert session.query(CollaborationCursor).count() == 1
+        assert session.query(CollaborationConflict).filter_by(resolved=False).count() == 1
+
+
+def test_collaboration_constraints(sqlite_engine):
+    now = datetime.now(timezone.utc)
+    with Session(sqlite_engine) as session:
+        user = User(
+            id=20,
+            username="user20",
+            email="user20@example.com",
+            password_hash="hash20",
+            role="user",
+            status="active",
+        )
+        workflow = Workflow(
+            id=20,
+            name="约束测试流程",
+            definition={"nodes": [], "edges": []},
+            owner_id=20,
+            is_public=False,
+        )
+        session.add(user)
+        session.flush()
+        session.add(workflow)
+        session.flush()
+
+        session.add(
+            Delegation(
+                id=20,
+                workflow_id=workflow.id,
+                delegator_id=user.id,
+                delegate_id=user.id,
+                permissions={"can_edit": True},
+                expires_at=now + timedelta(hours=1),
+            )
+        )
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
+
+        session.add(
+            Invitation(
+                id=21,
+                team_id=None,
+                workflow_id=None,
+                invited_by_id=user.id,
+                invitee_email="x@example.com",
+                token="invalid-invite-token",
+                status="pending",
+                expires_at=now + timedelta(days=1),
+            )
+        )
+        with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
