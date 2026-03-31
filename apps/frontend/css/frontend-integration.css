@@ -83,6 +83,17 @@
     gap: 6px;
 }
 
+.history-snapshot-refresh-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.history-snapshot-refresh-row .integration-field {
+    min-width: 180px;
+}
+
 .integration-action-btn {
     padding: 6px 10px;
     font-size: 12px;
@@ -537,6 +548,14 @@
 .history-trend-card > h4 {
     margin: 0;
     font-size: 13px;
+}
+
+.status-message.is-success {
+    color: #065f46;
+}
+
+.status-message.is-error {
+    color: #991b1b;
 }
 
 .history-trend-param-grid {

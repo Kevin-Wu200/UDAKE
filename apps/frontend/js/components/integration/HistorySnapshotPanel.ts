@@ -6,6 +6,7 @@ import type {
 import { APIService } from '../../services/API封装.js';
 import { ConfirmDialog } from '../ConfirmDialog.js';
 import notificationManager from '../NotificationManager.js';
+import { SkeletonLoader } from '../../utils/SkeletonLoader.js';
 
 interface SnapshotLocalState {
     labelOverrides: Record<string, string>;
@@ -21,6 +22,15 @@ interface SnapshotSummary {
 
 const LOCAL_STATE_KEY = 'udake_history_snapshot_panel_state_v1';
 const LAST_DATASET_KEY = 'udake_history_snapshot_last_dataset_id';
+const SNAPSHOT_AUTO_REFRESH_KEY = 'udake_history_snapshot_auto_refresh_sec_v1';
+const RETRY_TIMES = 2;
+
+type StatusType = 'success' | 'error' | 'warning';
+
+interface RetryOptions {
+    actionName: string;
+    retries?: number;
+}
 
 export class HistorySnapshotPanel {
     private root: HTMLElement | null = null;
@@ -41,6 +51,18 @@ export class HistorySnapshotPanel {
     private createMetadataInput: HTMLTextAreaElement | null = null;
 
     private keepLatestInput: HTMLInputElement | null = null;
+    private autoRefreshSelect: HTMLSelectElement | null = null;
+    private refreshProgressElement: HTMLElement | null = null;
+    private shortcutHintElement: HTMLElement | null = null;
+
+    private listSkeleton: HTMLDivElement | null = null;
+    private detailSkeleton: HTMLDivElement | null = null;
+    private autoRefreshTimer: number | null = null;
+    private refreshCountdownTimer: number | null = null;
+    private refreshRemainSec = 0;
+    private lastRetryAction: (() => Promise<void>) | null = null;
+    private retryButtonText = '重试上次失败请求';
+    private loading = false;
 
     private localState: SnapshotLocalState = this.loadLocalState();
     private snapshots: HistorySnapshotMetadata[] = [];
@@ -133,7 +155,31 @@ export class HistorySnapshotPanel {
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="restore-local-selected">恢复选中本地归档</button>
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="restore-local-all">恢复全部本地归档</button>
                 </div>
+                <div class="integration-actions">
+                    <button type="button" class="btn btn-danger integration-action-btn" data-action="delete-selected">批量删除选中版本</button>
+                    <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-selected">批量导出选中版本(JSON)</button>
+                </div>
                 <p class="history-archive-hint">说明：本地归档仅影响当前界面显示；后端归档会将旧版本移出服务端活动列表。</p>
+            </section>
+
+            <section class="history-snapshot-card">
+                <h4>刷新与快捷键</h4>
+                <div class="history-snapshot-refresh-row">
+                    <button type="button" class="btn btn-secondary integration-action-btn" data-action="refresh-list">手动刷新</button>
+                    <label class="integration-field">
+                        <span class="integration-field-label">自动刷新间隔</span>
+                        <select id="snapshot-auto-refresh" class="select integration-input">
+                            <option value="0">关闭</option>
+                            <option value="10">10 秒</option>
+                            <option value="30">30 秒</option>
+                            <option value="60">60 秒</option>
+                            <option value="120">120 秒</option>
+                        </select>
+                    </label>
+                    <button type="button" class="btn btn-secondary integration-action-btn" data-action="retry-last">重试</button>
+                </div>
+                <p class="history-archive-hint" data-role="snapshot-refresh-progress">自动刷新已关闭。</p>
+                <p class="history-archive-hint" data-role="snapshot-shortcut-hint">快捷键：Alt+R 刷新，Alt+L 加载列表，Alt+Shift+Delete 批量删除，Alt+E 批量导出。</p>
             </section>
 
             <div class="status-message" data-role="history-snapshot-status"></div>
@@ -172,6 +218,9 @@ export class HistorySnapshotPanel {
         this.createMetadataInput = this.root.querySelector('#snapshot-create-metadata');
 
         this.keepLatestInput = this.root.querySelector('#snapshot-keep-latest');
+        this.autoRefreshSelect = this.root.querySelector('#snapshot-auto-refresh');
+        this.refreshProgressElement = this.root.querySelector('[data-role="snapshot-refresh-progress"]');
+        this.shortcutHintElement = this.root.querySelector('[data-role="snapshot-shortcut-hint"]');
     }
 
     private bindEvents(): void {
@@ -212,7 +261,7 @@ export class HistorySnapshotPanel {
                 return;
             }
             if (action === 'archive-local-selected') {
-                this.handleLocalArchiveSelected();
+                await this.handleLocalArchiveSelected();
                 return;
             }
             if (action === 'restore-local-selected') {
@@ -221,6 +270,22 @@ export class HistorySnapshotPanel {
             }
             if (action === 'restore-local-all') {
                 this.handleLocalRestoreAll();
+                return;
+            }
+            if (action === 'refresh-list') {
+                await this.handleRefreshList();
+                return;
+            }
+            if (action === 'retry-last') {
+                await this.handleRetryLast();
+                return;
+            }
+            if (action === 'delete-selected') {
+                await this.handleDeleteSelected();
+                return;
+            }
+            if (action === 'export-selected') {
+                await this.handleExportSelected();
                 return;
             }
 
@@ -279,6 +344,36 @@ export class HistorySnapshotPanel {
         this.filterStartInput?.addEventListener('change', onFilterChanged);
         this.filterEndInput?.addEventListener('change', onFilterChanged);
         this.showArchivedCheckbox?.addEventListener('change', onFilterChanged);
+
+        this.autoRefreshSelect?.addEventListener('change', () => {
+            this.updateAutoRefreshFromSelect();
+        });
+
+        this.root.tabIndex = 0;
+        this.root.addEventListener('keydown', async (event: KeyboardEvent) => {
+            if (!event.altKey) {
+                return;
+            }
+            if (event.key.toLowerCase() === 'r') {
+                event.preventDefault();
+                await this.handleRefreshList();
+                return;
+            }
+            if (event.key.toLowerCase() === 'l') {
+                event.preventDefault();
+                await this.handleLoadList();
+                return;
+            }
+            if (event.key.toLowerCase() === 'e') {
+                event.preventDefault();
+                await this.handleExportSelected();
+                return;
+            }
+            if (event.shiftKey && event.key === 'Delete') {
+                event.preventDefault();
+                await this.handleDeleteSelected();
+            }
+        });
     }
 
     private bootstrapDefaultValues(): void {
@@ -313,11 +408,21 @@ export class HistorySnapshotPanel {
             }
             this.currentDatasetId = lastDatasetId;
             void this.loadSnapshots(lastDatasetId);
+            this.syncAutoRefreshSelect();
+            this.updateAutoRefreshFromSelect();
+            if (this.shortcutHintElement) {
+                this.shortcutHintElement.title = '在当前面板聚焦后使用快捷键';
+            }
             return;
         }
 
         this.renderList();
         this.renderDetail();
+        this.syncAutoRefreshSelect();
+        this.updateAutoRefreshFromSelect();
+        if (this.shortcutHintElement) {
+            this.shortcutHintElement.title = '在当前面板聚焦后使用快捷键';
+        }
     }
 
     private syncCreateDatasetFromFilter(): void {
@@ -336,42 +441,66 @@ export class HistorySnapshotPanel {
         await this.loadSnapshots(datasetId);
     }
 
-    private async loadSnapshots(datasetId: string): Promise<void> {
-        this.setStatus('正在加载快照列表...', 'warning');
-        this.setLoading(true);
-        try {
-            const response = await this.apiService.listHistorySnapshots(datasetId);
-            this.currentDatasetId = datasetId;
-            this.safeWriteLocalStorage(LAST_DATASET_KEY, datasetId);
-
-            if (this.createDatasetInput && !this.createDatasetInput.value.trim()) {
-                this.createDatasetInput.value = datasetId;
-            }
-
-            this.snapshots = [...(response.versions || [])].sort((a, b) => b.version - a.version);
-            this.pruneLocalStateForCurrentDataset();
-
-            if (this.snapshots.length === 0) {
-                this.selectedVersion = null;
-            } else if (!this.selectedVersion || !this.snapshots.some((item) => item.version === this.selectedVersion)) {
-                this.selectedVersion = this.snapshots[0].version;
-            }
-
-            this.selectedVersions.forEach((version) => {
-                if (!this.snapshots.some((item) => item.version === version)) {
-                    this.selectedVersions.delete(version);
-                }
-            });
-
-            this.applyFilters();
-            this.renderList();
-            this.renderDetail();
-            this.setStatus(`已加载 ${this.snapshots.length} 个快照版本。`, 'success');
-        } catch (error) {
-            this.setStatus(`快照列表加载失败：${this.getErrorMessage(error)}`, 'error');
-        } finally {
-            this.setLoading(false);
+    private async handleRefreshList(): Promise<void> {
+        if (!this.currentDatasetId) {
+            this.setStatus('请先加载数据集后再刷新。', 'warning');
+            return;
         }
+        await this.loadSnapshots(this.currentDatasetId, true);
+    }
+
+    private async handleRetryLast(): Promise<void> {
+        if (!this.lastRetryAction) {
+            this.setStatus('当前没有可重试的失败请求。', 'warning');
+            return;
+        }
+        await this.lastRetryAction();
+    }
+
+    private async loadSnapshots(datasetId: string, forceRefresh = false): Promise<void> {
+        const statusMessage = forceRefresh ? '正在刷新快照列表...' : '正在加载快照列表...';
+        this.setStatus(statusMessage, 'warning');
+        this.setLoading(true);
+        this.showSkeleton();
+        await this.runWithRetry(
+            async () => {
+                const response = await this.apiService.listHistorySnapshots(datasetId);
+                this.currentDatasetId = datasetId;
+                this.safeWriteLocalStorage(LAST_DATASET_KEY, datasetId);
+
+                if (this.createDatasetInput && !this.createDatasetInput.value.trim()) {
+                    this.createDatasetInput.value = datasetId;
+                }
+
+                this.snapshots = [...(response.versions || [])].sort((a, b) => b.version - a.version);
+                this.pruneLocalStateForCurrentDataset();
+
+                if (this.snapshots.length === 0) {
+                    this.selectedVersion = null;
+                } else if (!this.selectedVersion || !this.snapshots.some((item) => item.version === this.selectedVersion)) {
+                    this.selectedVersion = this.snapshots[0].version;
+                }
+
+                this.selectedVersions.forEach((version) => {
+                    if (!this.snapshots.some((item) => item.version === version)) {
+                        this.selectedVersions.delete(version);
+                    }
+                });
+
+                this.applyFilters();
+                this.renderList();
+                this.renderDetail();
+                this.setStatus(`已加载 ${this.snapshots.length} 个快照版本。`, 'success');
+                this.lastRetryAction = null;
+                this.resetRefreshCountdown();
+            },
+            { actionName: forceRefresh ? '刷新快照列表' : '加载快照列表', retries: RETRY_TIMES }
+        ).catch(() => {
+            this.lastRetryAction = async () => this.loadSnapshots(datasetId, forceRefresh);
+        }).finally(() => {
+            this.setLoading(false);
+            this.hideSkeleton();
+        });
     }
 
     private applyFilters(): void {
@@ -445,18 +574,22 @@ export class HistorySnapshotPanel {
 
         this.setStatus('正在创建快照...', 'warning');
         this.setLoading(true);
-        try {
-            await this.apiService.createHistorySnapshot(payload);
-            this.notifySuccess('快照创建成功', `数据集 ${datasetId} 已创建新快照。`);
-            if (this.datasetInput) {
-                this.datasetInput.value = datasetId;
-            }
-            await this.loadSnapshots(datasetId);
-        } catch (error) {
-            this.setStatus(`创建失败：${this.getErrorMessage(error)}`, 'error');
-        } finally {
+        await this.runWithRetry(
+            async () => {
+                await this.apiService.createHistorySnapshot(payload);
+                this.notifySuccess('快照创建成功', `数据集 ${datasetId} 已创建新快照。`);
+                if (this.datasetInput) {
+                    this.datasetInput.value = datasetId;
+                }
+                await this.loadSnapshots(datasetId, true);
+                this.lastRetryAction = null;
+            },
+            { actionName: '创建快照', retries: RETRY_TIMES }
+        ).catch(() => {
+            this.lastRetryAction = async () => this.handleCreateSnapshot();
+        }).finally(() => {
             this.setLoading(false);
-        }
+        });
     }
 
     private async handleBackendArchive(): Promise<void> {
@@ -470,32 +603,54 @@ export class HistorySnapshotPanel {
             return;
         }
 
+        const confirmed = await ConfirmDialog.confirmDanger({
+            title: '确认后端归档',
+            message: `将仅保留最新 ${Math.floor(keepLatest)} 个版本，其余版本会从服务端活动列表归档。是否继续？`,
+            confirmText: '继续归档',
+            cancelText: '取消'
+        });
+        if (!confirmed) {
+            return;
+        }
+
         this.setStatus('正在执行后端归档...', 'warning');
         this.setLoading(true);
-        try {
-            const response = await this.apiService.archiveHistorySnapshots({
-                dataset_id: this.currentDatasetId,
-                keep_latest: Math.floor(keepLatest)
-            }) as { archived_count?: number; kept_count?: number };
+        await this.runWithRetry(
+            async () => {
+                const response = await this.apiService.archiveHistorySnapshots({
+                    dataset_id: this.currentDatasetId,
+                    keep_latest: Math.floor(keepLatest)
+                }) as { archived_count?: number; kept_count?: number };
 
-            const archivedCount = Number(response?.archived_count || 0);
-            const keptCount = Number(response?.kept_count || 0);
-            this.notifySuccess('后端归档完成', `已归档 ${archivedCount} 个版本，保留 ${keptCount} 个版本。`);
-            await this.loadSnapshots(this.currentDatasetId);
-        } catch (error) {
-            this.setStatus(`后端归档失败：${this.getErrorMessage(error)}`, 'error');
-        } finally {
+                const archivedCount = Number(response?.archived_count || 0);
+                const keptCount = Number(response?.kept_count || 0);
+                this.notifySuccess('后端归档完成', `已归档 ${archivedCount} 个版本，保留 ${keptCount} 个版本。`);
+                await this.loadSnapshots(this.currentDatasetId, true);
+            },
+            { actionName: '后端归档', retries: RETRY_TIMES }
+        ).catch(() => {
+            this.lastRetryAction = async () => this.handleBackendArchive();
+        }).finally(() => {
             this.setLoading(false);
-        }
+        });
     }
 
-    private handleLocalArchiveSelected(): void {
+    private async handleLocalArchiveSelected(): Promise<void> {
         if (!this.currentDatasetId) {
             this.setStatus('请先加载快照列表。', 'error');
             return;
         }
         if (this.selectedVersions.size === 0) {
             this.setStatus('请先选择要归档的版本。', 'error');
+            return;
+        }
+        const confirmed = await ConfirmDialog.confirm({
+            title: '确认本地归档',
+            message: `将本地归档 ${this.selectedVersions.size} 个选中版本，仅影响当前界面显示。是否继续？`,
+            confirmText: '确认归档',
+            cancelText: '取消'
+        });
+        if (!confirmed) {
             return;
         }
 
@@ -637,19 +792,108 @@ export class HistorySnapshotPanel {
 
         this.setStatus(`正在删除版本 v${version}...`, 'warning');
         this.setLoading(true);
-        try {
-            await this.apiService.deleteHistorySnapshot(this.currentDatasetId, version);
-            const key = this.toLocalSnapshotKey(this.currentDatasetId, version);
-            delete this.localState.archivedKeys[key];
-            delete this.localState.labelOverrides[key];
-            this.saveLocalState();
-            this.notifySuccess('删除成功', `版本 v${version} 已删除。`);
-            await this.loadSnapshots(this.currentDatasetId);
-        } catch (error) {
-            this.setStatus(`删除失败：${this.getErrorMessage(error)}`, 'error');
-        } finally {
+        await this.runWithRetry(
+            async () => {
+                await this.apiService.deleteHistorySnapshot(this.currentDatasetId, version);
+                const key = this.toLocalSnapshotKey(this.currentDatasetId, version);
+                delete this.localState.archivedKeys[key];
+                delete this.localState.labelOverrides[key];
+                this.saveLocalState();
+                this.notifySuccess('删除成功', `版本 v${version} 已删除。`);
+                await this.loadSnapshots(this.currentDatasetId, true);
+            },
+            { actionName: `删除快照 v${version}`, retries: RETRY_TIMES }
+        ).catch(() => {
+            this.lastRetryAction = async () => this.handleDeleteSnapshot(version);
+        }).finally(() => {
             this.setLoading(false);
+        });
+    }
+
+    private async handleDeleteSelected(): Promise<void> {
+        if (!this.currentDatasetId) {
+            this.setStatus('请先加载快照列表。', 'error');
+            return;
         }
+        const versions = Array.from(this.selectedVersions).sort((a, b) => b - a);
+        if (versions.length === 0) {
+            this.setStatus('请先勾选要删除的版本。', 'warning');
+            return;
+        }
+
+        const confirmed = await ConfirmDialog.confirmDanger({
+            title: '批量删除确认',
+            message: `即将删除 ${versions.length} 个版本（${versions.map(v => `v${v}`).join('、')}）。该操作不可撤销。`,
+            confirmText: '确认批量删除',
+            cancelText: '取消'
+        });
+        if (!confirmed) {
+            return;
+        }
+
+        this.setLoading(true);
+        this.setStatus(`正在批量删除 ${versions.length} 个版本...`, 'warning');
+        const failures: string[] = [];
+        for (const version of versions) {
+            try {
+                await this.apiService.deleteHistorySnapshot(this.currentDatasetId, version);
+                const key = this.toLocalSnapshotKey(this.currentDatasetId, version);
+                delete this.localState.archivedKeys[key];
+                delete this.localState.labelOverrides[key];
+            } catch (error) {
+                failures.push(`v${version}: ${this.getErrorMessage(error)}`);
+            }
+        }
+        this.saveLocalState();
+        this.selectedVersions.clear();
+        await this.loadSnapshots(this.currentDatasetId, true);
+        this.setLoading(false);
+
+        if (failures.length > 0) {
+            this.setStatus(`批量删除完成，但有 ${failures.length} 项失败。`, 'warning');
+            this.lastRetryAction = async () => this.handleDeleteSelected();
+            return;
+        }
+        this.notifySuccess('批量删除完成', `已成功删除 ${versions.length} 个版本。`);
+        this.lastRetryAction = null;
+    }
+
+    private async handleExportSelected(): Promise<void> {
+        if (!this.currentDatasetId) {
+            this.setStatus('请先加载快照列表。', 'error');
+            return;
+        }
+        const versions = Array.from(this.selectedVersions).sort((a, b) => b - a);
+        if (versions.length === 0) {
+            this.setStatus('请先勾选要导出的版本。', 'warning');
+            return;
+        }
+        const confirmed = await ConfirmDialog.confirm({
+            title: '批量导出确认',
+            message: `将导出 ${versions.length} 个版本为 JSON 文件，是否继续？`,
+            confirmText: '确认导出',
+            cancelText: '取消'
+        });
+        if (!confirmed) {
+            return;
+        }
+
+        const payload = {
+            dataset_id: this.currentDatasetId,
+            selected_versions: versions,
+            exported_at: new Date().toISOString(),
+            snapshots: this.snapshots.filter((item) => versions.includes(item.version))
+        };
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `${this.currentDatasetId}_selected_snapshots.json`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+        this.notifySuccess('批量导出完成', `已导出 ${versions.length} 个版本。`);
     }
 
     private checkDeletionDependency(version: number): { blockedReason: string | null; warnings: string[] } {
@@ -1018,21 +1262,148 @@ export class HistorySnapshotPanel {
         return null;
     }
 
+    private syncAutoRefreshSelect(): void {
+        const interval = Number(this.safeReadLocalStorage(SNAPSHOT_AUTO_REFRESH_KEY) || '0');
+        if (this.autoRefreshSelect) {
+            this.autoRefreshSelect.value = Number.isFinite(interval) ? String(Math.max(0, interval)) : '0';
+        }
+    }
+
+    private updateAutoRefreshFromSelect(): void {
+        const intervalSec = Number(this.autoRefreshSelect?.value || '0');
+        this.safeWriteLocalStorage(SNAPSHOT_AUTO_REFRESH_KEY, String(intervalSec));
+        this.stopAutoRefresh();
+        if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
+            if (this.refreshProgressElement) {
+                this.refreshProgressElement.textContent = '自动刷新已关闭。';
+            }
+            return;
+        }
+        this.refreshRemainSec = Math.floor(intervalSec);
+        this.autoRefreshTimer = window.setInterval(() => {
+            if (!this.loading && this.currentDatasetId) {
+                void this.handleRefreshList();
+            }
+        }, Math.floor(intervalSec) * 1000);
+        this.resetRefreshCountdown();
+    }
+
+    private stopAutoRefresh(): void {
+        if (this.autoRefreshTimer !== null) {
+            window.clearInterval(this.autoRefreshTimer);
+            this.autoRefreshTimer = null;
+        }
+        if (this.refreshCountdownTimer !== null) {
+            window.clearInterval(this.refreshCountdownTimer);
+            this.refreshCountdownTimer = null;
+        }
+    }
+
+    private resetRefreshCountdown(): void {
+        if (this.refreshCountdownTimer !== null) {
+            window.clearInterval(this.refreshCountdownTimer);
+            this.refreshCountdownTimer = null;
+        }
+        const intervalSec = Number(this.autoRefreshSelect?.value || '0');
+        if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
+            return;
+        }
+        this.refreshRemainSec = Math.floor(intervalSec);
+        this.refreshCountdownTimer = window.setInterval(() => {
+            this.refreshRemainSec = Math.max(0, this.refreshRemainSec - 1);
+            if (this.refreshProgressElement) {
+                this.refreshProgressElement.textContent = `自动刷新中，${this.refreshRemainSec} 秒后刷新。`;
+            }
+            if (this.refreshRemainSec <= 0) {
+                this.refreshRemainSec = Math.floor(intervalSec);
+            }
+        }, 1000);
+    }
+
+    private showSkeleton(): void {
+        if (!this.listHost || !this.detailHost) {
+            return;
+        }
+        SkeletonLoader.hideByContainer(this.listHost);
+        SkeletonLoader.hideByContainer(this.detailHost);
+        this.listSkeleton = SkeletonLoader.show(this.listHost, 'list', { lines: 6, showAvatar: false });
+        this.detailSkeleton = SkeletonLoader.show(this.detailHost, 'card', {});
+    }
+
+    private hideSkeleton(): void {
+        SkeletonLoader.hide(this.listSkeleton);
+        SkeletonLoader.hide(this.detailSkeleton);
+        this.listSkeleton = null;
+        this.detailSkeleton = null;
+    }
+
+    private async runWithRetry(executor: () => Promise<void>, options: RetryOptions): Promise<void> {
+        const retries = options.retries ?? 0;
+        for (let attempt = 0; attempt <= retries; attempt += 1) {
+            try {
+                await executor();
+                return;
+            } catch (error) {
+                const errorMsg = this.getErrorMessage(error);
+                if (attempt >= retries || !this.isRetryableError(errorMsg)) {
+                    const classified = this.classifyError(errorMsg);
+                    this.setStatus(`${options.actionName}失败（${classified}）：${errorMsg}`, 'error');
+                    throw error;
+                }
+                this.setStatus(`${options.actionName}失败，正在第 ${attempt + 1} 次重试...`, 'warning');
+                await this.delay(350 * (attempt + 1));
+            }
+        }
+    }
+
+    private isRetryableError(message: string): boolean {
+        return /(timeout|timed out|network|fetch|502|503|504|连接|超时|网络)/i.test(message);
+    }
+
+    private classifyError(message: string): string {
+        if (/(timeout|timed out|超时)/i.test(message)) {
+            return '请求超时';
+        }
+        if (/(network|fetch|连接|断开|offline)/i.test(message)) {
+            return '网络异常';
+        }
+        if (/(401|403)/.test(message)) {
+            return '权限不足';
+        }
+        if (/(404)/.test(message)) {
+            return '资源不存在';
+        }
+        if (/(500|502|503|504)/.test(message)) {
+            return '服务端错误';
+        }
+        return '未知错误';
+    }
+
+    private delay(ms: number): Promise<void> {
+        return new Promise((resolve) => {
+            window.setTimeout(resolve, ms);
+        });
+    }
+
     private setLoading(loading: boolean): void {
         if (!this.root) {
             return;
         }
+        this.loading = loading;
         this.root.querySelectorAll('button[data-action]').forEach((button) => {
             (button as HTMLButtonElement).disabled = loading;
         });
     }
 
-    private setStatus(message: string, type: 'success' | 'error' | 'warning' = 'success'): void {
+    private setStatus(message: string, type: StatusType = 'success'): void {
         if (!this.statusElement) {
             return;
         }
         this.statusElement.className = `status-message ${type}`;
-        this.statusElement.textContent = message;
+        const withRetryHint = type === 'error' && this.lastRetryAction
+            ? `${message}；可点击“${this.retryButtonText}”。`
+            : message;
+        this.statusElement.textContent = withRetryHint;
     }
 
     private notifySuccess(title: string, body: string): void {

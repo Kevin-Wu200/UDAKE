@@ -2,6 +2,7 @@ import type { HistorySnapshotMetadata, HistoryTrendPayload } from '../../service
 import { APIService } from '../../services/API封装.js';
 import notificationManager from '../NotificationManager.js';
 import { ConfirmDialog } from '../ConfirmDialog.js';
+import { SkeletonLoader } from '../../utils/SkeletonLoader.js';
 
 interface TrendPoint {
     timestamp: string;
@@ -177,6 +178,8 @@ const SUBSCRIPTION_KEY = 'udake_history_anomaly_subscription';
 const REPORT_HISTORY_KEY = 'udake_history_analysis_report_history';
 const REPORT_DOWNLOAD_HISTORY_KEY = 'udake_history_analysis_report_download_history';
 const REPORT_TEMPLATE_KEY = 'udake_history_analysis_report_templates';
+const TREND_AUTO_REFRESH_KEY = 'udake_history_trend_auto_refresh_sec_v1';
+const RETRY_TIMES = 2;
 
 export class HistoryTrendAnalysisPanel {
     private root: HTMLElement | null = null;
@@ -190,6 +193,8 @@ export class HistoryTrendAnalysisPanel {
     private confidenceLevelSelect: HTMLSelectElement | null = null;
     private timelineRangeSelect: HTMLSelectElement | null = null;
     private timelineGranularitySelect: HTMLSelectElement | null = null;
+    private autoRefreshSelect: HTMLSelectElement | null = null;
+    private refreshProgressElement: HTMLElement | null = null;
 
     private metricsHost: HTMLElement | null = null;
     private mannHost: HTMLElement | null = null;
@@ -248,6 +253,13 @@ export class HistoryTrendAnalysisPanel {
     private reportPreviewZoom = 1;
     private reportPreviewPage: 'summary' | 'metrics' | 'full' = 'summary';
     private reportLatestRecord: ReportHistoryRecord | null = null;
+    private chartSkeleton: HTMLDivElement | null = null;
+    private metricsSkeleton: HTMLDivElement | null = null;
+    private autoRefreshTimer: number | null = null;
+    private refreshCountdownTimer: number | null = null;
+    private refreshRemainSec = 0;
+    private loading = false;
+    private lastRetryAction: (() => Promise<void>) | null = null;
 
     constructor(private readonly apiService: APIService) {}
 
@@ -315,11 +327,26 @@ export class HistoryTrendAnalysisPanel {
                 <div class="integration-actions">
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="load-versions">加载版本</button>
                     <button type="button" class="btn btn-primary integration-action-btn" data-action="analyze">执行趋势分析</button>
+                    <button type="button" class="btn btn-secondary integration-action-btn" data-action="refresh-analysis">刷新分析</button>
+                    <button type="button" class="btn btn-secondary integration-action-btn" data-action="retry-last">重试</button>
                     <button type="button" class="btn btn-primary integration-action-btn" data-action="open-report-dialog">报告生成与导出</button>
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-forecast-csv">导出预测 CSV</button>
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-chart-png">导出图表 PNG</button>
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-report-pdf">导出预测报告（PDF）</button>
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-all">批量导出</button>
+                </div>
+                <div class="history-snapshot-refresh-row">
+                    <label class="integration-field">
+                        <span class="integration-field-label">自动刷新间隔</span>
+                        <select id="history-trend-auto-refresh" class="select integration-input">
+                            <option value="0">关闭</option>
+                            <option value="30">30 秒</option>
+                            <option value="60">60 秒</option>
+                            <option value="120">120 秒</option>
+                        </select>
+                    </label>
+                    <p class="history-archive-hint" data-role="trend-refresh-progress">自动刷新已关闭。</p>
+                    <p class="history-archive-hint">快捷键：Alt+T 执行分析，Alt+R 刷新，Alt+X 批量导出。</p>
                 </div>
             </section>
 
@@ -464,6 +491,8 @@ export class HistoryTrendAnalysisPanel {
         this.confidenceLevelSelect = this.root.querySelector('#history-trend-confidence');
         this.timelineRangeSelect = this.root.querySelector('#history-trend-range');
         this.timelineGranularitySelect = this.root.querySelector('#history-trend-granularity');
+        this.autoRefreshSelect = this.root.querySelector('#history-trend-auto-refresh');
+        this.refreshProgressElement = this.root.querySelector('[data-role="trend-refresh-progress"]');
 
         this.metricsHost = this.root.querySelector('[data-role="trend-metrics"]');
         this.mannHost = this.root.querySelector('[data-role="mann-result"]');
@@ -519,6 +548,14 @@ export class HistoryTrendAnalysisPanel {
 
             if (action === 'analyze') {
                 await this.handleAnalyze();
+                return;
+            }
+            if (action === 'refresh-analysis') {
+                await this.handleRefreshAnalysis();
+                return;
+            }
+            if (action === 'retry-last') {
+                await this.handleRetryLast();
                 return;
             }
 
@@ -600,6 +637,32 @@ export class HistoryTrendAnalysisPanel {
                 this.renderForControls();
             }
         });
+
+        this.autoRefreshSelect?.addEventListener('change', () => {
+            this.updateAutoRefreshFromSelect();
+        });
+
+        this.root.tabIndex = 0;
+        this.root.addEventListener('keydown', async (event: KeyboardEvent) => {
+            if (!event.altKey) {
+                return;
+            }
+            const key = event.key.toLowerCase();
+            if (key === 't') {
+                event.preventDefault();
+                await this.handleAnalyze();
+                return;
+            }
+            if (key === 'r') {
+                event.preventDefault();
+                await this.handleRefreshAnalysis();
+                return;
+            }
+            if (key === 'x') {
+                event.preventDefault();
+                await this.exportAll();
+            }
+        });
     }
 
     private bootstrapDefaults(): void {
@@ -622,6 +685,8 @@ export class HistoryTrendAnalysisPanel {
         if (this.warningThresholdInput && Number.isFinite(storedThreshold) && storedThreshold >= 1) {
             this.warningThresholdInput.value = String(Math.floor(storedThreshold));
         }
+        this.syncAutoRefreshSelect();
+        this.updateAutoRefreshFromSelect();
         this.renderSubscription();
         this.renderReportSummaries();
     }
@@ -634,24 +699,32 @@ export class HistoryTrendAnalysisPanel {
         }
 
         this.updateStatus('正在加载版本列表...', 'info');
-        try {
-            const response = await this.apiService.listHistorySnapshots(datasetId);
-            this.snapshots = Array.isArray(response.versions) ? [...response.versions] : [];
-            this.snapshots.sort((a, b) => a.version - b.version);
-            this.renderVersionOptions();
-            this.writeStorage(LAST_DATASET_KEY, datasetId);
-            this.updateStatus(`版本列表加载完成，共 ${this.snapshots.length} 个版本。`, 'success');
-        } catch (error) {
+        this.setLoading(true);
+        await this.runWithRetry(
+            async () => {
+                const response = await this.apiService.listHistorySnapshots(datasetId);
+                this.snapshots = Array.isArray(response.versions) ? [...response.versions] : [];
+                this.snapshots.sort((a, b) => a.version - b.version);
+                this.renderVersionOptions();
+                this.writeStorage(LAST_DATASET_KEY, datasetId);
+                this.updateStatus(`版本列表加载完成，共 ${this.snapshots.length} 个版本。`, 'success');
+                this.lastRetryAction = null;
+                this.resetRefreshCountdown();
+            },
+            '加载版本列表'
+        ).catch((error) => {
             this.snapshots = [];
             this.renderVersionOptions();
             const message = error instanceof Error ? error.message : '加载版本列表失败';
-            this.updateStatus(message, 'error');
             notificationManager.show({
                 type: 'taskFailure',
                 title: '趋势分析版本加载失败',
                 body: message
             });
-        }
+            this.lastRetryAction = async () => this.handleLoadVersions();
+        }).finally(() => {
+            this.setLoading(false);
+        });
     }
 
     private async handleAnalyze(): Promise<void> {
@@ -668,37 +741,63 @@ export class HistoryTrendAnalysisPanel {
         this.currentThreshold = payload.anomaly_z_threshold || 2.5;
 
         this.updateStatus('正在执行趋势分析并生成图表...', 'info');
+        this.setLoading(true);
+        this.showSkeleton();
+        await this.runWithRetry(
+            async () => {
+                const raw = await this.apiService.analyzeHistoryTrend(payload);
+                const trendResult = this.normalizeTrendResult(raw);
+                this.trendResult = trendResult;
 
-        try {
-            const raw = await this.apiService.analyzeHistoryTrend(payload);
-            const trendResult = this.normalizeTrendResult(raw);
-            this.trendResult = trendResult;
+                const series = await this.getTimeSeries(datasetId, trendResult.version);
+                this.currentTimeSeries = [...series];
+                this.modelResults = this.buildModelResults(trendResult, series);
+                this.activeModelKeys = new Set(this.modelResults.slice(0, 2).map(item => item.key));
+                const displaySeries = this.getFilteredTimeSeries(series);
+                this.renderDashboard(trendResult, displaySeries);
+                this.renderAnomalyModule(trendResult, series, payload.anomaly_z_threshold || 2.5);
+                this.renderModelComparison();
+                this.evaluateAndNotifyWarning(trendResult);
 
-            const series = await this.getTimeSeries(datasetId, trendResult.version);
-            this.currentTimeSeries = [...series];
-            this.modelResults = this.buildModelResults(trendResult, series);
-            this.activeModelKeys = new Set(this.modelResults.slice(0, 2).map(item => item.key));
-            const displaySeries = this.getFilteredTimeSeries(series);
-            this.renderDashboard(trendResult, displaySeries);
-            this.renderAnomalyModule(trendResult, series, payload.anomaly_z_threshold || 2.5);
-            this.renderModelComparison();
-            this.evaluateAndNotifyWarning(trendResult);
-
-            this.updateStatus(`趋势分析完成（版本 v${trendResult.version}，样本 ${trendResult.sample_size} 条）。`, 'success');
-            notificationManager.show({
-                type: 'taskSuccess',
-                title: '趋势分析完成',
-                body: `数据集 ${trendResult.dataset_id} 版本 v${trendResult.version} 已完成分析。`
-            });
-        } catch (error) {
+                this.updateStatus(`趋势分析完成（版本 v${trendResult.version}，样本 ${trendResult.sample_size} 条）。`, 'success');
+                notificationManager.show({
+                    type: 'taskSuccess',
+                    title: '趋势分析完成',
+                    body: `数据集 ${trendResult.dataset_id} 版本 v${trendResult.version} 已完成分析。`
+                });
+                this.lastRetryAction = null;
+                this.resetRefreshCountdown();
+            },
+            '趋势分析'
+        ).catch((error) => {
             const message = error instanceof Error ? error.message : '趋势分析失败';
-            this.updateStatus(message, 'error');
             notificationManager.show({
                 type: 'taskFailure',
                 title: '趋势分析失败',
                 body: message
             });
+            this.lastRetryAction = async () => this.handleAnalyze();
+        }).finally(() => {
+            this.setLoading(false);
+            this.hideSkeleton();
+        });
+    }
+
+    private async handleRefreshAnalysis(): Promise<void> {
+        if (!this.datasetInput?.value.trim()) {
+            this.updateStatus('请输入数据集 ID 后再刷新。', 'error');
+            return;
         }
+        await this.handleLoadVersions();
+        await this.handleAnalyze();
+    }
+
+    private async handleRetryLast(): Promise<void> {
+        if (!this.lastRetryAction) {
+            this.updateStatus('当前没有可重试的失败请求。', 'error');
+            return;
+        }
+        await this.lastRetryAction();
     }
 
     private buildPayload(datasetId: string): HistoryTrendPayload | null {
@@ -2945,6 +3044,127 @@ export class HistoryTrendAnalysisPanel {
         this.anomalyTrendChart?.resize();
     };
 
+    private setLoading(loading: boolean): void {
+        if (!this.root) {
+            return;
+        }
+        this.loading = loading;
+        this.root.querySelectorAll('button[data-action]').forEach((button) => {
+            (button as HTMLButtonElement).disabled = loading;
+        });
+    }
+
+    private syncAutoRefreshSelect(): void {
+        const interval = Number(this.readStorage(TREND_AUTO_REFRESH_KEY) || '0');
+        if (this.autoRefreshSelect) {
+            this.autoRefreshSelect.value = Number.isFinite(interval) ? String(Math.max(0, interval)) : '0';
+        }
+    }
+
+    private updateAutoRefreshFromSelect(): void {
+        const intervalSec = Number(this.autoRefreshSelect?.value || '0');
+        this.writeStorage(TREND_AUTO_REFRESH_KEY, String(intervalSec));
+        this.stopAutoRefresh();
+        if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
+            if (this.refreshProgressElement) {
+                this.refreshProgressElement.textContent = '自动刷新已关闭。';
+            }
+            return;
+        }
+        this.refreshRemainSec = Math.floor(intervalSec);
+        this.autoRefreshTimer = window.setInterval(() => {
+            if (!this.loading && this.datasetInput?.value.trim()) {
+                void this.handleRefreshAnalysis();
+            }
+        }, Math.floor(intervalSec) * 1000);
+        this.resetRefreshCountdown();
+    }
+
+    private stopAutoRefresh(): void {
+        if (this.autoRefreshTimer !== null) {
+            window.clearInterval(this.autoRefreshTimer);
+            this.autoRefreshTimer = null;
+        }
+        if (this.refreshCountdownTimer !== null) {
+            window.clearInterval(this.refreshCountdownTimer);
+            this.refreshCountdownTimer = null;
+        }
+    }
+
+    private resetRefreshCountdown(): void {
+        if (this.refreshCountdownTimer !== null) {
+            window.clearInterval(this.refreshCountdownTimer);
+            this.refreshCountdownTimer = null;
+        }
+        const intervalSec = Number(this.autoRefreshSelect?.value || '0');
+        if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
+            return;
+        }
+        this.refreshRemainSec = Math.floor(intervalSec);
+        this.refreshCountdownTimer = window.setInterval(() => {
+            this.refreshRemainSec = Math.max(0, this.refreshRemainSec - 1);
+            if (this.refreshProgressElement) {
+                this.refreshProgressElement.textContent = `自动刷新中，${this.refreshRemainSec} 秒后刷新。`;
+            }
+            if (this.refreshRemainSec <= 0) {
+                this.refreshRemainSec = Math.floor(intervalSec);
+            }
+        }, 1000);
+    }
+
+    private showSkeleton(): void {
+        if (!this.metricsHost || !this.linearChartHost) {
+            return;
+        }
+        SkeletonLoader.hideByContainer(this.metricsHost);
+        SkeletonLoader.hideByContainer(this.linearChartHost);
+        this.metricsSkeleton = SkeletonLoader.show(this.metricsHost, 'list', { lines: 5, showAvatar: false });
+        this.chartSkeleton = SkeletonLoader.show(this.linearChartHost, 'chart', {});
+    }
+
+    private hideSkeleton(): void {
+        SkeletonLoader.hide(this.metricsSkeleton);
+        SkeletonLoader.hide(this.chartSkeleton);
+        this.metricsSkeleton = null;
+        this.chartSkeleton = null;
+    }
+
+    private async runWithRetry(executor: () => Promise<void>, actionName: string): Promise<void> {
+        for (let attempt = 0; attempt <= RETRY_TIMES; attempt += 1) {
+            try {
+                await executor();
+                return;
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error || '未知错误');
+                if (attempt >= RETRY_TIMES || !/(timeout|network|fetch|502|503|504|连接|超时|网络)/i.test(message)) {
+                    this.updateStatus(`${actionName}失败：${this.classifyError(message)}，${message}`, 'error');
+                    throw error;
+                }
+                this.updateStatus(`${actionName}失败，正在第 ${attempt + 1} 次重试...`, 'info');
+                await this.delay(350 * (attempt + 1));
+            }
+        }
+    }
+
+    private classifyError(message: string): string {
+        if (/(timeout|timed out|超时)/i.test(message)) {
+            return '请求超时';
+        }
+        if (/(network|fetch|连接|offline|断开)/i.test(message)) {
+            return '网络异常';
+        }
+        if (/(500|502|503|504)/.test(message)) {
+            return '服务端错误';
+        }
+        return '未知错误';
+    }
+
+    private delay(ms: number): Promise<void> {
+        return new Promise((resolve) => {
+            window.setTimeout(resolve, ms);
+        });
+    }
+
     private updateStatus(message: string, type: 'info' | 'success' | 'error'): void {
         if (!this.statusElement) {
             return;
@@ -2957,6 +3177,9 @@ export class HistoryTrendAnalysisPanel {
         }
         if (type === 'error') {
             this.statusElement.classList.add('is-error');
+        }
+        if (type === 'error' && this.lastRetryAction) {
+            this.statusElement.textContent = `${message}；可点击“重试”。`;
         }
     }
 

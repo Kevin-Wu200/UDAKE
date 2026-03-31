@@ -3,6 +3,7 @@ import { APIService } from '../../services/API封装.js';
 import { DataComparison } from '../../utils/DataComparison.js';
 import { LayerComparisonPanel, LayerType } from '../LayerComparisonPanel.js';
 import notificationManager from '../NotificationManager.js';
+import { SkeletonLoader } from '../../utils/SkeletonLoader.js';
 
 interface ComparisonDiffItem {
     key: string;
@@ -49,6 +50,9 @@ type SortKey = 'key' | 'absolute_diff' | 'relative_diff' | 'from_value' | 'to_va
 type SortDirection = 'asc' | 'desc';
 
 const DEFAULT_GRID_SIZE = 16;
+const COMPARE_AUTO_REFRESH_KEY = 'udake_history_compare_auto_refresh_sec_v1';
+const RETRY_TIMES = 2;
+type StatusType = 'success' | 'error' | 'warning';
 
 export class HistoryVersionComparisonPanel {
     private root: HTMLElement | null = null;
@@ -68,6 +72,8 @@ export class HistoryVersionComparisonPanel {
     private detailHost: HTMLElement | null = null;
     private heatmapHost: HTMLElement | null = null;
     private versionInfoHost: HTMLElement | null = null;
+    private autoRefreshSelect: HTMLSelectElement | null = null;
+    private refreshProgressElement: HTMLElement | null = null;
 
     private layerPanelHost: HTMLElement | null = null;
     private layerPanel: LayerComparisonPanel | null = null;
@@ -83,6 +89,13 @@ export class HistoryVersionComparisonPanel {
     private sortDirection: SortDirection = 'desc';
 
     private cellDiffEntries: DiffCellEntry[] = [];
+    private summarySkeleton: HTMLDivElement | null = null;
+    private tableSkeleton: HTMLDivElement | null = null;
+    private autoRefreshTimer: number | null = null;
+    private refreshCountdownTimer: number | null = null;
+    private refreshRemainSec = 0;
+    private lastRetryAction: (() => Promise<void>) | null = null;
+    private loading = false;
 
     constructor(private readonly apiService: APIService) {}
 
@@ -153,6 +166,26 @@ export class HistoryVersionComparisonPanel {
                 </div>
             </section>
 
+            <section class="history-compare-card">
+                <h4>刷新与快捷键</h4>
+                <div class="history-snapshot-refresh-row">
+                    <button type="button" class="btn btn-secondary integration-action-btn" data-action="refresh-compare">刷新版本与结果</button>
+                    <label class="integration-field">
+                        <span class="integration-field-label">自动刷新间隔</span>
+                        <select id="history-compare-auto-refresh" class="select integration-input">
+                            <option value="0">关闭</option>
+                            <option value="10">10 秒</option>
+                            <option value="30">30 秒</option>
+                            <option value="60">60 秒</option>
+                            <option value="120">120 秒</option>
+                        </select>
+                    </label>
+                    <button type="button" class="btn btn-secondary integration-action-btn" data-action="retry-last">重试</button>
+                </div>
+                <p class="history-archive-hint" data-role="compare-refresh-progress">自动刷新已关闭。</p>
+                <p class="history-archive-hint">快捷键：Alt+C 执行对比，Alt+R 刷新，Alt+1 导出 CSV，Alt+2 导出 GeoJSON。</p>
+            </section>
+
             <div class="status-message" data-role="compare-status"></div>
 
             <section class="history-compare-main-grid">
@@ -208,6 +241,8 @@ export class HistoryVersionComparisonPanel {
         this.renderTable();
         this.renderDetail();
         this.renderHeatmapLayers();
+        this.syncAutoRefreshSelect();
+        this.updateAutoRefreshFromSelect();
     }
 
     private bindElements(): void {
@@ -232,6 +267,8 @@ export class HistoryVersionComparisonPanel {
         this.heatmapHost = this.root.querySelector('.history-compare-heatmap-wrapper');
         this.versionInfoHost = this.root.querySelector('[data-role="version-info"]');
         this.layerPanelHost = this.root.querySelector('[data-role="layer-panel"]');
+        this.autoRefreshSelect = this.root.querySelector('#history-compare-auto-refresh');
+        this.refreshProgressElement = this.root.querySelector('[data-role="compare-refresh-progress"]');
     }
 
     private bindEvents(): void {
@@ -289,6 +326,14 @@ export class HistoryVersionComparisonPanel {
                 this.exportGeoJson();
                 return;
             }
+            if (action === 'refresh-compare') {
+                await this.handleRefreshCompare();
+                return;
+            }
+            if (action === 'retry-last') {
+                await this.handleRetryLast();
+                return;
+            }
 
             if (action === 'select-diff') {
                 const key = actionEl.getAttribute('data-diff-key') || '';
@@ -323,6 +368,37 @@ export class HistoryVersionComparisonPanel {
         this.thresholdRange?.addEventListener('input', () => {
             const value = this.parseThreshold(this.thresholdRange?.value || '0');
             this.setThreshold(value, true);
+        });
+
+        this.autoRefreshSelect?.addEventListener('change', () => {
+            this.updateAutoRefreshFromSelect();
+        });
+
+        this.root.tabIndex = 0;
+        this.root.addEventListener('keydown', async (event: KeyboardEvent) => {
+            if (!event.altKey) {
+                return;
+            }
+            const key = event.key.toLowerCase();
+            if (key === 'c') {
+                event.preventDefault();
+                await this.handleRunCompare();
+                return;
+            }
+            if (key === 'r') {
+                event.preventDefault();
+                await this.handleRefreshCompare();
+                return;
+            }
+            if (key === '1') {
+                event.preventDefault();
+                this.exportCsv();
+                return;
+            }
+            if (key === '2') {
+                event.preventDefault();
+                this.exportGeoJson();
+            }
         });
     }
 
@@ -371,6 +447,27 @@ export class HistoryVersionComparisonPanel {
         }
     }
 
+    private async handleRefreshCompare(): Promise<void> {
+        if (!this.currentDatasetId && !(this.datasetInput?.value.trim())) {
+            this.setStatus('请先加载版本列表。', 'warning');
+            return;
+        }
+        await this.handleLoadVersions();
+        if (this.comparison) {
+            await this.handleRunCompare();
+        } else {
+            this.resetRefreshCountdown();
+        }
+    }
+
+    private async handleRetryLast(): Promise<void> {
+        if (!this.lastRetryAction) {
+            this.setStatus('当前没有可重试的失败请求。', 'warning');
+            return;
+        }
+        await this.lastRetryAction();
+    }
+
     private async handleLoadVersions(): Promise<void> {
         const datasetId = this.datasetInput?.value.trim() || '';
         if (!datasetId) {
@@ -380,21 +477,28 @@ export class HistoryVersionComparisonPanel {
 
         this.setLoading(true);
         this.setStatus('正在加载版本列表...', 'warning');
+        this.showSkeleton();
 
-        try {
-            const resp = await this.apiService.listHistorySnapshots(datasetId);
-            this.currentDatasetId = datasetId;
-            this.writeLocalStorage('udake_history_snapshot_last_dataset_id', datasetId);
-            this.snapshots = [...(resp.versions || [])].sort((a, b) => b.version - a.version);
+        await this.runWithRetry(
+            async () => {
+                const resp = await this.apiService.listHistorySnapshots(datasetId);
+                this.currentDatasetId = datasetId;
+                this.writeLocalStorage('udake_history_snapshot_last_dataset_id', datasetId);
+                this.snapshots = [...(resp.versions || [])].sort((a, b) => b.version - a.version);
 
-            this.renderVersionPicker();
-            this.renderVersionInfo();
-            this.setStatus(`已加载 ${this.snapshots.length} 个版本。`, 'success');
-        } catch (error) {
-            this.setStatus(`加载版本失败：${this.getErrorMessage(error)}`, 'error');
-        } finally {
+                this.renderVersionPicker();
+                this.renderVersionInfo();
+                this.setStatus(`已加载 ${this.snapshots.length} 个版本。`, 'success');
+                this.lastRetryAction = null;
+                this.resetRefreshCountdown();
+            },
+            '加载版本列表'
+        ).catch(() => {
+            this.lastRetryAction = async () => this.handleLoadVersions();
+        }).finally(() => {
             this.setLoading(false);
-        }
+            this.hideSkeleton();
+        });
     }
 
     private async handleRunCompare(): Promise<void> {
@@ -415,6 +519,7 @@ export class HistoryVersionComparisonPanel {
 
         this.setLoading(true);
         this.setStatus('正在执行版本对比...', 'warning');
+        this.showSkeleton();
 
         const payload: HistoryComparisonPayload = {
             dataset_id: datasetId,
@@ -423,29 +528,35 @@ export class HistoryVersionComparisonPanel {
             heatmap_grid_size: gridSize
         };
 
-        try {
-            const raw = await this.apiService.compareHistoryVersions(payload);
-            this.comparison = this.normalizeComparisonResponse(raw, payload);
-            this.cellDiffEntries = this.buildCellDiffEntries(this.comparison);
+        await this.runWithRetry(
+            async () => {
+                const raw = await this.apiService.compareHistoryVersions(payload);
+                this.comparison = this.normalizeComparisonResponse(raw, payload);
+                this.cellDiffEntries = this.buildCellDiffEntries(this.comparison);
 
-            const maxDiff = this.comparison.summary.max_absolute_diff;
-            if (this.thresholdRange) {
-                this.thresholdRange.max = String(Math.max(maxDiff, 1));
-                this.thresholdRange.step = maxDiff > 0 && maxDiff < 1 ? '0.0001' : '0.001';
-            }
+                const maxDiff = this.comparison.summary.max_absolute_diff;
+                if (this.thresholdRange) {
+                    this.thresholdRange.max = String(Math.max(maxDiff, 1));
+                    this.thresholdRange.step = maxDiff > 0 && maxDiff < 1 ? '0.0001' : '0.001';
+                }
 
-            const suggestedThreshold = maxDiff > 0 ? maxDiff * 0.3 : 0;
-            this.setThreshold(suggestedThreshold, false);
-            this.applyFilterAndSort();
-            this.setStatus(`版本对比完成：v${fromVersion} → v${toVersion}。`, 'success');
-        } catch (error) {
+                const suggestedThreshold = maxDiff > 0 ? maxDiff * 0.3 : 0;
+                this.setThreshold(suggestedThreshold, false);
+                this.applyFilterAndSort();
+                this.setStatus(`版本对比完成：v${fromVersion} → v${toVersion}。`, 'success');
+                this.lastRetryAction = null;
+                this.resetRefreshCountdown();
+            },
+            '版本对比'
+        ).catch(() => {
             this.comparison = null;
             this.cellDiffEntries = [];
             this.applyFilterAndSort();
-            this.setStatus(`版本对比失败：${this.getErrorMessage(error)}`, 'error');
-        } finally {
+            this.lastRetryAction = async () => this.handleRunCompare();
+        }).finally(() => {
             this.setLoading(false);
-        }
+            this.hideSkeleton();
+        });
     }
 
     private renderVersionPicker(): void {
@@ -1137,21 +1248,135 @@ export class HistoryVersionComparisonPanel {
         });
     }
 
+    private syncAutoRefreshSelect(): void {
+        const interval = Number(this.readLocalStorage(COMPARE_AUTO_REFRESH_KEY) || '0');
+        if (this.autoRefreshSelect) {
+            this.autoRefreshSelect.value = Number.isFinite(interval) ? String(Math.max(0, interval)) : '0';
+        }
+    }
+
+    private updateAutoRefreshFromSelect(): void {
+        const intervalSec = Number(this.autoRefreshSelect?.value || '0');
+        this.writeLocalStorage(COMPARE_AUTO_REFRESH_KEY, String(intervalSec));
+        this.stopAutoRefresh();
+        if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
+            if (this.refreshProgressElement) {
+                this.refreshProgressElement.textContent = '自动刷新已关闭。';
+            }
+            return;
+        }
+        this.refreshRemainSec = Math.floor(intervalSec);
+        this.autoRefreshTimer = window.setInterval(() => {
+            if (!this.loading) {
+                void this.handleRefreshCompare();
+            }
+        }, Math.floor(intervalSec) * 1000);
+        this.resetRefreshCountdown();
+    }
+
+    private stopAutoRefresh(): void {
+        if (this.autoRefreshTimer !== null) {
+            window.clearInterval(this.autoRefreshTimer);
+            this.autoRefreshTimer = null;
+        }
+        if (this.refreshCountdownTimer !== null) {
+            window.clearInterval(this.refreshCountdownTimer);
+            this.refreshCountdownTimer = null;
+        }
+    }
+
+    private resetRefreshCountdown(): void {
+        if (this.refreshCountdownTimer !== null) {
+            window.clearInterval(this.refreshCountdownTimer);
+            this.refreshCountdownTimer = null;
+        }
+        const intervalSec = Number(this.autoRefreshSelect?.value || '0');
+        if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
+            return;
+        }
+        this.refreshRemainSec = Math.floor(intervalSec);
+        this.refreshCountdownTimer = window.setInterval(() => {
+            this.refreshRemainSec = Math.max(0, this.refreshRemainSec - 1);
+            if (this.refreshProgressElement) {
+                this.refreshProgressElement.textContent = `自动刷新中，${this.refreshRemainSec} 秒后刷新。`;
+            }
+            if (this.refreshRemainSec <= 0) {
+                this.refreshRemainSec = Math.floor(intervalSec);
+            }
+        }, 1000);
+    }
+
+    private showSkeleton(): void {
+        if (!this.summaryHost || !this.tableHost) {
+            return;
+        }
+        SkeletonLoader.hideByContainer(this.summaryHost);
+        SkeletonLoader.hideByContainer(this.tableHost);
+        this.summarySkeleton = SkeletonLoader.show(this.summaryHost, 'card', {});
+        this.tableSkeleton = SkeletonLoader.show(this.tableHost, 'list', { lines: 8, showAvatar: false });
+    }
+
+    private hideSkeleton(): void {
+        SkeletonLoader.hide(this.summarySkeleton);
+        SkeletonLoader.hide(this.tableSkeleton);
+        this.summarySkeleton = null;
+        this.tableSkeleton = null;
+    }
+
+    private async runWithRetry(executor: () => Promise<void>, actionName: string): Promise<void> {
+        for (let attempt = 0; attempt <= RETRY_TIMES; attempt += 1) {
+            try {
+                await executor();
+                return;
+            } catch (error) {
+                const message = this.getErrorMessage(error);
+                if (attempt >= RETRY_TIMES || !/(timeout|network|fetch|502|503|504|连接|超时|网络)/i.test(message)) {
+                    this.setStatus(`${actionName}失败：${this.classifyError(message)}，${message}`, 'error');
+                    throw error;
+                }
+                this.setStatus(`${actionName}失败，正在第 ${attempt + 1} 次重试...`, 'warning');
+                await this.delay(350 * (attempt + 1));
+            }
+        }
+    }
+
+    private classifyError(message: string): string {
+        if (/(timeout|timed out|超时)/i.test(message)) {
+            return '请求超时';
+        }
+        if (/(network|fetch|连接|offline|断开)/i.test(message)) {
+            return '网络异常';
+        }
+        if (/(500|502|503|504)/.test(message)) {
+            return '服务端错误';
+        }
+        return '未知错误';
+    }
+
+    private delay(ms: number): Promise<void> {
+        return new Promise((resolve) => {
+            window.setTimeout(resolve, ms);
+        });
+    }
+
     private setLoading(loading: boolean): void {
         if (!this.root) {
             return;
         }
+        this.loading = loading;
         this.root.querySelectorAll('button[data-action]').forEach((button) => {
             (button as HTMLButtonElement).disabled = loading;
         });
     }
 
-    private setStatus(message: string, type: 'success' | 'error' | 'warning' = 'success'): void {
+    private setStatus(message: string, type: StatusType = 'success'): void {
         if (!this.statusElement) {
             return;
         }
         this.statusElement.className = `status-message ${type}`;
-        this.statusElement.textContent = message;
+        this.statusElement.textContent = type === 'error' && this.lastRetryAction
+            ? `${message}；可点击“重试”。`
+            : message;
     }
 
     private notifySuccess(title: string, body: string): void {

@@ -65,6 +65,14 @@ function toRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
+function toNullableNumber(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
+}
+
 function normalizeSample(sample: unknown): DatabaseGPSSample {
   const raw = toRecord(sample);
   const now = nowMs();
@@ -74,9 +82,9 @@ function normalizeSample(sample: unknown): DatabaseGPSSample {
     latitude: Number(raw.latitude),
     longitude: Number(raw.longitude),
     accuracy: Number(raw.accuracy || 0),
-    altitude: raw.altitude ?? null,
-    speed: raw.speed ?? null,
-    heading: raw.heading ?? null,
+    altitude: toNullableNumber(raw.altitude),
+    speed: toNullableNumber(raw.speed),
+    heading: toNullableNumber(raw.heading),
     attributes: (raw.attributes && typeof raw.attributes === 'object' && !Array.isArray(raw.attributes))
       ? (raw.attributes as Record<string, unknown>)
       : {},
