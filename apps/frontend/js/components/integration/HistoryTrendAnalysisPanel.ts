@@ -88,6 +88,7 @@ interface ForecastEvaluation {
     mape: number;
     r2: number;
     accuracy: number;
+    rmse?: number;
 }
 
 interface TrendAnalysisResult {
@@ -116,7 +117,15 @@ interface EChartInstance {
     setOption: (option: Record<string, unknown>, opts?: { notMerge?: boolean }) => void;
     resize: () => void;
     dispose: () => void;
+    getDataURL?: (opts?: Record<string, unknown>) => string;
     on?: (event: string, handler: (params: Record<string, unknown>) => void) => void;
+}
+
+interface ForecastModelResult {
+    key: string;
+    name: string;
+    values: number[];
+    evaluation: ForecastEvaluation;
 }
 
 const LAST_DATASET_KEY = 'udake_history_snapshot_last_dataset_id';
@@ -133,6 +142,9 @@ export class HistoryTrendAnalysisPanel {
     private horizonInput: HTMLInputElement | null = null;
     private seasonalInput: HTMLInputElement | null = null;
     private anomalyInput: HTMLInputElement | null = null;
+    private confidenceLevelSelect: HTMLSelectElement | null = null;
+    private timelineRangeSelect: HTMLSelectElement | null = null;
+    private timelineGranularitySelect: HTMLSelectElement | null = null;
 
     private metricsHost: HTMLElement | null = null;
     private mannHost: HTMLElement | null = null;
@@ -150,6 +162,8 @@ export class HistoryTrendAnalysisPanel {
     private filterTypeSelect: HTMLSelectElement | null = null;
     private filterSeveritySelect: HTMLSelectElement | null = null;
     private sortSelect: HTMLSelectElement | null = null;
+    private modelCompareHost: HTMLElement | null = null;
+    private modelVisibilityHost: HTMLElement | null = null;
 
     private linearChartHost: HTMLElement | null = null;
     private fftChartHost: HTMLElement | null = null;
@@ -174,6 +188,9 @@ export class HistoryTrendAnalysisPanel {
         last_notify_at: ''
     };
     private currentThreshold = 2.5;
+    private currentTimeSeries: TrendPoint[] = [];
+    private modelResults: ForecastModelResult[] = [];
+    private activeModelKeys: Set<string> = new Set(['server']);
 
     constructor(private readonly apiService: APIService) {}
 
@@ -182,7 +199,7 @@ export class HistoryTrendAnalysisPanel {
         this.root.className = 'integration-module-panel history-trend-analysis-panel';
         this.root.innerHTML = `
             <h3 class="integration-module-title">趋势分析可视化仪表板</h3>
-            <p class="integration-module-description">覆盖线性趋势、异常检测可视化、预警面板、原因分析与通知订阅。</p>
+            <p class="integration-module-description">覆盖线性趋势、异常检测可视化、预测对比导出、预警面板、原因分析与通知订阅。</p>
 
             <section class="history-trend-card">
                 <h4>参数配置</h4>
@@ -211,10 +228,40 @@ export class HistoryTrendAnalysisPanel {
                         <label class="integration-field-label" for="history-trend-anomaly">异常阈值 z-score</label>
                         <input id="history-trend-anomaly" class="input integration-input" type="number" min="1" max="6" step="0.1" value="2.5">
                     </div>
+                    <div class="integration-field">
+                        <label class="integration-field-label" for="history-trend-confidence">置信水平</label>
+                        <select id="history-trend-confidence" class="select integration-input">
+                            <option value="0.9">90%</option>
+                            <option value="0.95" selected>95%</option>
+                            <option value="0.99">99%</option>
+                        </select>
+                    </div>
+                    <div class="integration-field">
+                        <label class="integration-field-label" for="history-trend-range">时间范围</label>
+                        <select id="history-trend-range" class="select integration-input">
+                            <option value="all" selected>全部</option>
+                            <option value="30">近 30 天</option>
+                            <option value="90">近 90 天</option>
+                            <option value="180">近 180 天</option>
+                            <option value="365">近 365 天</option>
+                        </select>
+                    </div>
+                    <div class="integration-field">
+                        <label class="integration-field-label" for="history-trend-granularity">时间粒度</label>
+                        <select id="history-trend-granularity" class="select integration-input">
+                            <option value="day" selected>日</option>
+                            <option value="week">周</option>
+                            <option value="month">月</option>
+                        </select>
+                    </div>
                 </div>
                 <div class="integration-actions">
                     <button type="button" class="btn btn-secondary integration-action-btn" data-action="load-versions">加载版本</button>
                     <button type="button" class="btn btn-primary integration-action-btn" data-action="analyze">执行趋势分析</button>
+                    <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-forecast-csv">导出预测 CSV</button>
+                    <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-chart-png">导出图表 PNG</button>
+                    <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-report-pdf">导出预测报告（PDF）</button>
+                    <button type="button" class="btn btn-secondary integration-action-btn" data-action="export-all">批量导出</button>
                 </div>
             </section>
 
@@ -223,6 +270,19 @@ export class HistoryTrendAnalysisPanel {
             <section class="history-trend-card">
                 <h4>趋势统计指标面板</h4>
                 <div class="history-trend-metrics" data-role="trend-metrics"></div>
+            </section>
+
+            <section class="history-trend-main-grid">
+                <section class="history-trend-card">
+                    <h4>多模型预测对比</h4>
+                    <div class="history-trend-model-visibility" data-role="model-visibility"></div>
+                    <div class="history-trend-model-table" data-role="model-compare"></div>
+                </section>
+                <section class="history-trend-card">
+                    <h4>时间轴控制说明</h4>
+                    <p class="history-trend-hint">可通过上方时间范围与粒度切换控制显示窗口，图表底部滑块支持拖拽缩放时间轴。</p>
+                    <p class="history-trend-hint">预测步数支持 1-365 调整，切换后重新分析即可更新预测曲线。</p>
+                </section>
             </section>
 
             <section class="history-trend-main-grid">
@@ -335,6 +395,9 @@ export class HistoryTrendAnalysisPanel {
         this.horizonInput = this.root.querySelector('#history-trend-horizon');
         this.seasonalInput = this.root.querySelector('#history-trend-seasonal');
         this.anomalyInput = this.root.querySelector('#history-trend-anomaly');
+        this.confidenceLevelSelect = this.root.querySelector('#history-trend-confidence');
+        this.timelineRangeSelect = this.root.querySelector('#history-trend-range');
+        this.timelineGranularitySelect = this.root.querySelector('#history-trend-granularity');
 
         this.metricsHost = this.root.querySelector('[data-role="trend-metrics"]');
         this.mannHost = this.root.querySelector('[data-role="mann-result"]');
@@ -352,6 +415,8 @@ export class HistoryTrendAnalysisPanel {
         this.filterTypeSelect = this.root.querySelector('[data-role="anomaly-filter-type"]');
         this.filterSeveritySelect = this.root.querySelector('[data-role="anomaly-filter-severity"]');
         this.sortSelect = this.root.querySelector('[data-role="anomaly-sort"]');
+        this.modelCompareHost = this.root.querySelector('[data-role="model-compare"]');
+        this.modelVisibilityHost = this.root.querySelector('[data-role="model-visibility"]');
 
         this.linearChartHost = this.root.querySelector('[data-role="linear-chart"]');
         this.fftChartHost = this.root.querySelector('[data-role="fft-chart"]');
@@ -389,6 +454,26 @@ export class HistoryTrendAnalysisPanel {
                 return;
             }
 
+            if (action === 'export-forecast-csv') {
+                this.exportForecastCsv();
+                return;
+            }
+
+            if (action === 'export-chart-png') {
+                this.exportChartPng();
+                return;
+            }
+
+            if (action === 'export-report-pdf') {
+                await this.exportReportPdf();
+                return;
+            }
+
+            if (action === 'export-all') {
+                await this.exportAll();
+                return;
+            }
+
             if (action === 'save-warning-threshold') {
                 this.saveWarningThreshold();
                 return;
@@ -413,8 +498,17 @@ export class HistoryTrendAnalysisPanel {
             }
         });
 
-        this.root.addEventListener('change', () => {
+        this.root.addEventListener('change', (event: Event) => {
+            const target = event.target as HTMLElement | null;
+            if (target && target.matches('[data-role="model-visible"]')) {
+                this.syncModelVisibility();
+                this.renderForControls();
+                return;
+            }
             this.renderAnomalyList();
+            if (target && (target === this.timelineRangeSelect || target === this.timelineGranularitySelect || target === this.confidenceLevelSelect)) {
+                this.renderForControls();
+            }
         });
     }
 
@@ -487,8 +581,13 @@ export class HistoryTrendAnalysisPanel {
             this.trendResult = trendResult;
 
             const series = await this.getTimeSeries(datasetId, trendResult.version);
-            this.renderDashboard(trendResult, series);
+            this.currentTimeSeries = [...series];
+            this.modelResults = this.buildModelResults(trendResult, series);
+            this.activeModelKeys = new Set(this.modelResults.slice(0, 2).map(item => item.key));
+            const displaySeries = this.getFilteredTimeSeries(series);
+            this.renderDashboard(trendResult, displaySeries);
             this.renderAnomalyModule(trendResult, series, payload.anomaly_z_threshold || 2.5);
+            this.renderModelComparison();
             this.evaluateAndNotifyWarning(trendResult);
 
             this.updateStatus(`趋势分析完成（版本 v${trendResult.version}，样本 ${trendResult.sample_size} 条）。`, 'success');
@@ -727,7 +826,8 @@ export class HistoryTrendAnalysisPanel {
                 mae: this.asNumber(evalRaw?.mae) || 0,
                 mape: this.asNumber(evalRaw?.mape) || 0,
                 r2: this.asNumber(evalRaw?.r2) || 0,
-                accuracy: this.asNumber(evalRaw?.accuracy) || 0
+                accuracy: this.asNumber(evalRaw?.accuracy) || 0,
+                rmse: this.asNumber(evalRaw?.rmse) || 0
             }
         };
     }
@@ -738,6 +838,15 @@ export class HistoryTrendAnalysisPanel {
         this.renderFFT(result);
         this.renderSeasonal(result, timeSeries);
         this.renderLinearTrend(result, timeSeries);
+    }
+
+    private renderForControls(): void {
+        if (!this.trendResult) {
+            return;
+        }
+        const filteredSeries = this.getFilteredTimeSeries(this.currentTimeSeries);
+        this.renderDashboard(this.trendResult, filteredSeries);
+        this.renderModelComparison();
     }
 
     private renderAnomalyModule(result: TrendAnalysisResult, timeSeries: TrendPoint[], threshold: number): void {
@@ -1089,7 +1198,10 @@ export class HistoryTrendAnalysisPanel {
             { label: '变化率', value: `${changeRate.toFixed(2)}%` },
             { label: '预测范围', value: `${forecastMin.toFixed(4)} ~ ${forecastMax.toFixed(4)}` },
             { label: '异常点数量', value: `${result.anomalies.length}` },
-            { label: '预测准确率', value: `${result.evaluation.accuracy.toFixed(2)}%` }
+            { label: '预测准确率', value: `${result.evaluation.accuracy.toFixed(2)}%` },
+            { label: 'RMSE', value: `${(result.evaluation.rmse || 0).toFixed(4)}` },
+            { label: 'MAE', value: `${result.evaluation.mae.toFixed(4)}` },
+            { label: 'MAPE', value: `${result.evaluation.mape.toFixed(2)}%` }
         ];
 
         this.metricsHost.innerHTML = cards
@@ -1265,17 +1377,25 @@ export class HistoryTrendAnalysisPanel {
             return;
         }
 
-        const labels = timeSeries.map(item => this.formatDateLabel(item.timestamp));
+        const labels = this.buildAggregatedLabels(timeSeries);
         const values = timeSeries.map(item => item.value);
         const trendLine = values.map((_, index) => result.linear_trend.slope * index + result.linear_trend.intercept);
         const residualStd = this.computeResidualStd(values, trendLine);
-        const upper = trendLine.map(item => item + residualStd * 1.96);
-        const lower = trendLine.map(item => item - residualStd * 1.96);
+        const confidenceZ = this.getConfidenceZValue();
+        const upper = trendLine.map(item => item + residualStd * confidenceZ);
+        const lower = trendLine.map(item => item - residualStd * confidenceZ);
 
         const forecastLabels = result.forecast.map(item => this.formatDateLabel(item.timestamp));
-        const forecastValues = result.forecast.map(item => item.predicted_value);
-        const forecastUpper = result.forecast.map(item => item.upper_bound);
-        const forecastLower = result.forecast.map(item => item.lower_bound);
+        const serverModel = this.modelResults.find(item => item.key === 'server');
+        const forecastValues = serverModel ? serverModel.values : result.forecast.map(item => item.predicted_value);
+        const forecastUpper = result.forecast.map(item => {
+            const std = Math.max(0, (item.upper_bound - item.lower_bound) / (2 * 1.96));
+            return item.predicted_value + std * confidenceZ;
+        });
+        const forecastLower = result.forecast.map(item => {
+            const std = Math.max(0, (item.upper_bound - item.lower_bound) / (2 * 1.96));
+            return item.predicted_value - std * confidenceZ;
+        });
 
         const allLabels = [...labels, ...forecastLabels];
 
@@ -1304,13 +1424,14 @@ export class HistoryTrendAnalysisPanel {
         }).filter(item => item !== null);
 
         const equation = `y = ${result.linear_trend.slope.toFixed(6)}x + ${result.linear_trend.intercept.toFixed(6)}`;
+        const modelSeries = this.getActiveModelSeries(values.length);
 
         chart.setOption(
             {
                 tooltip: { trigger: 'axis' },
                 legend: {
                     top: 4,
-                    data: ['原始值', '趋势线', '趋势置信上界', '趋势置信下界', '预测值', '预测上界', '预测下界', '异常点']
+                    data: ['原始值', '趋势线', '趋势置信上界', '趋势置信下界', '预测值', '预测上界', '预测下界', ...modelSeries.map(item => String(item.name || '')), '异常点']
                 },
                 grid: { left: 45, right: 25, top: 48, bottom: 50 },
                 dataZoom: [
@@ -1349,7 +1470,8 @@ export class HistoryTrendAnalysisPanel {
                         data: anomalyData,
                         symbolSize: 10,
                         itemStyle: { color: '#dc2626' }
-                    }
+                    },
+                    ...modelSeries
                 ],
                 graphic: [
                     {
@@ -1357,7 +1479,7 @@ export class HistoryTrendAnalysisPanel {
                         left: 50,
                         top: 28,
                         style: {
-                            text: `趋势方程：${equation}`,
+                            text: `趋势方程：${equation} | 置信水平 ${Math.round(this.getConfidenceLevel() * 100)}%`,
                             fontSize: 12,
                             fill: '#374151'
                         }
@@ -1366,6 +1488,362 @@ export class HistoryTrendAnalysisPanel {
             },
             { notMerge: true }
         );
+    }
+
+    private getConfidenceLevel(): number {
+        const value = Number(this.confidenceLevelSelect?.value || '0.95');
+        if (value === 0.9 || value === 0.95 || value === 0.99) {
+            return value;
+        }
+        return 0.95;
+    }
+
+    private getConfidenceZValue(): number {
+        const level = this.getConfidenceLevel();
+        if (level === 0.9) {
+            return 1.645;
+        }
+        if (level === 0.99) {
+            return 2.576;
+        }
+        return 1.96;
+    }
+
+    private getFilteredTimeSeries(source: TrendPoint[]): TrendPoint[] {
+        if (source.length === 0) {
+            return [];
+        }
+        const rangeValue = this.timelineRangeSelect?.value || 'all';
+        let timeFiltered = [...source];
+        if (rangeValue !== 'all') {
+            const days = Number(rangeValue);
+            if (Number.isFinite(days) && days > 0) {
+                const maxTs = Date.parse(source[source.length - 1].timestamp);
+                const cutoff = maxTs - days * 24 * 60 * 60 * 1000;
+                timeFiltered = source.filter(item => {
+                    const ts = Date.parse(item.timestamp);
+                    return Number.isFinite(ts) && ts >= cutoff;
+                });
+            }
+        }
+        return this.aggregateTimeSeries(timeFiltered, this.timelineGranularitySelect?.value || 'day');
+    }
+
+    private aggregateTimeSeries(source: TrendPoint[], granularity: string): TrendPoint[] {
+        if (granularity === 'day') {
+            return [...source];
+        }
+        const buckets = new Map<string, TrendPoint[]>();
+        source.forEach(item => {
+            const date = new Date(item.timestamp);
+            if (Number.isNaN(date.getTime())) {
+                return;
+            }
+            let bucketKey = '';
+            if (granularity === 'week') {
+                const start = new Date(date);
+                const day = start.getDay();
+                const offset = day === 0 ? -6 : 1 - day;
+                start.setDate(start.getDate() + offset);
+                bucketKey = this.formatDateLabel(start.toISOString());
+            } else {
+                bucketKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`;
+            }
+            const list = buckets.get(bucketKey) || [];
+            list.push(item);
+            buckets.set(bucketKey, list);
+        });
+        return Array.from(buckets.entries())
+            .sort((a, b) => Date.parse(a[0]) - Date.parse(b[0]))
+            .map(([bucket, items], index) => {
+                const avg = items.reduce((sum, item) => sum + item.value, 0) / Math.max(1, items.length);
+                return {
+                    timestamp: bucket,
+                    value: avg,
+                    point_id: `agg-${granularity}-${index}`
+                };
+            });
+    }
+
+    private buildAggregatedLabels(timeSeries: TrendPoint[]): string[] {
+        return timeSeries.map(item => this.formatDateLabel(item.timestamp));
+    }
+
+    private buildModelResults(result: TrendAnalysisResult, timeSeries: TrendPoint[]): ForecastModelResult[] {
+        const horizon = result.forecast.length;
+        const values = timeSeries.map(item => item.value);
+        if (horizon <= 0 || values.length === 0) {
+            return [];
+        }
+        const serverValues = result.forecast.map(item => item.predicted_value);
+        const holdout = Math.min(Math.max(3, Math.floor(horizon / 2)), Math.max(3, Math.floor(values.length / 3)));
+        const train = values.slice(0, Math.max(1, values.length - holdout));
+        const actual = values.slice(Math.max(0, values.length - holdout));
+        const linearPred = this.predictLinear(train, holdout);
+        const movingAvgPred = this.predictMovingAverage(train, holdout);
+        const naivePred = this.predictNaive(train, holdout);
+        return [
+            {
+                key: 'server',
+                name: '服务端主模型',
+                values: serverValues,
+                evaluation: result.evaluation
+            },
+            {
+                key: 'linear',
+                name: '线性回归基线',
+                values: this.predictLinear(values, horizon),
+                evaluation: this.evaluatePredictions(actual, linearPred)
+            },
+            {
+                key: 'moving_avg',
+                name: '移动平均基线',
+                values: this.predictMovingAverage(values, horizon),
+                evaluation: this.evaluatePredictions(actual, movingAvgPred)
+            },
+            {
+                key: 'naive',
+                name: '朴素持平基线',
+                values: this.predictNaive(values, horizon),
+                evaluation: this.evaluatePredictions(actual, naivePred)
+            }
+        ];
+    }
+
+    private predictLinear(values: number[], horizon: number): number[] {
+        if (values.length === 0 || horizon <= 0) {
+            return [];
+        }
+        const n = values.length;
+        const xMean = (n - 1) / 2;
+        const yMean = values.reduce((sum, item) => sum + item, 0) / n;
+        let numerator = 0;
+        let denominator = 0;
+        values.forEach((value, index) => {
+            numerator += (index - xMean) * (value - yMean);
+            denominator += Math.pow(index - xMean, 2);
+        });
+        const slope = denominator > 0 ? numerator / denominator : 0;
+        const intercept = yMean - slope * xMean;
+        return Array.from({ length: horizon }, (_, idx) => intercept + slope * (n + idx));
+    }
+
+    private predictMovingAverage(values: number[], horizon: number): number[] {
+        if (values.length === 0 || horizon <= 0) {
+            return [];
+        }
+        const windowSize = Math.max(2, Math.min(7, values.length));
+        const base = values.slice(values.length - windowSize);
+        const avg = base.reduce((sum, item) => sum + item, 0) / base.length;
+        return Array(horizon).fill(avg);
+    }
+
+    private predictNaive(values: number[], horizon: number): number[] {
+        if (values.length === 0 || horizon <= 0) {
+            return [];
+        }
+        return Array(horizon).fill(values[values.length - 1]);
+    }
+
+    private evaluatePredictions(actual: number[], predicted: number[]): ForecastEvaluation {
+        const length = Math.min(actual.length, predicted.length);
+        if (length === 0) {
+            return { mae: 0, mape: 0, r2: 0, accuracy: 0, rmse: 0 };
+        }
+        const actualSlice = actual.slice(0, length);
+        const predSlice = predicted.slice(0, length);
+        const absErrors = actualSlice.map((item, index) => Math.abs(item - predSlice[index]));
+        const squaredErrors = actualSlice.map((item, index) => Math.pow(item - predSlice[index], 2));
+        const mae = absErrors.reduce((sum, item) => sum + item, 0) / length;
+        const rmse = Math.sqrt(squaredErrors.reduce((sum, item) => sum + item, 0) / length);
+        const mapeValues = actualSlice
+            .map((item, index) => (Math.abs(item) > 1e-8 ? (Math.abs(item - predSlice[index]) / Math.abs(item)) * 100 : null))
+            .filter((item): item is number => item !== null);
+        const mape = mapeValues.length > 0 ? mapeValues.reduce((sum, item) => sum + item, 0) / mapeValues.length : 0;
+        const meanActual = actualSlice.reduce((sum, item) => sum + item, 0) / length;
+        const ssRes = squaredErrors.reduce((sum, item) => sum + item, 0);
+        const ssTot = actualSlice.reduce((sum, item) => sum + Math.pow(item - meanActual, 2), 0);
+        const r2 = ssTot > 0 ? 1 - ssRes / ssTot : 0;
+        const accuracy = Math.max(0, 100 - mape);
+        return { mae, mape, r2, accuracy, rmse };
+    }
+
+    private renderModelComparison(): void {
+        if (!this.modelCompareHost || !this.modelVisibilityHost) {
+            return;
+        }
+        if (this.modelResults.length === 0) {
+            this.modelVisibilityHost.innerHTML = '<div class="history-empty">执行趋势分析后展示模型切换。</div>';
+            this.modelCompareHost.innerHTML = '<div class="history-empty">执行趋势分析后展示模型性能对比。</div>';
+            return;
+        }
+        const best = this.modelResults
+            .slice()
+            .sort((a, b) => (a.evaluation.rmse || Number.MAX_VALUE) - (b.evaluation.rmse || Number.MAX_VALUE))[0];
+        this.modelVisibilityHost.innerHTML = this.modelResults
+            .map(item => {
+                const checked = this.activeModelKeys.has(item.key) ? 'checked' : '';
+                return `<label><input type="checkbox" data-role="model-visible" value="${this.escapeHtml(item.key)}" ${checked}> ${this.escapeHtml(item.name)}</label>`;
+            })
+            .join('');
+        const rows = this.modelResults
+            .map(item => {
+                const isBest = item.key === best.key ? 'is-best' : '';
+                return `
+                    <tr class="${isBest}">
+                        <td>${this.escapeHtml(item.name)}${isBest ? '（推荐）' : ''}</td>
+                        <td>${(item.evaluation.rmse || 0).toFixed(4)}</td>
+                        <td>${item.evaluation.mae.toFixed(4)}</td>
+                        <td>${item.evaluation.mape.toFixed(2)}%</td>
+                        <td>${item.evaluation.r2.toFixed(4)}</td>
+                        <td>${item.evaluation.accuracy.toFixed(2)}%</td>
+                    </tr>
+                `;
+            })
+            .join('');
+        this.modelCompareHost.innerHTML = `
+            <table class="history-table history-trend-model-compare-table">
+                <thead>
+                    <tr>
+                        <th>模型</th>
+                        <th>RMSE</th>
+                        <th>MAE</th>
+                        <th>MAPE</th>
+                        <th>R²</th>
+                        <th>准确率</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+    }
+
+    private syncModelVisibility(): void {
+        if (!this.modelVisibilityHost) {
+            return;
+        }
+        const selected = Array.from(this.modelVisibilityHost.querySelectorAll('[data-role="model-visible"]'))
+            .filter(node => (node as HTMLInputElement).checked)
+            .map(node => (node as HTMLInputElement).value);
+        this.activeModelKeys = new Set(selected);
+    }
+
+    private getActiveModelSeries(prefixLength: number): Array<Record<string, unknown>> {
+        const palette: Record<string, string> = {
+            linear: '#7c3aed',
+            moving_avg: '#ea580c',
+            naive: '#0891b2'
+        };
+        const padding = Array(prefixLength).fill(null);
+        return this.modelResults
+            .filter(item => item.key !== 'server' && this.activeModelKeys.has(item.key))
+            .map(item => ({
+                name: item.name,
+                type: 'line',
+                data: [...padding, ...item.values],
+                smooth: true,
+                symbol: 'none',
+                lineStyle: { width: 2, type: 'dashed', color: palette[item.key] || '#6b7280' }
+            }));
+    }
+
+    private exportForecastCsv(): void {
+        if (!this.trendResult || this.trendResult.forecast.length === 0) {
+            this.updateStatus('暂无预测结果可导出。', 'error');
+            return;
+        }
+        const header = ['timestamp', 'server_prediction', 'lower_bound', 'upper_bound', 'linear_baseline', 'moving_avg_baseline', 'naive_baseline'];
+        const modelMap = new Map(this.modelResults.map(item => [item.key, item]));
+        const rows = this.trendResult.forecast.map((item, index) => {
+            const linear = modelMap.get('linear')?.values[index] ?? '';
+            const movingAvg = modelMap.get('moving_avg')?.values[index] ?? '';
+            const naive = modelMap.get('naive')?.values[index] ?? '';
+            return [item.timestamp, item.predicted_value, item.lower_bound, item.upper_bound, linear, movingAvg, naive].join(',');
+        });
+        const content = [header.join(','), ...rows].join('\n');
+        this.downloadFile(`${this.trendResult.dataset_id}_v${this.trendResult.version}_forecast.csv`, content, 'text/csv;charset=utf-8');
+        this.updateStatus('预测 CSV 导出成功。', 'success');
+    }
+
+    private exportChartPng(): void {
+        if (!this.linearChart?.getDataURL) {
+            this.updateStatus('图表尚未渲染，无法导出 PNG。', 'error');
+            return;
+        }
+        const dataUrl = this.linearChart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#ffffff' });
+        const anchor = document.createElement('a');
+        const result = this.trendResult;
+        const fileName = result ? `${result.dataset_id}_v${result.version}_forecast.png` : 'forecast.png';
+        anchor.href = dataUrl;
+        anchor.download = fileName;
+        anchor.click();
+        this.updateStatus('预测图表 PNG 导出成功。', 'success');
+    }
+
+    private async exportReportPdf(): Promise<void> {
+        if (!this.trendResult) {
+            this.updateStatus('请先执行趋势分析再导出报告。', 'error');
+            return;
+        }
+        const result = this.trendResult;
+        let reportContent = '';
+        try {
+            const report = await this.apiService.generateHistoryAnalysisReport({
+                dataset_id: result.dataset_id,
+                from_version: Math.max(1, result.version - 1),
+                to_version: result.version,
+                forecast_horizon: result.forecast.length
+            });
+            reportContent = this.asString(report.report) || this.asString(report.content) || '';
+        } catch {
+            reportContent = '';
+        }
+
+        const html = `
+            <html>
+            <head><title>预测报告</title><style>body{font-family:Arial,sans-serif;padding:24px;color:#111}h1,h2{margin:0 0 12px}pre{white-space:pre-wrap;line-height:1.6;font-size:12px;background:#f8fafc;padding:12px;border:1px solid #e5e7eb;border-radius:6px}</style></head>
+            <body>
+                <h1>预测结果报告</h1>
+                <p>数据集：${this.escapeHtml(result.dataset_id)}，版本：v${result.version}，时间：${this.escapeHtml(new Date().toLocaleString())}</p>
+                <h2>关键指标</h2>
+                <ul>
+                    <li>准确率：${result.evaluation.accuracy.toFixed(2)}%</li>
+                    <li>RMSE：${(result.evaluation.rmse || 0).toFixed(4)}</li>
+                    <li>MAE：${result.evaluation.mae.toFixed(4)}</li>
+                    <li>MAPE：${result.evaluation.mape.toFixed(2)}%</li>
+                    <li>R²：${result.evaluation.r2.toFixed(4)}</li>
+                </ul>
+                <h2>报告正文</h2>
+                <pre>${this.escapeHtml(reportContent || '后端未返回文本报告，已导出关键指标与预测图表。')}</pre>
+                <p>提示：打开打印对话框后选择“另存为 PDF”。</p>
+            </body></html>
+        `;
+        const printWindow = window.open('', '_blank', 'width=960,height=760');
+        if (!printWindow) {
+            this.updateStatus('浏览器拦截了弹窗，无法导出 PDF。', 'error');
+            return;
+        }
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        printWindow.print();
+        this.updateStatus('已打开报告打印窗口，请保存为 PDF。', 'success');
+    }
+
+    private async exportAll(): Promise<void> {
+        this.exportForecastCsv();
+        this.exportChartPng();
+        await this.exportReportPdf();
+    }
+
+    private downloadFile(fileName: string, content: string, mimeType: string): void {
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = fileName;
+        anchor.click();
+        URL.revokeObjectURL(url);
     }
 
     private decomposeSeries(values: number[], period: number): SeasonalDecomposition {
@@ -1430,6 +1908,14 @@ export class HistoryTrendAnalysisPanel {
 
         if (this.reasonHost) {
             this.reasonHost.innerHTML = '<div class="history-empty">执行趋势分析后展示异常原因。</div>';
+        }
+
+        if (this.modelVisibilityHost) {
+            this.modelVisibilityHost.innerHTML = '<div class="history-empty">执行趋势分析后展示模型切换。</div>';
+        }
+
+        if (this.modelCompareHost) {
+            this.modelCompareHost.innerHTML = '<div class="history-empty">执行趋势分析后展示模型性能对比。</div>';
         }
     }
 

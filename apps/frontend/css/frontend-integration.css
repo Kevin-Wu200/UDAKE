@@ -750,6 +750,32 @@
     gap: 4px;
 }
 
+.history-trend-model-visibility {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 12px;
+}
+
+.history-trend-model-visibility label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.history-trend-model-table {
+    overflow-x: auto;
+}
+
+.history-trend-model-compare-table {
+    min-width: 620px;
+}
+
+.history-trend-model-compare-table tr.is-best td {
+    background: rgba(22, 163, 74, 0.12);
+    font-weight: 600;
+}
+
 @media (max-width: 768px) {
     .frontend-integration-hub {
         max-height: 55vh;
