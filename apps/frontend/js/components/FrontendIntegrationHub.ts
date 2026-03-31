@@ -23,6 +23,7 @@ import { DataFeedbackPanel } from './integration/DataFeedbackPanel.js';
 import { GeneralDataProcessingPanel } from './integration/GeneralDataProcessingPanel.js';
 import { TaskQueuePanel } from './integration/TaskQueuePanel.js';
 import { GPUAccelerationPanel } from './integration/GPUAccelerationPanel.js';
+import MobileNavigation from './MobileNavigation.js';
 
 interface PanelMountable {
     mount(container: HTMLElement): void;
@@ -38,6 +39,7 @@ interface PanelDescriptor {
 
 export class FrontendIntegrationHub {
     private initialized = false;
+    private mobileNavigation: MobileNavigation | null = null;
 
     private readonly panelDescriptors: PanelDescriptor[] = [
         { id: 'data-quality', title: '数据质量管理', ctor: DataQualityPanel },
@@ -137,6 +139,7 @@ export class FrontendIntegrationHub {
         this.panelDescriptors.forEach((descriptor, index) => {
             const details = document.createElement('details');
             details.className = 'integration-detail';
+            details.dataset.panelId = descriptor.id;
             details.open = index === 0;
 
             const summary = document.createElement('summary');
@@ -153,6 +156,60 @@ export class FrontendIntegrationHub {
             details.appendChild(summary);
             details.appendChild(panelContainer);
             container.appendChild(details);
+        });
+
+        this.mountMobileHistoryNavigation(container);
+    }
+
+    private mountMobileHistoryNavigation(container: HTMLElement): void {
+        if (this.mobileNavigation) {
+            return;
+        }
+
+        this.mobileNavigation = new MobileNavigation({
+            navItems: [
+                {
+                    id: 'history-snapshot',
+                    label: '快照',
+                    icon: '<path d="M12 5v14M5 12h14"></path>',
+                    action: () => this.focusPanel(container, 'history-snapshot')
+                },
+                {
+                    id: 'history-version-comparison',
+                    label: '对比',
+                    icon: '<path d="M4 7h16M4 12h10M4 17h6"></path>',
+                    action: () => this.focusPanel(container, 'history-version-comparison')
+                },
+                {
+                    id: 'history-trend-analysis',
+                    label: '趋势',
+                    icon: '<path d="M4 16l5-5 4 3 7-8"></path>',
+                    action: () => this.focusPanel(container, 'history-trend-analysis')
+                }
+            ],
+            enableSwipe: true,
+            enableHaptic: true
+        });
+    }
+
+    private focusPanel(container: HTMLElement, panelId: string): void {
+        const detailsList = Array.from(container.querySelectorAll('.integration-detail')) as HTMLDetailsElement[];
+        if (detailsList.length === 0) {
+            return;
+        }
+
+        detailsList.forEach((item) => {
+            item.open = item.dataset.panelId === panelId;
+        });
+
+        const target = detailsList.find((item) => item.dataset.panelId === panelId);
+        if (!target) {
+            return;
+        }
+
+        target.scrollIntoView({
+            behavior: 'smooth',
+            block: 'start'
         });
     }
 }

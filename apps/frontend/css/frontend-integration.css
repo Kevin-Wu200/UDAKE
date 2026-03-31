@@ -933,17 +933,105 @@
     background: #ffffff;
 }
 
+.history-trend-card.is-chart-focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
+}
+
+@media (min-width: 1201px) {
+    .frontend-integration-hub {
+        max-height: 78vh;
+    }
+
+    .integration-detail-content {
+        padding: 12px;
+    }
+
+    .history-snapshot-main {
+        grid-template-columns: 1.5fr 1fr;
+    }
+
+    .history-compare-main-grid {
+        grid-template-columns: minmax(280px, 0.95fr) minmax(440px, 1.5fr) minmax(320px, 1fr);
+        align-items: start;
+    }
+
+    .history-compare-main-left {
+        display: contents;
+    }
+
+    .history-compare-main-left > .history-compare-card:first-child {
+        grid-column: 1;
+    }
+
+    .history-compare-main-left > .history-compare-card:last-child {
+        grid-column: 2;
+    }
+
+    .history-compare-main-right {
+        grid-column: 3;
+        position: sticky;
+        top: 10px;
+    }
+}
+
+@media (min-width: 768px) and (max-width: 1200px) {
+    .frontend-integration-hub {
+        max-height: 66vh;
+    }
+
+    .history-snapshot-main {
+        grid-template-columns: 1fr;
+    }
+
+    .history-compare-main-grid,
+    .history-trend-main-grid,
+    .history-report-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .integration-actions {
+        gap: 8px;
+    }
+
+    .integration-action-btn {
+        min-height: 42px;
+    }
+}
+
 @media (max-width: 768px) {
     .frontend-integration-hub {
         max-height: 55vh;
+        padding-bottom: calc(66px + env(safe-area-inset-bottom, 0px));
+        gap: 12px;
+    }
+
+    .integration-summary {
+        font-size: 15px;
+        padding: 12px 14px;
+    }
+
+    .integration-detail-content {
+        padding: 10px;
     }
 
     .integration-actions {
         flex-direction: column;
+        gap: 8px;
     }
 
     .integration-action-btn {
         width: 100%;
+        min-height: 44px;
+        font-size: 14px;
+    }
+
+    .history-snapshot-form-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .history-snapshot-inline-filters {
+        grid-template-columns: 1fr;
     }
 
     .history-snapshot-main {
@@ -952,6 +1040,19 @@
 
     .history-compare-main-grid {
         grid-template-columns: 1fr;
+    }
+
+    .history-compare-version-info,
+    .history-compare-version-pickers,
+    .history-compare-selector-grid,
+    .history-compare-controls-grid,
+    .history-trend-param-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .history-compare-main-left,
+    .history-compare-main-right {
+        gap: 8px;
     }
 
     .history-compare-distribution-row {
@@ -967,11 +1068,16 @@
     }
 
     .history-trend-chart {
-        min-height: 260px;
+        min-height: 240px;
+        touch-action: pan-x pan-y pinch-zoom;
     }
 
     .history-trend-chart-tall {
-        min-height: 360px;
+        min-height: 320px;
+    }
+
+    .history-trend-inline-controls {
+        grid-template-columns: 1fr;
     }
 
     .history-report-grid {
@@ -985,5 +1091,41 @@
     .history-report-preview-controls {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .history-table th,
+    .history-table td {
+        padding: 10px 6px;
+    }
+
+    .history-link-btn {
+        min-height: 32px;
+        padding: 2px 0;
+    }
+
+    .history-trend-card.is-chart-focus {
+        position: sticky;
+        top: 0;
+        z-index: 4;
+    }
+}
+
+@media (hover: none) and (pointer: coarse) {
+    .integration-action-btn,
+    .history-link-btn,
+    .history-compare-highlight-cell {
+        min-height: 44px;
+    }
+
+    .integration-action-btn:active,
+    .history-link-btn:active,
+    .history-compare-highlight-cell:active {
+        transform: scale(0.98);
+        filter: brightness(0.96);
+    }
+
+    .history-trend-chart,
+    .history-compare-heatmap-wrapper {
+        touch-action: pan-x pan-y pinch-zoom;
     }
 }

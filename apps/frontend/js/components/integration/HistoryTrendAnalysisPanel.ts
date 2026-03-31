@@ -260,6 +260,8 @@ export class HistoryTrendAnalysisPanel {
     private refreshRemainSec = 0;
     private loading = false;
     private lastRetryAction: (() => Promise<void>) | null = null;
+    private chartResizeObserver: ResizeObserver | null = null;
+    private chartLongPressTimer: number | null = null;
 
     constructor(private readonly apiService: APIService) {}
 
@@ -474,6 +476,9 @@ export class HistoryTrendAnalysisPanel {
         this.renderEmptyState();
 
         window.addEventListener('resize', this.handleResize);
+        window.addEventListener('orientationchange', this.handleOrientationChange);
+        this.observeChartContainers();
+        this.bindTouchInteractions();
     }
 
     private bindElements(): void {
@@ -1132,6 +1137,7 @@ export class HistoryTrendAnalysisPanel {
         if (!chart) {
             return;
         }
+        const compact = this.isCompactLayout();
 
         const points = this.anomalyViewItems.filter(item => item.x !== null && item.y !== null);
         if (points.length === 0) {
@@ -1173,9 +1179,10 @@ export class HistoryTrendAnalysisPanel {
                 },
                 xAxis: { type: 'value', name: 'X' },
                 yAxis: { type: 'value', name: 'Y' },
-                legend: { top: 4, data: ['异常点', '聚合点'] },
-                grid: { left: 45, right: 20, top: 38, bottom: 38 },
-                dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 12 }],
+                legend: { top: 4, data: ['异常点', '聚合点'], textStyle: { fontSize: compact ? 10 : 12 } },
+                animation: !compact,
+                grid: this.getResponsiveGrid(45, 20, 38, 38),
+                dataZoom: this.getResponsiveDataZoom(12, 16),
                 series: [
                     {
                         name: '异常点',
@@ -1195,7 +1202,7 @@ export class HistoryTrendAnalysisPanel {
                         type: 'scatter',
                         data: clusters.map(cluster => [cluster.centerX, cluster.centerY, cluster.count, cluster.maxScore, cluster.id]),
                         symbolSize: (value: number[]) => 12 + Number(value[2] || 0) * 2,
-                        label: { show: true, formatter: '{@[2]}', color: '#111827', fontSize: 10 },
+                        label: { show: !compact, formatter: '{@[2]}', color: '#111827', fontSize: 10 },
                         itemStyle: { color: 'rgba(22,163,74,0.6)', borderColor: '#166534', borderWidth: 1 }
                     }
                 ]
@@ -1209,6 +1216,7 @@ export class HistoryTrendAnalysisPanel {
         if (!chart) {
             return;
         }
+        const compact = this.isCompactLayout();
         if (timeSeries.length === 0) {
             chart.setOption(
                 { title: { text: '无时间序列数据', left: 'center', top: 'middle', textStyle: { fontSize: 12 } } },
@@ -1231,13 +1239,14 @@ export class HistoryTrendAnalysisPanel {
         chart.setOption(
             {
                 tooltip: { trigger: 'axis' },
-                legend: { top: 4, data: ['原始值', '异常点', '上阈值', '下阈值'] },
-                grid: { left: 45, right: 20, top: 36, bottom: 48 },
-                dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 12 }],
+                legend: { top: 4, data: ['原始值', '异常点', '上阈值', '下阈值'], textStyle: { fontSize: compact ? 10 : 12 } },
+                animation: !compact,
+                grid: this.getResponsiveGrid(45, 20, 36, 48),
+                dataZoom: this.getResponsiveDataZoom(12, 16),
                 xAxis: { type: 'category', data: labels },
                 yAxis: { type: 'value', scale: true },
                 series: [
-                    { name: '原始值', type: 'line', data: values, smooth: true, symbol: 'none', lineStyle: { color: '#1f2937' } },
+                    { name: '原始值', type: 'line', data: values, smooth: true, sampling: compact ? 'lttb' : undefined, symbol: 'none', lineStyle: { color: '#1f2937' } },
                     { name: '上阈值', type: 'line', data: Array(values.length).fill(thresholdUpper), symbol: 'none', lineStyle: { color: '#f59e0b', type: 'dashed' } },
                     { name: '下阈值', type: 'line', data: Array(values.length).fill(thresholdLower), symbol: 'none', lineStyle: { color: '#f59e0b', type: 'dashed' } },
                     { name: '异常点', type: 'scatter', data: anomalyMarks, symbolSize: 9, itemStyle: { color: '#dc2626' } }
@@ -1554,6 +1563,7 @@ export class HistoryTrendAnalysisPanel {
         if (!chart) {
             return;
         }
+        const compact = this.isCompactLayout();
 
         if (timeSeries.length === 0) {
             chart.setOption(
@@ -1624,18 +1634,17 @@ export class HistoryTrendAnalysisPanel {
                 tooltip: { trigger: 'axis' },
                 legend: {
                     top: 4,
-                    data: ['原始值', '趋势线', '趋势置信上界', '趋势置信下界', '预测值', '预测上界', '预测下界', ...modelSeries.map(item => String(item.name || '')), '异常点']
+                    data: ['原始值', '趋势线', '趋势置信上界', '趋势置信下界', '预测值', '预测上界', '预测下界', ...modelSeries.map(item => String(item.name || '')), '异常点'],
+                    textStyle: { fontSize: compact ? 10 : 12 }
                 },
-                grid: { left: 45, right: 25, top: 48, bottom: 50 },
-                dataZoom: [
-                    { type: 'inside' },
-                    { type: 'slider', height: 18, bottom: 18 }
-                ],
+                animation: !compact,
+                grid: this.getResponsiveGrid(45, 25, 48, 50),
+                dataZoom: this.getResponsiveDataZoom(18, 18),
                 xAxis: { type: 'category', data: allLabels },
                 yAxis: { type: 'value', scale: true },
                 series: [
-                    { name: '原始值', type: 'line', data: padActual, smooth: true, symbol: 'none', lineStyle: { color: '#111827' } },
-                    { name: '趋势线', type: 'line', data: padTrend, smooth: true, symbol: 'none', lineStyle: { color: '#2563eb', width: 2 } },
+                    { name: '原始值', type: 'line', data: padActual, smooth: true, sampling: compact ? 'lttb' : undefined, symbol: 'none', lineStyle: { color: '#111827' } },
+                    { name: '趋势线', type: 'line', data: padTrend, smooth: true, sampling: compact ? 'lttb' : undefined, symbol: 'none', lineStyle: { color: '#2563eb', width: 2 } },
                     { name: '趋势置信上界', type: 'line', data: padUpper, smooth: true, symbol: 'none', lineStyle: { color: '#93c5fd', type: 'dashed' } },
                     {
                         name: '趋势置信下界',
@@ -3034,6 +3043,125 @@ export class HistoryTrendAnalysisPanel {
         const win = window as Window & { echarts?: EChartsLike };
         return win.echarts || null;
     }
+
+    private getResponsiveGrid(left: number, right: number, top: number, bottom: number): { left: number; right: number; top: number; bottom: number } {
+        if (this.isCompactLayout()) {
+            return {
+                left: Math.max(36, left - 10),
+                right: Math.max(12, right - 8),
+                top: Math.max(20, top - 10),
+                bottom: Math.max(28, bottom - 12)
+            };
+        }
+        if (window.innerWidth <= 1200) {
+            return {
+                left: Math.max(40, left - 4),
+                right: Math.max(16, right - 4),
+                top: Math.max(22, top - 4),
+                bottom: Math.max(32, bottom - 6)
+            };
+        }
+        return { left, right, top, bottom };
+    }
+
+    private getResponsiveDataZoom(sliderBottom: number, sliderHeight: number): Array<Record<string, unknown>> {
+        if (this.isCompactLayout()) {
+            return [{ type: 'inside' }];
+        }
+        return [
+            { type: 'inside' },
+            { type: 'slider', height: sliderHeight, bottom: sliderBottom }
+        ];
+    }
+
+    private isCompactLayout(): boolean {
+        return window.innerWidth < 768;
+    }
+
+    private observeChartContainers(): void {
+        if (typeof ResizeObserver === 'undefined') {
+            return;
+        }
+        this.chartResizeObserver = new ResizeObserver(() => {
+            this.handleResize();
+        });
+        [
+            this.linearChartHost,
+            this.fftChartHost,
+            this.seasonalChartHost,
+            this.anomalyMapHost,
+            this.anomalySeriesHost,
+            this.anomalyTrendHost
+        ].forEach((host) => {
+            if (host) {
+                this.chartResizeObserver?.observe(host);
+            }
+        });
+    }
+
+    private bindTouchInteractions(): void {
+        if (!this.root) {
+            return;
+        }
+        const chartHosts = this.root.querySelectorAll('.history-trend-chart');
+        chartHosts.forEach((host) => {
+            const chartHost = host as HTMLElement;
+            chartHost.style.touchAction = 'pan-x pan-y pinch-zoom';
+            chartHost.addEventListener('touchstart', this.handleChartTouchStart, { passive: true });
+            chartHost.addEventListener('touchend', this.handleChartTouchEnd, { passive: true });
+            chartHost.addEventListener('touchcancel', this.handleChartTouchEnd, { passive: true });
+        });
+    }
+
+    private handleChartTouchStart = (event: TouchEvent): void => {
+        if (event.touches.length !== 1) {
+            this.clearChartLongPressTimer();
+            return;
+        }
+        this.clearChartLongPressTimer();
+        const target = event.currentTarget as HTMLElement | null;
+        if (!target) {
+            return;
+        }
+        this.chartLongPressTimer = window.setTimeout(() => {
+            this.toggleChartFocus(target);
+        }, 520);
+    };
+
+    private handleChartTouchEnd = (): void => {
+        this.clearChartLongPressTimer();
+    };
+
+    private clearChartLongPressTimer(): void {
+        if (this.chartLongPressTimer !== null) {
+            window.clearTimeout(this.chartLongPressTimer);
+            this.chartLongPressTimer = null;
+        }
+    }
+
+    private toggleChartFocus(chartHost: HTMLElement): void {
+        const card = chartHost.closest('.history-trend-card') as HTMLElement | null;
+        if (!card || !this.root) {
+            return;
+        }
+        this.root.querySelectorAll('.history-trend-card.is-chart-focus').forEach((el) => {
+            if (el !== card) {
+                el.classList.remove('is-chart-focus');
+            }
+        });
+        const focused = card.classList.toggle('is-chart-focus');
+        this.updateStatus(focused ? '图表已进入聚焦模式，长按可退出。' : '图表已退出聚焦模式。', 'info');
+        if ('vibrate' in navigator) {
+            navigator.vibrate(12);
+        }
+        this.handleResize();
+    }
+
+    private handleOrientationChange = (): void => {
+        window.setTimeout(() => {
+            this.handleResize();
+        }, 180);
+    };
 
     private handleResize = (): void => {
         this.linearChart?.resize();
