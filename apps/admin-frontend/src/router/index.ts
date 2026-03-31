@@ -8,6 +8,8 @@ const UsersView = () => import('../views/UsersView.vue');
 const AuditLogsView = () => import('../views/AuditLogsView.vue');
 const WorkflowListView = () => import('../views/workflow/WorkflowList.vue');
 const WorkflowEditorView = () => import('../views/workflow/WorkflowEditor.vue');
+const HistoryAnalysisLayoutView = () => import('../views/history-analysis/HistoryAnalysisLayout.vue');
+const HistorySectionView = () => import('../views/history-analysis/HistorySectionView.vue');
 const AdminLayout = () => import('../layouts/AdminLayout.vue');
 
 const UserCenterLayout = () => import('../layouts/UserCenterLayout.vue');
@@ -20,6 +22,7 @@ const ChangeEmailView = () => import('../views/user/ChangeEmailView.vue');
 const DeviceManagementView = () => import('../views/user/DeviceManagementView.vue');
 
 const USER_ALLOWED_ROLES = ['user', 'company_admin', 'super_admin', 'admin'];
+const ADMIN_ALLOWED_ROLES = ['company_admin', 'super_admin', 'admin'];
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -105,28 +108,129 @@ const router = createRouter({
           path: '/dashboard',
           name: 'dashboard',
           component: DashboardView,
-          meta: { title: '统计概览' }
+          meta: { title: '统计概览', titleKey: 'dashboard', breadcrumbKey: 'dashboard' }
         },
         {
           path: '/product-keys',
           name: 'product-keys',
           component: ProductKeysView,
-          meta: { title: '产品密钥管理' }
+          meta: { title: '产品密钥管理', titleKey: 'productKeys', breadcrumbKey: 'productKeys' }
         },
         {
           path: '/workflows',
           name: 'workflows',
           component: WorkflowListView,
-          meta: { title: '智能工作流引擎' }
+          meta: { title: '智能工作流引擎', titleKey: 'workflowEngine', breadcrumbKey: 'workflowEngine' }
         },
         {
           path: '/workflows/editor/:workflowId?',
           name: 'workflow-editor',
           component: WorkflowEditorView,
-          meta: { title: '工作流可视化编辑器' }
+          meta: { title: '工作流可视化编辑器', titleKey: 'workflowEditor', breadcrumbKey: 'workflowEditor' }
         },
-        { path: '/users', name: 'users', component: UsersView, meta: { title: '用户管理' } },
-        { path: '/audit-logs', name: 'audit-logs', component: AuditLogsView, meta: { title: '审计日志' } }
+        {
+          path: '/history-analysis',
+          component: HistoryAnalysisLayoutView,
+          redirect: '/history-analysis/snapshots',
+          meta: {
+            title: '历史分析',
+            titleKey: 'historyAnalysis',
+            breadcrumbKey: 'historyAnalysis',
+            requiredRoles: ADMIN_ALLOWED_ROLES
+          },
+          children: [
+            {
+              path: 'snapshots',
+              name: 'history-analysis-snapshots',
+              component: HistorySectionView,
+              props: { section: 'snapshots' },
+              meta: {
+                title: '快照管理',
+                titleKey: 'historyAnalysisSnapshots',
+                breadcrumbKey: 'historyAnalysisSnapshots',
+                requiredRoles: ADMIN_ALLOWED_ROLES,
+                keepAlive: true
+              }
+            },
+            {
+              path: 'compare',
+              name: 'history-analysis-compare',
+              component: HistorySectionView,
+              props: { section: 'compare' },
+              meta: {
+                title: '版本对比',
+                titleKey: 'historyAnalysisCompare',
+                breadcrumbKey: 'historyAnalysisCompare',
+                requiredRoles: ADMIN_ALLOWED_ROLES,
+                keepAlive: true
+              }
+            },
+            {
+              path: 'trend',
+              name: 'history-analysis-trend',
+              component: HistorySectionView,
+              props: { section: 'trend' },
+              meta: {
+                title: '趋势分析',
+                titleKey: 'historyAnalysisTrend',
+                breadcrumbKey: 'historyAnalysisTrend',
+                requiredRoles: ADMIN_ALLOWED_ROLES,
+                keepAlive: true
+              }
+            },
+            {
+              path: 'anomaly',
+              name: 'history-analysis-anomaly',
+              component: HistorySectionView,
+              props: { section: 'anomaly' },
+              meta: {
+                title: '异常检测',
+                titleKey: 'historyAnalysisAnomaly',
+                breadcrumbKey: 'historyAnalysisAnomaly',
+                requiredRoles: ADMIN_ALLOWED_ROLES,
+                keepAlive: true
+              }
+            },
+            {
+              path: 'forecast',
+              name: 'history-analysis-forecast',
+              component: HistorySectionView,
+              props: { section: 'forecast' },
+              meta: {
+                title: '预测结果',
+                titleKey: 'historyAnalysisForecast',
+                breadcrumbKey: 'historyAnalysisForecast',
+                requiredRoles: ADMIN_ALLOWED_ROLES,
+                keepAlive: true
+              }
+            },
+            {
+              path: 'reports',
+              name: 'history-analysis-reports',
+              component: HistorySectionView,
+              props: { section: 'reports' },
+              meta: {
+                title: '报告管理',
+                titleKey: 'historyAnalysisReports',
+                breadcrumbKey: 'historyAnalysisReports',
+                requiredRoles: ADMIN_ALLOWED_ROLES,
+                keepAlive: true
+              }
+            }
+          ]
+        },
+        {
+          path: '/users',
+          name: 'users',
+          component: UsersView,
+          meta: { title: '用户管理', titleKey: 'users', breadcrumbKey: 'users' }
+        },
+        {
+          path: '/audit-logs',
+          name: 'audit-logs',
+          component: AuditLogsView,
+          meta: { title: '审计日志', titleKey: 'auditLogs', breadcrumbKey: 'auditLogs' }
+        }
       ]
     },
     {
@@ -190,21 +294,21 @@ router.beforeEach(async (to) => {
         };
       }
     }
-
-    const requiredRoles = Array.isArray(to.meta.requiredRoles)
-      ? (to.meta.requiredRoles as string[])
-      : [];
-
-    if (requiredRoles.length > 0) {
-      const role = authStore.user?.role;
-      if (!role || !requiredRoles.includes(role)) {
-        return '/403';
-      }
-    }
   }
 
   if (requiresAdminAuth && !loggedIn) {
     return { path: '/login', query: { redirect: to.fullPath } };
+  }
+
+  const requiredRoles = Array.isArray(to.meta.requiredRoles)
+    ? (to.meta.requiredRoles as string[])
+    : [];
+
+  if (requiredRoles.length > 0 && !authStore.isLegacyAdminSession) {
+    const role = authStore.user?.role;
+    if (!role || !requiredRoles.includes(role)) {
+      return '/403';
+    }
   }
 
   return true;

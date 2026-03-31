@@ -4,20 +4,59 @@
       <div class="brand">{{ t('appTitle') }}</div>
       <el-menu
         :default-active="activePath"
+        :default-openeds="defaultOpeneds"
         class="menu"
         router
       >
-        <el-menu-item index="/dashboard">{{ t('dashboard') }}</el-menu-item>
-        <el-menu-item index="/product-keys">{{ t('productKeys') }}</el-menu-item>
-        <el-menu-item index="/workflows">{{ t('workflowEngine') }}</el-menu-item>
-        <el-menu-item index="/users">{{ t('users') }}</el-menu-item>
-        <el-menu-item index="/audit-logs">{{ t('auditLogs') }}</el-menu-item>
+        <el-menu-item index="/dashboard">
+          <el-icon><Histogram /></el-icon>
+          <span>{{ t('dashboard') }}</span>
+        </el-menu-item>
+        <el-menu-item index="/product-keys">
+          <el-icon><Key /></el-icon>
+          <span>{{ t('productKeys') }}</span>
+        </el-menu-item>
+        <el-menu-item index="/workflows">
+          <el-icon><Operation /></el-icon>
+          <span>{{ t('workflowEngine') }}</span>
+        </el-menu-item>
+        <el-sub-menu index="/history-analysis">
+          <template #title>
+            <el-icon><DataAnalysis /></el-icon>
+            <span>{{ t('historyAnalysis') }}</span>
+          </template>
+          <el-menu-item index="/history-analysis/snapshots">{{ t('historyAnalysisSnapshots') }}</el-menu-item>
+          <el-menu-item index="/history-analysis/compare">{{ t('historyAnalysisCompare') }}</el-menu-item>
+          <el-menu-item index="/history-analysis/trend">{{ t('historyAnalysisTrend') }}</el-menu-item>
+          <el-menu-item index="/history-analysis/anomaly">{{ t('historyAnalysisAnomaly') }}</el-menu-item>
+          <el-menu-item index="/history-analysis/forecast">{{ t('historyAnalysisForecast') }}</el-menu-item>
+          <el-menu-item index="/history-analysis/reports">{{ t('historyAnalysisReports') }}</el-menu-item>
+        </el-sub-menu>
+        <el-menu-item index="/users">
+          <el-icon><UserFilled /></el-icon>
+          <span>{{ t('users') }}</span>
+        </el-menu-item>
+        <el-menu-item index="/audit-logs">
+          <el-icon><Document /></el-icon>
+          <span>{{ t('auditLogs') }}</span>
+        </el-menu-item>
       </el-menu>
     </aside>
 
     <section class="content-wrap">
       <header class="topbar">
-        <div class="title">{{ route.meta.title || t('appTitle') }}</div>
+        <div class="title-wrap">
+          <div class="title">{{ currentTitle }}</div>
+          <el-breadcrumb separator="/">
+            <el-breadcrumb-item
+              v-for="item in breadcrumbs"
+              :key="item.path"
+              :to="item.clickable ? item.path : undefined"
+            >
+              {{ item.label }}
+            </el-breadcrumb-item>
+          </el-breadcrumb>
+        </div>
         <div class="actions">
           <el-select :model-value="appStore.language" style="width: 120px" @change="onLanguageChange">
             <el-option label="中文" value="zh-CN" />
@@ -28,7 +67,11 @@
         </div>
       </header>
       <main class="content">
-        <router-view />
+        <router-view v-slot="{ Component, route: currentRoute }">
+          <keep-alive :include="cachedRouteNames">
+            <component :is="Component" :key="currentRoute.path" />
+          </keep-alive>
+        </router-view>
       </main>
     </section>
   </div>
@@ -38,6 +81,7 @@
 import type { AppLanguage } from '../stores/app';
 import { computed } from 'vue';
 import { ElMessage } from 'element-plus';
+import { DataAnalysis, Document, Histogram, Key, Operation, UserFilled } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useAppStore } from '../stores/app';
@@ -50,6 +94,45 @@ const appStore = useAppStore();
 const { t } = useI18nText();
 
 const activePath = computed(() => route.path);
+const defaultOpeneds = ['/history-analysis'];
+
+const currentTitle = computed(() => {
+  const titleKey = typeof route.meta.titleKey === 'string' ? route.meta.titleKey : '';
+  if (titleKey) {
+    return t(titleKey);
+  }
+  const title = typeof route.meta.title === 'string' ? route.meta.title : '';
+  return title || t('appTitle');
+});
+
+const breadcrumbs = computed(() => {
+  return route.matched
+    .filter((record) => Boolean(record.path) && !record.path.includes(':'))
+    .map((record, index, arr) => {
+      const key =
+        typeof record.meta.breadcrumbKey === 'string'
+          ? record.meta.breadcrumbKey
+          : typeof record.meta.titleKey === 'string'
+            ? record.meta.titleKey
+            : '';
+      const label = key ? t(key) : String(record.meta.title || t('appTitle'));
+      return {
+        path: record.path,
+        label,
+        clickable: index < arr.length - 1
+      };
+    })
+    .filter((item) => item.path !== '/');
+});
+
+const cachedRouteNames = [
+  'history-analysis-snapshots',
+  'history-analysis-compare',
+  'history-analysis-trend',
+  'history-analysis-anomaly',
+  'history-analysis-forecast',
+  'history-analysis-reports'
+];
 
 const onLanguageChange = (language: AppLanguage) => {
   appStore.setLanguage(language);
@@ -113,6 +196,12 @@ const onLogout = () => {
   justify-content: space-between;
   border-bottom: 1px solid #dde6ef;
   background: #fff;
+}
+
+.title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .title {
