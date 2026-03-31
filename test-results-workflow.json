@@ -11,7 +11,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 3
+      "actualWorkers": 2
     },
     "preserveOutput": "always",
     "projects": [
@@ -20,7 +20,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 3
+          "actualWorkers": 2
         },
         "id": "chromium",
         "name": "chromium",
@@ -80,7 +80,7 @@
         {
           "title": "工作流编辑器专项E2E",
           "file": "workflow-editor.test.ts",
-          "line": 130,
+          "line": 191,
           "column": 6,
           "specs": [
             {
@@ -99,12 +99,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 865,
+                      "duration": 804,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-31T02:27:42.337Z",
+                      "startTime": "2026-03-31T06:21:13.769Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -114,7 +114,7 @@
               ],
               "id": "54ffd8241e2ed16661c0-6ea5dff28b05fd2c997c",
               "file": "workflow-editor.test.ts",
-              "line": 131,
+              "line": 192,
               "column": 7
             },
             {
@@ -133,12 +133,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 1240,
+                      "duration": 1219,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-31T02:27:43.604Z",
+                      "startTime": "2026-03-31T06:21:14.886Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -148,7 +148,7 @@
               ],
               "id": "54ffd8241e2ed16661c0-36e6998e112a26e985cf",
               "file": "workflow-editor.test.ts",
-              "line": 148,
+              "line": 209,
               "column": 7
             },
             {
@@ -167,12 +167,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 701,
+                      "duration": 710,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-31T02:27:44.848Z",
+                      "startTime": "2026-03-31T06:21:16.108Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -182,7 +182,7 @@
               ],
               "id": "54ffd8241e2ed16661c0-88f741c58e8ce4e1da67",
               "file": "workflow-editor.test.ts",
-              "line": 160,
+              "line": 221,
               "column": 7
             },
             {
@@ -201,12 +201,12 @@
                       "workerIndex": 0,
                       "parallelIndex": 0,
                       "status": "passed",
-                      "duration": 416,
+                      "duration": 433,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-31T02:27:45.552Z",
+                      "startTime": "2026-03-31T06:21:16.822Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -216,7 +216,7 @@
               ],
               "id": "54ffd8241e2ed16661c0-e100dedace2c04583b02",
               "file": "workflow-editor.test.ts",
-              "line": 174,
+              "line": 235,
               "column": 7
             }
           ]
@@ -233,7 +233,7 @@
         {
           "title": "工作流执行专项E2E",
           "file": "workflow-execution.test.ts",
-          "line": 214,
+          "line": 226,
           "column": 6,
           "specs": [
             {
@@ -252,12 +252,12 @@
                       "workerIndex": 1,
                       "parallelIndex": 1,
                       "status": "passed",
-                      "duration": 808,
+                      "duration": 713,
                       "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-03-31T02:27:42.337Z",
+                      "startTime": "2026-03-31T06:21:13.771Z",
                       "annotations": [],
                       "attachments": []
                     }
@@ -267,92 +267,7 @@
               ],
               "id": "8b3d96d0e08581553c47-bc33f946824a030f2351",
               "file": "workflow-execution.test.ts",
-              "line": 215,
-              "column": 7
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "title": "workflow-templates.test.ts",
-      "file": "workflow-templates.test.ts",
-      "column": 0,
-      "line": 0,
-      "specs": [],
-      "suites": [
-        {
-          "title": "工作流模板专项E2E",
-          "file": "workflow-templates.test.ts",
-          "line": 228,
-          "column": 6,
-          "specs": [
-            {
-              "title": "应该能够浏览模板并应用到编辑器",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 30000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
-                      "status": "passed",
-                      "duration": 706,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-31T02:27:42.336Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "92316ce3b77ff094dab6-f927a72289f51efa713a",
-              "file": "workflow-templates.test.ts",
-              "line": 229,
-              "column": 7
-            },
-            {
-              "title": "应该能够请求模板推荐并实例化模板",
-              "ok": true,
-              "tags": [],
-              "tests": [
-                {
-                  "timeout": 30000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
-                  "projectId": "chromium",
-                  "projectName": "chromium",
-                  "results": [
-                    {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
-                      "status": "passed",
-                      "duration": 422,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-03-31T02:27:43.445Z",
-                      "annotations": [],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "expected"
-                }
-              ],
-              "id": "92316ce3b77ff094dab6-d1ecf6fadb110688569f",
-              "file": "workflow-templates.test.ts",
-              "line": 240,
+              "line": 227,
               "column": 7
             }
           ]
@@ -362,9 +277,9 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-03-31T02:27:41.472Z",
-    "duration": 4527.603999999999,
-    "expected": 7,
+    "startTime": "2026-03-31T06:21:12.383Z",
+    "duration": 4900.039,
+    "expected": 5,
     "skipped": 0,
     "unexpected": 0,
     "flaky": 0

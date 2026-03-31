@@ -6,6 +6,7 @@ type ExecutionState = {
   workflowId: string;
   runId: string;
   detailFetchCount: number;
+  latestDefinition: Record<string, unknown>;
 };
 
 function buildWorkflowRecord(definition: Record<string, unknown>, workflowId: string) {
@@ -38,7 +39,8 @@ async function mockWorkflowExecutionApi(page: Page): Promise<ExecutionState> {
     executeCalls: 0,
     workflowId: 'wf_e2e_execution',
     runId: 'run_e2e_execution',
-    detailFetchCount: 0
+    detailFetchCount: 0,
+    latestDefinition: {}
   };
 
   await page.addInitScript(() => {
@@ -86,10 +88,20 @@ async function mockWorkflowExecutionApi(page: Page): Promise<ExecutionState> {
       state.createCalls += 1;
       const payload = JSON.parse(request.postData() || '{}') as { definition?: Record<string, unknown> };
       const definition = payload.definition || {};
+      state.latestDefinition = definition;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ workflow: buildWorkflowRecord(definition, state.workflowId) })
+      });
+      return;
+    }
+
+    if (method === 'GET' && path.endsWith(`/workflow/${state.workflowId}`)) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildWorkflowRecord(state.latestDefinition, state.workflowId))
       });
       return;
     }
@@ -219,6 +231,7 @@ test.describe('工作流执行专项E2E', () => {
 
     await page.getByRole('button', { name: '保存' }).click();
     await expect.poll(() => state.createCalls).toBeGreaterThan(0);
+    await expect(page.getByRole('button', { name: '执行' })).toBeEnabled();
 
     await page.getByRole('button', { name: '执行' }).click();
     await expect.poll(() => state.executeCalls).toBeGreaterThan(0);

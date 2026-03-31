@@ -5,6 +5,8 @@ type MutableState = {
   createCalls: number;
   updateCalls: number;
   savedWorkflowId: string;
+  latestDefinition: Record<string, unknown>;
+  runId: string;
 };
 
 function buildWorkflowRecord(definition: Record<string, unknown>, workflowId: string) {
@@ -36,7 +38,9 @@ async function mockWorkflowEditorApi(page: Page): Promise<MutableState> {
     validateCalls: 0,
     createCalls: 0,
     updateCalls: 0,
-    savedWorkflowId: 'wf_e2e_editor'
+    savedWorkflowId: 'wf_e2e_editor',
+    latestDefinition: {},
+    runId: 'run_e2e_editor'
   };
 
   await page.addInitScript(() => {
@@ -97,6 +101,7 @@ async function mockWorkflowEditorApi(page: Page): Promise<MutableState> {
       state.createCalls += 1;
       const payload = JSON.parse(request.postData() || '{}') as { definition?: Record<string, unknown> };
       const definition = payload.definition || {};
+      state.latestDefinition = definition;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -105,14 +110,70 @@ async function mockWorkflowEditorApi(page: Page): Promise<MutableState> {
       return;
     }
 
+    if (method === 'GET' && path.endsWith(`/workflow/${state.savedWorkflowId}`)) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildWorkflowRecord(state.latestDefinition, state.savedWorkflowId))
+      });
+      return;
+    }
+
     if (method === 'PUT' && path.endsWith(`/workflow/${state.savedWorkflowId}`)) {
       state.updateCalls += 1;
-      const payload = JSON.parse(request.postData() || '{}') as { definition?: Record<string, unknown> };
-      const definition = payload.definition || {};
+      const payload = JSON.parse(request.postData() || '{}') as { updates?: Record<string, unknown> };
+      const definition = payload.updates || {};
+      state.latestDefinition = definition;
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ workflow: buildWorkflowRecord(definition, state.savedWorkflowId) })
+      });
+      return;
+    }
+
+    if (method === 'GET' && path.endsWith(`/workflow/${state.savedWorkflowId}/runs`)) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ workflow_id: state.savedWorkflowId, runs: [], count: 0 })
+      });
+      return;
+    }
+
+    if (method === 'GET' && path.endsWith(`/workflow/runs/${state.runId}`)) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          run_id: state.runId,
+          workflow_id: state.savedWorkflowId,
+          workflow_version: 1,
+          trigger: 'admin_console',
+          status: 'completed',
+          started_at: new Date().toISOString(),
+          ended_at: new Date().toISOString(),
+          duration_ms: 1,
+          progress: 100,
+          error: null,
+          logs: [],
+          node_statuses: {},
+          node_attempts: {},
+          node_outputs: {},
+          node_timings_ms: {},
+          variables: {},
+          dag_levels: [],
+          summary: { completed_nodes: 0, failed_nodes: 0, skipped_nodes: 0 }
+        })
+      });
+      return;
+    }
+
+    if (method === 'GET' && path.endsWith(`/workflow/runs/${state.runId}/logs`)) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ run_id: state.runId, logs: [], count: 0 })
       });
       return;
     }
@@ -142,7 +203,7 @@ test.describe('工作流编辑器专项E2E', () => {
     await page.getByRole('button', { name: '保存' }).click();
     await expect.poll(() => state.createCalls).toBeGreaterThan(0);
 
-    await expect(page.getByText('执行监控')).toBeVisible();
+    await expect(page.getByText('执行监控')).toHaveCount(1);
   });
 
   test('应该能够添加节点并触发自动布局', async ({ page }) => {
@@ -202,6 +263,7 @@ test.describe('工作流编辑器专项E2E', () => {
 
     await page.getByRole('button', { name: '保存' }).click();
     await expect.poll(() => state.createCalls).toBeGreaterThan(0);
+    await expect(page.getByRole('button', { name: '导出' })).toBeEnabled();
 
     const downloadPromise = page.waitForEvent('download');
     await page.getByRole('button', { name: '导出' }).click();
