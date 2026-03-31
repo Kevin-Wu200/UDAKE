@@ -5,6 +5,9 @@ import notificationManager from '../NotificationManager.js';
 interface TrendPoint {
     timestamp: string;
     value: number;
+    point_id?: string;
+    x?: number;
+    y?: number;
 }
 
 interface MannKendallResult {
@@ -34,6 +37,42 @@ interface AnomalyPoint {
     value: number;
     score: number;
     anomaly_type: string;
+}
+
+type AnomalySeverity = 'high' | 'medium' | 'low';
+
+interface AnomalyViewItem extends AnomalyPoint {
+    severity: AnomalySeverity;
+    severity_label: string;
+    anomaly_type_label: string;
+    threshold: number;
+    x: number | null;
+    y: number | null;
+    point_id: string;
+}
+
+interface AnomalyCluster {
+    id: string;
+    centerX: number;
+    centerY: number;
+    count: number;
+    maxScore: number;
+}
+
+interface WarningRecord {
+    timestamp: string;
+    dataset_id: string;
+    version: number;
+    anomaly_count: number;
+    threshold: number;
+    level: 'high' | 'normal';
+}
+
+interface AnomalySubscriptionConfig {
+    enabled: boolean;
+    channels: string[];
+    frequency: 'realtime' | 'hourly' | 'daily';
+    last_notify_at: string;
 }
 
 interface ForecastPoint {
@@ -77,9 +116,13 @@ interface EChartInstance {
     setOption: (option: Record<string, unknown>, opts?: { notMerge?: boolean }) => void;
     resize: () => void;
     dispose: () => void;
+    on?: (event: string, handler: (params: Record<string, unknown>) => void) => void;
 }
 
 const LAST_DATASET_KEY = 'udake_history_snapshot_last_dataset_id';
+const WARNING_THRESHOLD_KEY = 'udake_history_anomaly_warning_threshold';
+const WARNING_HISTORY_KEY = 'udake_history_anomaly_warning_history';
+const SUBSCRIPTION_KEY = 'udake_history_anomaly_subscription';
 
 export class HistoryTrendAnalysisPanel {
     private root: HTMLElement | null = null;
@@ -94,6 +137,19 @@ export class HistoryTrendAnalysisPanel {
     private metricsHost: HTMLElement | null = null;
     private mannHost: HTMLElement | null = null;
     private fftTableHost: HTMLElement | null = null;
+    private anomalyListHost: HTMLElement | null = null;
+    private anomalyMapHost: HTMLElement | null = null;
+    private anomalyMapClusterHost: HTMLElement | null = null;
+    private anomalySeriesHost: HTMLElement | null = null;
+    private anomalyTrendHost: HTMLElement | null = null;
+    private warningStatsHost: HTMLElement | null = null;
+    private warningHistoryHost: HTMLElement | null = null;
+    private reasonHost: HTMLElement | null = null;
+    private subscriptionHost: HTMLElement | null = null;
+    private warningThresholdInput: HTMLInputElement | null = null;
+    private filterTypeSelect: HTMLSelectElement | null = null;
+    private filterSeveritySelect: HTMLSelectElement | null = null;
+    private sortSelect: HTMLSelectElement | null = null;
 
     private linearChartHost: HTMLElement | null = null;
     private fftChartHost: HTMLElement | null = null;
@@ -102,10 +158,22 @@ export class HistoryTrendAnalysisPanel {
     private linearChart: EChartInstance | null = null;
     private fftChart: EChartInstance | null = null;
     private seasonalChart: EChartInstance | null = null;
+    private anomalyMapChart: EChartInstance | null = null;
+    private anomalySeriesChart: EChartInstance | null = null;
+    private anomalyTrendChart: EChartInstance | null = null;
 
     private snapshots: HistorySnapshotMetadata[] = [];
     private trendResult: TrendAnalysisResult | null = null;
     private timeSeriesCache: Map<number, TrendPoint[]> = new Map();
+    private anomalyViewItems: AnomalyViewItem[] = [];
+    private warningHistory: WarningRecord[] = [];
+    private subscriptionConfig: AnomalySubscriptionConfig = {
+        enabled: false,
+        channels: ['app'],
+        frequency: 'realtime',
+        last_notify_at: ''
+    };
+    private currentThreshold = 2.5;
 
     constructor(private readonly apiService: APIService) {}
 
@@ -114,7 +182,7 @@ export class HistoryTrendAnalysisPanel {
         this.root.className = 'integration-module-panel history-trend-analysis-panel';
         this.root.innerHTML = `
             <h3 class="integration-module-title">趋势分析可视化仪表板</h3>
-            <p class="integration-module-description">覆盖线性趋势、置信区间、Mann-Kendall 检验、FFT 周期分析、季节性分解与统计指标。</p>
+            <p class="integration-module-description">覆盖线性趋势、异常检测可视化、预警面板、原因分析与通知订阅。</p>
 
             <section class="history-trend-card">
                 <h4>参数配置</h4>
@@ -182,6 +250,68 @@ export class HistoryTrendAnalysisPanel {
                     <div class="history-trend-chart history-trend-chart-tall" data-role="seasonal-chart"></div>
                 </section>
             </section>
+
+            <section class="history-trend-main-grid">
+                <section class="history-trend-card">
+                    <h4>异常点列表视图</h4>
+                    <div class="history-trend-inline-controls">
+                        <select class="select integration-input" data-role="anomaly-filter-type">
+                            <option value="all">全部类型</option>
+                            <option value="positive">正异常</option>
+                            <option value="negative">负异常</option>
+                        </select>
+                        <select class="select integration-input" data-role="anomaly-filter-severity">
+                            <option value="all">全部严重程度</option>
+                            <option value="high">高</option>
+                            <option value="medium">中</option>
+                            <option value="low">低</option>
+                        </select>
+                        <select class="select integration-input" data-role="anomaly-sort">
+                            <option value="score_desc">按异常分数降序</option>
+                            <option value="time_desc">按时间倒序</option>
+                            <option value="time_asc">按时间正序</option>
+                            <option value="value_desc">按异常值降序</option>
+                        </select>
+                    </div>
+                    <div class="history-trend-anomaly-table-wrap" data-role="anomaly-list"></div>
+                </section>
+
+                <section class="history-trend-card">
+                    <h4>异常点地图标注（坐标视图）</h4>
+                    <div class="history-trend-chart" data-role="anomaly-map-chart"></div>
+                    <div class="history-trend-cluster-list" data-role="anomaly-clusters"></div>
+                </section>
+            </section>
+
+            <section class="history-trend-main-grid">
+                <section class="history-trend-card">
+                    <h4>异常值时间序列图表</h4>
+                    <div class="history-trend-chart" data-role="anomaly-series-chart"></div>
+                </section>
+
+                <section class="history-trend-card">
+                    <h4>异常趋势预警面板</h4>
+                    <div class="history-trend-inline-controls">
+                        <input class="input integration-input" data-role="warning-threshold" type="number" min="1" max="500" step="1" value="5" placeholder="预警阈值">
+                        <button type="button" class="btn btn-secondary integration-action-btn" data-action="save-warning-threshold">保存阈值</button>
+                    </div>
+                    <div class="history-trend-warning-stats" data-role="warning-stats"></div>
+                    <div class="history-trend-chart" data-role="anomaly-trend-chart"></div>
+                    <div class="history-trend-warning-history" data-role="warning-history"></div>
+                </section>
+            </section>
+
+            <section class="history-trend-main-grid">
+                <section class="history-trend-card">
+                    <h4>异常原因分析展示</h4>
+                    <div data-role="anomaly-reasons"></div>
+                </section>
+
+                <section class="history-trend-card">
+                    <h4>异常通知订阅</h4>
+                    <div data-role="anomaly-subscription"></div>
+                </section>
+            </section>
         `;
 
         container.appendChild(this.root);
@@ -209,6 +339,19 @@ export class HistoryTrendAnalysisPanel {
         this.metricsHost = this.root.querySelector('[data-role="trend-metrics"]');
         this.mannHost = this.root.querySelector('[data-role="mann-result"]');
         this.fftTableHost = this.root.querySelector('[data-role="fft-table"]');
+        this.anomalyListHost = this.root.querySelector('[data-role="anomaly-list"]');
+        this.anomalyMapHost = this.root.querySelector('[data-role="anomaly-map-chart"]');
+        this.anomalyMapClusterHost = this.root.querySelector('[data-role="anomaly-clusters"]');
+        this.anomalySeriesHost = this.root.querySelector('[data-role="anomaly-series-chart"]');
+        this.anomalyTrendHost = this.root.querySelector('[data-role="anomaly-trend-chart"]');
+        this.warningStatsHost = this.root.querySelector('[data-role="warning-stats"]');
+        this.warningHistoryHost = this.root.querySelector('[data-role="warning-history"]');
+        this.reasonHost = this.root.querySelector('[data-role="anomaly-reasons"]');
+        this.subscriptionHost = this.root.querySelector('[data-role="anomaly-subscription"]');
+        this.warningThresholdInput = this.root.querySelector('[data-role="warning-threshold"]');
+        this.filterTypeSelect = this.root.querySelector('[data-role="anomaly-filter-type"]');
+        this.filterSeveritySelect = this.root.querySelector('[data-role="anomaly-filter-severity"]');
+        this.sortSelect = this.root.querySelector('[data-role="anomaly-sort"]');
 
         this.linearChartHost = this.root.querySelector('[data-role="linear-chart"]');
         this.fftChartHost = this.root.querySelector('[data-role="fft-chart"]');
@@ -243,7 +386,35 @@ export class HistoryTrendAnalysisPanel {
 
             if (action === 'analyze') {
                 await this.handleAnalyze();
+                return;
             }
+
+            if (action === 'save-warning-threshold') {
+                this.saveWarningThreshold();
+                return;
+            }
+
+            if (action === 'subscribe-anomaly-notification') {
+                this.subscribeNotification();
+                return;
+            }
+
+            if (action === 'unsubscribe-anomaly-notification') {
+                this.unsubscribeNotification();
+                return;
+            }
+
+            if (action === 'focus-anomaly') {
+                const rawIndex = actionEl.getAttribute('data-index');
+                const index = Number(rawIndex || '-1');
+                if (Number.isFinite(index) && index >= 0) {
+                    this.focusAnomaly(index);
+                }
+            }
+        });
+
+        this.root.addEventListener('change', () => {
+            this.renderAnomalyList();
         });
     }
 
@@ -258,6 +429,13 @@ export class HistoryTrendAnalysisPanel {
         }
 
         this.renderVersionOptions();
+        this.warningHistory = this.readWarningHistory();
+        this.subscriptionConfig = this.readSubscriptionConfig();
+        const storedThreshold = Number(this.readStorage(WARNING_THRESHOLD_KEY) || '5');
+        if (this.warningThresholdInput && Number.isFinite(storedThreshold) && storedThreshold >= 1) {
+            this.warningThresholdInput.value = String(Math.floor(storedThreshold));
+        }
+        this.renderSubscription();
     }
 
     private async handleLoadVersions(): Promise<void> {
@@ -299,6 +477,7 @@ export class HistoryTrendAnalysisPanel {
         if (!payload) {
             return;
         }
+        this.currentThreshold = payload.anomaly_z_threshold || 2.5;
 
         this.updateStatus('正在执行趋势分析并生成图表...', 'info');
 
@@ -309,6 +488,8 @@ export class HistoryTrendAnalysisPanel {
 
             const series = await this.getTimeSeries(datasetId, trendResult.version);
             this.renderDashboard(trendResult, series);
+            this.renderAnomalyModule(trendResult, series, payload.anomaly_z_threshold || 2.5);
+            this.evaluateAndNotifyWarning(trendResult);
 
             this.updateStatus(`趋势分析完成（版本 v${trendResult.version}，样本 ${trendResult.sample_size} 条）。`, 'success');
             notificationManager.show({
@@ -408,7 +589,20 @@ export class HistoryTrendAnalysisPanel {
                     if (!timestamp || value === null) {
                         return null;
                     }
-                    return { timestamp, value };
+                    const point: TrendPoint = { timestamp, value };
+                    const pointId = this.asString(item.point_id);
+                    const x = this.asNumber(item.x);
+                    const y = this.asNumber(item.y);
+                    if (pointId) {
+                        point.point_id = pointId;
+                    }
+                    if (x !== null) {
+                        point.x = x;
+                    }
+                    if (y !== null) {
+                        point.y = y;
+                    }
+                    return point;
                 })
                 .filter((item): item is TrendPoint => item !== null)
             : [];
@@ -544,6 +738,332 @@ export class HistoryTrendAnalysisPanel {
         this.renderFFT(result);
         this.renderSeasonal(result, timeSeries);
         this.renderLinearTrend(result, timeSeries);
+    }
+
+    private renderAnomalyModule(result: TrendAnalysisResult, timeSeries: TrendPoint[], threshold: number): void {
+        this.anomalyViewItems = this.buildAnomalyViewItems(result, timeSeries, threshold);
+        this.renderAnomalyList();
+        this.renderAnomalyMap();
+        this.renderAnomalySeries(timeSeries, threshold);
+        this.renderWarningPanel(result, timeSeries);
+        this.renderAnomalyReasons(result, timeSeries);
+        this.renderSubscription();
+    }
+
+    private buildAnomalyViewItems(result: TrendAnalysisResult, timeSeries: TrendPoint[], threshold: number): AnomalyViewItem[] {
+        return result.anomalies.map(item => {
+            const source = timeSeries[item.index] || null;
+            const scoreAbs = Math.abs(item.score);
+            let severity: AnomalySeverity = 'low';
+            if (scoreAbs >= threshold * 1.6) {
+                severity = 'high';
+            } else if (scoreAbs >= threshold * 1.2) {
+                severity = 'medium';
+            }
+
+            return {
+                ...item,
+                severity,
+                severity_label: severity === 'high' ? '高' : severity === 'medium' ? '中' : '低',
+                anomaly_type_label: this.getAnomalyTypeLabel(item.anomaly_type),
+                threshold,
+                x: source?.x ?? null,
+                y: source?.y ?? null,
+                point_id: source?.point_id || '-'
+            };
+        });
+    }
+
+    private renderAnomalyList(): void {
+        if (!this.anomalyListHost) {
+            return;
+        }
+        if (this.anomalyViewItems.length === 0) {
+            this.anomalyListHost.innerHTML = '<div class="history-empty">未检测到异常点。</div>';
+            return;
+        }
+
+        const filtered = this.getFilteredAnomalies();
+        if (filtered.length === 0) {
+            this.anomalyListHost.innerHTML = '<div class="history-empty">当前筛选条件下暂无异常点。</div>';
+            return;
+        }
+
+        const rows = filtered
+            .map(
+                item => `
+                    <tr>
+                        <td>${this.escapeHtml(this.formatDateTimeLabel(item.timestamp))}</td>
+                        <td>${item.value.toFixed(4)}</td>
+                        <td>${item.threshold.toFixed(2)}</td>
+                        <td>${this.escapeHtml(item.anomaly_type_label)}</td>
+                        <td><span class="history-anomaly-severity is-${item.severity}">${this.escapeHtml(item.severity_label)}</span></td>
+                        <td>${item.score.toFixed(3)}</td>
+                        <td>${item.x === null || item.y === null ? '-' : `${item.x.toFixed(4)}, ${item.y.toFixed(4)}`}</td>
+                        <td><button type="button" class="history-link-btn" data-action="focus-anomaly" data-index="${item.index}">定位</button></td>
+                    </tr>
+                `
+            )
+            .join('');
+
+        this.anomalyListHost.innerHTML = `
+            <table class="history-table history-trend-anomaly-table">
+                <thead>
+                    <tr>
+                        <th>时间戳</th>
+                        <th>异常值</th>
+                        <th>阈值</th>
+                        <th>异常类型</th>
+                        <th>严重程度</th>
+                        <th>z-score</th>
+                        <th>坐标</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+    }
+
+    private renderAnomalyMap(): void {
+        const chart = this.ensureChart('anomalyMap');
+        if (!chart) {
+            return;
+        }
+
+        const points = this.anomalyViewItems.filter(item => item.x !== null && item.y !== null);
+        if (points.length === 0) {
+            chart.setOption(
+                { title: { text: '快照中未包含 x/y 坐标，无法进行地图标注', left: 'center', top: 'middle', textStyle: { fontSize: 12 } } },
+                { notMerge: true }
+            );
+            if (this.anomalyMapClusterHost) {
+                this.anomalyMapClusterHost.innerHTML = '<div class="history-empty">暂无可聚合的坐标异常点。</div>';
+            }
+            return;
+        }
+
+        const clusters = this.buildAnomalyClusters(points);
+        if (this.anomalyMapClusterHost) {
+            if (clusters.length === 0) {
+                this.anomalyMapClusterHost.innerHTML = '<div class="history-empty">当前无密集区域聚合。</div>';
+            } else {
+                const clusterRows = clusters
+                    .map(cluster => `<li>聚合 ${cluster.id}: ${cluster.count} 个点，最高分 ${cluster.maxScore.toFixed(2)}</li>`)
+                    .join('');
+                this.anomalyMapClusterHost.innerHTML = `<ul>${clusterRows}</ul>`;
+            }
+        }
+
+        const severityWeight = (severity: AnomalySeverity): number => (severity === 'high' ? 3 : severity === 'medium' ? 2 : 1);
+        chart.setOption(
+            {
+                tooltip: {
+                    trigger: 'item',
+                    formatter: (params: { data?: unknown[] }) => {
+                        const data = Array.isArray(params.data) ? params.data : [];
+                        const timestamp = String(data[4] || '-');
+                        const value = Number(data[2] || 0);
+                        const score = Number(data[3] || 0);
+                        const severity = String(data[5] || '-');
+                        return `时间: ${timestamp}<br/>值: ${value.toFixed(4)}<br/>z-score: ${score.toFixed(3)}<br/>严重程度: ${severity}`;
+                    }
+                },
+                xAxis: { type: 'value', name: 'X' },
+                yAxis: { type: 'value', name: 'Y' },
+                legend: { top: 4, data: ['异常点', '聚合点'] },
+                grid: { left: 45, right: 20, top: 38, bottom: 38 },
+                dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 12 }],
+                series: [
+                    {
+                        name: '异常点',
+                        type: 'scatter',
+                        data: points.map(item => [item.x, item.y, item.value, item.score, this.formatDateTimeLabel(item.timestamp), item.severity_label]),
+                        symbolSize: (value: number[]) => 8 + severityWeight(this.getSeverityByScore(Math.abs(Number(value[3] || 0)), this.currentThreshold)) * 3,
+                        itemStyle: {
+                            color: (params: { data?: unknown[] }) => {
+                                const score = Math.abs(Number((params.data || [])[3] || 0));
+                                const severity = this.getSeverityByScore(score, this.currentThreshold);
+                                return severity === 'high' ? '#dc2626' : severity === 'medium' ? '#f59e0b' : '#2563eb';
+                            }
+                        }
+                    },
+                    {
+                        name: '聚合点',
+                        type: 'scatter',
+                        data: clusters.map(cluster => [cluster.centerX, cluster.centerY, cluster.count, cluster.maxScore, cluster.id]),
+                        symbolSize: (value: number[]) => 12 + Number(value[2] || 0) * 2,
+                        label: { show: true, formatter: '{@[2]}', color: '#111827', fontSize: 10 },
+                        itemStyle: { color: 'rgba(22,163,74,0.6)', borderColor: '#166534', borderWidth: 1 }
+                    }
+                ]
+            },
+            { notMerge: true }
+        );
+    }
+
+    private renderAnomalySeries(timeSeries: TrendPoint[], threshold: number): void {
+        const chart = this.ensureChart('anomalySeries');
+        if (!chart) {
+            return;
+        }
+        if (timeSeries.length === 0) {
+            chart.setOption(
+                { title: { text: '无时间序列数据', left: 'center', top: 'middle', textStyle: { fontSize: 12 } } },
+                { notMerge: true }
+            );
+            return;
+        }
+
+        const values = timeSeries.map(item => item.value);
+        const mean = values.reduce((sum, item) => sum + item, 0) / Math.max(1, values.length);
+        const std = this.computeStd(values);
+        const thresholdUpper = mean + threshold * std;
+        const thresholdLower = mean - threshold * std;
+        const labels = timeSeries.map(item => this.formatDateLabel(item.timestamp));
+        const anomalyIndex = new Set(this.anomalyViewItems.map(item => item.index));
+        const anomalyMarks = values
+            .map((value, index) => (anomalyIndex.has(index) ? [index, value] : null))
+            .filter((item): item is [number, number] => item !== null);
+
+        chart.setOption(
+            {
+                tooltip: { trigger: 'axis' },
+                legend: { top: 4, data: ['原始值', '异常点', '上阈值', '下阈值'] },
+                grid: { left: 45, right: 20, top: 36, bottom: 48 },
+                dataZoom: [{ type: 'inside' }, { type: 'slider', height: 16, bottom: 12 }],
+                xAxis: { type: 'category', data: labels },
+                yAxis: { type: 'value', scale: true },
+                series: [
+                    { name: '原始值', type: 'line', data: values, smooth: true, symbol: 'none', lineStyle: { color: '#1f2937' } },
+                    { name: '上阈值', type: 'line', data: Array(values.length).fill(thresholdUpper), symbol: 'none', lineStyle: { color: '#f59e0b', type: 'dashed' } },
+                    { name: '下阈值', type: 'line', data: Array(values.length).fill(thresholdLower), symbol: 'none', lineStyle: { color: '#f59e0b', type: 'dashed' } },
+                    { name: '异常点', type: 'scatter', data: anomalyMarks, symbolSize: 9, itemStyle: { color: '#dc2626' } }
+                ]
+            },
+            { notMerge: true }
+        );
+    }
+
+    private renderWarningPanel(result: TrendAnalysisResult, timeSeries: TrendPoint[]): void {
+        const warningThreshold = this.getWarningThreshold();
+        const highCount = this.anomalyViewItems.filter(item => item.severity === 'high').length;
+        const anomalyRate = timeSeries.length > 0 ? (this.anomalyViewItems.length / timeSeries.length) * 100 : 0;
+
+        if (this.warningStatsHost) {
+            this.warningStatsHost.innerHTML = `
+                <div class="history-trend-warning-card"><span>异常总数</span><strong>${this.anomalyViewItems.length}</strong></div>
+                <div class="history-trend-warning-card"><span>高危异常</span><strong>${highCount}</strong></div>
+                <div class="history-trend-warning-card"><span>异常占比</span><strong>${anomalyRate.toFixed(2)}%</strong></div>
+                <div class="history-trend-warning-card"><span>当前阈值</span><strong>${warningThreshold}</strong></div>
+            `;
+        }
+
+        this.renderAnomalyTrendChart();
+        this.renderWarningHistory();
+
+        if (this.anomalyViewItems.length >= warningThreshold) {
+            this.recordWarning({
+                timestamp: new Date().toISOString(),
+                dataset_id: result.dataset_id,
+                version: result.version,
+                anomaly_count: this.anomalyViewItems.length,
+                threshold: warningThreshold,
+                level: highCount > 0 ? 'high' : 'normal'
+            });
+            this.renderWarningHistory();
+        }
+    }
+
+    private renderAnomalyTrendChart(): void {
+        const chart = this.ensureChart('anomalyTrend');
+        if (!chart) {
+            return;
+        }
+        if (this.anomalyViewItems.length === 0) {
+            chart.setOption(
+                { title: { text: '暂无异常频率趋势', left: 'center', top: 'middle', textStyle: { fontSize: 12 } } },
+                { notMerge: true }
+            );
+            return;
+        }
+
+        const dailyMap = new Map<string, number>();
+        this.anomalyViewItems.forEach(item => {
+            const day = this.formatDateLabel(item.timestamp);
+            dailyMap.set(day, (dailyMap.get(day) || 0) + 1);
+        });
+        const labels = Array.from(dailyMap.keys()).sort();
+        const values = labels.map(label => dailyMap.get(label) || 0);
+
+        chart.setOption(
+            {
+                tooltip: { trigger: 'axis' },
+                grid: { left: 45, right: 20, top: 24, bottom: 38 },
+                xAxis: { type: 'category', data: labels },
+                yAxis: { type: 'value', minInterval: 1, name: '异常次数' },
+                series: [{ type: 'line', data: values, smooth: true, itemStyle: { color: '#dc2626' }, areaStyle: { color: 'rgba(220,38,38,0.12)' } }]
+            },
+            { notMerge: true }
+        );
+    }
+
+    private renderWarningHistory(): void {
+        if (!this.warningHistoryHost) {
+            return;
+        }
+        if (this.warningHistory.length === 0) {
+            this.warningHistoryHost.innerHTML = '<div class="history-empty">暂无预警历史记录。</div>';
+            return;
+        }
+
+        const rows = this.warningHistory
+            .slice(0, 8)
+            .map(item => `<li>${this.formatDateTimeLabel(item.timestamp)} | ${this.escapeHtml(item.dataset_id)} v${item.version} | 异常 ${item.anomaly_count}/${item.threshold} | 级别 ${item.level === 'high' ? '高' : '一般'}</li>`)
+            .join('');
+        this.warningHistoryHost.innerHTML = `<ul>${rows}</ul>`;
+    }
+
+    private renderAnomalyReasons(result: TrendAnalysisResult, timeSeries: TrendPoint[]): void {
+        if (!this.reasonHost) {
+            return;
+        }
+
+        if (this.anomalyViewItems.length === 0) {
+            this.reasonHost.innerHTML = '<div class="history-empty">未检测到异常点，暂无原因分析。</div>';
+            return;
+        }
+
+        const highCount = this.anomalyViewItems.filter(item => item.severity === 'high').length;
+        const positiveCount = this.anomalyViewItems.filter(item => item.anomaly_type === 'positive').length;
+        const negativeCount = this.anomalyViewItems.filter(item => item.anomaly_type === 'negative').length;
+        const avgValue = timeSeries.length > 0 ? timeSeries.reduce((sum, item) => sum + item.value, 0) / timeSeries.length : 0;
+        const latest = this.anomalyViewItems.slice().sort((a, b) => Date.parse(b.timestamp) - Date.parse(a.timestamp))[0];
+
+        const reasons = [
+            `高危异常占比 ${(highCount / Math.max(1, this.anomalyViewItems.length) * 100).toFixed(1)}%，可能存在突发性扰动或采样设备漂移。`,
+            `正异常 ${positiveCount} 个、负异常 ${negativeCount} 个，说明系统偏移方向${positiveCount >= negativeCount ? '偏上行' : '偏下行'}。`,
+            `序列均值约 ${avgValue.toFixed(4)}，最近一次异常时间为 ${this.formatDateTimeLabel(latest.timestamp)}。`
+        ];
+
+        const measures = [
+            '核查异常时段的设备校准和采样环境变化。',
+            '结合周期分量复核是否存在季节性导致的误报。',
+            '对高危异常点进行人工复测并增加采样密度。'
+        ];
+
+        this.reasonHost.innerHTML = `
+            <div class="history-trend-reason-grid">
+                <div>
+                    <h5>可能原因</h5>
+                    <ul>${reasons.map(item => `<li>${this.escapeHtml(item)}</li>`).join('')}</ul>
+                </div>
+                <div>
+                    <h5>相关因素与建议</h5>
+                    <ul>${measures.map(item => `<li>${this.escapeHtml(item)}</li>`).join('')}</ul>
+                </div>
+            </div>
+        `;
     }
 
     private renderMetrics(result: TrendAnalysisResult, timeSeries: TrendPoint[]): void {
@@ -891,12 +1411,43 @@ export class HistoryTrendAnalysisPanel {
         if (this.fftTableHost) {
             this.fftTableHost.innerHTML = '<div class="history-empty">执行趋势分析后展示周期识别结果。</div>';
         }
+
+        if (this.anomalyListHost) {
+            this.anomalyListHost.innerHTML = '<div class="history-empty">执行趋势分析后展示异常点列表。</div>';
+        }
+
+        if (this.anomalyMapClusterHost) {
+            this.anomalyMapClusterHost.innerHTML = '<div class="history-empty">暂无聚合标注。</div>';
+        }
+
+        if (this.warningStatsHost) {
+            this.warningStatsHost.innerHTML = '<div class="history-empty">执行趋势分析后展示预警统计。</div>';
+        }
+
+        if (this.warningHistoryHost) {
+            this.warningHistoryHost.innerHTML = '<div class="history-empty">暂无预警历史记录。</div>';
+        }
+
+        if (this.reasonHost) {
+            this.reasonHost.innerHTML = '<div class="history-empty">执行趋势分析后展示异常原因。</div>';
+        }
     }
 
-    private ensureChart(type: 'linear' | 'fft' | 'seasonal'): EChartInstance | null {
+    private ensureChart(type: 'linear' | 'fft' | 'seasonal' | 'anomalyMap' | 'anomalySeries' | 'anomalyTrend'): EChartInstance | null {
         const echarts = this.getEcharts();
         if (!echarts) {
-            const host = type === 'linear' ? this.linearChartHost : type === 'fft' ? this.fftChartHost : this.seasonalChartHost;
+            const host =
+                type === 'linear'
+                    ? this.linearChartHost
+                    : type === 'fft'
+                        ? this.fftChartHost
+                        : type === 'seasonal'
+                            ? this.seasonalChartHost
+                            : type === 'anomalyMap'
+                                ? this.anomalyMapHost
+                                : type === 'anomalySeries'
+                                    ? this.anomalySeriesHost
+                                    : this.anomalyTrendHost;
             if (host) {
                 host.innerHTML = '<div class="history-empty">当前环境未加载 ECharts，无法渲染图表。</div>';
             }
@@ -920,7 +1471,28 @@ export class HistoryTrendAnalysisPanel {
         if (!this.seasonalChart && this.seasonalChartHost) {
             this.seasonalChart = echarts.init(this.seasonalChartHost);
         }
-        return this.seasonalChart;
+        if (type === 'seasonal') {
+            return this.seasonalChart;
+        }
+
+        if (type === 'anomalyMap') {
+            if (!this.anomalyMapChart && this.anomalyMapHost) {
+                this.anomalyMapChart = echarts.init(this.anomalyMapHost);
+            }
+            return this.anomalyMapChart;
+        }
+
+        if (type === 'anomalySeries') {
+            if (!this.anomalySeriesChart && this.anomalySeriesHost) {
+                this.anomalySeriesChart = echarts.init(this.anomalySeriesHost);
+            }
+            return this.anomalySeriesChart;
+        }
+
+        if (!this.anomalyTrendChart && this.anomalyTrendHost) {
+            this.anomalyTrendChart = echarts.init(this.anomalyTrendHost);
+        }
+        return this.anomalyTrendChart;
     }
 
     private getEcharts(): EChartsLike | null {
@@ -932,6 +1504,9 @@ export class HistoryTrendAnalysisPanel {
         this.linearChart?.resize();
         this.fftChart?.resize();
         this.seasonalChart?.resize();
+        this.anomalyMapChart?.resize();
+        this.anomalySeriesChart?.resize();
+        this.anomalyTrendChart?.resize();
     };
 
     private updateStatus(message: string, type: 'info' | 'success' | 'error'): void {
@@ -979,6 +1554,320 @@ export class HistoryTrendAnalysisPanel {
         const mm = `${date.getMonth() + 1}`.padStart(2, '0');
         const dd = `${date.getDate()}`.padStart(2, '0');
         return `${yyyy}-${mm}-${dd}`;
+    }
+
+    private formatDateTimeLabel(timestamp: string): string {
+        const date = new Date(timestamp);
+        if (Number.isNaN(date.getTime())) {
+            return timestamp;
+        }
+        const yyyy = date.getFullYear();
+        const mm = `${date.getMonth() + 1}`.padStart(2, '0');
+        const dd = `${date.getDate()}`.padStart(2, '0');
+        const hh = `${date.getHours()}`.padStart(2, '0');
+        const mi = `${date.getMinutes()}`.padStart(2, '0');
+        return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+    }
+
+    private getFilteredAnomalies(): AnomalyViewItem[] {
+        const type = this.filterTypeSelect?.value || 'all';
+        const severity = this.filterSeveritySelect?.value || 'all';
+        const sort = this.sortSelect?.value || 'score_desc';
+        const items = this.anomalyViewItems.filter(item => {
+            if (type !== 'all' && item.anomaly_type !== type) {
+                return false;
+            }
+            if (severity !== 'all' && item.severity !== severity) {
+                return false;
+            }
+            return true;
+        });
+
+        items.sort((a, b) => {
+            if (sort === 'time_asc') {
+                return Date.parse(a.timestamp) - Date.parse(b.timestamp);
+            }
+            if (sort === 'time_desc') {
+                return Date.parse(b.timestamp) - Date.parse(a.timestamp);
+            }
+            if (sort === 'value_desc') {
+                return b.value - a.value;
+            }
+            return Math.abs(b.score) - Math.abs(a.score);
+        });
+        return items;
+    }
+
+    private getAnomalyTypeLabel(type: string): string {
+        if (type === 'positive') {
+            return '正异常';
+        }
+        if (type === 'negative') {
+            return '负异常';
+        }
+        return '未知';
+    }
+
+    private getSeverityByScore(scoreAbs: number, threshold: number): AnomalySeverity {
+        if (scoreAbs >= threshold * 1.6) {
+            return 'high';
+        }
+        if (scoreAbs >= threshold * 1.2) {
+            return 'medium';
+        }
+        return 'low';
+    }
+
+    private buildAnomalyClusters(points: AnomalyViewItem[]): AnomalyCluster[] {
+        if (points.length < 2) {
+            return [];
+        }
+        const xs = points.map(item => item.x || 0);
+        const ys = points.map(item => item.y || 0);
+        const minX = Math.min(...xs);
+        const maxX = Math.max(...xs);
+        const minY = Math.min(...ys);
+        const maxY = Math.max(...ys);
+        const dx = Math.max(1e-6, maxX - minX);
+        const dy = Math.max(1e-6, maxY - minY);
+        const gridSize = 6;
+        const buckets = new Map<string, AnomalyViewItem[]>();
+
+        points.forEach(item => {
+            const x = item.x || 0;
+            const y = item.y || 0;
+            const gx = Math.min(gridSize - 1, Math.floor(((x - minX) / dx) * gridSize));
+            const gy = Math.min(gridSize - 1, Math.floor(((y - minY) / dy) * gridSize));
+            const key = `${gx}-${gy}`;
+            const bucket = buckets.get(key) || [];
+            bucket.push(item);
+            buckets.set(key, bucket);
+        });
+
+        const clusters: AnomalyCluster[] = [];
+        buckets.forEach((bucket, key) => {
+            if (bucket.length < 2) {
+                return;
+            }
+            const centerX = bucket.reduce((sum, item) => sum + (item.x || 0), 0) / bucket.length;
+            const centerY = bucket.reduce((sum, item) => sum + (item.y || 0), 0) / bucket.length;
+            const maxScore = Math.max(...bucket.map(item => Math.abs(item.score)));
+            clusters.push({
+                id: key,
+                centerX,
+                centerY,
+                count: bucket.length,
+                maxScore
+            });
+        });
+
+        return clusters.sort((a, b) => b.count - a.count);
+    }
+
+    private computeStd(values: number[]): number {
+        if (values.length <= 1) {
+            return 0;
+        }
+        const mean = values.reduce((sum, item) => sum + item, 0) / values.length;
+        const variance = values.reduce((sum, item) => sum + Math.pow(item - mean, 2), 0) / (values.length - 1);
+        return Math.sqrt(Math.max(0, variance));
+    }
+
+    private getWarningThreshold(): number {
+        const inputValue = Number(this.warningThresholdInput?.value || '');
+        if (Number.isFinite(inputValue) && inputValue >= 1) {
+            return Math.floor(inputValue);
+        }
+        const stored = Number(this.readStorage(WARNING_THRESHOLD_KEY) || '5');
+        if (Number.isFinite(stored) && stored >= 1) {
+            return Math.floor(stored);
+        }
+        return 5;
+    }
+
+    private saveWarningThreshold(): void {
+        const threshold = this.getWarningThreshold();
+        this.writeStorage(WARNING_THRESHOLD_KEY, String(threshold));
+        this.updateStatus(`异常预警阈值已更新为 ${threshold}。`, 'success');
+    }
+
+    private recordWarning(record: WarningRecord): void {
+        const latest = this.warningHistory[0];
+        if (
+            latest &&
+            latest.dataset_id === record.dataset_id &&
+            latest.version === record.version &&
+            latest.anomaly_count === record.anomaly_count &&
+            latest.threshold === record.threshold
+        ) {
+            return;
+        }
+        this.warningHistory = [record, ...this.warningHistory].slice(0, 60);
+        this.writeStorage(WARNING_HISTORY_KEY, JSON.stringify(this.warningHistory));
+    }
+
+    private readWarningHistory(): WarningRecord[] {
+        const raw = this.readStorage(WARNING_HISTORY_KEY);
+        if (!raw) {
+            return [];
+        }
+        try {
+            const parsed = JSON.parse(raw);
+            if (!Array.isArray(parsed)) {
+                return [];
+            }
+            return parsed
+                .filter(item => item && typeof item === 'object')
+                .map(item => {
+                    const record = item as Record<string, unknown>;
+                    const level: 'high' | 'normal' = this.asString(record.level) === 'high' ? 'high' : 'normal';
+                    return {
+                        timestamp: this.asString(record.timestamp) || '',
+                        dataset_id: this.asString(record.dataset_id) || '',
+                        version: this.asNumber(record.version) || 0,
+                        anomaly_count: this.asNumber(record.anomaly_count) || 0,
+                        threshold: this.asNumber(record.threshold) || 0,
+                        level
+                    };
+                })
+                .filter(item => item.dataset_id && item.version > 0);
+        } catch {
+            return [];
+        }
+    }
+
+    private readSubscriptionConfig(): AnomalySubscriptionConfig {
+        const raw = this.readStorage(SUBSCRIPTION_KEY);
+        if (!raw) {
+            return {
+                enabled: false,
+                channels: ['app'],
+                frequency: 'realtime',
+                last_notify_at: ''
+            };
+        }
+        try {
+            const parsed = JSON.parse(raw) as Partial<AnomalySubscriptionConfig>;
+            const frequency = parsed.frequency === 'hourly' || parsed.frequency === 'daily' ? parsed.frequency : 'realtime';
+            return {
+                enabled: Boolean(parsed.enabled),
+                channels: Array.isArray(parsed.channels) ? parsed.channels.filter(item => typeof item === 'string') : ['app'],
+                frequency,
+                last_notify_at: typeof parsed.last_notify_at === 'string' ? parsed.last_notify_at : ''
+            };
+        } catch {
+            return {
+                enabled: false,
+                channels: ['app'],
+                frequency: 'realtime',
+                last_notify_at: ''
+            };
+        }
+    }
+
+    private renderSubscription(): void {
+        if (!this.subscriptionHost) {
+            return;
+        }
+        const config = this.subscriptionConfig;
+        this.subscriptionHost.innerHTML = `
+            <div class="history-trend-subscription-grid">
+                <label><input type="checkbox" data-role="sub-channel" value="mail" ${config.channels.includes('mail') ? 'checked' : ''}> 邮件</label>
+                <label><input type="checkbox" data-role="sub-channel" value="sms" ${config.channels.includes('sms') ? 'checked' : ''}> 短信</label>
+                <label><input type="checkbox" data-role="sub-channel" value="app" ${config.channels.includes('app') ? 'checked' : ''}> 应用内</label>
+                <select class="select integration-input" data-role="sub-frequency">
+                    <option value="realtime" ${config.frequency === 'realtime' ? 'selected' : ''}>实时</option>
+                    <option value="hourly" ${config.frequency === 'hourly' ? 'selected' : ''}>每小时</option>
+                    <option value="daily" ${config.frequency === 'daily' ? 'selected' : ''}>每天</option>
+                </select>
+            </div>
+            <div class="integration-actions">
+                <button type="button" class="btn btn-primary integration-action-btn" data-action="subscribe-anomaly-notification">订阅异常通知</button>
+                <button type="button" class="btn btn-secondary integration-action-btn" data-action="unsubscribe-anomaly-notification">取消订阅</button>
+            </div>
+            <p class="history-trend-hint">当前状态：${config.enabled ? '已订阅' : '未订阅'}${config.last_notify_at ? `，上次通知 ${this.formatDateTimeLabel(config.last_notify_at)}` : ''}</p>
+        `;
+    }
+
+    private subscribeNotification(): void {
+        if (!this.subscriptionHost) {
+            return;
+        }
+        const channels = Array.from(this.subscriptionHost.querySelectorAll('[data-role="sub-channel"]'))
+            .filter(node => (node as HTMLInputElement).checked)
+            .map(node => (node as HTMLInputElement).value);
+        if (channels.length === 0) {
+            this.updateStatus('至少选择一种通知方式。', 'error');
+            return;
+        }
+        const frequencyEl = this.subscriptionHost.querySelector('[data-role="sub-frequency"]') as HTMLSelectElement | null;
+        const frequency = frequencyEl?.value === 'hourly' || frequencyEl?.value === 'daily' ? frequencyEl.value : 'realtime';
+        this.subscriptionConfig = {
+            ...this.subscriptionConfig,
+            enabled: true,
+            channels,
+            frequency
+        };
+        this.writeStorage(SUBSCRIPTION_KEY, JSON.stringify(this.subscriptionConfig));
+        this.renderSubscription();
+        this.updateStatus('异常通知订阅已保存。', 'success');
+    }
+
+    private unsubscribeNotification(): void {
+        this.subscriptionConfig = {
+            ...this.subscriptionConfig,
+            enabled: false
+        };
+        this.writeStorage(SUBSCRIPTION_KEY, JSON.stringify(this.subscriptionConfig));
+        this.renderSubscription();
+        this.updateStatus('已取消异常通知订阅。', 'success');
+    }
+
+    private evaluateAndNotifyWarning(result: TrendAnalysisResult): void {
+        const threshold = this.getWarningThreshold();
+        if (this.anomalyViewItems.length < threshold) {
+            return;
+        }
+        if (!this.subscriptionConfig.enabled || !this.subscriptionConfig.channels.includes('app')) {
+            return;
+        }
+        if (!this.shouldDispatchByFrequency()) {
+            return;
+        }
+
+        this.subscriptionConfig.last_notify_at = new Date().toISOString();
+        this.writeStorage(SUBSCRIPTION_KEY, JSON.stringify(this.subscriptionConfig));
+        notificationManager.show({
+            type: 'taskFailure',
+            title: '异常趋势预警',
+            body: `数据集 ${result.dataset_id} v${result.version} 检测到 ${this.anomalyViewItems.length} 个异常点（阈值 ${threshold}）。`,
+            priority: 'high'
+        });
+        this.renderSubscription();
+    }
+
+    private shouldDispatchByFrequency(): boolean {
+        const frequency = this.subscriptionConfig.frequency;
+        const last = this.subscriptionConfig.last_notify_at ? Date.parse(this.subscriptionConfig.last_notify_at) : 0;
+        if (!last || Number.isNaN(last)) {
+            return true;
+        }
+        const now = Date.now();
+        if (frequency === 'hourly') {
+            return now - last >= 60 * 60 * 1000;
+        }
+        if (frequency === 'daily') {
+            return now - last >= 24 * 60 * 60 * 1000;
+        }
+        return true;
+    }
+
+    private focusAnomaly(index: number): void {
+        const target = this.anomalyViewItems.find(item => item.index === index);
+        if (!target) {
+            return;
+        }
+        this.updateStatus(`异常点定位：${this.formatDateTimeLabel(target.timestamp)}，值 ${target.value.toFixed(4)}，z-score ${target.score.toFixed(3)}。`, 'info');
     }
 
     private asRecord(value: unknown): Record<string, unknown> | null {

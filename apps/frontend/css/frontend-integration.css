@@ -638,6 +638,118 @@
     min-width: 420px;
 }
 
+.history-trend-inline-controls {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.history-trend-anomaly-table-wrap {
+    overflow-x: auto;
+}
+
+.history-trend-anomaly-table {
+    min-width: 760px;
+}
+
+.history-anomaly-severity {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.history-anomaly-severity.is-high {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.history-anomaly-severity.is-medium {
+    background: #fef3c7;
+    color: #b45309;
+}
+
+.history-anomaly-severity.is-low {
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.history-trend-cluster-list {
+    font-size: 12px;
+    color: #4b5563;
+}
+
+.history-trend-cluster-list ul,
+.history-trend-warning-history ul {
+    margin: 0;
+    padding-left: 18px;
+    display: grid;
+    gap: 4px;
+}
+
+.history-trend-warning-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.history-trend-warning-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 11px;
+    color: #6b7280;
+}
+
+.history-trend-warning-card strong {
+    font-size: 14px;
+    color: #111827;
+}
+
+.history-trend-warning-history {
+    font-size: 12px;
+    color: #374151;
+}
+
+.history-trend-reason-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+}
+
+.history-trend-reason-grid h5 {
+    margin: 0 0 4px;
+    font-size: 12px;
+}
+
+.history-trend-reason-grid ul {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 12px;
+    color: #374151;
+    display: grid;
+    gap: 4px;
+}
+
+.history-trend-subscription-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+}
+
+.history-trend-subscription-grid label {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
 @media (max-width: 768px) {
     .frontend-integration-hub {
         max-height: 55vh;
