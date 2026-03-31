@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 type MutableState = {
   validateCalls: number;
   createCalls: number;
+  updateCalls: number;
   savedWorkflowId: string;
 };
 
@@ -34,6 +35,7 @@ async function mockWorkflowEditorApi(page: Page): Promise<MutableState> {
   const state: MutableState = {
     validateCalls: 0,
     createCalls: 0,
+    updateCalls: 0,
     savedWorkflowId: 'wf_e2e_editor'
   };
 
@@ -103,6 +105,18 @@ async function mockWorkflowEditorApi(page: Page): Promise<MutableState> {
       return;
     }
 
+    if (method === 'PUT' && path.endsWith(`/workflow/${state.savedWorkflowId}`)) {
+      state.updateCalls += 1;
+      const payload = JSON.parse(request.postData() || '{}') as { definition?: Record<string, unknown> };
+      const definition = payload.definition || {};
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ workflow: buildWorkflowRecord(definition, state.savedWorkflowId) })
+      });
+      return;
+    }
+
     await route.fulfill({
       status: 404,
       contentType: 'application/json',
@@ -141,5 +155,57 @@ test.describe('工作流编辑器专项E2E', () => {
 
     await page.getByRole('button', { name: '自动布局' }).click();
     await expect(page.locator('.workflow-canvas')).toBeVisible();
+  });
+
+  test('应该能够复制并删除节点', async ({ page }) => {
+    await mockWorkflowEditorApi(page);
+
+    await page.goto('/#/workflows/editor');
+
+    await page.getByText('input_1').first().click();
+    await page.getByRole('button', { name: '复制节点' }).click();
+    await expect(page.getByText('input_1_复制')).toBeVisible();
+
+    await page.getByText('input_1_复制').first().click();
+    await page.getByRole('button', { name: '删除节点' }).click();
+    await expect(page.getByText('input_1_复制')).toHaveCount(0);
+  });
+
+  test('应该能够导入和导出工作流定义', async ({ page }) => {
+    const state = await mockWorkflowEditorApi(page);
+
+    await page.goto('/#/workflows/editor');
+
+    const importedDefinition = {
+      workflow_id: 'wf_imported_case',
+      name: '导入流程A',
+      description: 'imported by e2e',
+      version: 1,
+      nodes: [
+        {
+          node_id: 'input_a',
+          kind: 'input',
+          node_type: 'input.constant',
+          params: { value: [10, 20] }
+        }
+      ],
+      edges: []
+    };
+
+    await page.setInputFiles('input[type="file"]', {
+      name: 'imported-workflow.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify(importedDefinition), 'utf-8')
+    });
+
+    await expect(page.getByPlaceholder('工作流名称')).toHaveValue('导入流程A');
+
+    await page.getByRole('button', { name: '保存' }).click();
+    await expect.poll(() => state.createCalls).toBeGreaterThan(0);
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: '导出' }).click();
+    const download = await downloadPromise;
+    expect(download.suggestedFilename()).toContain('导入流程A');
   });
 });

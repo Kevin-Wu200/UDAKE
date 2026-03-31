@@ -27,6 +27,7 @@
           :id="flowId"
           v-model:nodes="nodes"
           v-model:edges="edges"
+          :only-render-visible-elements="true"
           class="workflow-canvas"
           :node-types="nodeTypes"
           :edge-types="edgeTypes"

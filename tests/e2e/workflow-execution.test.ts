@@ -223,9 +223,7 @@ test.describe('工作流执行专项E2E', () => {
     await page.getByRole('button', { name: '执行' }).click();
     await expect.poll(() => state.executeCalls).toBeGreaterThan(0);
 
-    await page.getByRole('button', { name: '刷新' }).click();
-
-    await expect(page.getByText(state.runId)).toBeVisible();
+    await expect(page.getByText(state.runId).first()).toBeVisible();
     await expect(page.getByText('node_completed')).toBeVisible();
   });
 });

@@ -27,6 +27,7 @@
     "coverage:report": "node scripts/coverage-report.js",
     "test:security": "vitest --config configs/vitest.config.js --run tests/security.test.ts",
     "test:e2e": "playwright test --config configs/playwright.config.ts",
+    "test:e2e:workflow": "playwright test --config configs/playwright.workflow.config.ts tests/e2e/workflow-editor.test.ts tests/e2e/workflow-execution.test.ts tests/e2e/workflow-templates.test.ts",
     "test:e2e:auth": "playwright test --config configs/playwright.auth.config.ts",
     "test:e2e:ui": "playwright test --config configs/playwright.config.ts --ui",
     "test:performance": "vitest --config configs/vitest.config.js --run tests/performance-monitor.test.ts",

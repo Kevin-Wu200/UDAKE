@@ -1,0 +1,58 @@
+name: Workflow E2E
+
+on:
+  push:
+    paths:
+      - 'apps/admin-frontend/**'
+      - 'tests/e2e/workflow*.test.ts'
+      - 'configs/playwright.config.ts'
+      - 'configs/playwright.workflow.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/workflow_e2e.yml'
+  pull_request:
+    paths:
+      - 'apps/admin-frontend/**'
+      - 'tests/e2e/workflow*.test.ts'
+      - 'configs/playwright.config.ts'
+      - 'configs/playwright.workflow.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/workflow_e2e.yml'
+
+jobs:
+  workflow-e2e:
+    runs-on: ubuntu-latest
+    env:
+      CI: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --no-audit --prefer-offline
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run workflow E2E tests
+        run: npm run test:e2e:workflow
+
+      - name: Upload Playwright artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workflow-e2e-artifacts
+          path: |
+            playwright-report
+            playwright-report-workflow
+            test-results
+            test-results.json
+            test-results-workflow.json
+          if-no-files-found: ignore

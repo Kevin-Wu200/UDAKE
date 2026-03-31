@@ -153,6 +153,34 @@ async function mockWorkflowTemplateApi(page: Page): Promise<TemplateState> {
       return;
     }
 
+    if (method === 'POST' && path.endsWith('/workflow/templates/tpl_e2e_2/instantiate')) {
+      state.instantiateCalls += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          workflow: {
+            workflow_id: 'wf_from_recommend',
+            name: '推荐模板实例',
+            description: 'instantiated from recommendation',
+            current: {
+              workflow_id: 'wf_from_recommend',
+              name: '推荐模板实例',
+              version: 1,
+              description: 'instantiated from recommendation',
+              nodes: [],
+              edges: []
+            },
+            versions: [],
+            collaborators: [],
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          }
+        })
+      });
+      return;
+    }
+
     if (method === 'GET' && path.endsWith('/workflow/wf_from_template')) {
       await route.fulfill({
         status: 200,
