@@ -2,6 +2,7 @@ import { APIService } from '../services/API封装.js';
 import { DataQualityPanel } from './integration/DataQualityPanel.js';
 import { HistorySnapshotPanel } from './integration/HistorySnapshotPanel.js';
 import { HistoryVersionComparisonPanel } from './integration/HistoryVersionComparisonPanel.js';
+import { HistoryTrendAnalysisPanel } from './integration/HistoryTrendAnalysisPanel.js';
 import { ModelEvaluationPanel } from './integration/ModelEvaluationPanel.js';
 import { UserValidationPanel } from './integration/UserValidationPanel.js';
 import { ModelFusionPanel } from './integration/ModelFusionPanel.js';
@@ -42,6 +43,7 @@ export class FrontendIntegrationHub {
         { id: 'data-quality', title: '数据质量管理', ctor: DataQualityPanel },
         { id: 'history-snapshot', title: '历史快照管理', ctor: HistorySnapshotPanel },
         { id: 'history-version-comparison', title: '历史版本对比', ctor: HistoryVersionComparisonPanel },
+        { id: 'history-trend-analysis', title: '趋势分析可视化', ctor: HistoryTrendAnalysisPanel },
         { id: 'model-evaluation', title: '模型评估与优化', ctor: ModelEvaluationPanel },
         { id: 'user-validation', title: '用户验证与自评估', ctor: UserValidationPanel },
         { id: 'model-fusion', title: '模型融合', ctor: ModelFusionPanel },
