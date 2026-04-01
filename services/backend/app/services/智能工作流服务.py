@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 import json
+import os
 import re
 import threading
 import time
@@ -15,6 +16,7 @@ from urllib.parse import quote_plus
 from uuid import uuid4
 
 from .websocket_service import websocket_service
+from .smart_workflow_dao import build_smart_workflow_daos
 from .workflow_redis_cache import WorkflowRedisCacheManager
 from ..config import settings
 from ..workflow.engine import WorkflowEngine
@@ -95,6 +97,22 @@ class SmartWorkflowService:
         self._invitations: Dict[str, Dict[str, Any]] = {}
         self._delegations: Dict[str, Dict[str, Any]] = {}
         self._share_links: Dict[str, Dict[str, Any]] = {}
+        self._comments: Dict[str, Dict[str, Any]] = {}
+        self._notifications: Dict[str, Dict[str, Any]] = {}
+
+        dao_bundle = build_smart_workflow_daos(
+            backend=os.getenv("SMART_WORKFLOW_DAO_BACKEND", "auto"),
+            workflows_store=self._workflows,
+            teams_store=self._teams,
+            comments_store=self._comments,
+            notifications_store=self._notifications,
+        )
+        self._dao_backend = dao_bundle.backend
+        self._workflow_dao = dao_bundle.workflow_dao
+        self._team_dao = dao_bundle.team_dao
+        self._comment_dao = dao_bundle.comment_dao
+        self._notification_dao = dao_bundle.notification_dao
+        self._dao_connection_manager = dao_bundle.connection_manager
 
         self._metrics: Dict[str, Any] = {
             "total_runs": 0,
@@ -106,6 +124,7 @@ class SmartWorkflowService:
 
         self._running = False
         self._scheduler_thread: Optional[threading.Thread] = None
+        self._restore_from_persistent_storage()
         if auto_start_scheduler:
             self.start_scheduler()
 
@@ -132,6 +151,11 @@ class SmartWorkflowService:
     def health_snapshot(self) -> Dict[str, Any]:
         with self._lock:
             cache_metrics = self._cache.get_metrics()
+            dao_health = (
+                self._dao_connection_manager.health()
+                if self._dao_connection_manager is not None
+                else {"healthy": True, "pool_status": "memory", "dialect": "memory", "error": ""}
+            )
             return {
                 "status": "healthy",
                 "module": "smart_workflow",
@@ -146,6 +170,12 @@ class SmartWorkflowService:
                     "healthy": bool(cache_metrics.get("healthy", False)),
                     "backend": cache_metrics.get("memory", {}).get("backend", "unknown"),
                     "hit_rate": cache_metrics.get("hit_rate", 0.0),
+                },
+                "dao": {
+                    "backend": self._dao_backend,
+                    "healthy": bool(dao_health.get("healthy", False)),
+                    "pool_status": str(dao_health.get("pool_status", "")),
+                    "dialect": str(dao_health.get("dialect", "")),
                 },
             }
 
@@ -189,6 +219,82 @@ class SmartWorkflowService:
             },
             "last_activity_at": now,
         }
+
+    def _restore_from_persistent_storage(self) -> None:
+        if self._dao_backend != "database":
+            return
+        try:
+            workflows = self._workflow_dao.list_items()
+            teams = self._team_dao.list_items()
+            comments = self._comment_dao.paginate(offset=0, limit=5000).items
+            notifications = self._notification_dao.paginate(offset=0, limit=5000).items
+        except Exception:  # pylint: disable=broad-except
+            return
+
+        for item in workflows:
+            workflow_id = str(item.get("workflow_id") or "")
+            if workflow_id:
+                self._workflows[workflow_id] = deepcopy(item)
+        for item in teams:
+            team_id = str(item.get("team_id") or "")
+            if team_id:
+                self._teams[team_id] = deepcopy(item)
+        for item in comments:
+            comment_id = str(item.get("comment_id") or "")
+            workflow_id = str(item.get("workflow_id") or "")
+            if not comment_id:
+                continue
+            self._comments[comment_id] = deepcopy(item)
+            workflow = self._workflows.get(workflow_id)
+            if workflow:
+                workflow.setdefault("collab_state", {}).setdefault("comments", []).append(deepcopy(item))
+        for item in notifications:
+            notification_id = str(item.get("notification_id") or "")
+            workflow_id = str(item.get("workflow_id") or "")
+            if not notification_id:
+                continue
+            self._notifications[notification_id] = deepcopy(item)
+            workflow = self._workflows.get(workflow_id)
+            if workflow:
+                workflow.setdefault("collab_state", {}).setdefault("notifications", []).append(deepcopy(item))
+
+    def _persist_workflow_record(self, record: Mapping[str, Any]) -> None:
+        workflow_id = str(record.get("workflow_id") or "")
+        if not workflow_id:
+            return
+        try:
+            self._workflow_dao.upsert(workflow_id, record)
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+    def _persist_team_record(self, record: Mapping[str, Any]) -> None:
+        team_id = str(record.get("team_id") or "")
+        if not team_id:
+            return
+        try:
+            self._team_dao.upsert(team_id, record)
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+    def _persist_comment_record(self, record: Mapping[str, Any]) -> None:
+        comment_id = str(record.get("comment_id") or "")
+        if not comment_id:
+            return
+        self._comments[comment_id] = deepcopy(dict(record))
+        try:
+            self._comment_dao.upsert(comment_id, record)
+        except Exception:  # pylint: disable=broad-except
+            pass
+
+    def _persist_notification_record(self, record: Mapping[str, Any]) -> None:
+        notification_id = str(record.get("notification_id") or "")
+        if not notification_id:
+            return
+        self._notifications[notification_id] = deepcopy(dict(record))
+        try:
+            self._notification_dao.upsert(notification_id, record)
+        except Exception:  # pylint: disable=broad-except
+            pass
 
     def _cache_key_workflow(self, workflow_id: str) -> str:
         return f"workflow:{workflow_id}"
@@ -261,6 +367,10 @@ class SmartWorkflowService:
 
     def _workflow_or_error(self, workflow_id: str) -> Dict[str, Any]:
         workflow = self._workflows.get(workflow_id)
+        if not workflow and self._dao_backend == "database":
+            workflow = self._workflow_dao.get(workflow_id)
+            if workflow:
+                self._workflows[workflow_id] = deepcopy(workflow)
         if not workflow:
             raise KeyError(f"workflow '{workflow_id}' not found")
         return workflow
@@ -292,6 +402,7 @@ class SmartWorkflowService:
 
         notification = {
             "notification_id": f"ntf_{uuid4().hex[:12]}",
+            "workflow_id": str(workflow.get("workflow_id") or ""),
             "user_id": user_id,
             "event_type": event_type,
             "message": message,
@@ -307,6 +418,7 @@ class SmartWorkflowService:
         state["notifications"].append(notification)
         if len(state["notifications"]) > 2000:
             state["notifications"] = state["notifications"][-2000:]
+        self._persist_notification_record(notification)
         return notification
 
     # -------- 工作流定义与版本 --------
@@ -348,11 +460,17 @@ class SmartWorkflowService:
                 "collab_state": self._new_collab_state(),
             }
             self._workflows[workflow_id] = record
+            self._persist_workflow_record(record)
             self._cache.set(self._cache_key_workflow(workflow_id), record, ttl=self._WORKFLOW_CACHE_TTL)
             return deepcopy(record)
 
     def list_workflows(self) -> List[Dict[str, Any]]:
         with self._lock:
+            if not self._workflows and self._dao_backend == "database":
+                for item in self._workflow_dao.list_items():
+                    workflow_id = str(item.get("workflow_id") or "")
+                    if workflow_id:
+                        self._workflows[workflow_id] = deepcopy(item)
             return [
                 {
                     "workflow_id": item["workflow_id"],
@@ -373,6 +491,10 @@ class SmartWorkflowService:
             return deepcopy(cached)
         with self._lock:
             item = self._workflows.get(workflow_id)
+            if not item and self._dao_backend == "database":
+                item = self._workflow_dao.get(workflow_id)
+                if item:
+                    self._workflows[workflow_id] = deepcopy(item)
             if not item:
                 return None
             copied = deepcopy(item)
@@ -407,6 +529,7 @@ class SmartWorkflowService:
                     "definition": deepcopy(normalized),
                 }
             )
+            self._persist_workflow_record(current)
             self._invalidate_workflow_related_cache(workflow_id)
             self._cache.set(self._cache_key_workflow(workflow_id), current, ttl=self._WORKFLOW_CACHE_TTL)
             return deepcopy(current)
@@ -429,6 +552,17 @@ class SmartWorkflowService:
                 del self._delegations[delegation_id]
 
             del self._workflows[workflow_id]
+            self._workflow_dao.delete(workflow_id)
+            stale_comment_ids = [cid for cid, item in self._comments.items() if str(item.get("workflow_id")) == workflow_id]
+            for comment_id in stale_comment_ids:
+                self._comments.pop(comment_id, None)
+                self._comment_dao.delete(comment_id)
+            stale_notification_ids = [
+                nid for nid, item in self._notifications.items() if str(item.get("workflow_id")) == workflow_id
+            ]
+            for notification_id in stale_notification_ids:
+                self._notifications.pop(notification_id, None)
+                self._notification_dao.delete(notification_id)
 
             # 清理相关调度
             schedule_ids = [sid for sid, schedule in self._schedules.items() if schedule["workflow_id"] == workflow_id]
@@ -475,6 +609,7 @@ class SmartWorkflowService:
                     "definition": deepcopy(restored),
                 }
             )
+            self._persist_workflow_record(current)
             self._invalidate_workflow_related_cache(workflow_id)
             self._cache.set(self._cache_key_workflow(workflow_id), current, ttl=self._WORKFLOW_CACHE_TTL)
             return deepcopy(current)
@@ -525,6 +660,7 @@ class SmartWorkflowService:
 
             current["collaborators"] = normalized
             current["updated_at"] = datetime.now(timezone.utc).isoformat()
+            self._persist_workflow_record(current)
             self._invalidate_permission_cache(workflow_id)
             self._cache.set(self._cache_key_workflow(workflow_id), current, ttl=self._WORKFLOW_CACHE_TTL)
             return deepcopy(current)
@@ -559,11 +695,17 @@ class SmartWorkflowService:
                 "updated_at": now,
             }
             self._teams[team_id] = team
+            self._persist_team_record(team)
             return deepcopy(team)
 
     def list_teams(self, user_id: Optional[str] = None) -> List[Dict[str, Any]]:
         uid = str(user_id or "").strip()
         with self._lock:
+            if not self._teams and self._dao_backend == "database":
+                for item in self._team_dao.list_items():
+                    team_id = str(item.get("team_id") or "")
+                    if team_id:
+                        self._teams[team_id] = deepcopy(item)
             teams = list(self._teams.values())
         if uid:
             teams = [item for item in teams if uid in (item.get("members") or {})]
@@ -607,6 +749,7 @@ class SmartWorkflowService:
                 "invited_via": invited_via,
             }
             team["updated_at"] = self._now_iso()
+            self._persist_team_record(team)
             self._invalidate_team_permission_cache(team_id)
             return deepcopy(team)
 
@@ -620,6 +763,7 @@ class SmartWorkflowService:
                 raise ValueError("不能移除团队拥有者")
             team["members"].pop(uid, None)
             team["updated_at"] = self._now_iso()
+            self._persist_team_record(team)
             self._invalidate_team_permission_cache(team_id)
             return deepcopy(team)
 
@@ -636,6 +780,7 @@ class SmartWorkflowService:
             state["team_ids"] = existing
             workflow["updated_at"] = self._now_iso()
             state["last_activity_at"] = workflow["updated_at"]
+            self._persist_workflow_record(workflow)
             self._invalidate_permission_cache(workflow_id)
             self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
             return {"workflow_id": workflow_id, "team_ids": deepcopy(existing)}
@@ -720,6 +865,7 @@ class SmartWorkflowService:
             invitation["status"] = "accepted"
             invitation["accepted_by"] = uid
             invitation["accepted_at"] = self._now_iso()
+            self._persist_team_record(team)
             self._invalidate_team_permission_cache(team_id)
 
             return {
@@ -1060,6 +1206,7 @@ class SmartWorkflowService:
             state.setdefault("contributor_stats", {}).setdefault(actor_id, {"operations": 0, "comments": 0})
             state["contributor_stats"][actor_id]["operations"] += 1
             workflow["updated_at"] = now
+            self._persist_workflow_record(workflow)
             self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
 
             return {
@@ -1143,6 +1290,7 @@ class SmartWorkflowService:
             conflict["resolved_value"] = final_value
             state["analytics"]["manual_resolved_conflicts"] += 1
             workflow["updated_at"] = self._now_iso()
+            self._persist_workflow_record(workflow)
             self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
             return deepcopy(conflict)
 
@@ -1252,10 +1400,15 @@ class SmartWorkflowService:
                     message=f"{uid} 在评论中提及了你",
                     payload={"workflow_id": workflow_id, "comment_id": comment["comment_id"]},
                 )
+            self._persist_comment_record(comment)
+            self._persist_workflow_record(workflow)
             return deepcopy(comment)
 
     def list_comments(self, workflow_id: str, limit: int = 200) -> Dict[str, Any]:
         max_items = max(1, min(int(limit), 1000))
+        persisted_comments = self._comment_dao.list_by_workflow(workflow_id=workflow_id, limit=max_items)
+        if persisted_comments:
+            return {"workflow_id": workflow_id, "comments": persisted_comments, "count": len(persisted_comments)}
         with self._lock:
             workflow = self._workflow_or_error(workflow_id)
             comments = deepcopy(workflow["collab_state"].get("comments") or [])
@@ -1280,6 +1433,7 @@ class SmartWorkflowService:
             muted = prefs.get("muted_event_types") or []
             prefs["muted_event_types"] = sorted({str(item) for item in muted if str(item).strip()})
             state.setdefault("notification_preferences", {})[uid] = prefs
+            self._persist_workflow_record(workflow)
             return {"workflow_id": workflow_id, "user_id": uid, "preferences": deepcopy(prefs)}
 
     def get_notification_preferences(self, workflow_id: str, user_id: str) -> Dict[str, Any]:
@@ -1296,6 +1450,19 @@ class SmartWorkflowService:
     def list_notifications(self, workflow_id: str, user_id: str, unread_only: bool = False, limit: int = 100) -> Dict[str, Any]:
         uid = str(user_id or "").strip()
         max_items = max(1, min(int(limit), 500))
+        persisted_notifications = self._notification_dao.list_by_user(
+            workflow_id=workflow_id,
+            user_id=uid,
+            unread_only=unread_only,
+            limit=max_items,
+        )
+        if persisted_notifications:
+            return {
+                "workflow_id": workflow_id,
+                "user_id": uid,
+                "notifications": persisted_notifications,
+                "count": len(persisted_notifications),
+            }
         with self._lock:
             workflow = self._workflow_or_error(workflow_id)
             notifications = [
@@ -1326,6 +1493,8 @@ class SmartWorkflowService:
                 raise KeyError(f"notification '{notification_id}' not found")
             matched["read"] = True
             matched["read_at"] = self._now_iso()
+            self._persist_notification_record(matched)
+            self._persist_workflow_record(workflow)
             return deepcopy(matched)
 
     # -------- 分享、导出、社交 --------
@@ -1377,6 +1546,7 @@ class SmartWorkflowService:
                 share_ids.append(link_id)
             state["share_link_ids"] = share_ids
             workflow["updated_at"] = self._now_iso()
+            self._persist_workflow_record(workflow)
             self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
             return self._sanitize_share_link(record)
 
