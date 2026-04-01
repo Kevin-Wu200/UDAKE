@@ -1,6 +1,8 @@
 import { http } from './http';
 import type {
   WorkflowCollaborationCursor,
+  WorkflowComment,
+  WorkflowCommentListResult,
   WorkflowCollaborator,
   WorkflowDefinition,
   WorkflowHealthSnapshot,
@@ -32,6 +34,23 @@ export interface WorkflowTemplateCreatePayload {
   description?: string;
   shared?: boolean;
   workflow: WorkflowDefinition;
+}
+
+export interface WorkflowCommentListParams {
+  page?: number;
+  page_size?: number;
+  sort?: 'asc' | 'desc';
+}
+
+export interface WorkflowCommentCreatePayload {
+  content: string;
+  parent_id?: string | null;
+  mention_user_ids?: string[];
+}
+
+export interface WorkflowCommentUpdatePayload {
+  content: string;
+  mention_user_ids?: string[];
 }
 
 export const workflowService = {
@@ -279,5 +298,56 @@ export const workflowService = {
   async triggerSchedule(scheduleId: string) {
     const { data } = await http.post<{ run: WorkflowRunDetail }>(`/workflow/schedules/${scheduleId}/trigger`);
     return data.run;
+  },
+
+  async listComments(workflowId: string, params: WorkflowCommentListParams = {}) {
+    const { data } = await http.get<WorkflowCommentListResult>(`/workflow/${workflowId}/comments`, {
+      params: {
+        page: params.page ?? 1,
+        page_size: params.page_size ?? 30,
+        sort: params.sort ?? 'asc'
+      }
+    });
+    return data;
+  },
+
+  async createComment(workflowId: string, payload: WorkflowCommentCreatePayload) {
+    const { data } = await http.post<{ comment: WorkflowComment }>(`/workflow/${workflowId}/comments`, payload);
+    return data.comment;
+  },
+
+  async updateComment(workflowId: string, commentId: string, payload: WorkflowCommentUpdatePayload) {
+    const { data } = await http.put<{ comment: WorkflowComment }>(
+      `/workflow/${workflowId}/comments/${commentId}`,
+      payload
+    );
+    return data.comment;
+  },
+
+  async deleteComment(workflowId: string, commentId: string) {
+    const { data } = await http.delete<{ deleted: boolean; comment_id: string }>(
+      `/workflow/${workflowId}/comments/${commentId}`
+    );
+    return data;
+  },
+
+  async batchDeleteComments(workflowId: string, commentIds: string[]) {
+    const { data } = await http.post<{ deleted_ids: string[]; count: number }>(
+      `/workflow/${workflowId}/comments/batch-delete`,
+      { comment_ids: commentIds }
+    );
+    return data;
+  },
+
+  async searchMentionCandidates(workflowId: string, keyword = '') {
+    const { data } = await http.get<{ users: WorkflowCollaborator[]; count: number }>(
+      `/workflow/${workflowId}/comments/mentions`,
+      {
+        params: {
+          keyword
+        }
+      }
+    );
+    return data;
   }
 };

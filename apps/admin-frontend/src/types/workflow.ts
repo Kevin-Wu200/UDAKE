@@ -194,3 +194,34 @@ export interface WorkflowHealthSnapshot {
   schedule_count: number;
   scheduler_running: boolean;
 }
+
+export interface WorkflowCommentMention {
+  user_id: string;
+  display_name: string;
+}
+
+export interface WorkflowComment {
+  comment_id: string;
+  workflow_id: string;
+  parent_id: string | null;
+  root_id: string | null;
+  depth: number;
+  content: string;
+  created_at: string;
+  updated_at: string;
+  deleted: boolean;
+  author_id: string;
+  author_name: string;
+  author_avatar?: string;
+  mention_users: WorkflowCommentMention[];
+  reply_count: number;
+}
+
+export interface WorkflowCommentListResult {
+  workflow_id: string;
+  comments: WorkflowComment[];
+  count: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+}

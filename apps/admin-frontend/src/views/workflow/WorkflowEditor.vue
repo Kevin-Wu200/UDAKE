@@ -69,6 +69,14 @@
           :workflow-id="persistedWorkflowId"
           :initial-run-id="activeRunId"
         />
+
+        <CommentThread
+          v-if="persistedWorkflowId"
+          :workflow-id="persistedWorkflowId"
+          :current-user-id="currentUserId"
+          :current-user-name="currentUserName"
+          :is-admin="isAdminUser"
+        />
       </aside>
     </div>
   </div>
@@ -102,6 +110,7 @@ import NodePropertiesPanel from './NodePropertiesPanel.vue';
 import WorkflowTemplateLibrary from './WorkflowTemplateLibrary.vue';
 import WorkflowExecutionMonitor from './WorkflowExecutionMonitor.vue';
 import CollaborationCursorLayer from './CollaborationCursorLayer.vue';
+import CommentThread from './CommentThread.vue';
 import { workflowService } from '../../services/WorkflowService';
 import { useAuthStore } from '../../stores/auth';
 import type {
@@ -194,6 +203,11 @@ const currentUserId = computed(() => {
   const next = `guest_${Math.random().toString(36).slice(2, 10)}`;
   localStorage.setItem(key, next);
   return next;
+});
+
+const isAdminUser = computed(() => {
+  const role = authStore.user?.role || '';
+  return ['admin', 'super_admin', 'company_admin'].includes(role);
 });
 
 const buildStarterDefinition = (): WorkflowDefinition => ({
@@ -719,6 +733,7 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-height: 0;
 }
 
 @media (max-width: 1280px) {
