@@ -55,7 +55,7 @@ export class PluginMarket {
   private cache: Map<string, PluginMarketInfo> = new Map();
   private cacheTimeout: number = 5 * 60 * 1000; // 5分钟
 
-  constructor(baseUrl: string = 'https://plugins.udake.io/api') {
+  constructor(baseUrl: string = `${import.meta.env.VITE_OFFICIAL_WEB}/api/plugins`) {
     this.baseUrl = baseUrl;
   }
 

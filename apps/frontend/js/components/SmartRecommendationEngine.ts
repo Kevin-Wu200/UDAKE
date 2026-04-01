@@ -55,8 +55,8 @@ export class SmartRecommendationEngine {
             <p class="smart-recommendation-hint"></p>
             <div class="smart-recommendation-list"></div>
             <div class="smart-recommendation-help">
-                <a href="https://docs.udake.local/workflow/quick-actions" target="_blank" rel="noreferrer">快捷操作帮助</a>
-                <a href="https://video.udake.local/tutorials/wizard-overview" target="_blank" rel="noreferrer">向导视频</a>
+                <a href="${import.meta.env.VITE_OFFICIAL_WEB}/docs/workflow/quick-actions" target="_blank" rel="noreferrer">快捷操作帮助</a>
+                <a href="${import.meta.env.VITE_OFFICIAL_WEB}/videos/tutorials/wizard-overview" target="_blank" rel="noreferrer">向导视频</a>
             </div>
         `;
 
