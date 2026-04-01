@@ -9,6 +9,8 @@ import type {
   WorkflowListItem,
   WorkflowMetrics,
   WorkflowNodeTypeCatalog,
+  WorkflowNotificationListResult,
+  WorkflowNotificationPreferences,
   WorkflowRecord,
   WorkflowRunDetail,
   WorkflowRunItem,
@@ -51,6 +53,14 @@ export interface WorkflowCommentCreatePayload {
 export interface WorkflowCommentUpdatePayload {
   content: string;
   mention_user_ids?: string[];
+}
+
+export interface WorkflowNotificationListParams {
+  page?: number;
+  page_size?: number;
+  sort?: 'asc' | 'desc';
+  unread_only?: boolean;
+  types?: string[];
 }
 
 export const workflowService = {
@@ -347,6 +357,56 @@ export const workflowService = {
           keyword
         }
       }
+    );
+    return data;
+  },
+
+  async listNotifications(workflowId: string, params: WorkflowNotificationListParams = {}) {
+    const { data } = await http.get<WorkflowNotificationListResult>(`/workflow/${workflowId}/notifications`, {
+      params: {
+        page: params.page ?? 1,
+        page_size: params.page_size ?? 30,
+        sort: params.sort ?? 'desc',
+        unread_only: params.unread_only ?? false,
+        types: params.types?.join(',')
+      }
+    });
+    return data;
+  },
+
+  async markNotificationRead(workflowId: string, notificationId: string) {
+    const { data } = await http.post<{ notification_id: string; read: boolean }>(
+      `/workflow/${workflowId}/notifications/${notificationId}/read`
+    );
+    return data;
+  },
+
+  async batchMarkNotificationsRead(workflowId: string, notificationIds: string[]) {
+    const { data } = await http.post<{ count: number; notification_ids: string[] }>(
+      `/workflow/${workflowId}/notifications/batch-read`,
+      {
+        notification_ids: notificationIds
+      }
+    );
+    return data;
+  },
+
+  async markAllNotificationsRead(workflowId: string) {
+    const { data } = await http.post<{ workflow_id: string; count: number }>(
+      `/workflow/${workflowId}/notifications/read-all`
+    );
+    return data;
+  },
+
+  async getNotificationPreferences(workflowId: string) {
+    const { data } = await http.get<WorkflowNotificationPreferences>(`/workflow/${workflowId}/notifications/preferences`);
+    return data;
+  },
+
+  async updateNotificationPreferences(workflowId: string, payload: WorkflowNotificationPreferences) {
+    const { data } = await http.put<WorkflowNotificationPreferences>(
+      `/workflow/${workflowId}/notifications/preferences`,
+      payload
     );
     return data;
   }

@@ -225,3 +225,37 @@ export interface WorkflowCommentListResult {
   page_size: number;
   has_more: boolean;
 }
+
+export type WorkflowNotificationType = 'mention' | 'comment' | 'share' | 'system';
+
+export type WorkflowNotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
+
+export interface WorkflowNotification {
+  notification_id: string;
+  workflow_id: string;
+  type: WorkflowNotificationType;
+  title: string;
+  content: string;
+  source: string;
+  source_id?: string;
+  created_at: string;
+  read: boolean;
+  priority: WorkflowNotificationPriority;
+  metadata?: Record<string, unknown>;
+}
+
+export interface WorkflowNotificationListResult {
+  workflow_id: string;
+  notifications: WorkflowNotification[];
+  count: number;
+  page: number;
+  page_size: number;
+  has_more: boolean;
+}
+
+export interface WorkflowNotificationPreferences {
+  types: Record<WorkflowNotificationType, boolean>;
+  channels: Array<'popup' | 'list' | 'email'>;
+  frequency: 'realtime' | '5m' | '15m' | 'daily';
+  updated_at?: string;
+}

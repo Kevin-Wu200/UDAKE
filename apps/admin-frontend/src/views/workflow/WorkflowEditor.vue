@@ -85,6 +85,8 @@
           :is-admin="isAdminUser"
         />
 
+        <WorkflowNotificationCenter v-if="persistedWorkflowId" :workflow-id="persistedWorkflowId" />
+
         <WorkflowCollaborationSharePanel
           v-if="persistedWorkflowId"
           :workflow-id="persistedWorkflowId"
@@ -127,6 +129,7 @@ import WorkflowTemplateLibrary from './WorkflowTemplateLibrary.vue';
 import WorkflowExecutionMonitor from './WorkflowExecutionMonitor.vue';
 import CollaborationCursorLayer from './CollaborationCursorLayer.vue';
 import CommentThread from './CommentThread.vue';
+import WorkflowNotificationCenter from './WorkflowNotificationCenter.vue';
 import WorkflowCollaborationSharePanel from './WorkflowCollaborationSharePanel.vue';
 import { workflowService } from '../../services/WorkflowService';
 import { useAuthStore } from '../../stores/auth';

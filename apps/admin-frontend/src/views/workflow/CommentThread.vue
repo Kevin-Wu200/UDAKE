@@ -365,6 +365,7 @@ function notifyForNewComments(incoming: WorkflowComment[]) {
       : false;
 
     if (mentionedCurrent && settings.enableMention) {
+      emitNotificationPush(item, 'mention', '@提及通知', `${item.author_name} 在评论中提及了你`, 'high');
       ElNotification({
         title: '@提及通知',
         message: `${item.author_name} 在评论中提及了你`,
@@ -375,6 +376,7 @@ function notifyForNewComments(incoming: WorkflowComment[]) {
     }
 
     if (replyCurrent && settings.enableReply) {
+      emitNotificationPush(item, 'comment', '回复通知', `${item.author_name} 回复了你的评论`, 'high');
       ElNotification({
         title: '回复通知',
         message: `${item.author_name} 回复了你的评论`,
@@ -385,6 +387,7 @@ function notifyForNewComments(incoming: WorkflowComment[]) {
     }
 
     if (settings.enableNewComment) {
+      emitNotificationPush(item, 'comment', '新评论', `${item.author_name}: ${truncate(item.content, 32)}`, 'normal');
       ElNotification({
         title: '新评论',
         message: `${item.author_name}: ${truncate(item.content, 32)}`,
@@ -400,6 +403,30 @@ function truncate(text: string, size: number) {
     return text;
   }
   return `${text.slice(0, size)}...`;
+}
+
+function emitNotificationPush(
+  item: WorkflowComment,
+  type: 'mention' | 'comment' | 'share' | 'system',
+  title: string,
+  message: string,
+  priority: 'low' | 'normal' | 'high' | 'urgent'
+) {
+  window.dispatchEvent(
+    new CustomEvent('workflow-notification-push', {
+      detail: {
+        notification_id: `comment_${item.comment_id}`,
+        workflow_id: props.workflowId,
+        notification_type: type,
+        title,
+        content: message,
+        source: '评论线程',
+        source_id: item.comment_id,
+        priority,
+        created_at: item.created_at
+      }
+    })
+  );
 }
 
 function toggleSettings() {
