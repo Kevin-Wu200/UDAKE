@@ -1,7 +1,10 @@
 import asyncio
+import heapq
+import json
 import re
+from collections import deque
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Callable, Deque, Dict, List, Optional, Set, Tuple
 from uuid import uuid4
 
 from fastapi import WebSocket
@@ -13,6 +16,15 @@ class WebSocketService:
     RECONNECT_STATE_TTL_SECONDS = 300
     CURSOR_THROTTLE_MS = 100
     CURSOR_TIMEOUT_SECONDS = 30
+    USER_OFFLINE_TTL_SECONDS = 3600
+    USER_OFFLINE_MAX_MESSAGES = 1000
+    MAX_MESSAGE_CONTENT_LENGTH = 2000
+    USER_RATE_LIMIT_WINDOW_SECONDS = 60
+    USER_RATE_LIMIT_MAX_REQUESTS = 120
+    WORKFLOW_RATE_LIMIT_WINDOW_SECONDS = 60
+    WORKFLOW_RATE_LIMIT_MAX_REQUESTS = 240
+    GLOBAL_RATE_LIMIT_WINDOW_SECONDS = 60
+    GLOBAL_RATE_LIMIT_MAX_REQUESTS = 5000
 
     def __init__(self):
         self.active_connections: Dict[str, WebSocket] = {}
@@ -22,8 +34,12 @@ class WebSocketService:
         self.workflow_subscribers: Dict[str, Set[str]] = {}
         self.workflow_run_subscribers: Dict[str, Set[str]] = {}
         self.user_connections: Dict[str, Set[str]] = {}
+        self.user_notification_subscribers: Dict[str, Set[str]] = {}
+        self.user_mention_subscribers: Dict[str, Set[str]] = {}
+        self.user_activity_subscribers: Dict[str, Set[str]] = {}
         self.pending_messages: Dict[str, Dict[str, Dict[str, Any]]] = {}
         self.offline_message_queue: Dict[str, List[Dict[str, Any]]] = {}
+        self.user_offline_message_queue: Dict[str, List[Dict[str, Any]]] = {}
         self.disconnected_states: Dict[str, Dict[str, Any]] = {}
         self.operation_logs: Dict[str, List[Dict[str, Any]]] = {}
         self.operation_seq_index: Dict[str, Dict[str, int]] = {}
@@ -33,6 +49,16 @@ class WebSocketService:
         self.notification_cache: Dict[str, List[Dict[str, Any]]] = {}
         self.notification_dedup_cache: Dict[str, Dict[str, datetime]] = {}
         self.share_access_stats: Dict[str, Dict[str, Any]] = {}
+        self.message_priority_queue: List[Tuple[int, int, Dict[str, Any]]] = []
+        self.message_queue_seq = 0
+        self.rate_limit_logs: Dict[str, Deque[datetime]] = {}
+        self._blocked_content_patterns = [
+            re.compile(r"<\s*script", flags=re.IGNORECASE),
+            re.compile(r"javascript\s*:", flags=re.IGNORECASE),
+            re.compile(r"onerror\s*=", flags=re.IGNORECASE),
+            re.compile(r"onload\s*=", flags=re.IGNORECASE),
+        ]
+        self._sensitive_keywords = {"password", "secret", "token", "access_key", "private_key"}
         self._heartbeat_task: Optional[asyncio.Task[Any]] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
 
@@ -70,6 +96,10 @@ class WebSocketService:
 
         if user_id:
             self.user_connections.setdefault(str(user_id), set()).add(client_id)
+            # 用户连接建立时默认订阅全部用户级消息通道。
+            self.subscribe_user_channel(client_id=client_id, user_id=str(user_id), channel="notification")
+            self.subscribe_user_channel(client_id=client_id, user_id=str(user_id), channel="mention")
+            self.subscribe_user_channel(client_id=client_id, user_id=str(user_id), channel="activity")
 
         reconnect_state = self.disconnected_states.get(client_id)
         if reconnect_state and restore_subscriptions:
@@ -89,6 +119,18 @@ class WebSocketService:
         for queued in queued_messages:
             await self.send_personal_message(queued, client_id)
 
+        if user_id:
+            self._cleanup_user_offline_queue(str(user_id))
+            user_queue = self.user_offline_message_queue.get(str(user_id), [])
+            if user_queue:
+                queued_user_messages = list(user_queue)
+                self.user_offline_message_queue[str(user_id)] = []
+                queued_user_messages.sort(
+                    key=lambda item: str((item.get("message") or {}).get("timestamp") or item.get("queued_at") or "")
+                )
+                for queued in queued_user_messages:
+                    await self.send_personal_message(dict(queued.get("message") or {}), client_id)
+
         print(f"客户端 {client_id} 已连接")
 
     def disconnect(self, client_id: str):
@@ -103,6 +145,7 @@ class WebSocketService:
             self.user_connections[user_id].discard(client_id)
             if not self.user_connections[user_id]:
                 del self.user_connections[user_id]
+        self._remove_user_subscriptions_for_client(client_id)
 
         self.disconnected_states[client_id] = {
             "snapshot_at": self._now_iso(),
@@ -112,6 +155,9 @@ class WebSocketService:
                 "projects": [project_id for project_id, items in self.project_subscribers.items() if client_id in items],
                 "workflows": [workflow_id for workflow_id, items in self.workflow_subscribers.items() if client_id in items],
                 "workflow_runs": [run_id for run_id, items in self.workflow_run_subscribers.items() if client_id in items],
+                "user_notifications": [uid for uid, items in self.user_notification_subscribers.items() if client_id in items],
+                "user_mentions": [uid for uid, items in self.user_mention_subscribers.items() if client_id in items],
+                "user_activities": [uid for uid, items in self.user_activity_subscribers.items() if client_id in items],
             },
             "pending": list((self.pending_messages.get(client_id) or {}).values()),
             "user_id": user_id,
@@ -197,9 +243,32 @@ class WebSocketService:
                 self.offline_message_queue[client_id] = queue[-1000:]
 
     async def send_to_user(self, message: dict, user_id: str):
-        targets = list(self.user_connections.get(str(user_id), set()))
+        normalized_user = str(user_id)
+        message_type = str(message.get("type") or "")
+        data_type = str((message.get("data") or {}).get("type") or "")
+        channel = "notification"
+        if message_type == "mention" or data_type == "mention":
+            channel = "mention"
+        elif message_type == "activity" or data_type == "activity":
+            channel = "activity"
+        targets = list(self.user_connections.get(normalized_user, set()))
+        channel_subscribers = self._user_channel_subscribers(channel).get(normalized_user, set())
+        if channel_subscribers:
+            targets = [client_id for client_id in targets if client_id in channel_subscribers]
         for client_id in targets:
             await self.send_personal_message(message, client_id)
+        if not targets:
+            queue = self.user_offline_message_queue.setdefault(normalized_user, [])
+            queue.append(
+                {
+                    "message": message,
+                    "queued_at": self._now_iso(),
+                    "expire_at": (self._now() + timedelta(seconds=self.USER_OFFLINE_TTL_SECONDS)).isoformat(),
+                    "channel": channel,
+                }
+            )
+            if len(queue) > self.USER_OFFLINE_MAX_MESSAGES:
+                self.user_offline_message_queue[normalized_user] = queue[-self.USER_OFFLINE_MAX_MESSAGES:]
 
     async def broadcast(self, message: dict):
         for client_id in list(self.active_connections.keys()):
@@ -257,6 +326,187 @@ class WebSocketService:
     async def unsubscribe_from_workflow_run(self, client_id: str, run_id: str):
         if run_id in self.workflow_run_subscribers:
             self.workflow_run_subscribers[run_id].discard(client_id)
+
+    def get_client_user_id(self, client_id: str) -> str:
+        state = self.client_states.get(str(client_id)) or {}
+        return str(state.get("user_id") or "")
+
+    def _user_channel_subscribers(self, channel: str) -> Dict[str, Set[str]]:
+        normalized = str(channel or "").strip().lower()
+        if normalized == "mention":
+            return self.user_mention_subscribers
+        if normalized == "activity":
+            return self.user_activity_subscribers
+        return self.user_notification_subscribers
+
+    def subscribe_user_channel(self, client_id: str, user_id: str, channel: str = "notification") -> None:
+        if not client_id or not user_id:
+            return
+        bucket = self._user_channel_subscribers(channel)
+        bucket.setdefault(str(user_id), set()).add(str(client_id))
+
+    def unsubscribe_user_channel(self, client_id: str, user_id: str, channel: str = "notification") -> None:
+        if not client_id or not user_id:
+            return
+        bucket = self._user_channel_subscribers(channel)
+        if str(user_id) in bucket:
+            bucket[str(user_id)].discard(str(client_id))
+
+    def list_client_subscriptions(self, client_id: str) -> Dict[str, List[str]]:
+        cid = str(client_id)
+        return {
+            "tasks": [task_id for task_id, items in self.task_subscribers.items() if cid in items],
+            "projects": [project_id for project_id, items in self.project_subscribers.items() if cid in items],
+            "workflows": [workflow_id for workflow_id, items in self.workflow_subscribers.items() if cid in items],
+            "workflow_runs": [run_id for run_id, items in self.workflow_run_subscribers.items() if cid in items],
+            "user_notifications": [uid for uid, items in self.user_notification_subscribers.items() if cid in items],
+            "user_mentions": [uid for uid, items in self.user_mention_subscribers.items() if cid in items],
+            "user_activities": [uid for uid, items in self.user_activity_subscribers.items() if cid in items],
+        }
+
+    def _remove_user_subscriptions_for_client(self, client_id: str) -> None:
+        cid = str(client_id)
+        for bucket in (
+            self.user_notification_subscribers,
+            self.user_mention_subscribers,
+            self.user_activity_subscribers,
+        ):
+            for user_id, subscribers in bucket.items():
+                subscribers.discard(cid)
+
+    def _cleanup_user_offline_queue(self, user_id: str) -> None:
+        uid = str(user_id)
+        messages = self.user_offline_message_queue.get(uid, [])
+        if not messages:
+            return
+        now = self._now()
+        valid: List[Dict[str, Any]] = []
+        for item in messages:
+            expire_at_text = str(item.get("expire_at") or "")
+            try:
+                expire_at = datetime.fromisoformat(expire_at_text)
+            except Exception:
+                continue
+            if expire_at >= now:
+                valid.append(item)
+        if len(valid) > self.USER_OFFLINE_MAX_MESSAGES:
+            valid = valid[-self.USER_OFFLINE_MAX_MESSAGES:]
+        self.user_offline_message_queue[uid] = valid
+
+    def _trim_rate_limit_bucket(self, key: str, window_seconds: int) -> Deque[datetime]:
+        now = self._now()
+        logs = self.rate_limit_logs.setdefault(key, deque())
+        threshold = now - timedelta(seconds=int(window_seconds))
+        while logs and logs[0] < threshold:
+            logs.popleft()
+        return logs
+
+    def enforce_rate_limit(
+        self,
+        client_id: str,
+        workflow_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> Optional[str]:
+        cid = str(client_id)
+        uid = str(user_id or "")
+        wid = str(workflow_id or "")
+        now = self._now()
+
+        global_bucket = self._trim_rate_limit_bucket("global", self.GLOBAL_RATE_LIMIT_WINDOW_SECONDS)
+        if len(global_bucket) >= self.GLOBAL_RATE_LIMIT_MAX_REQUESTS:
+            return "全局消息频率限制"
+        global_bucket.append(now)
+
+        if uid:
+            user_bucket = self._trim_rate_limit_bucket(
+                f"user:{uid}",
+                self.USER_RATE_LIMIT_WINDOW_SECONDS,
+            )
+            if len(user_bucket) >= self.USER_RATE_LIMIT_MAX_REQUESTS:
+                return "用户消息频率限制"
+            user_bucket.append(now)
+
+        if wid:
+            workflow_bucket = self._trim_rate_limit_bucket(
+                f"workflow:{wid}",
+                self.WORKFLOW_RATE_LIMIT_WINDOW_SECONDS,
+            )
+            if len(workflow_bucket) >= self.WORKFLOW_RATE_LIMIT_MAX_REQUESTS:
+                return "工作流消息频率限制"
+            workflow_bucket.append(now)
+
+        client_bucket = self._trim_rate_limit_bucket(
+            f"client:{cid}",
+            self.USER_RATE_LIMIT_WINDOW_SECONDS,
+        )
+        client_bucket.append(now)
+        return None
+
+    def validate_message_content(self, content: str, max_length: Optional[int] = None) -> Optional[str]:
+        text = str(content or "")
+        if len(text) > int(max_length or self.MAX_MESSAGE_CONTENT_LENGTH):
+            return "消息内容过长"
+        lowered = text.lower()
+        if any(word in lowered for word in self._sensitive_keywords):
+            return "消息包含敏感信息"
+        for pattern in self._blocked_content_patterns:
+            if pattern.search(text):
+                return "消息包含潜在恶意内容"
+        return None
+
+    def validate_message_permission(
+        self,
+        *,
+        client_id: str,
+        sender_user_id: Optional[str],
+        receiver_user_id: Optional[str] = None,
+    ) -> Optional[str]:
+        connected_user = self.get_client_user_id(client_id)
+        sender = str(sender_user_id or "").strip()
+        receiver = str(receiver_user_id or "").strip()
+        if connected_user and sender and connected_user != sender:
+            return "发送者身份校验失败"
+        if sender and receiver and sender == receiver:
+            return "发送者与接收者不能相同"
+        return None
+
+    def enqueue_message(self, payload: Dict[str, Any], priority: str = "normal") -> Dict[str, Any]:
+        priority_map = {"urgent": 0, "high": 1, "normal": 2, "low": 3}
+        score = priority_map.get(str(priority or "normal").lower(), 2)
+        self.message_queue_seq += 1
+        record = {
+            "queue_id": f"mq_{uuid4().hex[:12]}",
+            "priority": str(priority or "normal").lower(),
+            "payload": payload or {},
+            "queued_at": self._now_iso(),
+        }
+        heapq.heappush(self.message_priority_queue, (score, self.message_queue_seq, record))
+        return record
+
+    def dequeue_messages(self, batch_size: int = 20) -> List[Dict[str, Any]]:
+        amount = max(1, min(int(batch_size), 200))
+        batch: List[Dict[str, Any]] = []
+        while len(batch) < amount and self.message_priority_queue:
+            _, _, record = heapq.heappop(self.message_priority_queue)
+            batch.append(record)
+        return batch
+
+    async def process_message_batch(
+        self,
+        handler: Callable[[Dict[str, Any]], Any],
+        batch_size: int = 20,
+    ) -> int:
+        batch = self.dequeue_messages(batch_size=batch_size)
+        processed = 0
+        for item in batch:
+            try:
+                result = handler(item)
+                if asyncio.iscoroutine(result):
+                    await result
+                processed += 1
+            except Exception:
+                continue
+        return processed
 
     def record_collaboration_operation(
         self,
@@ -409,7 +659,20 @@ class WebSocketService:
         user_logs.append(notification)
         if len(user_logs) > 3000:
             self.notification_cache[user_id] = user_logs[-3000:]
-        return {"deduplicated": False, "notification": notification, "priority": str(priority or "high").lower()}
+        queued = self.enqueue_message(
+            payload={
+                "message_type": "notification",
+                "user_id": user_id,
+                "notification": notification,
+            },
+            priority=str(priority or "high").lower(),
+        )
+        return {
+            "deduplicated": False,
+            "notification": notification,
+            "priority": str(priority or "high").lower(),
+            "queue_id": queued["queue_id"],
+        }
 
     def record_share_access(
         self,
@@ -455,6 +718,11 @@ class WebSocketService:
             "workflow_subscriptions": sum(len(v) for v in self.workflow_subscribers.values()),
             "project_subscriptions": sum(len(v) for v in self.project_subscribers.values()),
             "workflow_run_subscriptions": sum(len(v) for v in self.workflow_run_subscribers.values()),
+            "user_notification_subscriptions": sum(len(v) for v in self.user_notification_subscribers.values()),
+            "user_mention_subscriptions": sum(len(v) for v in self.user_mention_subscribers.values()),
+            "user_activity_subscriptions": sum(len(v) for v in self.user_activity_subscribers.values()),
+            "user_offline_queue_messages": sum(len(v) for v in self.user_offline_message_queue.values()),
+            "priority_queue_size": len(self.message_priority_queue),
             "timestamp": self._now_iso(),
         }
 
@@ -661,6 +929,12 @@ class WebSocketService:
             self.workflow_subscribers.setdefault(str(workflow_id), set()).add(client_id)
         for run_id in subscriptions.get("workflow_runs") or []:
             self.workflow_run_subscribers.setdefault(str(run_id), set()).add(client_id)
+        for uid in subscriptions.get("user_notifications") or []:
+            self.user_notification_subscribers.setdefault(str(uid), set()).add(client_id)
+        for uid in subscriptions.get("user_mentions") or []:
+            self.user_mention_subscribers.setdefault(str(uid), set()).add(client_id)
+        for uid in subscriptions.get("user_activities") or []:
+            self.user_activity_subscribers.setdefault(str(uid), set()).add(client_id)
 
     async def _heartbeat_loop(self) -> None:
         while True:
@@ -678,6 +952,8 @@ class WebSocketService:
                     self.disconnected_states.pop(client_id, None)
                     self.pending_messages.pop(client_id, None)
                     self.offline_message_queue.pop(client_id, None)
+            for user_id in list(self.user_offline_message_queue.keys()):
+                self._cleanup_user_offline_queue(user_id)
 
             for client_id, state in list(self.client_states.items()):
                 heartbeat_at = state.get("last_heartbeat_at")

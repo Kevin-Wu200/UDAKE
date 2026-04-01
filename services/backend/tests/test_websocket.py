@@ -16,8 +16,12 @@ def reset_websocket_service_state():
     websocket_service.workflow_subscribers.clear()
     websocket_service.workflow_run_subscribers.clear()
     websocket_service.user_connections.clear()
+    websocket_service.user_notification_subscribers.clear()
+    websocket_service.user_mention_subscribers.clear()
+    websocket_service.user_activity_subscribers.clear()
     websocket_service.pending_messages.clear()
     websocket_service.offline_message_queue.clear()
+    websocket_service.user_offline_message_queue.clear()
     websocket_service.disconnected_states.clear()
     websocket_service.operation_logs.clear()
     websocket_service.operation_seq_index.clear()
@@ -27,6 +31,8 @@ def reset_websocket_service_state():
     websocket_service.notification_cache.clear()
     websocket_service.notification_dedup_cache.clear()
     websocket_service.share_access_stats.clear()
+    websocket_service.message_priority_queue.clear()
+    websocket_service.rate_limit_logs.clear()
     yield
     task = websocket_service._heartbeat_task
     if task and not task.done():
@@ -366,3 +372,55 @@ async def test_websocket_share_access_stats():
         assert ack['type'] == 'ack'
         assert ack['data']['access_count'] == 1
         assert ack['data']['unique_visitors'] == 1
+
+
+@pytest.mark.asyncio
+async def test_websocket_user_channel_subscription():
+    client = TestClient(app)
+    with client.websocket_connect("/ws/user_sub_client?user_id=alice") as ws:
+        ws.send_json({"type": "subscribe_user_mentions", "user_id": "alice"})
+        data = ws.receive_json()
+        assert data["type"] == "subscription_confirmed"
+        assert data["data"]["channel"] == "mention"
+        assert "alice" in websocket_service.user_mention_subscribers
+        assert "user_sub_client" in websocket_service.user_mention_subscribers["alice"]
+
+
+@pytest.mark.asyncio
+async def test_websocket_user_offline_message_replay():
+    class MockWebSocket:
+        async def accept(self):
+            self.accepted = True
+
+        async def send_json(self, message):
+            self.messages = getattr(self, "messages", [])
+            self.messages.append(message)
+
+    queued_message = {"type": "notification", "data": {"title": "离线通知"}, "timestamp": "2026-04-01T10:00:00+00:00"}
+    await websocket_service.send_to_user(queued_message, "offline_user")
+    assert len(websocket_service.user_offline_message_queue.get("offline_user", [])) == 1
+
+    mock_ws = MockWebSocket()
+    await websocket_service.connect(mock_ws, "offline_client", user_id="offline_user")
+    assert len(getattr(mock_ws, "messages", [])) >= 1
+    assert any(item.get("type") == "notification" for item in mock_ws.messages)
+    assert websocket_service.user_offline_message_queue.get("offline_user", []) == []
+
+
+def test_websocket_notification_priority_queue():
+    notification = {
+        "user_id": "alice",
+        "notification_id": "ntf_1",
+        "type": "system",
+        "title": "系统通知",
+        "content": "内容",
+        "timestamp": "2026-04-01T10:00:00+00:00",
+    }
+    result = websocket_service.queue_notification(notification, priority="high")
+    assert result["deduplicated"] is False
+    assert result["priority"] == "high"
+    assert result["queue_id"].startswith("mq_")
+
+    batch = websocket_service.dequeue_messages(batch_size=1)
+    assert len(batch) == 1
+    assert batch[0]["payload"]["notification"]["notification_id"] == "ntf_1"

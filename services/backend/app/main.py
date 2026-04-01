@@ -250,6 +250,45 @@ def _get_field(message: dict, key: str, default=None):
     return (message.get("data") or {}).get(key, default)
 
 
+def _has_workflow_access(workflow_id: str, user_id: str) -> bool:
+    wid = str(workflow_id or "").strip()
+    uid = str(user_id or "").strip()
+    if not wid:
+        return False
+    if not uid:
+        return True
+    try:
+        workflow = smart_workflow_service.get_workflow(wid)
+        if not workflow:
+            return True
+    except Exception:
+        return True
+    permissions = ("read_workflow", "edit_workflow", "comment", "update_cursor", "manage_collaborators")
+    for permission in permissions:
+        try:
+            if smart_workflow_service.has_permission(wid, uid, permission):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+async def _dispatch_queued_message(queue_item: dict) -> None:
+    payload = (queue_item or {}).get("payload") or {}
+    message_type = str(payload.get("message_type") or "")
+    if message_type == "notification":
+        user_id = str(payload.get("user_id") or "")
+        notification = dict(payload.get("notification") or {})
+        if not user_id:
+            return
+        n_type = str(notification.get("type") or "notification")
+        outbound_type = "mention" if n_type == "mention" else "notification"
+        await websocket_service.send_to_user(
+            websocket_service.build_message(outbound_type, data=notification, user_id=user_id),
+            user_id,
+        )
+
+
 async def handle_websocket_message(client_id: str, message: dict):
     err = websocket_service.validate_message(message)
     if err:
@@ -261,6 +300,24 @@ async def handle_websocket_message(client_id: str, message: dict):
 
     message_type = message.get('type')
     message_data = message.get("data") or {}
+    workflow_for_limit = (
+        _get_field(message, "workflow_id")
+        or _get_field(message, "run_id")
+        or ""
+    )
+    connected_user_id = websocket_service.get_client_user_id(client_id)
+    effective_user_id = connected_user_id or str(_get_field(message, "user_id") or "")
+    rate_error = websocket_service.enforce_rate_limit(
+        client_id=client_id,
+        workflow_id=str(workflow_for_limit or ""),
+        user_id=str(effective_user_id or ""),
+    )
+    if rate_error:
+        await websocket_service.send_personal_message(
+            websocket_service.build_message("error", data={"message": rate_error}),
+            client_id,
+        )
+        return
     message_id = message.get("message_id") or message_data.get("message_id")
 
     if message_type == 'subscribe_task':
@@ -294,6 +351,16 @@ async def handle_websocket_message(client_id: str, message: dict):
         if not workflow_id:
             await websocket_service.send_personal_message(
                 websocket_service.build_message("error", message_id=message_id, data={"message": "workflow_id is required"}),
+                client_id,
+            )
+            return
+        if connected_user_id and not _has_workflow_access(str(workflow_id), connected_user_id):
+            await websocket_service.send_personal_message(
+                websocket_service.build_message(
+                    "error",
+                    message_id=message_id,
+                    data={"message": "workflow access denied"},
+                ),
                 client_id,
             )
             return
@@ -335,6 +402,22 @@ async def handle_websocket_message(client_id: str, message: dict):
                 client_id,
             )
             return
+        if connected_user_id:
+            try:
+                run_detail = smart_workflow_service.get_run(str(run_id))
+                run_workflow_id = str((run_detail or {}).get("workflow_id") or "")
+                if run_workflow_id and not _has_workflow_access(run_workflow_id, connected_user_id):
+                    await websocket_service.send_personal_message(
+                        websocket_service.build_message(
+                            "error",
+                            message_id=message_id,
+                            data={"message": "workflow run access denied"},
+                        ),
+                        client_id,
+                    )
+                    return
+            except Exception:
+                pass
         await websocket_service.subscribe_to_workflow_run(client_id, run_id)
         await websocket_service.send_personal_message(
             websocket_service.build_message('subscription_confirmed', message_id=message_id, data={"run_id": run_id}, run_id=run_id),
@@ -352,6 +435,64 @@ async def handle_websocket_message(client_id: str, message: dict):
         await websocket_service.unsubscribe_from_workflow_run(client_id, run_id)
         await websocket_service.send_personal_message(
             websocket_service.build_message('unsubscription_confirmed', message_id=message_id, data={"run_id": run_id}, run_id=run_id),
+            client_id,
+        )
+
+    elif message_type in {"subscribe_user_notifications", "subscribe_user_mentions", "subscribe_user_activity"}:
+        user_id = str(_get_field(message, "user_id") or "").strip()
+        if not user_id:
+            await websocket_service.send_personal_message(
+                websocket_service.build_message("error", message_id=message_id, data={"message": "user_id is required"}),
+                client_id,
+            )
+            return
+        if connected_user_id and connected_user_id != user_id:
+            await websocket_service.send_personal_message(
+                websocket_service.build_message("error", message_id=message_id, data={"message": "forbidden user subscription"}),
+                client_id,
+            )
+            return
+        channel = (
+            "mention"
+            if message_type.endswith("mentions")
+            else "activity"
+            if message_type.endswith("activity")
+            else "notification"
+        )
+        websocket_service.subscribe_user_channel(client_id=client_id, user_id=user_id, channel=channel)
+        await websocket_service.send_personal_message(
+            websocket_service.build_message(
+                "subscription_confirmed",
+                message_id=message_id,
+                data={"user_id": user_id, "channel": channel},
+                user_id=user_id,
+            ),
+            client_id,
+        )
+
+    elif message_type in {"unsubscribe_user_notifications", "unsubscribe_user_mentions", "unsubscribe_user_activity"}:
+        user_id = str(_get_field(message, "user_id") or "").strip()
+        if not user_id:
+            await websocket_service.send_personal_message(
+                websocket_service.build_message("error", message_id=message_id, data={"message": "user_id is required"}),
+                client_id,
+            )
+            return
+        channel = (
+            "mention"
+            if message_type.endswith("mentions")
+            else "activity"
+            if message_type.endswith("activity")
+            else "notification"
+        )
+        websocket_service.unsubscribe_user_channel(client_id=client_id, user_id=user_id, channel=channel)
+        await websocket_service.send_personal_message(
+            websocket_service.build_message(
+                "unsubscription_confirmed",
+                message_id=message_id,
+                data={"user_id": user_id, "channel": channel},
+                user_id=user_id,
+            ),
             client_id,
         )
 
@@ -413,6 +554,22 @@ async def handle_websocket_message(client_id: str, message: dict):
         if not user_id:
             await websocket_service.send_personal_message(
                 websocket_service.build_message("error", message_id=message_id, data={"message": "user_id is required"}),
+                client_id,
+            )
+            return
+        permission_error = websocket_service.validate_message_permission(
+            client_id=client_id,
+            sender_user_id=str(user_id),
+        )
+        if permission_error:
+            await websocket_service.send_personal_message(
+                websocket_service.build_message("error", message_id=message_id, data={"message": permission_error}),
+                client_id,
+            )
+            return
+        if connected_user_id and not _has_workflow_access(str(workflow_id), connected_user_id):
+            await websocket_service.send_personal_message(
+                websocket_service.build_message("error", message_id=message_id, data={"message": "workflow access denied"}),
                 client_id,
             )
             return
@@ -484,6 +641,22 @@ async def handle_websocket_message(client_id: str, message: dict):
                 client_id,
             )
             return
+        permission_error = websocket_service.validate_message_permission(
+            client_id=client_id,
+            sender_user_id=str(user_id),
+        )
+        if permission_error:
+            await websocket_service.send_personal_message(
+                websocket_service.build_message("error", message_id=message_id, data={"message": permission_error}),
+                client_id,
+            )
+            return
+        if connected_user_id and not _has_workflow_access(str(workflow_id), connected_user_id):
+            await websocket_service.send_personal_message(
+                websocket_service.build_message("error", message_id=message_id, data={"message": "workflow access denied"}),
+                client_id,
+            )
+            return
         try:
             op = websocket_service.record_collaboration_operation(
                 workflow_id=str(workflow_id),
@@ -517,6 +690,29 @@ async def handle_websocket_message(client_id: str, message: dict):
         if not workflow_id or not comment_id or not user_id or not content:
             await websocket_service.send_personal_message(
                 websocket_service.build_message("error", message_id=message_id, data={"message": "workflow_id/comment_id/user_id/content is required"}),
+                client_id,
+            )
+            return
+        permission_error = websocket_service.validate_message_permission(
+            client_id=client_id,
+            sender_user_id=str(user_id),
+        )
+        if permission_error:
+            await websocket_service.send_personal_message(
+                websocket_service.build_message("error", message_id=message_id, data={"message": permission_error}),
+                client_id,
+            )
+            return
+        if connected_user_id and not _has_workflow_access(str(workflow_id), connected_user_id):
+            await websocket_service.send_personal_message(
+                websocket_service.build_message("error", message_id=message_id, data={"message": "workflow access denied"}),
+                client_id,
+            )
+            return
+        content_error = websocket_service.validate_message_content(str(content))
+        if content_error:
+            await websocket_service.send_personal_message(
+                websocket_service.build_message("error", message_id=message_id, data={"message": content_error}),
                 client_id,
             )
             return
@@ -575,15 +771,38 @@ async def handle_websocket_message(client_id: str, message: dict):
                 client_id,
             )
             return
+        permission_error = websocket_service.validate_message_permission(
+            client_id=client_id,
+            sender_user_id=connected_user_id,
+            receiver_user_id=str(notification_payload.get("user_id") or ""),
+        )
+        if permission_error:
+            await websocket_service.send_personal_message(
+                websocket_service.build_message("error", message_id=message_id, data={"message": permission_error}),
+                client_id,
+            )
+            return
+        title_error = websocket_service.validate_message_content(
+            str(notification_payload.get("title") or ""),
+            max_length=120,
+        )
+        content_error = websocket_service.validate_message_content(str(notification_payload.get("content") or ""))
+        if title_error or content_error:
+            await websocket_service.send_personal_message(
+                websocket_service.build_message(
+                    "error",
+                    message_id=message_id,
+                    data={"message": title_error or content_error},
+                ),
+                client_id,
+            )
+            return
         result = websocket_service.queue_notification(
             notification=notification_payload,
             priority=str(_get_field(message, "priority", "high")),
         )
         if not result.get("deduplicated"):
-            await websocket_service.send_to_user(
-                websocket_service.build_message("notification", data=notification_payload, user_id=str(notification_payload["user_id"])),
-                str(notification_payload["user_id"]),
-            )
+            await websocket_service.process_message_batch(_dispatch_queued_message, batch_size=50)
         await websocket_service.send_personal_message(
             websocket_service.build_message("ack", message_id=message_id, data=result),
             client_id,
@@ -669,7 +888,14 @@ async def handle_websocket_message(client_id: str, message: dict):
 
     elif message_type == "connection_stats":
         await websocket_service.send_personal_message(
-            websocket_service.build_message("connection_stats", data=websocket_service.get_connection_stats(), message_id=message_id),
+            websocket_service.build_message(
+                "connection_stats",
+                data={
+                    **websocket_service.get_connection_stats(),
+                    "subscriptions": websocket_service.list_client_subscriptions(client_id),
+                },
+                message_id=message_id,
+            ),
             client_id,
         )
 
