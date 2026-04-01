@@ -44,6 +44,25 @@ export interface WorkflowCollaborator {
   display_name?: string;
 }
 
+export interface WorkflowCursorSelectionRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface WorkflowCollaborationCursor {
+  user_id: string;
+  node_id: string;
+  x: number;
+  y: number;
+  selection: WorkflowCursorSelectionRect[];
+  updated_at: string;
+  color?: string;
+  display_name?: string;
+  avatar?: string;
+}
+
 export interface WorkflowRecord {
   workflow_id: string;
   name: string;

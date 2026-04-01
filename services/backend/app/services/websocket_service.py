@@ -189,6 +189,27 @@ class WebSocketService:
         for subscriber_id in targets:
             await self.send_personal_message(message, subscriber_id)
 
+    async def notify_workflow_cursor_update(
+        self,
+        workflow_id: str,
+        cursor: Dict[str, Any],
+        exclude_client_id: Optional[str] = None,
+    ):
+        subscribers = self.workflow_subscribers.get(workflow_id, set())
+        if not subscribers:
+            return
+
+        message = {
+            "type": "collaboration_cursor_update",
+            "workflow_id": workflow_id,
+            "cursor": cursor,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        for subscriber_id in subscribers:
+            if exclude_client_id and subscriber_id == exclude_client_id:
+                continue
+            await self.send_personal_message(message, subscriber_id)
+
     def dispatch_workflow_update(
         self,
         workflow_id: str,

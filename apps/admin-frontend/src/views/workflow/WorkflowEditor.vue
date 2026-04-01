@@ -23,25 +23,34 @@
           <el-tag>版本 v{{ meta.version }}</el-tag>
         </div>
 
-        <VueFlow
-          :id="flowId"
-          v-model:nodes="nodes"
-          v-model:edges="edges"
-          :only-render-visible-elements="true"
-          class="workflow-canvas"
-          :node-types="nodeTypes"
-          :edge-types="edgeTypes"
-          :min-zoom="0.2"
-          :max-zoom="2.5"
-          fit-view-on-init
-          @connect="onConnect"
-          @node-click="onNodeClick"
-          @pane-click="clearSelection"
-          @edge-double-click="onEdgeDoubleClick"
-        >
-          <Background :gap="16" pattern-color="#d2dae8" />
-          <Controls position="top-right" />
-        </VueFlow>
+        <div ref="canvasWrapRef" class="workflow-canvas-wrap">
+          <VueFlow
+            :id="flowId"
+            v-model:nodes="nodes"
+            v-model:edges="edges"
+            :only-render-visible-elements="true"
+            class="workflow-canvas"
+            :node-types="nodeTypes"
+            :edge-types="edgeTypes"
+            :min-zoom="0.2"
+            :max-zoom="2.5"
+            fit-view-on-init
+            @connect="onConnect"
+            @node-click="onNodeClick"
+            @pane-click="clearSelection"
+            @edge-double-click="onEdgeDoubleClick"
+          >
+            <Background :gap="16" pattern-color="#d2dae8" />
+            <Controls position="top-right" />
+          </VueFlow>
+          <CollaborationCursorLayer
+            v-if="persistedWorkflowId"
+            :workflow-id="persistedWorkflowId"
+            :target-el="canvasWrapRef"
+            :current-user-id="currentUserId"
+            :current-user-name="currentUserName"
+          />
+        </div>
       </section>
 
       <aside class="side-panels">
@@ -92,7 +101,9 @@ import WorkflowToolbar from './WorkflowToolbar.vue';
 import NodePropertiesPanel from './NodePropertiesPanel.vue';
 import WorkflowTemplateLibrary from './WorkflowTemplateLibrary.vue';
 import WorkflowExecutionMonitor from './WorkflowExecutionMonitor.vue';
+import CollaborationCursorLayer from './CollaborationCursorLayer.vue';
 import { workflowService } from '../../services/WorkflowService';
+import { useAuthStore } from '../../stores/auth';
 import type {
   WorkflowDefinition,
   WorkflowEdgeDefinition,
@@ -105,6 +116,7 @@ import type { WorkflowCanvasNodeData } from './workflowCanvas';
 
 const route = useRoute();
 const router = useRouter();
+const authStore = useAuthStore();
 
 const flowId = 'workflow-editor-canvas';
 const { fitView } = useVueFlow({ id: flowId });
@@ -116,6 +128,7 @@ const selectedNode = ref<Node<WorkflowCanvasNodeData> | null>(null);
 const availableNodeTypes = ref<string[]>([]);
 const activeRunId = ref('');
 const persistedWorkflowId = ref('');
+const canvasWrapRef = ref<HTMLElement | null>(null);
 
 const meta = reactive({
   workflow_id: '',
@@ -164,6 +177,23 @@ const routeWorkflowId = computed(() => {
     return raw[0] || '';
   }
   return typeof raw === 'string' ? raw : '';
+});
+
+const currentUserName = computed(() => authStore.user?.email || authStore.username || '当前用户');
+
+const currentUserId = computed(() => {
+  const fromStore = authStore.user?.userId ?? authStore.username;
+  if (fromStore) {
+    return String(fromStore);
+  }
+  const key = 'udake_workflow_cursor_user_id';
+  const cached = localStorage.getItem(key);
+  if (cached) {
+    return cached;
+  }
+  const next = `guest_${Math.random().toString(36).slice(2, 10)}`;
+  localStorage.setItem(key, next);
+  return next;
 });
 
 const buildStarterDefinition = (): WorkflowDefinition => ({
@@ -677,6 +707,12 @@ onBeforeUnmount(() => {
   flex: 1;
   min-height: 560px;
   background: radial-gradient(circle at 15% 10%, #f7fbff 0%, #f8f9ff 42%, #f4f6fb 100%);
+}
+
+.workflow-canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 560px;
 }
 
 .side-panels {

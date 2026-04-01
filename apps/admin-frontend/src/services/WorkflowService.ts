@@ -1,5 +1,6 @@
 import { http } from './http';
 import type {
+  WorkflowCollaborationCursor,
   WorkflowCollaborator,
   WorkflowDefinition,
   WorkflowHealthSnapshot,
@@ -117,6 +118,37 @@ export const workflowService = {
       collaborators: WorkflowCollaborator[];
       count: number;
     }>(`/workflow/${workflowId}/collaborators`, { collaborators });
+    return data;
+  },
+
+  async updateCollaborationCursor(
+    workflowId: string,
+    userId: string,
+    position: {
+      node_id?: string;
+      x: number;
+      y: number;
+      selection?: Array<{ x: number; y: number; width: number; height: number }>;
+    }
+  ) {
+    const { data } = await http.post<{
+      workflow_id: string;
+      cursor: WorkflowCollaborationCursor;
+    }>(`/workflow/${workflowId}/collaboration/cursors`, {
+      user_id: userId,
+      position
+    });
+    return data;
+  },
+
+  async listCollaborationCursors(workflowId: string, activeSeconds = 30) {
+    const { data } = await http.get<{
+      workflow_id: string;
+      cursors: WorkflowCollaborationCursor[];
+      count: number;
+    }>(`/workflow/${workflowId}/collaboration/cursors`, {
+      params: { active_seconds: activeSeconds }
+    });
     return data;
   },
 

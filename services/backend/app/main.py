@@ -29,6 +29,7 @@ from .config import settings
 from .security_middleware import security_guard_middleware
 from .startup_manager import StartupManager
 from .services.websocket_service import websocket_service
+from .services.智能工作流服务 import smart_workflow_service
 from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 分布式计算接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口, 数据质量接口, 数据安全接口, GPU加速接口, 数据反馈接口, 主动学习接口, 用户验证与自评估接口, 移动端GPS接口, 历史对比与趋势分析接口, 智能工作流接口
 from .api.app_download_api import router as download_router
 from .api.admin_api import router as admin_router
@@ -359,6 +360,56 @@ async def handle_websocket_message(client_id: str, message: dict):
                     sample=applied,
                     exclude_client_id=client_id
                 )
+
+    elif message_type == 'collaboration_cursor_update':
+        workflow_id = message.get('workflow_id') or message_data.get('workflow_id')
+        cursor = message.get('cursor') or message_data.get('cursor') or {}
+        user_id = cursor.get('user_id') or message.get('user_id') or message_data.get('user_id')
+
+        if not workflow_id:
+            await websocket_service.send_personal_message({
+                'type': 'error',
+                'message': 'workflow_id is required',
+                'message_id': message_id
+            }, client_id)
+            return
+
+        if not user_id:
+            await websocket_service.send_personal_message({
+                'type': 'error',
+                'message': 'user_id is required',
+                'message_id': message_id
+            }, client_id)
+            return
+
+        try:
+            result = smart_workflow_service.update_collaboration_cursor(
+                workflow_id=str(workflow_id),
+                user_id=str(user_id),
+                position={
+                    'node_id': cursor.get('node_id') or '',
+                    'x': cursor.get('x', 0.0),
+                    'y': cursor.get('y', 0.0),
+                    'selection': cursor.get('selection') or [],
+                },
+            )
+            await websocket_service.notify_workflow_cursor_update(
+                workflow_id=str(workflow_id),
+                cursor=result.get('cursor') or {},
+                exclude_client_id=client_id
+            )
+            await websocket_service.send_personal_message({
+                'type': 'ack',
+                'message_id': message_id,
+                'workflow_id': workflow_id,
+                'cursor': result.get('cursor') or {}
+            }, client_id)
+        except Exception as exc:
+            await websocket_service.send_personal_message({
+                'type': 'error',
+                'message': str(exc),
+                'message_id': message_id
+            }, client_id)
 
     elif message_type in {'gps_ping', 'ping'}:
         await websocket_service.send_personal_message({

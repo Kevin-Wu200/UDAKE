@@ -118,6 +118,13 @@ export class WorkflowRealtimeService {
     }
   }
 
+  publish(type: string, payload: Record<string, unknown>) {
+    this.send({
+      type,
+      ...payload
+    });
+  }
+
   notify(type: string, payload: Record<string, unknown>, raw: unknown) {
     const event: WorkflowRealtimeEvent = {
       type,
