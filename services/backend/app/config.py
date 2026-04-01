@@ -136,6 +136,11 @@ class Settings(BaseSettings):
     AUTH_DB_SSLROOTCERT: Optional[str] = None
     AUTH_DB_LOG_SLOW_QUERY_MS: int = 100
     AUTH_DB_SLOW_QUERY_ENABLED: bool = True
+    AUTH_DB_READ_REPLICA_URLS: Union[str, List[str]] = "[]"
+    AUTH_DB_RW_SPLIT_ENABLED: bool = False
+    AUTH_DB_QUERY_CACHE_TTL_SECONDS: float = 2.0
+    AUTH_DB_QUERY_CACHE_MAX_ENTRIES: int = 2048
+    AUTH_DB_REPLICA_LAG_WARN_SECONDS: int = 5
     REDIS_URL: Optional[str] = None
     REDIS_ENABLED: bool = False
     REDIS_HOST: str = "127.0.0.1"
@@ -211,7 +216,13 @@ class Settings(BaseSettings):
                 return [139.767125, 35.681236]
         return v
 
-    @field_validator('FEEDBACK_FALLBACK_KEYS', 'FEEDBACK_MASK_FIELDS', 'WORKFLOW_REDIS_CLUSTER_NODES', mode='before')
+    @field_validator(
+        'FEEDBACK_FALLBACK_KEYS',
+        'FEEDBACK_MASK_FIELDS',
+        'WORKFLOW_REDIS_CLUSTER_NODES',
+        'AUTH_DB_READ_REPLICA_URLS',
+        mode='before'
+    )
     @classmethod
     def parse_feedback_lists(cls, v):
         return _parse_json_or_csv_list(v)
@@ -227,6 +238,7 @@ class Settings(BaseSettings):
         'AUTH_DB_POOL_TIMEOUT',
         'AUTH_DB_POOL_RECYCLE',
         'AUTH_DB_LOG_SLOW_QUERY_MS',
+        'AUTH_DB_REPLICA_LAG_WARN_SECONDS',
         'REDIS_PORT',
         'WORKFLOW_REDIS_POOL_SIZE',
         'WORKFLOW_REDIS_TIMEOUT_SECONDS',
@@ -247,6 +259,14 @@ class Settings(BaseSettings):
         if v <= 0:
             raise ValueError(f'{v} must be positive')
         return v
+
+    @field_validator('AUTH_DB_QUERY_CACHE_TTL_SECONDS', mode='before')
+    @classmethod
+    def validate_positive_float(cls, v):
+        fv = float(v)
+        if fv <= 0:
+            raise ValueError(f'{fv} must be positive')
+        return fv
 
     @field_validator('REDIS_DB')
     @classmethod

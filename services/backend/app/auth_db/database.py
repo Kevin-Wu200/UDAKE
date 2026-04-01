@@ -14,6 +14,7 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
+from app.auth_db.performance import ReadWriteSessionRouter
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -111,9 +112,36 @@ def create_auth_engine(database_url: Optional[str] = None) -> Engine:
     return engine
 
 
+def create_auth_replica_engines() -> list[Engine]:
+    """Create read replica engines from AUTH_DB_READ_REPLICA_URLS."""
+    replica_urls = settings.AUTH_DB_READ_REPLICA_URLS
+    engines: list[Engine] = []
+    for raw_url in replica_urls:
+        url = str(raw_url or "").strip()
+        if not url:
+            continue
+        replica_url = url
+        if settings.AUTH_DB_REQUIRE_SSL and _is_postgres_url(replica_url):
+            replica_url = _ensure_query_param(replica_url, key="sslmode", value=settings.AUTH_DB_SSLMODE)
+        engines.append(create_engine(replica_url, **_build_engine_options(replica_url)))
+    return engines
+
+
 def create_auth_session_factory(engine: Engine) -> sessionmaker:
     """Create session factory bound to the supplied engine."""
     return sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
+
+
+def create_read_write_router(
+    primary_engine: Optional[Engine] = None,
+    replica_engines: Optional[list[Engine]] = None,
+) -> ReadWriteSessionRouter:
+    """Build read/write router using primary and optional replica engines."""
+    resolved_primary = primary_engine or create_auth_engine()
+    resolved_replicas = replica_engines if replica_engines is not None else create_auth_replica_engines()
+    primary_session_factory = create_auth_session_factory(resolved_primary)
+    replica_factories = [create_auth_session_factory(engine) for engine in resolved_replicas]
+    return ReadWriteSessionRouter(primary_session_factory=primary_session_factory, replica_session_factories=replica_factories)
 
 
 def ping_database(engine: Engine) -> bool:

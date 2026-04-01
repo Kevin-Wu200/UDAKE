@@ -7,8 +7,11 @@ from typing import Dict, Any
 
 # 兼容直接在仓库根目录执行 pytest 的场景
 SERVICES_ROOT = Path(__file__).resolve().parent / "services"
+BACKEND_ROOT = SERVICES_ROOT / "backend"
 if str(SERVICES_ROOT) not in sys.path:
     sys.path.insert(0, str(SERVICES_ROOT))
+if str(BACKEND_ROOT) not in sys.path:
+    sys.path.insert(0, str(BACKEND_ROOT))
 
 # 抑制 starlette 对 multipart 导入兼容层的待弃用提示
 warnings.filterwarnings(

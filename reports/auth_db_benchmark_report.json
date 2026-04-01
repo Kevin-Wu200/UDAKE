@@ -1,0 +1,44 @@
+{
+  "generated_at": 1775003164,
+  "database_url": "sqlite+pysqlite:////tmp/auth_db_benchmark.sqlite",
+  "results": [
+    {
+      "users": 100,
+      "total_requests": 100,
+      "success_requests": 100,
+      "failed_requests": 0,
+      "p95_ms": 147.33,
+      "avg_ms": 24.52,
+      "simple_query_avg_ms": 0.18,
+      "complex_query_avg_ms": 3.51,
+      "batch_op_avg_ms": 24.52
+    },
+    {
+      "users": 500,
+      "total_requests": 500,
+      "success_requests": 500,
+      "failed_requests": 0,
+      "p95_ms": 89.47,
+      "avg_ms": 17.89,
+      "simple_query_avg_ms": 0.16,
+      "complex_query_avg_ms": 1.06,
+      "batch_op_avg_ms": 17.89
+    },
+    {
+      "users": 1000,
+      "total_requests": 1000,
+      "success_requests": 1000,
+      "failed_requests": 0,
+      "p95_ms": 88.69,
+      "avg_ms": 18.82,
+      "simple_query_avg_ms": 0.09,
+      "complex_query_avg_ms": 0.67,
+      "batch_op_avg_ms": 18.82
+    }
+  ],
+  "thresholds": {
+    "query_response_ms": 100,
+    "concurrency_users": 1000,
+    "stability_target": 99.9
+  }
+}
