@@ -50,6 +50,13 @@
             :current-user-id="currentUserId"
             :current-user-name="currentUserName"
           />
+          <div
+            v-if="focusPulse"
+            class="cursor-focus-pulse"
+            :style="{ left: `${focusPulse.x}px`, top: `${focusPulse.y}px` }"
+          >
+            {{ focusPulse.label }}
+          </div>
         </div>
       </section>
 
@@ -76,6 +83,15 @@
           :current-user-id="currentUserId"
           :current-user-name="currentUserName"
           :is-admin="isAdminUser"
+        />
+
+        <WorkflowCollaborationSharePanel
+          v-if="persistedWorkflowId"
+          :workflow-id="persistedWorkflowId"
+          :current-user-id="currentUserId"
+          :current-user-name="currentUserName"
+          @jump-position="handleJumpPosition"
+          @mention-user="handleMentionUser"
         />
       </aside>
     </div>
@@ -111,6 +127,7 @@ import WorkflowTemplateLibrary from './WorkflowTemplateLibrary.vue';
 import WorkflowExecutionMonitor from './WorkflowExecutionMonitor.vue';
 import CollaborationCursorLayer from './CollaborationCursorLayer.vue';
 import CommentThread from './CommentThread.vue';
+import WorkflowCollaborationSharePanel from './WorkflowCollaborationSharePanel.vue';
 import { workflowService } from '../../services/WorkflowService';
 import { useAuthStore } from '../../stores/auth';
 import type {
@@ -138,6 +155,8 @@ const availableNodeTypes = ref<string[]>([]);
 const activeRunId = ref('');
 const persistedWorkflowId = ref('');
 const canvasWrapRef = ref<HTMLElement | null>(null);
+const focusPulse = ref<{ x: number; y: number; label: string } | null>(null);
+let focusPulseTimer: number | null = null;
 
 const meta = reactive({
   workflow_id: '',
@@ -657,6 +676,29 @@ const handleKeyboardShortcuts = (event: KeyboardEvent) => {
   }
 };
 
+const handleJumpPosition = (payload: { x: number; y: number; userId: string; userName: string }) => {
+  focusPulse.value = {
+    x: payload.x,
+    y: payload.y,
+    label: `定位到 ${payload.userName}`
+  };
+  if (focusPulseTimer !== null) {
+    window.clearTimeout(focusPulseTimer);
+  }
+  focusPulseTimer = window.setTimeout(() => {
+    focusPulse.value = null;
+    focusPulseTimer = null;
+  }, 1500);
+};
+
+const handleMentionUser = (payload: { userId: string; displayName: string }) => {
+  window.dispatchEvent(
+    new CustomEvent('workflow-mention-user', {
+      detail: payload
+    })
+  );
+};
+
 watch(
   routeWorkflowId,
   (workflowId) => {
@@ -682,6 +724,9 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  if (focusPulseTimer !== null) {
+    window.clearTimeout(focusPulseTimer);
+  }
   window.removeEventListener('keydown', handleKeyboardShortcuts);
 });
 </script>
@@ -729,6 +774,20 @@ onBeforeUnmount(() => {
   min-height: 560px;
 }
 
+.cursor-focus-pulse {
+  position: absolute;
+  z-index: 26;
+  transform: translate(-50%, -50%);
+  background: rgba(37, 99, 235, 0.92);
+  color: #fff;
+  font-size: 12px;
+  border-radius: 999px;
+  padding: 4px 10px;
+  box-shadow: 0 12px 22px rgba(15, 23, 42, 0.25);
+  pointer-events: none;
+  animation: pulse-fade 1.5s ease forwards;
+}
+
 .side-panels {
   display: flex;
   flex-direction: column;
@@ -747,6 +806,21 @@ onBeforeUnmount(() => {
 
   .workflow-canvas {
     min-height: 500px;
+  }
+}
+
+@keyframes pulse-fade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.82);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.08);
   }
 }
 </style>

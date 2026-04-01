@@ -926,6 +926,24 @@ function attachRealtime() {
   });
 }
 
+function handleMentionShortcut(event: Event) {
+  const custom = event as CustomEvent<{ userId?: string; displayName?: string }>;
+  const name = custom.detail?.displayName || custom.detail?.userId;
+  if (!name) {
+    return;
+  }
+
+  if (composer.value.trim()) {
+    composer.value = `${composer.value} @${name} `;
+  } else {
+    composer.value = `@${name} `;
+  }
+
+  nextTick(() => {
+    composerRef.value?.focus?.();
+  });
+}
+
 watch(
   () => props.workflowId,
   (workflowId) => {
@@ -959,6 +977,7 @@ onMounted(() => {
   loadCommentCache();
   attachRealtime();
   syncPolling();
+  window.addEventListener('workflow-mention-user', handleMentionShortcut as EventListener);
 });
 
 onBeforeUnmount(() => {
@@ -971,6 +990,8 @@ onBeforeUnmount(() => {
     unsubRealtime.value();
     unsubRealtime.value = null;
   }
+
+  window.removeEventListener('workflow-mention-user', handleMentionShortcut as EventListener);
 });
 
 const CommentItem: any = defineComponent({
