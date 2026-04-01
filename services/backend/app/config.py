@@ -162,6 +162,21 @@ class Settings(BaseSettings):
     CACHE_AUTO_TUNE_ENABLED: bool = True
     CACHE_TUNE_REQUEST_INTERVAL: int = 200
 
+    # SMTP/邮件通知配置
+    SMTP_HOST: str = "smtp.qq.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
+    SMTP_TIMEOUT_SECONDS: int = 15
+    SMTP_POOL_SIZE: int = 4
+    WORKFLOW_EMAIL_WORKERS: int = 2
+    WORKFLOW_EMAIL_USER_LIMIT_PER_HOUR: int = 10
+    WORKFLOW_EMAIL_EVENT_LIMIT_PER_HOUR: int = 30
+    WORKFLOW_EMAIL_DEDUP_SECONDS: int = 300
+    WORKFLOW_EMAIL_RETRY_BACKOFF_SECONDS: str = "60,300,900"
+
     # 认证安全策略
     AUTH_ENCRYPTION_KEY: Optional[str] = None
     FEEDBACK_ENCRYPTION_KEY: Optional[str] = None

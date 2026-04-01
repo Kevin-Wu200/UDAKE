@@ -172,6 +172,10 @@ class CacheInvalidateRequest(BaseModel):
     workflow_id: Optional[str] = Field(default=None, max_length=120)
 
 
+class SMTPValidateRequest(BaseModel):
+    test_recipient: str = Field(default="", max_length=255)
+
+
 def _handle_error(exc: Exception) -> None:
     if isinstance(exc, WorkflowValidationError):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -201,6 +205,19 @@ async def workflow_cache_invalidate(payload: CacheInvalidateRequest) -> Dict[str
         pattern=payload.pattern,
         workflow_id=payload.workflow_id,
     )
+
+
+@router.post("/workflow/notifications/smtp/validate")
+async def workflow_smtp_validate(payload: SMTPValidateRequest) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.validate_smtp_configuration(test_recipient=payload.test_recipient)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/notifications/email-logs")
+async def workflow_email_logs(limit: int = Query(default=200, ge=1, le=2000)) -> Dict[str, Any]:
+    return smart_workflow_service.list_email_delivery_logs(limit=limit)
 
 
 @router.get("/workflow/schema")

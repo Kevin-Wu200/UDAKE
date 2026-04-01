@@ -18,6 +18,7 @@ from uuid import uuid4
 from .websocket_service import websocket_service
 from .smart_workflow_dao import build_smart_workflow_daos
 from .workflow_redis_cache import WorkflowRedisCacheManager
+from .workflow_email_service import get_workflow_email_service
 from ..config import settings
 from ..workflow.engine import WorkflowEngine
 from ..workflow.schema import WorkflowValidationError, get_workflow_schema
@@ -73,6 +74,7 @@ class SmartWorkflowService:
     _DEFAULT_NOTIFICATION_PREFS: Dict[str, Any] = {
         "in_app": True,
         "email": False,
+        "email_address": "",
         "realtime": True,
         "mention_only": False,
         "muted_event_types": [],
@@ -113,6 +115,7 @@ class SmartWorkflowService:
         self._comment_dao = dao_bundle.comment_dao
         self._notification_dao = dao_bundle.notification_dao
         self._dao_connection_manager = dao_bundle.connection_manager
+        self._email_service = get_workflow_email_service()
 
         self._metrics: Dict[str, Any] = {
             "total_runs": 0,
@@ -176,6 +179,10 @@ class SmartWorkflowService:
                     "healthy": bool(dao_health.get("healthy", False)),
                     "pool_status": str(dao_health.get("pool_status", "")),
                     "dialect": str(dao_health.get("dialect", "")),
+                },
+                "email": {
+                    "enabled": self._email_service.enabled,
+                    "queue": self._email_service.queue_snapshot(),
                 },
             }
 
@@ -418,8 +425,83 @@ class SmartWorkflowService:
         state["notifications"].append(notification)
         if len(state["notifications"]) > 2000:
             state["notifications"] = state["notifications"][-2000:]
+        self._dispatch_email_notification(workflow=workflow, notification=notification)
         self._persist_notification_record(notification)
         return notification
+
+    def _resolve_user_email(
+        self,
+        workflow: Mapping[str, Any],
+        user_id: str,
+        payload: Optional[Mapping[str, Any]] = None,
+    ) -> str:
+        uid = str(user_id or "").strip()
+        data = dict(payload or {})
+        for key in ("email", "to_email", "invitee_email", "recipient_email"):
+            value = str(data.get(key) or "").strip().lower()
+            if "@" in value:
+                return value
+
+        state = workflow.get("collab_state") or {}
+        prefs = (state.get("notification_preferences") or {}).get(uid) or {}
+        pref_email = str(prefs.get("email_address") or "").strip().lower()
+        if "@" in pref_email:
+            return pref_email
+
+        for item in workflow.get("collaborators") or []:
+            if str(item.get("user_id") or "") != uid:
+                continue
+            candidate = str(item.get("email") or "").strip().lower()
+            if "@" in candidate:
+                return candidate
+        if "@" in uid:
+            return uid.lower()
+        return ""
+
+    def _dispatch_email_notification(self, workflow: Mapping[str, Any], notification: Dict[str, Any]) -> None:
+        channels = dict(notification.get("channels") or {})
+        if not bool(channels.get("email", False)):
+            return
+
+        event_type = str(notification.get("event_type") or "")
+        user_id = str(notification.get("user_id") or "")
+        payload = dict(notification.get("payload") or {})
+        recipient_email = self._resolve_user_email(workflow=workflow, user_id=user_id, payload=payload)
+        if not recipient_email:
+            notification.setdefault("channels", {})["email_error"] = "missing_recipient_email"
+            return
+
+        workflow_id = str(workflow.get("workflow_id") or payload.get("workflow_id") or "")
+        run_id = str(payload.get("run_id") or "")
+        context = {
+            "message": str(notification.get("message") or ""),
+            "inviter": str(payload.get("invited_by") or payload.get("actor") or "系统"),
+            "team_name": str(payload.get("team_name") or "未命名团队"),
+            "document_name": str(payload.get("document_name") or workflow.get("name") or workflow_id),
+            "action_url": str(payload.get("action_url") or f"/#/workflows/{workflow_id}"),
+            "actor": str(payload.get("actor") or payload.get("invited_by") or "系统"),
+            "content": str(payload.get("content") or payload.get("content_snippet") or notification.get("message") or ""),
+            "document_url": str(payload.get("document_url") or f"/#/workflows/{workflow_id}"),
+            "comment_url": str(payload.get("comment_url") or f"/#/workflows/{workflow_id}"),
+            "visitor": str(payload.get("visitor") or payload.get("viewer_user_id") or "匿名访问者"),
+            "visited_at": str(payload.get("visited_at") or self._now_iso()),
+            "result": str(payload.get("result") or payload.get("status") or "已完成"),
+            "result_url": str(payload.get("result_url") or f"/#/workflows/{workflow_id}/runs/{run_id}"),
+        }
+        priority = "high" if event_type in {"invite_notification", "mention", "conflict_resolved"} else "normal"
+        message_id = self._email_service.enqueue_mail(
+            user_id=user_id or "unknown",
+            to_email=recipient_email,
+            event_type=event_type,
+            context=context,
+            priority=priority,
+            delay_seconds=0,
+        )
+        notification.setdefault("channels", {})["email_message_id"] = message_id
+        notification["channels"]["email_recipient"] = recipient_email
+        status = self._email_service.get_status(message_id)
+        if status:
+            notification["channels"]["email_status"] = status.get("status")
 
     # -------- 工作流定义与版本 --------
     def validate_definition(self, payload: Mapping[str, Any]) -> Dict[str, Any]:
@@ -654,6 +736,9 @@ class SmartWorkflowService:
                 }
                 if user_id:
                     normalized_item["user_id"] = user_id
+                    email = str(item.get("email") or "").strip().lower()
+                    if email:
+                        normalized_item["email"] = email
                 if team_id:
                     normalized_item["team_id"] = team_id
                 normalized.append(normalized_item)
@@ -819,6 +904,20 @@ class SmartWorkflowService:
                 "accepted_by": None,
                 "accepted_at": None,
             }
+            invite_message_id = self._email_service.enqueue_mail(
+                user_id=invite_email,
+                to_email=invite_email,
+                event_type="invite_notification",
+                context={
+                    "message": f"{invitation['invited_by']} 邀请您加入团队协作",
+                    "inviter": invitation["invited_by"],
+                    "team_name": str(team.get("name") or team_id),
+                    "document_name": "",
+                    "action_url": f"/#/teams/{team_id}/invitations/{invite_id}",
+                },
+                priority="high",
+            )
+            invitation["email_message_id"] = invite_message_id
             self._invitations[invite_id] = invitation
             return deepcopy(invitation)
 
@@ -1007,6 +1106,14 @@ class SmartWorkflowService:
 
     def get_cache_metrics(self) -> Dict[str, Any]:
         return self._cache.get_metrics()
+
+    def validate_smtp_configuration(self, test_recipient: str = "") -> Dict[str, Any]:
+        recipient = str(test_recipient or "").strip()
+        return self._email_service.validate_configuration(test_recipient=recipient or None)
+
+    def list_email_delivery_logs(self, limit: int = 200) -> Dict[str, Any]:
+        rows = self._email_service.get_delivery_logs(limit=limit)
+        return {"logs": rows, "count": len(rows)}
 
     def invalidate_cache(
         self,
@@ -1289,6 +1396,20 @@ class SmartWorkflowService:
             conflict["resolution_strategy"] = strategy_name
             conflict["resolved_value"] = final_value
             state["analytics"]["manual_resolved_conflicts"] += 1
+            target_user_id = str(conflict.get("actor_id") or "").strip()
+            if target_user_id and target_user_id != resolver:
+                self._notify(
+                    workflow=workflow,
+                    user_id=target_user_id,
+                    event_type="conflict_resolved",
+                    message=f"工作流冲突已由 {resolver} 解决",
+                    payload={
+                        "workflow_id": workflow_id,
+                        "conflict_id": conflict_id,
+                        "result": f"策略 {strategy_name}，结果值 {final_value}",
+                        "document_url": f"/#/workflows/{workflow_id}",
+                    },
+                )
             workflow["updated_at"] = self._now_iso()
             self._persist_workflow_record(workflow)
             self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
@@ -1385,6 +1506,16 @@ class SmartWorkflowService:
             }
             mentions = sorted(set(re.findall(r"@([A-Za-z0-9_.-]+)", text)))
             comment["mentions"] = mentions
+            parent_comment = None
+            if parent_comment_id:
+                parent_comment = next(
+                    (
+                        item
+                        for item in state.get("comments") or []
+                        if str(item.get("comment_id") or "") == str(parent_comment_id)
+                    ),
+                    None,
+                )
             state.setdefault("comments", []).append(comment)
             state["analytics"]["total_comments"] += 1
             state["analytics"]["total_mentions"] += len(mentions)
@@ -1392,13 +1523,36 @@ class SmartWorkflowService:
             state["contributor_stats"][uid]["comments"] += 1
             state["last_activity_at"] = comment["created_at"]
 
+            if parent_comment:
+                parent_user_id = str(parent_comment.get("user_id") or "").strip()
+                if parent_user_id and parent_user_id != uid:
+                    self._notify(
+                        workflow=workflow,
+                        user_id=parent_user_id,
+                        event_type="comment_reply",
+                        message=f"{uid} 回复了你的评论",
+                        payload={
+                            "workflow_id": workflow_id,
+                            "comment_id": comment["comment_id"],
+                            "comment_url": f"/#/workflows/{workflow_id}/comments/{comment['comment_id']}",
+                            "actor": uid,
+                            "content": text[:120],
+                        },
+                    )
+
             for mentioned_user in mentions:
                 self._notify(
                     workflow=workflow,
                     user_id=mentioned_user,
                     event_type="mention",
                     message=f"{uid} 在评论中提及了你",
-                    payload={"workflow_id": workflow_id, "comment_id": comment["comment_id"]},
+                    payload={
+                        "workflow_id": workflow_id,
+                        "comment_id": comment["comment_id"],
+                        "comment_url": f"/#/workflows/{workflow_id}/comments/{comment['comment_id']}",
+                        "actor": uid,
+                        "content": text[:120],
+                    },
                 )
             self._persist_comment_record(comment)
             self._persist_workflow_record(workflow)
@@ -1432,6 +1586,8 @@ class SmartWorkflowService:
             prefs.update(deepcopy(dict(preferences or {})))
             muted = prefs.get("muted_event_types") or []
             prefs["muted_event_types"] = sorted({str(item) for item in muted if str(item).strip()})
+            email_address = str(prefs.get("email_address") or "").strip().lower()
+            prefs["email_address"] = email_address
             state.setdefault("notification_preferences", {})[uid] = prefs
             self._persist_workflow_record(workflow)
             return {"workflow_id": workflow_id, "user_id": uid, "preferences": deepcopy(prefs)}
@@ -1589,6 +1745,20 @@ class SmartWorkflowService:
             stats_payload["views"] = int(stats_payload.get("views", 0)) + 1
             stats_payload["last_view_at"] = self._now_iso()
             self._cache.set(cache_stats_key, stats_payload, ttl=self._SHARE_STATS_CACHE_TTL)
+            self._notify(
+                workflow=workflow,
+                user_id=str(link.get("created_by") or ""),
+                event_type="share_link_access",
+                message="您的分享链接被访问",
+                payload={
+                    "workflow_id": workflow_id,
+                    "share_link_id": share_link_id,
+                    "viewer_user_id": str(viewer_user_id or "anonymous"),
+                    "visitor": str(viewer_user_id or "anonymous"),
+                    "visited_at": self._now_iso(),
+                    "document_url": f"/#/workflows/{workflow_id}",
+                },
+            )
             return {
                 "share_link": self._sanitize_share_link(link),
                 "workflow": {
@@ -1859,6 +2029,34 @@ class SmartWorkflowService:
             snapshot=deepcopy(dict(snapshot or {})),
         )
 
+    def _notify_workflow_execution_completed(self, workflow_id: str, run: Mapping[str, Any]) -> None:
+        with self._lock:
+            workflow = self._workflows.get(workflow_id)
+            if not workflow:
+                return
+            recipients: Set[str] = set()
+            for collaborator in workflow.get("collaborators") or []:
+                uid = str(collaborator.get("user_id") or "").strip()
+                if uid:
+                    recipients.add(uid)
+
+            for uid in recipients:
+                self._notify(
+                    workflow=workflow,
+                    user_id=uid,
+                    event_type="workflow_execution_completed",
+                    message=f"工作流 {workflow.get('name') or workflow_id} 执行完成",
+                    payload={
+                        "workflow_id": workflow_id,
+                        "run_id": str(run.get("run_id") or ""),
+                        "status": str(run.get("status") or "unknown"),
+                        "result": str(run.get("status") or "unknown"),
+                        "result_url": f"/#/workflows/{workflow_id}/runs/{run.get('run_id')}",
+                    },
+                )
+            if recipients:
+                self._persist_workflow_record(workflow)
+
     # -------- 执行与监控 --------
     def execute_workflow(
         self,
@@ -2034,6 +2232,7 @@ class SmartWorkflowService:
             snapshot=final_snapshot,
         )
         self._update_metrics(result)
+        self._notify_workflow_execution_completed(workflow_id=workflow_id, run=result)
 
     def get_run(self, run_id: str) -> Optional[Dict[str, Any]]:
         with self._lock:

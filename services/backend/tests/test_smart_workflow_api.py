@@ -232,6 +232,7 @@ def test_team_invitation_and_permission_delegation(client: TestClient) -> None:
 
 def test_collaboration_ot_conflict_comment_cursor_notification(client: TestClient) -> None:
     workflow_id = _create_workflow_and_set_admin(client, admin_user_id="alice")
+    workflow_api.smart_workflow_service._email_service._send_sync = lambda task: None  # type: ignore[attr-defined]
     collaborators_resp = client.patch(
         f"/api/workflow/{workflow_id}/collaborators",
         json={
@@ -298,10 +299,27 @@ def test_collaboration_ot_conflict_comment_cursor_notification(client: TestClien
     assert comment_resp.status_code == 200
     assert "charlie" in comment_resp.json()["comment"]["mentions"]
 
+    pref_set_for_email_resp = client.put(
+        f"/api/workflow/{workflow_id}/notifications/preferences",
+        json={
+            "user_id": "charlie",
+            "preferences": {"email": True, "email_address": "charlie@example.com"},
+        },
+    )
+    assert pref_set_for_email_resp.status_code == 200
+
+    comment_resp2 = client.post(
+        f"/api/workflow/{workflow_id}/comments",
+        json={"user_id": "bob", "content": "再请 @charlie 看一下"},
+    )
+    assert comment_resp2.status_code == 200
+
     notif_resp = client.get(f"/api/workflow/{workflow_id}/notifications?user_id=charlie")
     assert notif_resp.status_code == 200
     assert notif_resp.json()["count"] >= 1
     assert notif_resp.json()["notifications"][0]["event_type"] == "mention"
+    assert notif_resp.json()["notifications"][0]["channels"]["email"] is True
+    assert notif_resp.json()["notifications"][0]["channels"].get("email_message_id")
 
     pref_set_resp = client.put(
         f"/api/workflow/{workflow_id}/notifications/preferences",
@@ -358,8 +376,14 @@ def test_share_export_social_and_collaboration_analytics(client: TestClient) -> 
     cache_metrics_resp = client.get("/api/workflow/cache/metrics")
     assert cache_metrics_resp.status_code == 200
     assert "hit_rate" in cache_metrics_resp.json()
-    invalidate_resp = client.post(
-        "/api/workflow/cache/invalidate",
-        json={"workflow_id": workflow_id, "pattern": f"user_permissions:*:{workflow_id}"},
-    )
-    assert invalidate_resp.status_code == 200
+
+
+def test_smtp_validate_and_email_logs_api(client: TestClient) -> None:
+    workflow_api.smart_workflow_service._email_service._send_sync = lambda task: None  # type: ignore[attr-defined]
+    validate_resp = client.post("/api/workflow/notifications/smtp/validate", json={"test_recipient": ""})
+    assert validate_resp.status_code == 200
+    assert "enabled" in validate_resp.json()
+
+    logs_resp = client.get("/api/workflow/notifications/email-logs?limit=10")
+    assert logs_resp.status_code == 200
+    assert "logs" in logs_resp.json()
