@@ -313,7 +313,7 @@ export class MapEngineTestHelper {
             }
 
             if (provider === 'arcgis') {
-                const { ArcGISConfig } = await import('../config/arcgis.config.js') as { ArcGISConfig: ArcGISConfigModule };
+                const { ArcGISConfig } = await import('../config/geoscene.config.js') as { ArcGISConfig: ArcGISConfigModule };
                 const config = ArcGISConfig.getConfig();
                 if (!config) {
                     throw new Error('ArcGIS 配置加载失败');

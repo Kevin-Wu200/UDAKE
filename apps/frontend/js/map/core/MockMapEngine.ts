@@ -261,7 +261,7 @@ export class MockMapEngine extends BaseMapEngine {
             </div>
             <div style="font-size: 14px; line-height: 1.5;">
                 当前使用 Mock 地图引擎<br>
-                ArcGIS API Key 未配置或无法访问<br>
+                GeoScene API Key 未配置或无法访问<br>
                 <span style="color: #ffd700;">应用功能不受影响，仅地图显示为模拟界面</span>
             </div>
         `;

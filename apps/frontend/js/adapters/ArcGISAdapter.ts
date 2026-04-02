@@ -4,7 +4,7 @@
  */
 
 import { MapAdapter } from './MapAdapter';
-import { ArcGISConfig } from '../config/arcgis.config';
+import { ArcGISConfig } from '../config/geoscene.config';
 import { ArcGISEngine } from '../map/core/ArcGISEngine';
 import { MockMapEngine } from '../map/core/MockMapEngine';
 import type {
@@ -60,7 +60,7 @@ export class ArcGISAdapter extends MapAdapter {
         this.graphicsLayer = null;
         this.samplingPoints = [];
 
-        console.log(`🗺️ 地图模式: ${this.isMock ? 'Mock 模式' : 'ArcGIS 模式'}`);
+        console.log(`🗺️ 地图模式: ${this.isMock ? 'Mock 模式' : 'GeoScene 模式'}`);
     }
 
     /**
@@ -75,8 +75,8 @@ export class ArcGISAdapter extends MapAdapter {
             // 使用 Mock 引擎
             console.log('🗺️ 使用 Mock 地图引擎');
             this.engine = new MockMapEngine({
-                center: ArcGISConfig.ARCGIS_DEFAULT_CENTER as any,
-                zoom: ArcGISConfig.ARCGIS_DEFAULT_ZOOM,
+                center: ArcGISConfig.GEOSCENE_DEFAULT_CENTER as any,
+                zoom: ArcGISConfig.GEOSCENE_DEFAULT_ZOOM,
                 minZoom: ArcGISConfig.VIEW_OPTIONS.constraints.minZoom,
                 maxZoom: ArcGISConfig.VIEW_OPTIONS.constraints.maxZoom
             });
@@ -93,12 +93,12 @@ export class ArcGISAdapter extends MapAdapter {
             return this.view;
         } else {
             // 使用 ArcGIS 引擎
-            console.log('🗺️ 使用 ArcGIS 地图引擎');
+            console.log('🗺️ 使用 GeoScene 地图引擎');
 
             // 设置 ArcGIS 配置
             try {
                 // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-                const esriConfig = await import('https://js.arcgis.com/4.28/@arcgis/core/config.js');
+                const esriConfig: any = await import('@geoscene/core/config');
                 (esriConfig.default as any).apiKey = config.apiKey;
                 (esriConfig.default as any).portalUrl = config.portalUrl;
             } catch (error) {
@@ -107,8 +107,8 @@ export class ArcGISAdapter extends MapAdapter {
 
             // 创建 ArcGISEngine
             this.engine = new ArcGISEngine({
-                center: ArcGISConfig.ARCGIS_DEFAULT_CENTER as any,
-                zoom: ArcGISConfig.ARCGIS_DEFAULT_ZOOM,
+                center: ArcGISConfig.GEOSCENE_DEFAULT_CENTER as any,
+                zoom: ArcGISConfig.GEOSCENE_DEFAULT_ZOOM,
                 minZoom: ArcGISConfig.VIEW_OPTIONS.constraints.minZoom,
                 maxZoom: ArcGISConfig.VIEW_OPTIONS.constraints.maxZoom
             });
@@ -123,7 +123,7 @@ export class ArcGISAdapter extends MapAdapter {
             // 初始化 Graphics 图层
             await this.initGraphicsLayer();
 
-            console.log('✅ ArcGIS 地图初始化完成');
+            console.log('✅ GeoScene 地图初始化完成');
 
             return this.view;
         }
@@ -140,10 +140,10 @@ export class ArcGISAdapter extends MapAdapter {
         }
 
         // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-        const GraphicsLayer = (await import('https://js.arcgis.com/4.28/@arcgis/core/layers/GraphicsLayer.js')).default;
+        const GraphicsLayer: any = (await import('@geoscene/core/layers/GraphicsLayer')).default;
         this.graphicsLayer = new GraphicsLayer({
             title: '手动采样点'
-        });
+        }) as any;
         this.map.add(this.graphicsLayer);
     }
 
@@ -170,10 +170,10 @@ export class ArcGISAdapter extends MapAdapter {
         }
 
         try {
-            const [GeoJSONLayer] = await Promise.all([
+            const [GeoJSONLayer]: [any] = await Promise.all([
                 // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-                import('https://js.arcgis.com/4.28/@arcgis/core/layers/GeoJSONLayer.js')
-            ].map(p => p.then(m => m.default)));
+                import('@geoscene/core/layers/GeoJSONLayer').then((m: any) => m.default)
+            ]);
 
             // 创建 Blob URL
             const blob = new Blob([JSON.stringify(geojson)], { type: 'application/json' });
@@ -224,10 +224,10 @@ export class ArcGISAdapter extends MapAdapter {
         }
 
         try {
-            const [ImageryLayer] = await Promise.all([
+            const [ImageryLayer]: [any] = await Promise.all([
                 // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-                import('https://js.arcgis.com/4.28/@arcgis/core/layers/ImageryLayer.js')
-            ].map(p => p.then(m => m.default)));
+                import('@geoscene/core/layers/ImageryLayer').then((m: any) => m.default)
+            ]);
 
             // 移除旧图层
             if (this.layers[type]) {
@@ -262,14 +262,14 @@ export class ArcGISAdapter extends MapAdapter {
             return;
         }
 
-        const [Graphic, Point, SimpleMarkerSymbol] = await Promise.all([
+        const [Graphic, Point, SimpleMarkerSymbol]: [any, any, any] = await Promise.all([
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            import('https://js.arcgis.com/4.28/@arcgis/core/Graphic.js'),
+            import('@geoscene/core/Graphic').then((m: any) => m.default),
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            import('https://js.arcgis.com/4.28/@arcgis/core/geometry/Point.js'),
+            import('@geoscene/core/geometry/Point').then((m: any) => m.default),
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            import('https://js.arcgis.com/4.28/@arcgis/core/symbols/SimpleMarkerSymbol.js')
-        ].map(p => p.then(m => m.default)));
+            import('@geoscene/core/symbols/SimpleMarkerSymbol').then((m: any) => m.default)
+        ]);
 
         const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
@@ -320,14 +320,14 @@ export class ArcGISAdapter extends MapAdapter {
             return;
         }
 
-        const [Graphic, Polygon, SimpleFillSymbol] = await Promise.all([
+        const [Graphic, Polygon, SimpleFillSymbol]: [any, any, any] = await Promise.all([
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            import('https://js.arcgis.com/4.28/@arcgis/core/Graphic.js'),
+            import('@geoscene/core/Graphic').then((m: any) => m.default),
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            import('https://js.arcgis.com/4.28/@arcgis/core/geometry/Polygon.js'),
+            import('@geoscene/core/geometry/Polygon').then((m: any) => m.default),
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            import('https://js.arcgis.com/4.28/@arcgis/core/symbols/SimpleFillSymbol.js')
-        ].map(p => p.then(m => m.default)));
+            import('@geoscene/core/symbols/SimpleFillSymbol').then((m: any) => m.default)
+        ]);
 
         const polygon = new Polygon({
             rings: coordinates,
@@ -438,7 +438,7 @@ export class ArcGISAdapter extends MapAdapter {
             this.clearAllLayers();
             this.engine?.destroy();
         } catch (error) {
-            console.warn('清理 ArcGIS 适配器资源时出现警告:', error);
+            console.warn('清理 GeoScene 适配器资源时出现警告:', error);
         } finally {
             this.graphicsLayer = null;
             this.view = null;

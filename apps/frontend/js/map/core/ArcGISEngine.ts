@@ -45,14 +45,14 @@ export class ArcGISEngine extends BaseMapEngine {
         }
 
         // 动态加载 ArcGIS 模块
-        const [Map, MapView, Home] = await Promise.all([
+        const [Map, MapView, Home]: [any, any, any] = await Promise.all([
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            import('https://js.arcgis.com/4.28/@arcgis/core/Map.js'),
+            import('@geoscene/core/Map').then((m: any) => m.default),
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            import('https://js.arcgis.com/4.28/@arcgis/core/views/MapView.js'),
+            import('@geoscene/core/views/MapView').then((m: any) => m.default),
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            import('https://js.arcgis.com/4.28/@arcgis/core/widgets/Home.js')
-        ].map(p => p.then(m => m.default)));
+            import('@geoscene/core/widgets/Home').then((m: any) => m.default)
+        ]);
 
         // 检测深色模式
         const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -61,7 +61,7 @@ export class ArcGISEngine extends BaseMapEngine {
         // 创建地图
         this.map = new Map({
             basemap: basemap as any
-        });
+        }) as any;
 
         // 创建视图
         this.view = new MapView({
@@ -76,10 +76,10 @@ export class ArcGISEngine extends BaseMapEngine {
             ui: {
                 components: ['attribution']
             }
-        });
+        }) as any;
 
         // 添加 Home 控件
-        const homeWidget = new Home({ view: this.view });
+        const homeWidget = new Home({ view: this.view }) as any;
         this.view!.ui.add(homeWidget, 'top-left');
 
         // 监听缩放变化
@@ -104,7 +104,7 @@ export class ArcGISEngine extends BaseMapEngine {
 
         await this.view!.when();
 
-        console.log('✅ ArcGIS 引擎初始化完成');
+        console.log('✅ GeoScene 引擎初始化完成');
     }
 
     /**
@@ -152,7 +152,7 @@ export class ArcGISEngine extends BaseMapEngine {
 
         // 动态加载 Extent 模块
         // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-        const Extent = (await import('https://js.arcgis.com/4.28/@arcgis/core/geometry/Extent.js')).default;
+        const Extent: any = (await import('@geoscene/core/geometry/Extent')).default;
 
         const extent = new Extent({
             xmin: minLng,
