@@ -1,11 +1,119 @@
 /**
  * 参数调整面板组件
- * 实现滑块与输入框的双向绑定
+ * 提供双向绑定、模板管理、智能推荐、实时校验与警告聚合
  */
+
+type ParamName = 'grid-resolution' | 'nlags' | 'nugget' | 'sill' | 'range';
+
+type TemplateConfig = {
+    id: string;
+    name: string;
+    description: string;
+    params: Record<ParamName, number>;
+    method?: 'ordinary' | 'universal' | 'block';
+    variogram_model?: 'spherical' | 'exponential' | 'gaussian';
+};
+
+type ValidationIssue = {
+    level: 'error' | 'warning';
+    message: string;
+};
+
+type SamplingContextPoint = {
+    x: number;
+    y: number;
+    value?: number;
+};
+
+const PARAM_META: Record<ParamName, { min: number; max: number; step: number }> = {
+    'grid-resolution': { min: 50, max: 500, step: 10 },
+    nlags: { min: 6, max: 24, step: 1 },
+    nugget: { min: 0, max: 1, step: 0.05 },
+    sill: { min: 0, max: 10, step: 0.1 },
+    range: { min: 0, max: 100, step: 1 }
+};
+
+const BUILTIN_TEMPLATES: Record<string, TemplateConfig> = {
+    'quick-estimate': {
+        id: 'quick-estimate',
+        name: '快速估算模式',
+        description: '牺牲部分精度，优先缩短计算时间',
+        params: {
+            'grid-resolution': 80,
+            nlags: 8,
+            nugget: 0.15,
+            sill: 1,
+            range: 20
+        },
+        method: 'ordinary',
+        variogram_model: 'spherical'
+    },
+    'high-precision': {
+        id: 'high-precision',
+        name: '高精度模式',
+        description: '提高网格细节与拟合能力，计算更慢',
+        params: {
+            'grid-resolution': 220,
+            nlags: 18,
+            nugget: 0.05,
+            sill: 1.2,
+            range: 40
+        },
+        method: 'universal',
+        variogram_model: 'gaussian'
+    },
+    balanced: {
+        id: 'balanced',
+        name: '平衡模式',
+        description: '速度与精度折中，适合大多数场景',
+        params: {
+            'grid-resolution': 120,
+            nlags: 12,
+            nugget: 0.1,
+            sill: 1,
+            range: 30
+        },
+        method: 'ordinary',
+        variogram_model: 'spherical'
+    },
+    'large-dataset': {
+        id: 'large-dataset',
+        name: '大数据集模式',
+        description: '控制计算资源消耗，避免大规模数据阻塞',
+        params: {
+            'grid-resolution': 90,
+            nlags: 10,
+            nugget: 0.2,
+            sill: 1.2,
+            range: 35
+        },
+        method: 'block',
+        variogram_model: 'exponential'
+    },
+    'terrain-analysis': {
+        id: 'terrain-analysis',
+        name: '地形分析模式',
+        description: '强调空间连续地形变化',
+        params: {
+            'grid-resolution': 150,
+            nlags: 14,
+            nugget: 0.08,
+            sill: 1.1,
+            range: 45
+        },
+        method: 'universal',
+        variogram_model: 'gaussian'
+    }
+};
 
 export class ParameterAdjustmentPanel {
     private static instance: ParameterAdjustmentPanel;
-    private parameters: Map<string, number> = new Map();
+
+    private parameters: Map<ParamName, number> = new Map();
+
+    private customTemplates: Record<string, TemplateConfig> = {};
+
+    private samplingContext: SamplingContextPoint[] = [];
 
     private constructor() {
         this.initialize();
@@ -19,101 +127,183 @@ export class ParameterAdjustmentPanel {
     }
 
     private initialize(): void {
-        this.bindSlider('grid-resolution', 50, 500);
-        this.bindSlider('nlags', 6, 24);
-        this.bindSlider('nugget', 0, 1);
-        this.bindSlider('sill', 0, 10);
-        this.bindSlider('range', 0, 100);
+        (Object.keys(PARAM_META) as ParamName[]).forEach((paramName) => {
+            const meta = PARAM_META[paramName];
+            this.bindSlider(paramName, meta.min, meta.max);
+        });
 
         this.loadSavedParameters();
+        this.loadCustomTemplates();
+        this.bindTemplateControls();
+        this.bindConfigApplyEvent();
+
+        this.refreshTemplateSelector();
+        this.updateRangeVisualization();
+        this.updateWarningPanel();
     }
 
-    /**
-     * 绑定滑块和输入框的双向同步
-     */
-    private bindSlider(paramName: string, min: number, max: number): void {
-        const slider = document.getElementById(`${paramName}-slider`) as HTMLInputElement;
-        const input = document.getElementById(paramName) as HTMLInputElement;
-        const valueDisplay = document.getElementById(`${paramName}-value`) as HTMLElement;
+    private bindSlider(paramName: ParamName, min: number, max: number): void {
+        const slider = document.getElementById(`${paramName}-slider`) as HTMLInputElement | null;
+        const input = document.getElementById(paramName) as HTMLInputElement | null;
+        const valueDisplay = document.getElementById(`${paramName}-value`) as HTMLElement | null;
 
         if (!slider || !input) {
             console.warn(`Slider or input not found for parameter: ${paramName}`);
             return;
         }
 
-        // 滑块变化时更新输入框和显示
-        slider.addEventListener('input', () => {
-            const value = parseFloat(slider.value);
-            input.value = slider.value;
+        const applyValue = (rawValue: number): void => {
+            const value = this.normalizeValue(paramName, rawValue);
+            slider.value = String(value);
+            input.value = String(value);
             if (valueDisplay) {
-                valueDisplay.textContent = slider.value;
+                valueDisplay.textContent = String(value);
             }
             this.parameters.set(paramName, value);
             this.validateParameter(paramName, value, min, max);
+            if (paramName === 'range') {
+                this.updateRangeVisualization();
+            }
+            this.updateWarningPanel();
+        };
+
+        slider.addEventListener('input', () => {
+            applyValue(parseFloat(slider.value));
         });
 
-        // 输入框变化时更新滑块和显示
         input.addEventListener('input', () => {
-            const value = parseFloat(input.value);
-            if (!isNaN(value)) {
-                slider.value = input.value;
-                if (valueDisplay) {
-                    valueDisplay.textContent = input.value;
-                }
-                this.parameters.set(paramName, value);
-                this.validateParameter(paramName, value, min, max);
+            const parsed = parseFloat(input.value);
+            if (!Number.isNaN(parsed)) {
+                applyValue(parsed);
             }
         });
 
-        // 初始化参数值
         const initialValue = parseFloat(input.value);
-        this.parameters.set(paramName, initialValue);
+        this.parameters.set(paramName, Number.isNaN(initialValue) ? min : initialValue);
     }
 
-    /**
-     * 验证参数值是否在有效范围内
-     */
-    private validateParameter(paramName: string, value: number, min: number, max: number): void {
-        const input = document.getElementById(paramName) as HTMLInputElement;
+    private bindTemplateControls(): void {
+        const applyBtn = document.getElementById('apply-template-btn') as HTMLButtonElement | null;
+        const recommendBtn = document.getElementById('recommend-template-btn') as HTMLButtonElement | null;
+        const saveBtn = document.getElementById('save-template-btn') as HTMLButtonElement | null;
+        const exportBtn = document.getElementById('export-template-btn') as HTMLButtonElement | null;
+        const importBtn = document.getElementById('import-template-btn') as HTMLButtonElement | null;
+
+        applyBtn?.addEventListener('click', () => {
+            const select = document.getElementById('kriging-template-select') as HTMLSelectElement | null;
+            const templateId = select?.value || 'balanced';
+            const applied = this.applyTemplate(templateId);
+            this.showTemplateOperationResult(
+                applied ? '已应用模板配置' : '模板不存在，已回退到平衡模式',
+                applied ? 'success' : 'warning'
+            );
+        });
+
+        recommendBtn?.addEventListener('click', () => {
+            this.recommendParametersFromSampling();
+        });
+
+        saveBtn?.addEventListener('click', () => {
+            this.saveCurrentAsTemplate();
+        });
+
+        exportBtn?.addEventListener('click', () => {
+            this.exportTemplates();
+        });
+
+        importBtn?.addEventListener('click', () => {
+            this.importTemplates();
+        });
+    }
+
+    private bindConfigApplyEvent(): void {
+        document.addEventListener('applyParameterConfig', (event: Event) => {
+            const customEvent = event as CustomEvent<{ krigingParams?: Record<string, unknown> }>;
+            const params = customEvent.detail?.krigingParams;
+            if (!params) {
+                return;
+            }
+            this.applyExternalParameters(params);
+        });
+    }
+
+    private applyExternalParameters(params: Record<string, unknown>): void {
+        const map: Record<ParamName, string> = {
+            'grid-resolution': 'grid_resolution',
+            nlags: 'nlags',
+            nugget: 'nugget',
+            sill: 'sill',
+            range: 'range'
+        };
+
+        (Object.keys(map) as ParamName[]).forEach((paramName) => {
+            const apiField = map[paramName];
+            const raw = params[apiField];
+            if (typeof raw === 'number') {
+                this.setParameter(paramName, raw);
+            }
+        });
+
+        if (params.method && typeof params.method === 'string') {
+            this.setSelectValue('kriging-method', params.method);
+        }
+
+        if (params.variogram_model && typeof params.variogram_model === 'string') {
+            this.setSelectValue('variogram-model', params.variogram_model);
+        }
+
+        this.updateWarningPanel();
+    }
+
+    private setSelectValue(id: string, value: string): void {
+        const select = document.getElementById(id) as HTMLSelectElement | null;
+        if (!select) {
+            return;
+        }
+        select.value = value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
+    private normalizeValue(paramName: ParamName, value: number): number {
+        const meta = PARAM_META[paramName];
+        const clamped = Math.max(meta.min, Math.min(meta.max, value));
+        const precision = meta.step < 1 ? 2 : 0;
+        return Number(clamped.toFixed(precision));
+    }
+
+    private validateParameter(paramName: ParamName, value: number, min: number, max: number): void {
+        const input = document.getElementById(paramName) as HTMLInputElement | null;
+        if (!input) {
+            return;
+        }
 
         if (value < min || value > max) {
             input.classList.add('error');
             this.showParameterWarning(paramName, `参数值必须在 ${min} 到 ${max} 之间`);
-        } else {
-            input.classList.remove('error');
-            this.hideParameterWarning(paramName);
+            return;
         }
 
-        // 特殊验证：基台值应该大于变差值
-        if (paramName === 'nugget' || paramName === 'sill') {
-            const nugget = this.parameters.get('nugget') || 0;
-            const sill = this.parameters.get('sill') || 1;
+        input.classList.remove('error');
+        this.hideParameterWarning(paramName);
 
-            if (nugget >= sill) {
-                this.showParameterWarning('sill', '基台值应该大于变差值');
-            } else {
-                this.hideParameterWarning('sill');
-            }
+        const nugget = this.parameters.get('nugget') ?? 0;
+        const sill = this.parameters.get('sill') ?? 1;
+        if (nugget > sill) {
+            this.showParameterWarning('nugget', '块金值不能大于基台值');
+            this.showParameterWarning('sill', '基台值应大于或等于块金值');
+        } else {
+            this.hideParameterWarning('nugget');
+            this.hideParameterWarning('sill');
         }
     }
 
-    /**
-     * 显示参数警告
-     */
-    private showParameterWarning(paramName: string, message: string): void {
+    private showParameterWarning(paramName: ParamName, message: string): void {
         let warningEl = document.getElementById(`${paramName}-warning`);
 
         if (!warningEl) {
             warningEl = document.createElement('div');
             warningEl.id = `${paramName}-warning`;
             warningEl.className = 'parameter-warning';
-            warningEl.style.cssText = `
-                color: #ff3b30;
-                font-size: 12px;
-                margin-top: 4px;
-                display: none;
-            `;
-
             const input = document.getElementById(paramName);
             if (input) {
                 input.parentElement?.appendChild(warningEl);
@@ -121,115 +311,411 @@ export class ParameterAdjustmentPanel {
         }
 
         warningEl.textContent = message;
-        warningEl.style.display = 'block';
+        (warningEl as HTMLElement).style.display = 'block';
     }
 
-    /**
-     * 隐藏参数警告
-     */
-    private hideParameterWarning(paramName: string): void {
+    private hideParameterWarning(paramName: ParamName): void {
         const warningEl = document.getElementById(`${paramName}-warning`);
         if (warningEl) {
-            warningEl.style.display = 'none';
+            (warningEl as HTMLElement).style.display = 'none';
         }
     }
 
-    /**
-     * 获取所有参数值
-     */
+    private updateWarningPanel(): void {
+        const warningPanel = document.getElementById('kriging-warning-panel') as HTMLElement | null;
+        if (!warningPanel) {
+            return;
+        }
+
+        const validation = this.validateAll();
+        if (validation.errors.length === 0 && validation.warnings.length === 0) {
+            warningPanel.style.display = 'none';
+            warningPanel.textContent = '';
+            warningPanel.className = 'status-message';
+            return;
+        }
+
+        const errorPrefix = validation.errors.length > 0 ? `错误: ${validation.errors.join('；')}` : '';
+        const warningPrefix = validation.warnings.length > 0 ? `警告: ${validation.warnings.join('；')}` : '';
+        const merged = [errorPrefix, warningPrefix].filter(Boolean).join(' | ');
+
+        warningPanel.style.display = 'block';
+        warningPanel.textContent = merged;
+        warningPanel.className = `status-message ${validation.valid ? 'warning' : 'error'}`;
+    }
+
+    private updateRangeVisualization(): void {
+        const range = this.parameters.get('range') ?? 10;
+        const bar = document.getElementById('range-visual-bar') as HTMLElement | null;
+        if (!bar) {
+            return;
+        }
+        const ratio = Math.max(0, Math.min(100, range));
+        bar.style.width = `${ratio}%`;
+    }
+
+    private collectValidationIssues(): ValidationIssue[] {
+        const issues: ValidationIssue[] = [];
+
+        const gridResolution = this.parameters.get('grid-resolution') ?? 100;
+        const nlags = this.parameters.get('nlags') ?? 12;
+        const nugget = this.parameters.get('nugget') ?? 0;
+        const sill = this.parameters.get('sill') ?? 1;
+        const range = this.parameters.get('range') ?? 10;
+
+        if (gridResolution <= 0) {
+            issues.push({ level: 'error', message: '网格分辨率必须大于 0' });
+        }
+
+        if (nugget > sill) {
+            issues.push({ level: 'error', message: '块金值不能大于基台值' });
+        }
+
+        if (sill <= 0) {
+            issues.push({ level: 'error', message: '基台值必须大于 0' });
+        }
+
+        if (range <= 0) {
+            issues.push({ level: 'error', message: '范围值必须大于 0' });
+        }
+
+        if (range > sill) {
+            issues.push({ level: 'warning', message: '范围值大于基台值，可能导致过度平滑' });
+        }
+
+        if (this.samplingContext.length > 0) {
+            if (gridResolution > 280 && this.samplingContext.length < 20) {
+                issues.push({ level: 'warning', message: '采样点较少时高分辨率可能引入伪细节' });
+            }
+
+            if (nlags > Math.max(6, Math.floor(this.samplingContext.length / 2))) {
+                issues.push({ level: 'warning', message: '滞后数偏高，建议降低以避免分组过稀' });
+            }
+        }
+
+        return issues;
+    }
+
     public getParameters(): Record<string, number> {
         return Object.fromEntries(this.parameters);
     }
 
-    /**
-     * 设置参数值
-     */
     public setParameter(paramName: string, value: number): void {
-        const slider = document.getElementById(`${paramName}-slider`) as HTMLInputElement;
-        const input = document.getElementById(paramName) as HTMLInputElement;
-        const valueDisplay = document.getElementById(`${paramName}-value`) as HTMLElement;
+        const key = paramName as ParamName;
+        if (!PARAM_META[key]) {
+            return;
+        }
+
+        const normalized = this.normalizeValue(key, value);
+        const slider = document.getElementById(`${key}-slider`) as HTMLInputElement | null;
+        const input = document.getElementById(key) as HTMLInputElement | null;
+        const valueDisplay = document.getElementById(`${key}-value`) as HTMLElement | null;
 
         if (slider) {
-            slider.value = value.toString();
+            slider.value = String(normalized);
         }
         if (input) {
-            input.value = value.toString();
+            input.value = String(normalized);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
         }
         if (valueDisplay) {
-            valueDisplay.textContent = value.toString();
+            valueDisplay.textContent = String(normalized);
         }
 
-        this.parameters.set(paramName, value);
+        this.parameters.set(key, normalized);
+
+        if (key === 'range') {
+            this.updateRangeVisualization();
+        }
+
+        this.updateWarningPanel();
     }
 
-    /**
-     * 重置所有参数为默认值
-     */
     public resetToDefaults(): void {
-        this.setParameter('grid-resolution', 100);
-        this.setParameter('nlags', 12);
-        this.setParameter('nugget', 0);
-        this.setParameter('sill', 1);
-        this.setParameter('range', 10);
+        this.applyTemplate('balanced');
     }
 
-    /**
-     * 保存当前参数到 localStorage
-     */
     public saveParameters(name: string): void {
-        const savedParameters = JSON.parse(localStorage.getItem('savedParameters') || '[]');
-
-        savedParameters.push({
+        const records = this.getHistoryRecords();
+        records.unshift({
             id: Date.now().toString(),
-            name: name || `参数组合 ${savedParameters.length + 1}`,
+            name: name || `参数组合 ${records.length + 1}`,
             parameters: this.getParameters(),
             timestamp: new Date().toISOString()
         });
-
-        localStorage.setItem('savedParameters', JSON.stringify(savedParameters));
+        localStorage.setItem('savedParameters', JSON.stringify(records.slice(0, 30)));
     }
 
-    /**
-     * 加载保存的参数
-     */
     private loadSavedParameters(): void {
         const lastUsed = localStorage.getItem('lastUsedParameters');
-        if (lastUsed) {
-            try {
-                const parameters = JSON.parse(lastUsed);
-                Object.entries(parameters).forEach(([key, value]) => {
-                    if (typeof value === 'number') {
-                        this.setParameter(key, value as number);
-                    }
-                });
-            } catch (error) {
-                console.warn('Failed to load saved parameters:', error);
-            }
+        if (!lastUsed) {
+            return;
+        }
+
+        try {
+            const parameters = JSON.parse(lastUsed) as Record<string, unknown>;
+            Object.entries(parameters).forEach(([key, value]) => {
+                if (typeof value === 'number') {
+                    this.setParameter(key, value);
+                }
+            });
+        } catch (error) {
+            console.warn('Failed to load saved parameters:', error);
         }
     }
 
-    /**
-     * 将当前参数保存为最后使用的参数
-     */
     public saveAsLastUsed(): void {
         localStorage.setItem('lastUsedParameters', JSON.stringify(this.getParameters()));
+        this.recordHistory('最近使用', this.getParameters());
     }
 
-    /**
-     * 验证所有参数是否有效
-     */
-    public validateAll(): { valid: boolean; errors: string[] } {
-        const errors: string[] = [];
-        const nugget = this.parameters.get('nugget') || 0;
-        const sill = this.parameters.get('sill') || 1;
-
-        if (nugget >= sill) {
-            errors.push('基台值应该大于变差值');
-        }
+    public validateAll(): { valid: boolean; errors: string[]; warnings: string[] } {
+        const issues = this.collectValidationIssues();
+        const errors = issues.filter((item) => item.level === 'error').map((item) => item.message);
+        const warnings = issues.filter((item) => item.level === 'warning').map((item) => item.message);
 
         return {
             valid: errors.length === 0,
-            errors
+            errors,
+            warnings
         };
+    }
+
+    public setSamplingContext(points: SamplingContextPoint[]): void {
+        this.samplingContext = points;
+        this.updateWarningPanel();
+    }
+
+    public applyTemplate(templateId: string): boolean {
+        const templates = this.getAllTemplates();
+        const template = templates[templateId];
+        const fallback = templates.balanced;
+        const chosen = template || fallback;
+        if (!chosen) {
+            return false;
+        }
+
+        (Object.entries(chosen.params) as Array<[ParamName, number]>).forEach(([key, value]) => {
+            this.setParameter(key, value);
+        });
+
+        if (chosen.method) {
+            this.setSelectValue('kriging-method', chosen.method);
+        }
+        if (chosen.variogram_model) {
+            this.setSelectValue('variogram-model', chosen.variogram_model);
+        }
+
+        this.recordHistory(`应用模板:${chosen.name}`, this.getParameters());
+        return Boolean(template);
+    }
+
+    private recommendParametersFromSampling(): void {
+        if (this.samplingContext.length === 0) {
+            this.showTemplateOperationResult('暂无采样上下文，已回退为平衡模式', 'warning');
+            this.applyTemplate('balanced');
+            return;
+        }
+
+        const xValues = this.samplingContext.map((point) => point.x);
+        const yValues = this.samplingContext.map((point) => point.y);
+        const vValues = this.samplingContext.map((point) => point.value).filter((value): value is number => typeof value === 'number');
+
+        const xSpan = Math.max(...xValues) - Math.min(...xValues);
+        const ySpan = Math.max(...yValues) - Math.min(...yValues);
+        const spatialSpan = Math.sqrt((xSpan ** 2) + (ySpan ** 2));
+        const pointCount = this.samplingContext.length;
+
+        const mean = vValues.length > 0
+            ? vValues.reduce((sum, value) => sum + value, 0) / vValues.length
+            : 0;
+        const variance = vValues.length > 1
+            ? vValues.reduce((sum, value) => sum + ((value - mean) ** 2), 0) / vValues.length
+            : 0.5;
+
+        const range = this.normalizeValue('range', Math.max(12, Math.min(95, spatialSpan * 0.25)));
+        const sill = this.normalizeValue('sill', Math.max(0.8, Math.min(8, variance * 1.2 + 0.5)));
+        const nugget = this.normalizeValue('nugget', Math.max(0, Math.min(0.8, sill * 0.2)));
+        const nlags = this.normalizeValue('nlags', Math.max(8, Math.min(20, Math.floor(pointCount / 8) + 8)));
+        const gridResolution = this.normalizeValue('grid-resolution', Math.max(70, Math.min(240, 260 - pointCount * 0.4)));
+
+        this.setParameter('range', range);
+        this.setParameter('sill', sill);
+        this.setParameter('nugget', Math.min(nugget, sill));
+        this.setParameter('nlags', nlags);
+        this.setParameter('grid-resolution', gridResolution);
+
+        const model = pointCount > 300 ? 'exponential' : pointCount > 80 ? 'gaussian' : 'spherical';
+        const method = pointCount > 500 ? 'block' : pointCount > 180 ? 'universal' : 'ordinary';
+        this.setSelectValue('variogram-model', model);
+        this.setSelectValue('kriging-method', method);
+
+        this.recordHistory('智能推荐', this.getParameters());
+        this.showTemplateOperationResult(`已按 ${pointCount} 个采样点完成智能推荐`, 'success');
+    }
+
+    private saveCurrentAsTemplate(): void {
+        const name = window.prompt('请输入模板名称');
+        if (!name) {
+            return;
+        }
+
+        const id = `custom-${Date.now()}`;
+        const method = (document.getElementById('kriging-method') as HTMLSelectElement | null)?.value;
+        const variogram = (document.getElementById('variogram-model') as HTMLSelectElement | null)?.value;
+        const template: TemplateConfig = {
+            id,
+            name,
+            description: '用户自定义模板',
+            params: {
+                'grid-resolution': this.parameters.get('grid-resolution') ?? 100,
+                nlags: this.parameters.get('nlags') ?? 12,
+                nugget: this.parameters.get('nugget') ?? 0,
+                sill: this.parameters.get('sill') ?? 1,
+                range: this.parameters.get('range') ?? 10
+            },
+            method: (method as TemplateConfig['method']) || 'ordinary',
+            variogram_model: (variogram as TemplateConfig['variogram_model']) || 'spherical'
+        };
+
+        this.customTemplates[id] = template;
+        this.persistCustomTemplates();
+        this.refreshTemplateSelector(id);
+        this.showTemplateOperationResult(`模板“${name}”已保存`, 'success');
+    }
+
+    private exportTemplates(): void {
+        const payload = {
+            exportedAt: new Date().toISOString(),
+            templates: this.getAllTemplates()
+        };
+
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = `kriging-templates-${Date.now()}.json`;
+        document.body.appendChild(anchor);
+        anchor.click();
+        document.body.removeChild(anchor);
+        URL.revokeObjectURL(url);
+        this.showTemplateOperationResult('模板导出成功', 'success');
+    }
+
+    private importTemplates(): void {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'application/json';
+
+        input.addEventListener('change', async () => {
+            const file = input.files?.[0];
+            if (!file) {
+                return;
+            }
+
+            try {
+                const text = await file.text();
+                const parsed = JSON.parse(text) as { templates?: Record<string, TemplateConfig> };
+                const templates = parsed.templates || {};
+
+                Object.entries(templates).forEach(([id, template]) => {
+                    if (template && template.params && !BUILTIN_TEMPLATES[id]) {
+                        this.customTemplates[id] = template;
+                    }
+                });
+
+                this.persistCustomTemplates();
+                this.refreshTemplateSelector();
+                this.showTemplateOperationResult('模板导入成功', 'success');
+            } catch (error) {
+                console.error('导入模板失败:', error);
+                this.showTemplateOperationResult('模板导入失败，文件格式不正确', 'error');
+            }
+        });
+
+        input.click();
+    }
+
+    private refreshTemplateSelector(selectedId?: string): void {
+        const select = document.getElementById('kriging-template-select') as HTMLSelectElement | null;
+        if (!select) {
+            return;
+        }
+
+        const templates = this.getAllTemplates();
+        const preferred = selectedId || select.value || 'balanced';
+        const templateIds = Object.keys(templates);
+
+        const options: string[] = templateIds.map((templateId) => {
+            const template = templates[templateId];
+            return `<option value="${templateId}">${template.name}</option>`;
+        });
+
+        options.push('<option value="custom">自定义模板</option>');
+        select.innerHTML = options.join('');
+
+        const finalValue = templateIds.includes(preferred) ? preferred : 'balanced';
+        select.value = finalValue;
+    }
+
+    private getAllTemplates(): Record<string, TemplateConfig> {
+        return {
+            ...BUILTIN_TEMPLATES,
+            ...this.customTemplates
+        };
+    }
+
+    private loadCustomTemplates(): void {
+        const raw = localStorage.getItem('krigingCustomTemplates');
+        if (!raw) {
+            return;
+        }
+
+        try {
+            const parsed = JSON.parse(raw) as Record<string, TemplateConfig>;
+            this.customTemplates = parsed;
+        } catch (error) {
+            console.warn('加载自定义模板失败:', error);
+            this.customTemplates = {};
+        }
+    }
+
+    private persistCustomTemplates(): void {
+        localStorage.setItem('krigingCustomTemplates', JSON.stringify(this.customTemplates));
+    }
+
+    private getHistoryRecords(): Array<{ id: string; name: string; parameters: Record<string, number>; timestamp: string }> {
+        try {
+            const raw = localStorage.getItem('savedParameters');
+            if (!raw) {
+                return [];
+            }
+            const parsed = JSON.parse(raw) as Array<{ id: string; name: string; parameters: Record<string, number>; timestamp: string }>;
+            return Array.isArray(parsed) ? parsed : [];
+        } catch {
+            return [];
+        }
+    }
+
+    private recordHistory(actionName: string, parameters: Record<string, number>): void {
+        const key = 'parameterHistory';
+        const raw = localStorage.getItem(key);
+        const records = raw ? (JSON.parse(raw) as Array<{ action: string; parameters: Record<string, number>; timestamp: string }>) : [];
+        records.unshift({ action: actionName, parameters, timestamp: new Date().toISOString() });
+        localStorage.setItem(key, JSON.stringify(records.slice(0, 50)));
+    }
+
+    private showTemplateOperationResult(message: string, type: 'success' | 'warning' | 'error'): void {
+        const panel = document.getElementById('kriging-warning-panel') as HTMLElement | null;
+        if (!panel) {
+            return;
+        }
+        panel.style.display = 'block';
+        panel.className = `status-message ${type}`;
+        panel.textContent = message;
+
+        window.setTimeout(() => {
+            this.updateWarningPanel();
+        }, 2500);
     }
 }

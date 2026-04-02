@@ -1321,6 +1321,10 @@ class App {
             await this.layerManager.addSamplingPoint(normalizedPoint);
         }
 
+        const components = this.componentInitializer.getComponentRegistry();
+        const allPoints = this.currentProject?.points || this.layerManager?.getSamplingPoints() || [];
+        components.parameterAdjustmentPanel.setSamplingContext(allPoints);
+
         this.validateGridResolution();
     }
 
@@ -1454,6 +1458,8 @@ class App {
                 undoable: false
             });
 
+            const components = this.componentInitializer.getComponentRegistry();
+            components.parameterAdjustmentPanel.setSamplingContext(importedPoints);
             this.validateGridResolution();
 
         } catch (error) {
@@ -1502,6 +1508,7 @@ class App {
         const variogramModelSelect = document.getElementById('variogram-model') as HTMLSelectElement;
         const components = this.componentInitializer.getComponentRegistry();
         const parameterAdjustmentPanel = components.parameterAdjustmentPanel;
+        parameterAdjustmentPanel.setSamplingContext(samplingPoints);
         const adjustmentParams = parameterAdjustmentPanel.getParameters();
 
         const validation = parameterAdjustmentPanel.validateAll();
