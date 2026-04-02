@@ -228,8 +228,8 @@ export default defineConfig(({ mode }) => {
       __API_BASE_URL__: JSON.stringify(backendUrl),
       __WS_URL__: JSON.stringify(wsUrl),
       __FRONTEND_URL__: JSON.stringify(frontendUrl),
-      'import.meta.env.VITE_OFFICIAL_WEB': JSON.stringify(process.env.OFFICIAL_WEB),
-      'import.meta.env.VITE_ADMIN_WEB': JSON.stringify(process.env.ADMIN_WEB),
+      'import.meta.env.VITE_OFFICIAL_WEB': JSON.stringify(env.OFFICIAL_WEB || env.VITE_OFFICIAL_WEB || ''),
+      'import.meta.env.VITE_ADMIN_WEB': JSON.stringify(env.ADMIN_WEB || env.VITE_ADMIN_WEB || ''),
     },
   };
 });

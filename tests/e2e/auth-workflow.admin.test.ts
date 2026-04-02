@@ -150,10 +150,11 @@ test.describe('认证流程 E2E（管理员前端用户中心）', () => {
     await page.getByPlaceholder('请输入密码').fill('StrongPass123');
     await page.getByRole('button', { name: '登录' }).click();
 
-    await expect(page.getByText('登录成功')).toBeVisible();
     await expect
       .poll(async () => page.evaluate(() => localStorage.getItem('udake_access_token')))
       .toBe('mock-access-token');
+    await expect(page).toHaveURL(/#\/user\/devices/);
+    await expect(page.getByRole('heading', { name: '设备管理' })).toBeVisible();
   });
 
   test('找回密码流程：发送验证码并完成重置回到登录页', async ({ page }) => {
