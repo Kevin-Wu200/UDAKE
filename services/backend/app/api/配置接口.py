@@ -25,14 +25,14 @@ async def get_map_config():
     
     # 返回地图配置，但不暴露敏感信息
     config = {
-        "arcgis": {
-            "apiKey": settings.ARCGIS_API_KEY,
-            "portalUrl": settings.ARCGIS_PORTAL_URL,
-            "env": settings.ARCGIS_ENV,
-            "defaultBasemap": settings.ARCGIS_DEFAULT_BASEMAP,
-            "defaultCenter": settings.arcgis_center_list,
-            "defaultZoom": settings.ARCGIS_DEFAULT_ZOOM,
-            "isMock": settings.ARCGIS_API_KEY == "YOUR_ARCGIS_API_KEY_HERE"
+        "geoscene": {
+            "apiKey": settings.GEOSCENE_API_KEY,
+            "portalUrl": settings.GEOSCENE_PORTAL_URL,
+            "env": settings.GEOSCENE_ENV,
+            "defaultBasemap": settings.GEOSCENE_DEFAULT_BASEMAP,
+            "defaultCenter": settings.geoscene_center_list,
+            "defaultZoom": settings.GEOSCENE_DEFAULT_ZOOM,
+            "isMock": settings.GEOSCENE_API_KEY == "YOUR_ARCGIS_API_KEY_HERE"
         },
         "amap": {
             "apiKey": settings.AMAP_API_KEY,
@@ -102,14 +102,14 @@ async def get_all_config():
             "debug": settings.DEBUG
         },
         "map": {
-            "arcgis": {
-                "apiKey": settings.ARCGIS_API_KEY,
-                "portalUrl": settings.ARCGIS_PORTAL_URL,
-                "env": settings.ARCGIS_ENV,
-                "defaultBasemap": settings.ARCGIS_DEFAULT_BASEMAP,
-                "defaultCenter": settings.arcgis_center_list,
-                "defaultZoom": settings.ARCGIS_DEFAULT_ZOOM,
-                "isMock": settings.ARCGIS_API_KEY == "YOUR_ARCGIS_API_KEY_HERE"
+            "geoscene": {
+                "apiKey": settings.GEOSCENE_API_KEY,
+                "portalUrl": settings.GEOSCENE_PORTAL_URL,
+                "env": settings.GEOSCENE_ENV,
+                "defaultBasemap": settings.GEOSCENE_DEFAULT_BASEMAP,
+                "defaultCenter": settings.geoscene_center_list,
+                "defaultZoom": settings.GEOSCENE_DEFAULT_ZOOM,
+                "isMock": settings.GEOSCENE_API_KEY == "YOUR_ARCGIS_API_KEY_HERE"
             },
             "amap": {
                 "apiKey": settings.AMAP_API_KEY,

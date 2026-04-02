@@ -95,14 +95,14 @@ export class ArcGISAdapter extends MapAdapter {
             // 使用 ArcGIS 引擎
             console.log('🗺️ 使用 GeoScene 地图引擎');
 
-            // 设置 ArcGIS 配置
+            // 设置 GeoScene 配置
             try {
                 // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
                 const esriConfig: any = await import('@geoscene/core/config');
                 (esriConfig.default as any).apiKey = config.apiKey;
                 (esriConfig.default as any).portalUrl = config.portalUrl;
             } catch (error) {
-                console.warn('ArcGIS 配置设置失败，使用默认配置', error);
+                console.warn('GeoScene 配置设置失败，使用默认配置', error);
             }
 
             // 创建 ArcGISEngine

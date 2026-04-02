@@ -2,7 +2,7 @@
  * 地图引擎配置文件
  *
  * 支持两种地图引擎：
- * - arcgis: ArcGIS API for JavaScript
+ * - geoscene: GeoScene Maps SDK for JavaScript
  * - amap: 高德地图 JS API
  *
  * 切换方式：修改 MAP_PROVIDER 的值
@@ -17,8 +17,8 @@ export const MapConfig = {
         return this.MAP_PROVIDER;
     },
 
-    // 检查是否使用 ArcGIS
-    isArcGIS() {
+    // 检查是否使用 GeoScene
+    isGeoScene() {
         return this.MAP_PROVIDER === 'arcgis';
     },
 

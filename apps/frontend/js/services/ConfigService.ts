@@ -9,7 +9,7 @@ import { Logger } from '../utils/Logger';
 import { DEFAULT_AI_CONFIG, DEFAULT_APP_LIMITS, DEFAULT_MAP_CONFIG } from '../config/AppConfig';
 
 export interface MapConfig {
-    arcgis: {
+    geoscene: {
         apiKey: string;
         portalUrl: string;
         env: string;

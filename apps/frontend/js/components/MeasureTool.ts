@@ -518,11 +518,11 @@ export class MeasureTool {
         if (this.mapProvider === 'arcgis') {
             // 动态导入 ArcGIS 模块
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            return import('https://js.arcgis.com/4.28/@arcgis/core/Graphic.js').then(({ default: Graphic }) => {
+            return import('@geoscene/core/Graphic').then(({ default: Graphic }) => {
                 // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-                return import('https://js.arcgis.com/4.28/@arcgis/core/geometry/Point.js').then(({ default: Point }) => {
+                return import('@geoscene/core/geometry/Point').then(({ default: Point }) => {
                     // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-                    return import('https://js.arcgis.com/4.28/@arcgis/core/symbols/SimpleMarkerSymbol.js').then(({ default: SimpleMarkerSymbol }) => {
+                    return import('@geoscene/core/symbols/SimpleMarkerSymbol').then(({ default: SimpleMarkerSymbol }) => {
                         const point = new Point({
                             longitude: mapPoint.longitude,
                             latitude: mapPoint.latitude
@@ -610,11 +610,11 @@ export class MeasureTool {
     private createLine(from: MapPoint, to: MapPoint): any {
         if (this.mapProvider === 'arcgis') {
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            return import('https://js.arcgis.com/4.28/@arcgis/core/Graphic.js').then(({ default: Graphic }) => {
+            return import('@geoscene/core/Graphic').then(({ default: Graphic }) => {
                 // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-                return import('https://js.arcgis.com/4.28/@arcgis/core/geometry/Polyline.js').then(({ default: Polyline }) => {
+                return import('@geoscene/core/geometry/Polyline').then(({ default: Polyline }) => {
                     // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-                    return import('https://js.arcgis.com/4.28/@arcgis/core/symbols/SimpleLineSymbol.js').then(({ default: SimpleLineSymbol }) => {
+                    return import('@geoscene/core/symbols/SimpleLineSymbol').then(({ default: SimpleLineSymbol }) => {
                         const polyline = new Polyline({
                             paths: [[[from.longitude, from.latitude], [to.longitude, to.latitude]]]
                         });
@@ -683,11 +683,11 @@ export class MeasureTool {
     private createPolygon(path: number[][]): any {
         if (this.mapProvider === 'arcgis') {
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-            return import('https://js.arcgis.com/4.28/@arcgis/core/Graphic.js').then(({ default: Graphic }) => {
+            return import('@geoscene/core/Graphic').then(({ default: Graphic }) => {
                 // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-                return import('https://js.arcgis.com/4.28/@arcgis/core/geometry/Polygon.js').then(({ default: Polygon }) => {
+                return import('@geoscene/core/geometry/Polygon').then(({ default: Polygon }) => {
                     // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
-                    return import('https://js.arcgis.com/4.28/@arcgis/core/symbols/SimpleFillSymbol.js').then(({ default: SimpleFillSymbol }) => {
+                    return import('@geoscene/core/symbols/SimpleFillSymbol').then(({ default: SimpleFillSymbol }) => {
                         const polygon = new Polygon({
                             rings: [path]
                         });

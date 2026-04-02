@@ -100,13 +100,13 @@ class Settings(BaseSettings):
     DEFAULT_VARIOGRAM_MODEL: str = "spherical"
     GRID_RESOLUTION: int = 100
 
-    # ArcGIS配置
-    ARCGIS_API_KEY: str = "YOUR_ARCGIS_API_KEY_HERE"
-    ARCGIS_PORTAL_URL: str = "https://www.arcgis.com"
-    ARCGIS_ENV: str = "development"
-    ARCGIS_DEFAULT_BASEMAP: str = "streets-vector"
-    ARCGIS_DEFAULT_CENTER: Union[str, List[float]] = "[139.767125,35.681236]"
-    ARCGIS_DEFAULT_ZOOM: int = 10
+    # GeoScene配置
+    GEOSCENE_API_KEY: str = "YOUR_ARCGIS_API_KEY_HERE"
+    GEOSCENE_PORTAL_URL: str = "https://www.arcgis.com"
+    GEOSCENE_ENV: str = "development"
+    GEOSCENE_DEFAULT_BASEMAP: str = "streets-vector"
+    GEOSCENE_DEFAULT_CENTER: Union[str, List[float]] = "[139.767125,35.681236]"
+    GEOSCENE_DEFAULT_ZOOM: int = 10
 
     # 高德地图配置（从环境变量读取）
     AMAP_API_KEY: str = Field(default="", description="高德地图API密钥")
@@ -221,7 +221,7 @@ class Settings(BaseSettings):
                 return _default_cors_origins()
         return v
 
-    @field_validator('ARCGIS_DEFAULT_CENTER', mode='before')
+    @field_validator('GEOSCENE_DEFAULT_CENTER', mode='before')
     @classmethod
     def parse_center(cls, v):
         if isinstance(v, str):
@@ -322,11 +322,11 @@ class Settings(BaseSettings):
         return self.BACKEND_CORS_ORIGINS
 
     @property
-    def arcgis_center_list(self) -> List[float]:
-        """获取ArcGIS默认中心点列表"""
-        if isinstance(self.ARCGIS_DEFAULT_CENTER, str):
-            return json.loads(self.ARCGIS_DEFAULT_CENTER)
-        return self.ARCGIS_DEFAULT_CENTER
+    def geoscene_center_list(self) -> List[float]:
+        """获取GeoScene默认中心点列表"""
+        if isinstance(self.GEOSCENE_DEFAULT_CENTER, str):
+            return json.loads(self.GEOSCENE_DEFAULT_CENTER)
+        return self.GEOSCENE_DEFAULT_CENTER
 
     @property
     def is_development(self) -> bool:

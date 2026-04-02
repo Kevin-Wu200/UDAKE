@@ -81,7 +81,7 @@ export const AppConfig: RuntimeAppConfig = {
 };
 
 export const DEFAULT_MAP_CONFIG = {
-    arcgis: {
+    geoscene: {
         apiKey: 'YOUR_ARCGIS_API_KEY_HERE',
         portalUrl: 'https://www.arcgis.com',
         env: 'development',
