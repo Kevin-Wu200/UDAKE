@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { createTestDataFactory, gotoAndWaitForAppReady, waitForApiResponse } from './support/stability';
 
 type AnyJson = Record<string, unknown>;
 
@@ -123,19 +124,25 @@ test.describe('认证流程 E2E（管理员前端用户中心）', () => {
     await mockAuthApi(page);
   });
 
-  test('注册流程：发送验证码并完成注册后自动登录', async ({ page }) => {
-    await page.goto('/#/user/register');
+  test('注册流程：发送验证码并完成注册后自动登录', async ({ page }, testInfo) => {
+    const dataFactory = createTestDataFactory(testInfo.title);
+    const user = dataFactory.user();
+    await gotoAndWaitForAppReady(page, '/#/user/register', page.getByRole('button', { name: '发送验证码' }));
 
-    await page.getByPlaceholder('请输入邮箱').fill('new-user@example.com');
-    await page.getByPlaceholder('请输入密码').fill('StrongPass123');
-    await page.getByPlaceholder('请再次输入密码').fill('StrongPass123');
+    await page.getByPlaceholder('请输入邮箱').fill(user.email);
+    await page.getByPlaceholder('请输入密码').fill(user.password);
+    await page.getByPlaceholder('请再次输入密码').fill(user.password);
     await page.getByPlaceholder('例如：ABC-1234-5678-9XYZ').fill('ABC-1234-5678-9XYZ');
 
-    await page.getByRole('button', { name: '发送验证码' }).click();
+    await waitForApiResponse(page, '/auth/register', async () => {
+      await page.getByRole('button', { name: '发送验证码' }).click();
+    });
     await expect(page.getByText('验证码已发送，请查收邮箱')).toBeVisible();
 
     await page.getByPlaceholder('请输入6位验证码').fill('123456');
-    await page.getByRole('button', { name: '完成注册' }).click();
+    await waitForApiResponse(page, '/auth/verify-email-code', async () => {
+      await page.getByRole('button', { name: '完成注册' }).click();
+    });
 
     await expect(page.getByText('注册成功，已自动登录')).toBeVisible();
     await expect
@@ -144,11 +151,13 @@ test.describe('认证流程 E2E（管理员前端用户中心）', () => {
   });
 
   test('登录流程：登录后进入设备管理页面', async ({ page }) => {
-    await page.goto('/#/user/login');
+    await gotoAndWaitForAppReady(page, '/#/user/login', page.getByRole('button', { name: '登录' }));
 
     await page.getByPlaceholder('请输入邮箱').fill('user@example.com');
     await page.getByPlaceholder('请输入密码').fill('StrongPass123');
-    await page.getByRole('button', { name: '登录' }).click();
+    await waitForApiResponse(page, '/auth/login', async () => {
+      await page.getByRole('button', { name: '登录' }).click();
+    });
 
     await expect
       .poll(async () => page.evaluate(() => localStorage.getItem('udake_access_token')))
@@ -158,11 +167,13 @@ test.describe('认证流程 E2E（管理员前端用户中心）', () => {
   });
 
   test('找回密码流程：发送验证码并完成重置回到登录页', async ({ page }) => {
-    await page.goto('/#/user/forgot-password');
+    await gotoAndWaitForAppReady(page, '/#/user/forgot-password', page.getByRole('button', { name: '发送验证码' }));
 
     await page.getByPlaceholder('请输入注册邮箱').fill('user@example.com');
     await page.getByPlaceholder('请输入产品密钥').fill('ABC-1234-5678-9XYZ');
-    await page.getByRole('button', { name: '发送验证码' }).click();
+    await waitForApiResponse(page, '/auth/reset-password/send-code', async () => {
+      await page.getByRole('button', { name: '发送验证码' }).click();
+    });
 
     await expect(page.getByText('验证码已发送，请在10分钟内完成验证')).toBeVisible();
 
@@ -173,7 +184,9 @@ test.describe('认证流程 E2E（管理员前端用户中心）', () => {
     await page.getByPlaceholder('请再次输入新密码').fill('NewStrongPass123');
     await page.getByRole('button', { name: '下一步' }).click();
 
-    await page.getByRole('button', { name: '确认重置' }).click();
+    await waitForApiResponse(page, '/auth/reset-password/verify', async () => {
+      await page.getByRole('button', { name: '确认重置' }).click();
+    });
     await expect(page).toHaveURL(/#\/user\/login/);
     await expect(page.getByText('用户登录')).toBeVisible();
   });

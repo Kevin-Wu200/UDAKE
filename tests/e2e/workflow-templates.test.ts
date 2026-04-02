@@ -1,4 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+  createTestDataFactory,
+  gotoAndWaitForAppReady,
+  waitForApiResponse
+} from './support/stability';
 
 type TemplateState = {
   recommendationCalls: number;
@@ -226,10 +231,11 @@ async function mockWorkflowTemplateApi(page: Page): Promise<TemplateState> {
 }
 
 test.describe('工作流模板专项E2E', () => {
-  test('应该能够浏览模板并应用到编辑器', async ({ page }) => {
+  test('应该能够浏览模板并应用到编辑器', async ({ page }, testInfo) => {
+    createTestDataFactory(testInfo.title);
     await mockWorkflowTemplateApi(page);
 
-    await page.goto('/#/workflows/editor');
+    await gotoAndWaitForAppReady(page, '/#/workflows/editor', page.getByText('数据清洗模板'));
 
     await expect(page.getByText('数据清洗模板')).toBeVisible();
     await page.getByRole('button', { name: '应用' }).first().click();
@@ -237,16 +243,21 @@ test.describe('工作流模板专项E2E', () => {
     await expect(page.getByPlaceholder('工作流名称')).toHaveValue(/数据清洗模板_编辑副本/);
   });
 
-  test('应该能够请求模板推荐并实例化模板', async ({ page }) => {
+  test('应该能够请求模板推荐并实例化模板', async ({ page }, testInfo) => {
+    createTestDataFactory(testInfo.title);
     const state = await mockWorkflowTemplateApi(page);
 
-    await page.goto('/#/workflows/editor');
+    await gotoAndWaitForAppReady(page, '/#/workflows/editor', page.getByRole('button', { name: '推荐' }));
 
     await page.getByPlaceholder('推荐标签（逗号分隔）').fill('采样,插值');
-    await page.getByRole('button', { name: '推荐' }).click();
+    await waitForApiResponse(page, '/workflow/templates/recommend', async () => {
+      await page.getByRole('button', { name: '推荐' }).click();
+    });
     await expect.poll(() => state.recommendationCalls).toBeGreaterThan(0);
 
-    await page.getByRole('button', { name: '实例化' }).first().click();
+    await waitForApiResponse(page, '/instantiate', async () => {
+      await page.getByRole('button', { name: '实例化' }).first().click();
+    });
     await expect.poll(() => state.instantiateCalls).toBeGreaterThan(0);
   });
 });

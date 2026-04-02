@@ -5,19 +5,25 @@ on:
     paths:
       - 'apps/admin-frontend/**'
       - 'tests/e2e/workflow*.test.ts'
+      - 'tests/e2e/support/**'
       - 'configs/playwright.config.ts'
       - 'configs/playwright.workflow.config.ts'
+      - 'configs/playwright.global-setup.ts'
       - 'package.json'
       - 'package-lock.json'
+      - 'scripts/e2e-flakiness-report.js'
       - '.github/workflows/workflow_e2e.yml'
   pull_request:
     paths:
       - 'apps/admin-frontend/**'
       - 'tests/e2e/workflow*.test.ts'
+      - 'tests/e2e/support/**'
       - 'configs/playwright.config.ts'
       - 'configs/playwright.workflow.config.ts'
+      - 'configs/playwright.global-setup.ts'
       - 'package.json'
       - 'package-lock.json'
+      - 'scripts/e2e-flakiness-report.js'
       - '.github/workflows/workflow_e2e.yml'
 
 jobs:
@@ -46,6 +52,10 @@ jobs:
       - name: Run workflow E2E tests
         run: npm run test:e2e:workflow
 
+      - name: Generate flaky report
+        if: always()
+        run: npm run test:e2e:report
+
       - name: Upload Playwright artifacts
         if: always()
         uses: actions/upload-artifact@v4
@@ -57,4 +67,6 @@ jobs:
             test-results
             test-results.json
             test-results-workflow.json
+            test-results.junit.xml
+            test-results-workflow.junit.xml
           if-no-files-found: ignore

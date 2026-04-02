@@ -1,8 +1,9 @@
 import { test, expect } from '@playwright/test';
+import { gotoAndWaitForAppReady, retryWithBackoff } from './support/stability';
 
 test.describe('完整工作流', () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto('/');
+        await gotoAndWaitForAppReady(page, '/', page.locator('body'));
     });
 
     test('应该能够加载应用首页', async ({ page }) => {
@@ -63,7 +64,9 @@ test.describe('完整工作流', () => {
         const refreshButton = page.locator('button').filter({ hasText: /刷新|refresh/i }).first();
 
         if (await refreshButton.isVisible()) {
-            await refreshButton.click();
+            await retryWithBackoff(async () => {
+                await refreshButton.click();
+            }, { context: 'click refresh button in offline mode' });
 
             // 验证离线提示
             await expect(page.locator('.offline-indicator, .network-error').first()).toBeVisible();
@@ -92,7 +95,7 @@ test.describe('性能测试', () => {
     test('页面加载时间应该在合理范围内', async ({ page }) => {
         const startTime = Date.now();
 
-        await page.goto('/');
+        await gotoAndWaitForAppReady(page, '/', page.locator('body'));
 
         const loadTime = Date.now() - startTime;
 
@@ -120,7 +123,7 @@ test.describe('性能测试', () => {
 
 test.describe('可访问性测试', () => {
     test('应该有适当的标题和描述', async ({ page }) => {
-        await page.goto('/');
+        await gotoAndWaitForAppReady(page, '/', page.locator('body'));
 
         const title = await page.title();
         expect(title).toBeTruthy();
@@ -128,7 +131,7 @@ test.describe('可访问性测试', () => {
     });
 
     test('主要元素应该有适当的焦点管理', async ({ page }) => {
-        await page.goto('/');
+        await gotoAndWaitForAppReady(page, '/', page.locator('body'));
 
         // 测试 Tab 键导航
         await page.keyboard.press('Tab');

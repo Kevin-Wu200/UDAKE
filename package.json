@@ -36,6 +36,7 @@
     "test:e2e": "playwright test --config configs/playwright.config.ts",
     "test:e2e:workflow": "playwright test --config configs/playwright.workflow.config.ts tests/e2e/workflow-editor.test.ts tests/e2e/workflow-execution.test.ts tests/e2e/workflow-templates.test.ts tests/e2e/notification-center.spec.ts",
     "test:e2e:auth": "playwright test --config configs/playwright.auth.config.ts",
+    "test:e2e:report": "node scripts/e2e-flakiness-report.js",
     "test:e2e:ui": "playwright test --config configs/playwright.config.ts --ui",
     "test:performance": "vitest --config configs/vitest.config.js --run tests/performance-monitor.test.ts tests/performance/notification-center.performance.test.ts tests/load/notification-load.test.ts",
     "i18n:check": "node scripts/i18n-check.js",

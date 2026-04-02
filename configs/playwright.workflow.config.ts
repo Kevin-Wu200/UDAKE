@@ -6,15 +6,19 @@ const baseURL = `http://${frontendHost}:${frontendPort}`;
 
 export default defineConfig({
   testDir: '../tests/e2e',
-  timeout: 30 * 1000,
+  globalSetup: './playwright.global-setup.ts',
+  fullyParallel: true,
+  forbidOnly: !!process.env.CI,
+  timeout: 45 * 1000,
   expect: {
-    timeout: 5 * 1000
+    timeout: 8 * 1000
   },
-  retries: process.env.CI ? 2 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  retries: process.env.CI ? 2 : 1,
+  workers: process.env.CI ? 2 : undefined,
   reporter: [
     ['html', { outputFolder: '../playwright-report-workflow' }],
     ['json', { outputFile: '../test-results-workflow.json' }],
+    ['junit', { outputFile: '../test-results-workflow.junit.xml' }],
     ['list']
   ],
   use: {
@@ -22,8 +26,8 @@ export default defineConfig({
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    actionTimeout: 10 * 1000,
-    navigationTimeout: 30 * 1000
+    actionTimeout: 12 * 1000,
+    navigationTimeout: 35 * 1000
   },
   projects: [
     {

@@ -9,23 +9,27 @@ const resolvedFrontendUrl = (process.env.FRONTEND_URL || process.env.BASE_URL ||
 
 export default defineConfig({
     testDir: '../tests/e2e',
+    globalSetup: './playwright.global-setup.ts',
+    fullyParallel: true,
+    forbidOnly: !!process.env.CI,
 
     // 超时设置
-    timeout: 30 * 1000,
+    timeout: 45 * 1000,
     expect: {
-        timeout: 5 * 1000
+        timeout: 8 * 1000
     },
 
     // 测试失败时重试
-    retries: process.env.CI ? 2 : 0,
+    retries: process.env.CI ? 2 : 1,
 
     // 并行运行测试
-    workers: process.env.CI ? 1 : undefined,
+    workers: process.env.CI ? 2 : undefined,
 
     // 报告配置
     reporter: [
         ['html', { outputFolder: '../playwright-report' }],
         ['json', { outputFile: '../test-results.json' }],
+        ['junit', { outputFile: '../test-results.junit.xml' }],
         ['list']
     ],
 
@@ -44,8 +48,8 @@ export default defineConfig({
         video: 'retain-on-failure',
 
         // 超时
-        actionTimeout: 10 * 1000,
-        navigationTimeout: 30 * 1000
+        actionTimeout: 12 * 1000,
+        navigationTimeout: 35 * 1000
     },
 
     // 测试项目

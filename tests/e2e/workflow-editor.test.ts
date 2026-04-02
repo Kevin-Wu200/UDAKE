@@ -1,4 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+  createTestDataFactory,
+  gotoAndWaitForAppReady,
+  retryWithBackoff,
+  waitForApiResponse
+} from './support/stability';
 
 type MutableState = {
   validateCalls: number;
@@ -33,14 +39,15 @@ function buildWorkflowRecord(definition: Record<string, unknown>, workflowId: st
   };
 }
 
-async function mockWorkflowEditorApi(page: Page): Promise<MutableState> {
+async function mockWorkflowEditorApi(page: Page, namespace: string): Promise<MutableState> {
+  const factory = createTestDataFactory(namespace);
   const state: MutableState = {
     validateCalls: 0,
     createCalls: 0,
     updateCalls: 0,
-    savedWorkflowId: 'wf_e2e_editor',
+    savedWorkflowId: factory.nextId('wf_e2e_editor'),
     latestDefinition: {},
-    runId: 'run_e2e_editor'
+    runId: factory.nextId('run_e2e_editor')
   };
 
   await page.addInitScript(() => {
@@ -189,39 +196,48 @@ async function mockWorkflowEditorApi(page: Page): Promise<MutableState> {
 }
 
 test.describe('工作流编辑器专项E2E', () => {
-  test('应该能够校验并保存工作流', async ({ page }) => {
-    const state = await mockWorkflowEditorApi(page);
+  test('应该能够校验并保存工作流', async ({ page }, testInfo) => {
+    const state = await mockWorkflowEditorApi(page, testInfo.title);
 
-    await page.goto('/#/workflows/editor');
+    await gotoAndWaitForAppReady(page, '/#/workflows/editor', page.getByRole('button', { name: '保存' }));
 
     await expect(page.getByRole('button', { name: '校验' })).toBeVisible();
     await expect(page.getByRole('button', { name: '保存' })).toBeVisible();
 
-    await page.getByRole('button', { name: '校验' }).click();
+    await waitForApiResponse(page, '/workflow/validate', async () => {
+      await page.getByRole('button', { name: '校验' }).click();
+    });
     await expect.poll(() => state.validateCalls).toBeGreaterThan(0);
 
-    await page.getByRole('button', { name: '保存' }).click();
+    await waitForApiResponse(page, '/workflow', async () => {
+      await page.getByRole('button', { name: '保存' }).click();
+    });
     await expect.poll(() => state.createCalls).toBeGreaterThan(0);
 
     await expect(page.getByText('执行监控')).toHaveCount(1);
   });
 
-  test('应该能够添加节点并触发自动布局', async ({ page }) => {
-    await mockWorkflowEditorApi(page);
+  test('应该能够添加节点并触发自动布局', async ({ page }, testInfo) => {
+    await mockWorkflowEditorApi(page, testInfo.title);
 
-    await page.goto('/#/workflows/editor');
+    await gotoAndWaitForAppReady(page, '/#/workflows/editor', page.getByRole('button', { name: '添加节点' }));
 
-    await page.getByRole('button', { name: '添加节点' }).click();
-    await page.getByText('处理节点').click();
+    await retryWithBackoff(
+      async () => {
+        await page.getByRole('button', { name: '添加节点' }).click();
+        await page.getByText('处理节点').click();
+      },
+      { context: 'add node and select node type' }
+    );
 
     await page.getByRole('button', { name: '自动布局' }).click();
     await expect(page.locator('.workflow-canvas')).toBeVisible();
   });
 
-  test('应该能够复制并删除节点', async ({ page }) => {
-    await mockWorkflowEditorApi(page);
+  test('应该能够复制并删除节点', async ({ page }, testInfo) => {
+    await mockWorkflowEditorApi(page, testInfo.title);
 
-    await page.goto('/#/workflows/editor');
+    await gotoAndWaitForAppReady(page, '/#/workflows/editor', page.getByText('input_1').first());
 
     await page.getByText('input_1').first().click();
     await page.getByRole('button', { name: '复制节点' }).click();
@@ -232,10 +248,10 @@ test.describe('工作流编辑器专项E2E', () => {
     await expect(page.getByText('input_1_复制')).toHaveCount(0);
   });
 
-  test('应该能够导入和导出工作流定义', async ({ page }) => {
-    const state = await mockWorkflowEditorApi(page);
+  test('应该能够导入和导出工作流定义', async ({ page }, testInfo) => {
+    const state = await mockWorkflowEditorApi(page, testInfo.title);
 
-    await page.goto('/#/workflows/editor');
+    await gotoAndWaitForAppReady(page, '/#/workflows/editor', page.getByRole('button', { name: '保存' }));
 
     const importedDefinition = {
       workflow_id: 'wf_imported_case',
@@ -261,7 +277,9 @@ test.describe('工作流编辑器专项E2E', () => {
 
     await expect(page.getByPlaceholder('工作流名称')).toHaveValue('导入流程A');
 
-    await page.getByRole('button', { name: '保存' }).click();
+    await waitForApiResponse(page, '/workflow', async () => {
+      await page.getByRole('button', { name: '保存' }).click();
+    });
     await expect.poll(() => state.createCalls).toBeGreaterThan(0);
     await expect(page.getByRole('button', { name: '导出' })).toBeEnabled();
 

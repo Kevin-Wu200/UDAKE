@@ -34,6 +34,13 @@ logs/tests/*.log
 logs/tests/*.json
 logs/*.log
 npm-debug.log*
+playwright-report/
+playwright-report-*/
+test-results/
+test-results*.json
+test-results*.xml
+.tsbuildinfo/
+apps/admin-frontend/src/components.d.ts
 
 # Backend runtime artifacts
 services/backend/app/结果文件/

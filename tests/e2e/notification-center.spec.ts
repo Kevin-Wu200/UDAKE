@@ -1,4 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+  createTestDataFactory,
+  gotoAndWaitForAppReady,
+  retryWithBackoff,
+  waitForApiResponse
+} from './support/stability';
 
 type NotificationType = 'mention' | 'comment' | 'share' | 'system';
 type NotificationPriority = 'low' | 'normal' | 'high' | 'urgent';
@@ -157,16 +163,18 @@ function buildSeedNotifications(workflowId: string): NotificationItem[] {
   }));
 }
 
-async function setupNotificationMock(page: Page): Promise<NotificationTestState> {
+async function setupNotificationMock(page: Page, namespace: string): Promise<NotificationTestState> {
+  const factory = createTestDataFactory(namespace);
+  const workflowId = factory.nextId('wf_e2e_notify');
   const state: NotificationTestState = {
-    workflowId: 'wf_e2e_notify',
+    workflowId,
     createWorkflowCalls: 0,
     createCommentCalls: 0,
     markSingleCalls: 0,
     markBatchCalls: 0,
     markAllCalls: 0,
     updatePreferenceCalls: 0,
-    notifications: buildSeedNotifications('wf_e2e_notify'),
+    notifications: buildSeedNotifications(workflowId),
     preference: {
       types: {
         mention: true,
@@ -386,17 +394,21 @@ async function pushNotification(page: Page, payload: Record<string, unknown>) {
 }
 
 test.describe('通知中心专项E2E', () => {
-  test('创建工作流后评论并接收@提及通知', async ({ page }) => {
-    const state = await setupNotificationMock(page);
+  test('创建工作流后评论并接收@提及通知', async ({ page }, testInfo) => {
+    const state = await setupNotificationMock(page, testInfo.title);
 
-    await page.goto('/#/workflows/editor');
-    await page.getByRole('button', { name: '保存' }).click();
+    await gotoAndWaitForAppReady(page, '/#/workflows/editor', page.getByRole('button', { name: '保存' }));
+    await waitForApiResponse(page, '/workflow', async () => {
+      await page.getByRole('button', { name: '保存' }).click();
+    });
     await expect.poll(() => state.createWorkflowCalls).toBeGreaterThan(0);
 
     await expect(page.getByText('通知中心')).toBeVisible();
 
     await page.getByPlaceholder('输入评论，使用 @ 可提及协作者').fill('@alice 请确认这个节点输出');
-    await page.getByRole('button', { name: '提交评论' }).click();
+    await waitForApiResponse(page, '/comments', async () => {
+      await page.getByRole('button', { name: '提交评论' }).click();
+    });
     await expect.poll(() => state.createCommentCalls).toBeGreaterThan(0);
 
     await pushNotification(page, {
@@ -415,10 +427,10 @@ test.describe('通知中心专项E2E', () => {
     await expect(page.locator('.toast-list')).toContainText('用户A 在评论中提及了你');
   });
 
-  test('多用户协作通知收发链路', async ({ page }) => {
-    const state = await setupNotificationMock(page);
+  test('多用户协作通知收发链路', async ({ page }, testInfo) => {
+    const state = await setupNotificationMock(page, testInfo.title);
 
-    await page.goto(`/#/workflows/editor/${state.workflowId}`);
+    await gotoAndWaitForAppReady(page, `/#/workflows/editor/${state.workflowId}`, page.getByText('通知中心'));
     await expect(page.getByText('通知中心')).toBeVisible();
 
     await pushNotification(page, {
@@ -449,13 +461,18 @@ test.describe('通知中心专项E2E', () => {
     await expect(page.locator('.notification-list')).toContainText('用户B回复评论');
   });
 
-  test('通知设置关闭与恢复生效', async ({ page }) => {
-    const state = await setupNotificationMock(page);
+  test('通知设置关闭与恢复生效', async ({ page }, testInfo) => {
+    const state = await setupNotificationMock(page, testInfo.title);
 
-    await page.goto(`/#/workflows/editor/${state.workflowId}`);
+    await gotoAndWaitForAppReady(page, `/#/workflows/editor/${state.workflowId}`, page.getByText('通知中心'));
     await expect(page.getByText('通知中心')).toBeVisible();
 
-    await page.getByRole('button', { name: '通知设置' }).click();
+    await retryWithBackoff(
+      async () => {
+        await page.getByRole('button', { name: '通知设置' }).click();
+      },
+      { context: 'open notification settings' }
+    );
     const mentionSwitch = page.locator('.notification-center .settings-grid .el-switch').first();
     await mentionSwitch.click();
     await expect.poll(() => state.updatePreferenceCalls).toBeGreaterThan(0);
@@ -502,10 +519,10 @@ test.describe('通知中心专项E2E', () => {
     await expect(page.locator('.notification-list')).toContainText('恢复后提及通知');
   });
 
-  test('通知筛选支持单选、多选、关键字与未读', async ({ page }) => {
-    const state = await setupNotificationMock(page);
+  test('通知筛选支持单选、多选、关键字与未读', async ({ page }, testInfo) => {
+    const state = await setupNotificationMock(page, testInfo.title);
 
-    await page.goto(`/#/workflows/editor/${state.workflowId}`);
+    await gotoAndWaitForAppReady(page, `/#/workflows/editor/${state.workflowId}`, page.getByText('通知中心'));
     await expect(page.getByText('通知中心')).toBeVisible();
 
     await page.locator('.quick-filter-row').getByText('评论').click();
@@ -533,23 +550,29 @@ test.describe('通知中心专项E2E', () => {
     await expect(page.locator('.notification-list')).not.toContainText('评论-回归结果');
   });
 
-  test('通知操作支持单条、批量、全部已读与分页', async ({ page }) => {
-    const state = await setupNotificationMock(page);
+  test('通知操作支持单条、批量、全部已读与分页', async ({ page }, testInfo) => {
+    const state = await setupNotificationMock(page, testInfo.title);
 
-    await page.goto(`/#/workflows/editor/${state.workflowId}`);
+    await gotoAndWaitForAppReady(page, `/#/workflows/editor/${state.workflowId}`, page.getByText('通知中心'));
     await expect(page.getByText('通知中心')).toBeVisible();
 
     const firstCard = page.locator('.notification-card').first();
-    await firstCard.getByRole('button', { name: '标记已读' }).click();
+    await waitForApiResponse(page, '/read', async () => {
+      await firstCard.getByRole('button', { name: '标记已读' }).click();
+    });
     await expect.poll(() => state.markSingleCalls).toBeGreaterThan(0);
 
     const checkboxes = page.locator('.notification-card .card-left input[type="checkbox"]');
     await checkboxes.nth(0).click();
     await checkboxes.nth(1).click();
-    await page.getByRole('button', { name: /批量已读/ }).click();
+    await waitForApiResponse(page, '/batch-read', async () => {
+      await page.getByRole('button', { name: /批量已读/ }).click();
+    });
     await expect.poll(() => state.markBatchCalls).toBeGreaterThan(0);
 
-    await page.getByRole('button', { name: '全部已读' }).click();
+    await waitForApiResponse(page, '/read-all', async () => {
+      await page.getByRole('button', { name: '全部已读' }).click();
+    });
     await expect.poll(() => state.markAllCalls).toBeGreaterThan(0);
     await expect(page.locator('.notification-header')).toContainText('未读 0');
 

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { createTestDataFactory, gotoAndWaitForAppReady, waitForApiResponse } from './support/stability';
 
 type ExecutionState = {
   createCalls: number;
@@ -33,12 +34,13 @@ function buildWorkflowRecord(definition: Record<string, unknown>, workflowId: st
   };
 }
 
-async function mockWorkflowExecutionApi(page: Page): Promise<ExecutionState> {
+async function mockWorkflowExecutionApi(page: Page, namespace: string): Promise<ExecutionState> {
+  const factory = createTestDataFactory(namespace);
   const state: ExecutionState = {
     createCalls: 0,
     executeCalls: 0,
-    workflowId: 'wf_e2e_execution',
-    runId: 'run_e2e_execution',
+    workflowId: factory.nextId('wf_e2e_execution'),
+    runId: factory.nextId('run_e2e_execution'),
     detailFetchCount: 0,
     latestDefinition: {}
   };
@@ -224,16 +226,20 @@ async function mockWorkflowExecutionApi(page: Page): Promise<ExecutionState> {
 }
 
 test.describe('工作流执行专项E2E', () => {
-  test('应该能够触发执行并查看监控结果', async ({ page }) => {
-    const state = await mockWorkflowExecutionApi(page);
+  test('应该能够触发执行并查看监控结果', async ({ page }, testInfo) => {
+    const state = await mockWorkflowExecutionApi(page, testInfo.title);
 
-    await page.goto('/#/workflows/editor');
+    await gotoAndWaitForAppReady(page, '/#/workflows/editor', page.getByRole('button', { name: '保存' }));
 
-    await page.getByRole('button', { name: '保存' }).click();
+    await waitForApiResponse(page, '/workflow', async () => {
+      await page.getByRole('button', { name: '保存' }).click();
+    });
     await expect.poll(() => state.createCalls).toBeGreaterThan(0);
     await expect(page.getByRole('button', { name: '执行' })).toBeEnabled();
 
-    await page.getByRole('button', { name: '执行' }).click();
+    await waitForApiResponse(page, '/execute', async () => {
+      await page.getByRole('button', { name: '执行' }).click();
+    });
     await expect.poll(() => state.executeCalls).toBeGreaterThan(0);
 
     await expect(page.getByText(state.runId).first()).toBeVisible();
