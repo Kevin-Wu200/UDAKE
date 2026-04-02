@@ -24,6 +24,7 @@ import { GeneralDataProcessingPanel } from './integration/GeneralDataProcessingP
 import { TaskQueuePanel } from './integration/TaskQueuePanel.js';
 import { GPUAccelerationPanel } from './integration/GPUAccelerationPanel.js';
 import MobileNavigation from './MobileNavigation.js';
+import MobileInteractionEnhancer from './MobileInteractionEnhancer.js';
 
 interface PanelMountable {
     mount(container: HTMLElement): void;
@@ -40,6 +41,7 @@ interface PanelDescriptor {
 export class FrontendIntegrationHub {
     private initialized = false;
     private mobileNavigation: MobileNavigation | null = null;
+    private mobileInteractionEnhancer: MobileInteractionEnhancer | null = null;
 
     private readonly panelDescriptors: PanelDescriptor[] = [
         { id: 'data-quality', title: '数据质量管理', ctor: DataQualityPanel },
@@ -132,7 +134,9 @@ export class FrontendIntegrationHub {
         title.setAttribute('data-toggle-bound', 'true');
     }
 
-    private renderPanels(container: HTMLElement): void {
+    private renderPanels(container: HTMLElement, preferredOpenPanelId?: string): void {
+        this.mobileInteractionEnhancer?.destroy();
+        this.mobileInteractionEnhancer = null;
         container.innerHTML = '';
         container.classList.add('frontend-integration-hub');
 
@@ -140,7 +144,9 @@ export class FrontendIntegrationHub {
             const details = document.createElement('details');
             details.className = 'integration-detail';
             details.dataset.panelId = descriptor.id;
-            details.open = index === 0;
+            details.open = preferredOpenPanelId
+                ? descriptor.id === preferredOpenPanelId
+                : index === 0;
 
             const summary = document.createElement('summary');
             summary.className = 'integration-summary';
@@ -159,6 +165,7 @@ export class FrontendIntegrationHub {
         });
 
         this.mountMobileHistoryNavigation(container);
+        this.mountMobileInteractionEnhancer(container);
     }
 
     private mountMobileHistoryNavigation(container: HTMLElement): void {
@@ -189,6 +196,56 @@ export class FrontendIntegrationHub {
             ],
             enableSwipe: true,
             enableHaptic: true
+        });
+    }
+
+    private mountMobileInteractionEnhancer(container: HTMLElement): void {
+        if (typeof window === 'undefined' || !window.matchMedia('(max-width: 767px)').matches) {
+            return;
+        }
+
+        this.mobileInteractionEnhancer = new MobileInteractionEnhancer({
+            container,
+            searchPlaceholder: '搜索功能面板',
+            onSearch: (keyword) => this.filterPanels(container, keyword),
+            onRefresh: async () => {
+                const activePanelId = this.getActivePanelId(container);
+                this.renderPanels(container, activePanelId || undefined);
+            },
+            onLoadMore: async () => {
+                this.expandNextCollapsedPanel(container);
+            }
+        });
+    }
+
+    private filterPanels(container: HTMLElement, keyword: string): void {
+        const normalized = keyword.trim().toLowerCase();
+        const detailsList = Array.from(container.querySelectorAll('.integration-detail')) as HTMLDetailsElement[];
+
+        detailsList.forEach((detail) => {
+            const title = detail.querySelector('.integration-summary')?.textContent?.toLowerCase() || '';
+            const visible = !normalized || title.includes(normalized);
+            detail.style.display = visible ? '' : 'none';
+        });
+    }
+
+    private getActivePanelId(container: HTMLElement): string | null {
+        const detailsList = Array.from(container.querySelectorAll('.integration-detail')) as HTMLDetailsElement[];
+        const activePanel = detailsList.find((item) => item.open);
+        return activePanel?.dataset.panelId || null;
+    }
+
+    private expandNextCollapsedPanel(container: HTMLElement): void {
+        const detailsList = Array.from(container.querySelectorAll('.integration-detail')) as HTMLDetailsElement[];
+        const nextCollapsed = detailsList.find((item) => !item.open && item.style.display !== 'none');
+        if (!nextCollapsed) {
+            return;
+        }
+
+        nextCollapsed.open = true;
+        nextCollapsed.scrollIntoView({
+            behavior: 'smooth',
+            block: 'end'
         });
     }
 

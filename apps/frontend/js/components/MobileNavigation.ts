@@ -43,6 +43,8 @@ class MobileNavigation {
     private isSidebarOpen: boolean = false;
     private currentNavIndex: number = 0;
     private swipeThreshold: number = 50;
+    private touchActionDebounceMs: number = 180;
+    private lastTouchActionAt: number = 0;
     private touchStartX: number = 0;
     private touchStartY: number = 0;
     private navScrollMemory: Map<string, number> = new Map();
@@ -132,12 +134,7 @@ class MobileNavigation {
             `;
             navItem.setAttribute('aria-label', item.label);
             navItem.setAttribute('aria-current', index === 0 ? 'page' : 'false');
-
-            this.lifecycleScope.addEventListener(navItem, 'click', () => {
-                this.selectNavItem(index);
-                item.action();
-                this.hapticFeedback();
-            });
+            this.bindTouchAwareNavEvents(navItem, item, index);
 
             bottomNav.appendChild(navItem);
         });
@@ -299,6 +296,9 @@ class MobileNavigation {
      * 处理向左滑动
      */
     private handleSwipeLeft(): void {
+        if (!this.shouldHandleTouchAction()) {
+            return;
+        }
         const nextIndex = (this.currentNavIndex + 1) % this.navItems.length;
         this.selectNavItem(nextIndex);
         this.navItems[nextIndex].action();
@@ -309,10 +309,72 @@ class MobileNavigation {
      * 处理向右滑动
      */
     private handleSwipeRight(): void {
+        if (!this.shouldHandleTouchAction()) {
+            return;
+        }
         const prevIndex = (this.currentNavIndex - 1 + this.navItems.length) % this.navItems.length;
         this.selectNavItem(prevIndex);
         this.navItems[prevIndex].action();
         this.hapticFeedback();
+    }
+
+    private shouldHandleTouchAction(): boolean {
+        const now = Date.now();
+        if ((now - this.lastTouchActionAt) < this.touchActionDebounceMs) {
+            return false;
+        }
+        this.lastTouchActionAt = now;
+        return true;
+    }
+
+    private bindTouchAwareNavEvents(navItem: HTMLElement, item: NavItem, index: number): void {
+        let touchStartAt = 0;
+        let longPressTimer: number | null = null;
+        let lastTapAt = 0;
+
+        const selectItem = () => {
+            if (!this.shouldHandleTouchAction()) {
+                return;
+            }
+            this.selectNavItem(index);
+            item.action();
+            this.hapticFeedback();
+        };
+
+        this.lifecycleScope.addEventListener(navItem, 'click', () => {
+            selectItem();
+        });
+
+        this.lifecycleScope.addEventListener(navItem, 'touchstart', () => {
+            touchStartAt = Date.now();
+            longPressTimer = window.setTimeout(() => {
+                navItem.dispatchEvent(new CustomEvent('mobile-nav-longpress', {
+                    bubbles: true,
+                    detail: { id: item.id, index }
+                }));
+            }, 500);
+        }, { passive: true });
+
+        this.lifecycleScope.addEventListener(navItem, 'touchend', () => {
+            if (longPressTimer !== null) {
+                window.clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+
+            const now = Date.now();
+            const touchDuration = now - touchStartAt;
+            if (touchDuration > 450) {
+                return;
+            }
+
+            if ((now - lastTapAt) <= 280) {
+                navItem.dispatchEvent(new CustomEvent('mobile-nav-doubletap', {
+                    bubbles: true,
+                    detail: { id: item.id, index }
+                }));
+            }
+            lastTapAt = now;
+        }, { passive: true });
     }
 
     /**

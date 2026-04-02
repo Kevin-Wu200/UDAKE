@@ -33,6 +33,7 @@ class MobileParameterDrawer {
     private startY: number = 0;
     private currentY: number = 0;
     private dragThreshold: number = 50;
+    private isDragging: boolean = false;
 
     private elements: {
         drawer: HTMLElement | null;
@@ -44,6 +45,39 @@ class MobileParameterDrawer {
         handle: null,
         content: null,
         overlay: null,
+    };
+
+    private readonly handleTouchStart = (e: TouchEvent): void => {
+        this.isDragging = true;
+        this.startY = e.touches[0].clientY;
+        this.currentY = this.startY;
+    };
+
+    private readonly handleTouchMove = (e: TouchEvent): void => {
+        if (!this.isDragging || !this.elements.drawer) return;
+
+        this.currentY = e.touches[0].clientY;
+        const deltaY = this.currentY - this.startY;
+        if (deltaY > 0) {
+            this.elements.drawer.style.transition = 'none';
+            this.elements.drawer.style.transform = `translateY(${deltaY}px)`;
+        }
+    };
+
+    private readonly handleTouchEnd = (): void => {
+        if (!this.isDragging) return;
+        this.isDragging = false;
+
+        const deltaY = this.currentY - this.startY;
+        if (deltaY > this.dragThreshold) {
+            this.close();
+            return;
+        }
+
+        if (this.elements.drawer) {
+            this.elements.drawer.style.transition = 'transform 300ms cubic-bezier(0.4, 0.0, 0.2, 1)';
+            this.elements.drawer.style.transform = this.isOpen ? 'translateY(0)' : 'translateY(100%)';
+        }
     };
 
     constructor(options: MobileParameterDrawerOptions) {
@@ -301,42 +335,9 @@ class MobileParameterDrawer {
      */
     private bindEvents(): void {
         if (!this.enableDrag || !this.elements.drawer || !this.elements.handle) return;
-
-        let isDragging = false;
-
-        this.elements.handle.addEventListener('touchstart', (e: TouchEvent) => {
-            isDragging = true;
-            this.startY = e.touches[0].clientY;
-            this.currentY = this.startY;
-        }, { passive: true });
-
-        document.addEventListener('touchmove', (e: TouchEvent) => {
-            if (!isDragging) return;
-
-            this.currentY = e.touches[0].clientY;
-            const deltaY = this.currentY - this.startY;
-
-            if (deltaY > 0 && this.elements.drawer) {
-                this.elements.drawer.style.transition = 'none';
-                this.elements.drawer.style.transform = `translateY(${deltaY}px)`;
-            }
-        }, { passive: true });
-
-        document.addEventListener('touchend', (_e: TouchEvent) => {
-            if (!isDragging) return;
-            isDragging = false;
-
-            const deltaY = this.currentY - this.startY;
-
-            if (deltaY > this.dragThreshold) {
-                this.close();
-            } else {
-                if (this.elements.drawer) {
-                    this.elements.drawer.style.transition = 'transform 300ms cubic-bezier(0.4, 0.0, 0.2, 1)';
-                    this.elements.drawer.style.transform = this.isOpen ? 'translateY(0)' : 'translateY(100%)';
-                }
-            }
-        });
+        this.elements.handle.addEventListener('touchstart', this.handleTouchStart, { passive: true });
+        document.addEventListener('touchmove', this.handleTouchMove, { passive: true });
+        document.addEventListener('touchend', this.handleTouchEnd);
     }
 
     /**
@@ -405,6 +406,12 @@ class MobileParameterDrawer {
      * 销毁抽屉
      */
     public destroy(): void {
+        if (this.elements.handle) {
+            this.elements.handle.removeEventListener('touchstart', this.handleTouchStart);
+        }
+        document.removeEventListener('touchmove', this.handleTouchMove);
+        document.removeEventListener('touchend', this.handleTouchEnd);
+
         if (this.elements.drawer) {
             this.elements.drawer.remove();
         }
