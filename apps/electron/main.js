@@ -92,9 +92,9 @@ function createWindow() {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self';",
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://js.arcgis.com https://webapi.amap.com https://*.amap.com;",
-          "style-src 'self' 'unsafe-inline' blob: https://js.arcgis.com https://webapi.amap.com;",
-          "img-src 'self' data: blob: https: https://*.arcgis.com https://*.autonavi.com https://*.amap.com;",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://webapi.amap.com https://*.amap.com;",
+          "style-src 'self' 'unsafe-inline' blob: https://webapi.amap.com;",
+          "img-src 'self' data: blob: https: https://*.autonavi.com https://*.amap.com;",
           "font-src 'self' data: blob:;",
           `connect-src ${cspConnectSrc};`,
           "media-src 'self' data: blob:;",
@@ -102,7 +102,7 @@ function createWindow() {
           "base-uri 'self';",
           "form-action 'self';",
           "worker-src 'self' blob:;",
-          "frame-src 'self' https://*.arcgis.com https://*.amap.com;",
+          "frame-src 'self' https://*.amap.com;",
           "frame-ancestors 'self';"
         ].join(' ')
       }

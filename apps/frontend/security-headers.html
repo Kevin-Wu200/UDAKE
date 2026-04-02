@@ -8,7 +8,7 @@
 <!--
 <IfModule mod_headers.c>
     # Content Security Policy
-    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.arcgis.com https://webapi.amap.com https://webst01.is.autonavi.com; style-src 'self' 'unsafe-inline' https://js.arcgis.com https://webapi.amap.com; img-src 'self' data: https://*.arcgis.com https://*.autonavi.com https://*.amap.com; connect-src 'self' ${BACKEND_ORIGIN} https://*.arcgis.com https://*.amap.com; font-src 'self' data:; frame-src 'self' https://*.arcgis.com https://*.amap.com; base-uri 'self'; form-action 'self';"
+    Header set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://webapi.amap.com https://webst01.is.autonavi.com; style-src 'self' 'unsafe-inline' https://webapi.amap.com; img-src 'self' data: https://*.autonavi.com https://*.amap.com; connect-src 'self' ${BACKEND_ORIGIN} https://*.amap.com; font-src 'self' data:; frame-src 'self' https://*.amap.com; base-uri 'self'; form-action 'self';"
 
     # X-Frame-Options
     Header set X-Frame-Options "DENY"
@@ -34,7 +34,7 @@
 <!--
 server {
     # Content Security Policy
-    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.arcgis.com https://webapi.amap.com https://webst01.is.autonavi.com; style-src 'self' 'unsafe-inline' https://js.arcgis.com https://webapi.amap.com; img-src 'self' data: https://*.arcgis.com https://*.autonavi.com https://*.amap.com; connect-src 'self' ${BACKEND_ORIGIN} https://*.arcgis.com https://*.amap.com; font-src 'self' data:; frame-src 'self' https://*.arcgis.com https://*.amap.com; base-uri 'self'; form-action 'self';" always;
+    add_header Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://webapi.amap.com https://webst01.is.autonavi.com; style-src 'self' 'unsafe-inline' https://webapi.amap.com; img-src 'self' data: https://*.autonavi.com https://*.amap.com; connect-src 'self' ${BACKEND_ORIGIN} https://*.amap.com; font-src 'self' data:; frame-src 'self' https://*.amap.com; base-uri 'self'; form-action 'self';" always;
 
     # X-Frame-Options
     add_header X-Frame-Options "DENY" always;
@@ -64,12 +64,12 @@ app.use(helmet({
     contentSecurityPolicy: {
         directives: {
             defaultSrc: ["'self'"],
-            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://js.arcgis.com", "https://webapi.amap.com", "https://webst01.is.autonavi.com"],
-            styleSrc: ["'self'", "'unsafe-inline'", "https://js.arcgis.com", "https://webapi.amap.com"],
-            imgSrc: ["'self'", "data:", "https://*.arcgis.com", "https://*.autonavi.com", "https://*.amap.com"],
-            connectSrc: ["'self'", process.env.BACKEND_ORIGIN || "http://localhost:*", "https://*.arcgis.com", "https://*.amap.com"],
+            scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'", "https://webapi.amap.com", "https://webst01.is.autonavi.com"],
+            styleSrc: ["'self'", "'unsafe-inline'", "https://webapi.amap.com"],
+            imgSrc: ["'self'", "data:", "https://*.autonavi.com", "https://*.amap.com"],
+            connectSrc: ["'self'", process.env.BACKEND_ORIGIN || "http://localhost:*", "https://*.amap.com"],
             fontSrc: ["'self'", "data:"],
-            frameSrc: ["'self'", "https://*.arcgis.com", "https://*.amap.com"],
+            frameSrc: ["'self'", "https://*.amap.com"],
             baseUri: ["'self'"],
             formAction: ["'self'"],
         },

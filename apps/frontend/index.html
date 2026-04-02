@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="X-XSS-Protection" content="1; mode=block">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://js.arcgis.com https://webapi.amap.com https://*.amap.com; style-src 'self' 'unsafe-inline' https://js.arcgis.com https://webapi.amap.com; img-src 'self' data: blob: https:; font-src 'self' data: blob:; connect-src 'self' http: https: ws: wss:; frame-src 'self' https://*.arcgis.com https://*.amap.com;">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' blob: https://webapi.amap.com https://*.amap.com; style-src 'self' 'unsafe-inline' https://webapi.amap.com; img-src 'self' data: blob: https:; font-src 'self' data: blob:; connect-src 'self' http: https: ws: wss:; frame-src 'self' https://*.amap.com;">
     <title data-i18n="app.title">智能不确定性驱动空间决策平台</title>
 
     <!-- 自定义样式 -->
@@ -18,36 +18,10 @@
     <link rel="preload" href="css/layout-styles.css" as="style">
     <link rel="preload" href="css/component-styles.css" as="style">
 
-    <!-- 动态加载 ArcGIS API -->
+    <!-- GeoScene SDK 通过 npm 包 @geoscene/core 由应用模块导入 -->
     <script>
-        // 延迟加载 ArcGIS API
-        function loadArcGISAPI() {
-            return new Promise((resolve, reject) => {
-                // 检查是否已经加载
-                if (window.require) {
-                    resolve();
-                    return;
-                }
-
-                // 动态加载 ArcGIS API
-                const script = document.createElement('script');
-                script.src = 'https://js.arcgis.com/4.28/';
-                script.onload = () => {
-                    console.log('ArcGIS API 加载完成');
-                    resolve();
-                };
-                script.onerror = () => {
-                    console.error('ArcGIS API 加载失败');
-                    reject(new Error('ArcGIS API 加载失败'));
-                };
-                document.head.appendChild(script);
-
-                // 加载样式
-                const link = document.createElement('link');
-                link.rel = 'stylesheet';
-                link.href = 'https://js.arcgis.com/4.28/esri/themes/light/main.css';
-                document.head.appendChild(link);
-            });
+        function loadGeoSceneAPI() {
+            return Promise.resolve();
         }
     </script>
     <link rel="stylesheet" href="css/layout-styles.css">

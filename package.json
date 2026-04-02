@@ -76,6 +76,7 @@
     "@capacitor/geolocation": "^8.1.0",
     "@capacitor/haptics": "^8.0.1",
     "@capacitor/local-notifications": "^8.0.2",
+    "@geoscene/core": "^4.33.19",
     "echarts": "^6.0.0",
     "socket.io-client": "^4.8.3"
   },
