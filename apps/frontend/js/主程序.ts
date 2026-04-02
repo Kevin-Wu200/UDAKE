@@ -68,6 +68,8 @@ import {
     ExtendedSamplingPoint
 } from '../types/app';
 import { TaskStatus } from '../types/core';
+import type { GeoJSONParseResult } from '../types/geojson';
+import type { SamplingPointValue } from '../types/sampling';
 
 function stripApiSuffix(baseUrl: string): string {
     const trimmed = baseUrl.trim().replace(/\/+$/, '');
@@ -131,6 +133,51 @@ type StartupStepPriority = 'P0' | 'P1' | 'P2';
 
 interface NativeSplashPlugin {
     hide: () => Promise<void>;
+}
+
+interface UploadQueuePayload {
+    file?: File;
+}
+
+interface MapViewWithCamera {
+    setCenter?: (center: [number, number]) => void;
+    setZoom?: (zoom: number) => void;
+}
+
+interface SamplingComponentWithView extends ISamplingComponent {
+    view?: MapView | null;
+}
+
+interface DataImportModalParseResult {
+    fields: string[];
+    geojson: GeoJSONParseResult['geojson'];
+    crsInfo: {
+        projectedName: string;
+        projectedEPSG?: string;
+        geographicName: string;
+        geographicEPSG: string;
+    };
+}
+
+function isProjectConfig(config: unknown): config is ProjectConfig {
+    if (!config || typeof config !== 'object') {
+        return false;
+    }
+    const value = config as Partial<ProjectConfig>;
+    return (value.sampling_mode === 'free' || value.sampling_mode === 'region') &&
+        (value.coordinate_mode === 'manual' || value.coordinate_mode === 'device');
+}
+
+function isKrigingParams(payload: unknown): payload is KrigingParams {
+    if (!payload || typeof payload !== 'object') {
+        return false;
+    }
+    const data = payload as Partial<KrigingParams>;
+    return Array.isArray(data.points) &&
+        typeof data.grid_resolution === 'number' &&
+        typeof data.enable_cross_validation === 'boolean' &&
+        (data.method === 'ordinary' || data.method === 'universal' || data.method === 'block') &&
+        (data.variogram_model === 'spherical' || data.variogram_model === 'exponential' || data.variogram_model === 'gaussian');
 }
 
 // 初始化全局工具
@@ -723,9 +770,15 @@ class App {
             console.log('[离线管理器] 初始化完成');
 
             // 注册离线队列处理器
-            OfflineManager.registerHandler('upload', async (payload: any) => {
-                const formData = new FormData();
-                formData.append('file', payload.file);
+            OfflineManager.registerHandler('upload', async (payload: unknown) => {
+                const formData = payload instanceof FormData ? payload : new FormData();
+                if (!(payload instanceof FormData)) {
+                    const uploadPayload = payload as UploadQueuePayload;
+                    if (!uploadPayload.file) {
+                        throw new Error('离线上传缺少文件');
+                    }
+                    formData.append('file', uploadPayload.file);
+                }
                 if (this.apiService) {
                     await this.apiService.request(`${this.apiService.baseURL}/upload-data`, {
                         method: 'POST',
@@ -734,7 +787,10 @@ class App {
                 }
             });
 
-            OfflineManager.registerHandler('kriging', async (payload: any) => {
+            OfflineManager.registerHandler('kriging', async (payload: unknown) => {
+                if (!isKrigingParams(payload)) {
+                    throw new Error('离线克里金参数无效');
+                }
                 if (this.apiService) {
                     await this.apiService.startKriging(payload);
                 }
@@ -743,7 +799,7 @@ class App {
             const { gpsSyncService } = await import('./services/GPSSyncService.js');
             const defaultProjectId = localStorage.getItem('udake_gps_project_id') || 'default_mobile_project';
             await gpsSyncService.initialize(defaultProjectId);
-            OfflineManager.registerHandler('gps_sync', async (payload: any) => {
+            OfflineManager.registerHandler('gps_sync', async (payload: unknown) => {
                 await gpsSyncService.syncSample(payload, { fromQueue: true });
             });
 
@@ -1170,7 +1226,12 @@ class App {
      */
     public handleNewProject(): void {
         const modal = new NewProjectModal(
-            (project: any, config: any) => this.onProjectCreated(project, config as ProjectConfig),
+            (project: IProject, config: unknown) => {
+                if (!isProjectConfig(config)) {
+                    throw new Error('项目配置无效');
+                }
+                this.onProjectCreated(project, config);
+            },
             this.view!
         );
         modal.show();
@@ -1215,14 +1276,14 @@ class App {
             if (config.sampling_mode === 'free') {
                 this.samplingComponent = new FreeSampling(
                     this.view!,
-                    (pointData: any) => this.handlePointAdded(pointData)
+                    (pointData: SamplingPointValue) => this.handlePointAdded(pointData)
                 );
                 const panel = this.samplingComponent.createPanel(config.coordinate_mode);
                 projectContent.appendChild(panel);
             } else if (config.sampling_mode === 'region') {
                 this.samplingComponent = new RegionSampling(
                     this.view!,
-                    (pointData: any) => this.handlePointAdded(pointData)
+                    (pointData: SamplingPointValue) => this.handlePointAdded(pointData)
                 );
                 const panel = this.samplingComponent.createPanel(config.coordinate_mode);
                 projectContent.appendChild(panel);
@@ -1237,21 +1298,27 @@ class App {
     /**
      * 处理采样点添加
      */
-    private async handlePointAdded(pointData: ExtendedSamplingPoint): Promise<void> {
+    private async handlePointAdded(pointData: SamplingPointValue): Promise<void> {
         console.log('添加采样点:', pointData);
 
         if (!this.currentProject) {
             throw new Error('没有当前项目');
         }
 
-        const success = this.currentProject.addPoint(pointData);
+        const normalizedPoint: ExtendedSamplingPoint = {
+            x: pointData.longitude,
+            y: pointData.latitude,
+            value: pointData.value,
+            timestamp: pointData.timestamp
+        };
+        const success = this.currentProject.addPoint(normalizedPoint);
 
         if (!success) {
             throw new Error('采样点超出区域边界');
         }
 
         if (this.layerManager) {
-            await this.layerManager.addSamplingPoint(pointData);
+            await this.layerManager.addSamplingPoint(normalizedPoint);
         }
 
         this.validateGridResolution();
@@ -1323,7 +1390,7 @@ class App {
             console.log('开始解析 GeoJSON 文件');
             LoadingManager.show('正在解析文件...');
 
-            const parseResult = await GeoJSONParser.parseFile(file) as any;
+            const parseResult: GeoJSONParseResult = await GeoJSONParser.parseFile(file);
             console.log('GeoJSON 解析成功:', parseResult);
 
             LoadingManager.hide();
@@ -1332,7 +1399,18 @@ class App {
                 this.handleDataImport(transformedData as TransformedData);
             }, this.view!);
 
-            modal.show(parseResult);
+            const modalParseResult: DataImportModalParseResult = {
+                ...parseResult,
+                crsInfo: {
+                    projectedName: parseResult.crsInfo.projectedName,
+                    projectedEPSG: parseResult.crsInfo.projectedEPSG !== null
+                        ? String(parseResult.crsInfo.projectedEPSG)
+                        : undefined,
+                    geographicName: parseResult.crsInfo.geographicName,
+                    geographicEPSG: String(parseResult.crsInfo.geographicEPSG)
+                }
+            };
+            modal.show(modalParseResult);
 
         } catch (error) {
             console.error('上传失败:', error);
@@ -1820,11 +1898,11 @@ class App {
             });
 
             if (currentCenter && currentZoom) {
-                const center = Array.isArray(currentCenter)
-                    ? currentCenter
+                const center: [number, number] = Array.isArray(currentCenter)
+                    ? [currentCenter[0], currentCenter[1]]
                     : [currentCenter.lng, currentCenter.lat];
-                (this.view as any).setCenter?.(center);
-                (this.view as any).setZoom?.(currentZoom);
+                (this.view as MapViewWithCamera).setCenter?.(center);
+                (this.view as MapViewWithCamera).setZoom?.(currentZoom);
             }
 
             const pointsToRestore = projectPoints.length > 0 ? projectPoints : samplingPoints;
@@ -1833,7 +1911,7 @@ class App {
             }
 
             if (this.samplingComponent) {
-                (this.samplingComponent as any).view = this.view;
+                (this.samplingComponent as SamplingComponentWithView).view = this.view;
             }
 
             LoadingManager.hide();

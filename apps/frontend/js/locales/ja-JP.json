@@ -353,5 +353,21 @@
   "project.created": "Created",
   "project.status": "Status",
   "project.status.active": "Active",
-  "project.status.completed": "Completed"
+  "project.status.completed": "Completed",
+  "error.common.refreshButton": "再読み込み",
+  "error.common.helpButton": "ヘルプ",
+  "error.common.detailsButton": "詳細",
+  "error.common.icon.error": "error",
+  "error.common.icon.warning": "warning",
+  "error.common.icon.success": "success",
+  "error.not_found.message": "指定されたリソースが見つかりません",
+  "error.plugin_error.message": "プラグインでエラーが発生しました",
+  "error.cache_error.message": "キャッシュでエラーが発生しました",
+  "error.solution.check_network": "ネットワーク接続を確認してください",
+  "error.solution.relogin": "再度ログインしてください",
+  "error.solution.request_permission": "権限をリクエストしてください",
+  "error.solution.check_resource_path": "リソースパスを確認してください",
+  "error.solution.disable_plugin": "プラグインを無効にしてください",
+  "error.solution.clear_cache": "キャッシュをクリアしてください",
+  "error.solution.try_again_later": "後でもう一度お試しください"
 }

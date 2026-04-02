@@ -353,5 +353,21 @@
   "project.created": "Created",
   "project.status": "Status",
   "project.status.active": "Active",
-  "project.status.completed": "Completed"
+  "project.status.completed": "Completed",
+  "error.common.refreshButton": "重新整理",
+  "error.common.helpButton": "說明",
+  "error.common.detailsButton": "詳情",
+  "error.common.icon.error": "error",
+  "error.common.icon.warning": "warning",
+  "error.common.icon.success": "success",
+  "error.not_found.message": "找不到指定的資源",
+  "error.plugin_error.message": "外掛程式發生錯誤",
+  "error.cache_error.message": "快取發生錯誤",
+  "error.solution.check_network": "請檢查網路連線",
+  "error.solution.relogin": "請重新登入",
+  "error.solution.request_permission": "請請求權限",
+  "error.solution.check_resource_path": "請檢查資源路徑",
+  "error.solution.disable_plugin": "請停用外掛程式",
+  "error.solution.clear_cache": "請清除快取",
+  "error.solution.try_again_later": "請稍後再試"
 }

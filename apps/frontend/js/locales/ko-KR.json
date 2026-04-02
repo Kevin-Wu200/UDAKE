@@ -353,5 +353,21 @@
   "project.created": "Created",
   "project.status": "Status",
   "project.status.active": "Active",
-  "project.status.completed": "Completed"
+  "project.status.completed": "Completed",
+  "error.common.refreshButton": "새로고침",
+  "error.common.helpButton": "도움말",
+  "error.common.detailsButton": "세부정보",
+  "error.common.icon.error": "error",
+  "error.common.icon.warning": "warning",
+  "error.common.icon.success": "success",
+  "error.not_found.message": "지정된 리소스를 찾을 수 없습니다",
+  "error.plugin_error.message": "플러그인 오류가 발생했습니다",
+  "error.cache_error.message": "캐시 오류가 발생했습니다",
+  "error.solution.check_network": "네트워크 연결을 확인하세요",
+  "error.solution.relogin": "다시 로그인하세요",
+  "error.solution.request_permission": "권한을 요청하세요",
+  "error.solution.check_resource_path": "리소스 경로를 확인하세요",
+  "error.solution.disable_plugin": "플러그인을 비활성화하세요",
+  "error.solution.clear_cache": "캐시를 지우세요",
+  "error.solution.try_again_later": "나중에 다시 시도하세요"
 }

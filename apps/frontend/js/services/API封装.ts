@@ -474,7 +474,7 @@ export class APIService implements IAPIService {
                 } else if (url.includes('start-kriging')) {
                     await OfflineManager.enqueue({ type: 'kriging', payload: JSON.parse(options.body as string) });
                 } else if (url.includes('/mobile-gps/')) {
-                    let bodyPayload: any = {};
+                    let bodyPayload: Record<string, unknown> = {};
                     if (typeof options.body === 'string') {
                         try {
                             bodyPayload = JSON.parse(options.body);
