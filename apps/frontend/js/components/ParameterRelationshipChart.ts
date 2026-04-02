@@ -26,6 +26,8 @@ export interface RelationshipChartConfig {
 }
 
 export class ParameterRelationshipChart {
+    private static readonly PADDING = { top: 24, right: 20, bottom: 38, left: 44 };
+
     private container: HTMLElement;
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
@@ -120,7 +122,7 @@ export class ParameterRelationshipChart {
 
     private render(): void {
         const { ctx, canvas } = this;
-        const padding = { top: 24, right: 20, bottom: 38, left: 44 };
+        const padding = ParameterRelationshipChart.PADDING;
         const width = canvas.width;
         const height = canvas.height;
         const plotWidth = width - padding.left - padding.right;
@@ -171,37 +173,33 @@ export class ParameterRelationshipChart {
             return;
         }
 
-        const min = Math.min(this.config.axisX.max, this.config.axisY.max);
-        const diagonalX = this.dataToPixelX(min, padding.left, plotWidth);
-        const diagonalY = this.dataToPixelY(min, padding.top, plotHeight);
+        const validColor = this.regionHighlight === 'invalid' ? 'rgba(250, 160, 120, 0.2)' : 'rgba(82, 196, 26, 0.18)';
+        const invalidColor = this.regionHighlight === 'valid' ? 'rgba(245, 63, 63, 0.09)' : 'rgba(245, 63, 63, 0.16)';
 
-        const validColor = this.regionHighlight === 'invalid' ? 'rgba(250, 160, 120, 0.2)' : 'rgba(82, 196, 26, 0.16)';
-        const invalidColor = this.regionHighlight === 'valid' ? 'rgba(176, 224, 171, 0.12)' : 'rgba(245, 63, 63, 0.14)';
+        const sampleX = 64;
+        const sampleY = 44;
+        const cellWidth = plotWidth / sampleX;
+        const cellHeight = plotHeight / sampleY;
+        const rangeX = Math.max(1e-6, this.config.axisX.max - this.config.axisX.min);
+        const rangeY = Math.max(1e-6, this.config.axisY.max - this.config.axisY.min);
 
-        ctx.fillStyle = validColor;
-        ctx.beginPath();
-        ctx.moveTo(padding.left, padding.top + plotHeight);
-        ctx.lineTo(diagonalX, diagonalY);
-        ctx.lineTo(padding.left + plotWidth, padding.top + plotHeight);
-        ctx.closePath();
-        ctx.fill();
+        for (let xi = 0; xi < sampleX; xi++) {
+            for (let yi = 0; yi < sampleY; yi++) {
+                const xRatio = (xi + 0.5) / sampleX;
+                const yRatio = (yi + 0.5) / sampleY;
+                const valueX = this.config.axisX.min + xRatio * rangeX;
+                const valueY = this.config.axisY.max - yRatio * rangeY;
+                const isValid = this.config.constraint.validate(valueX, valueY);
 
-        ctx.fillStyle = invalidColor;
-        ctx.beginPath();
-        ctx.moveTo(padding.left, padding.top);
-        ctx.lineTo(padding.left, padding.top + plotHeight);
-        ctx.lineTo(diagonalX, diagonalY);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = '#ff7a45';
-        ctx.lineWidth = 1.5;
-        ctx.setLineDash([6, 4]);
-        ctx.beginPath();
-        ctx.moveTo(padding.left, padding.top + plotHeight);
-        ctx.lineTo(diagonalX, diagonalY);
-        ctx.stroke();
-        ctx.setLineDash([]);
+                ctx.fillStyle = isValid ? validColor : invalidColor;
+                ctx.fillRect(
+                    padding.left + xi * cellWidth,
+                    padding.top + yi * cellHeight,
+                    Math.ceil(cellWidth + 0.8),
+                    Math.ceil(cellHeight + 0.8)
+                );
+            }
+        }
     }
 
     private drawHistory(
@@ -304,7 +302,7 @@ export class ParameterRelationshipChart {
     }
 
     private pixelToData(x: number, y: number): { x: number; y: number } {
-        const padding = { top: 24, right: 20, bottom: 38, left: 44 };
+        const padding = ParameterRelationshipChart.PADDING;
         const plotWidth = this.canvas.width - padding.left - padding.right;
         const plotHeight = this.canvas.height - padding.top - padding.bottom;
 

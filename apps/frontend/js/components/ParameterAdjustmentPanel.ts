@@ -29,6 +29,21 @@ type SamplingContextPoint = {
     value?: number;
 };
 
+type RelationshipType = 'nugget-sill' | 'range-spatial' | 'grid-performance';
+
+type RelationshipChartViewConfig = {
+    id: RelationshipType;
+    title: string;
+    axisX: { key: string; label: string; min: number; max: number };
+    axisY: { key: string; label: string; min: number; max: number };
+    constraint: {
+        label: string;
+        validate: (x: number, y: number) => boolean;
+    };
+};
+
+const RELATIONSHIP_STORAGE_KEY = 'krigingRelationshipType';
+
 const PARAM_META: Record<ParamName, { min: number; max: number; step: number }> = {
     'grid-resolution': { min: 50, max: 500, step: 10 },
     nlags: { min: 6, max: 24, step: 1 },
@@ -125,6 +140,10 @@ export class ParameterAdjustmentPanel {
 
     private variogramChart: VariogramChart | null = null;
 
+    private relationshipType: RelationshipType = 'nugget-sill';
+
+    private currentRelationshipAxisSignature = '';
+
     private constructor() {
         this.initialize();
     }
@@ -137,6 +156,8 @@ export class ParameterAdjustmentPanel {
     }
 
     private initialize(): void {
+        this.relationshipType = this.loadRelationshipType();
+
         (Object.keys(PARAM_META) as ParamName[]).forEach((paramName) => {
             const meta = PARAM_META[paramName];
             this.bindSlider(paramName, meta.min, meta.max);
@@ -252,18 +273,15 @@ export class ParameterAdjustmentPanel {
         const variogramContainer = root.querySelector('#variogram-fitting-chart') as HTMLElement | null;
 
         if (relationshipContainer) {
+            const config = this.buildRelationshipConfig(this.relationshipType);
             this.relationshipChart = new ParameterRelationshipChart(relationshipContainer, {
-                axisX: { key: 'nugget', label: 'nugget', min: PARAM_META.nugget.min, max: PARAM_META.nugget.max },
-                axisY: { key: 'sill', label: 'sill', min: PARAM_META.sill.min, max: PARAM_META.sill.max },
-                constraint: {
-                    label: 'nugget ≤ sill',
-                    validate: (x, y) => x <= y
-                },
-                onPointSelected: (x, y) => {
-                    this.setParameter('nugget', x);
-                    this.setParameter('sill', y);
-                }
+                axisX: config.axisX,
+                axisY: config.axisY,
+                constraint: config.constraint,
+                onPointSelected: (x, y) => this.applyRelationshipSelection(x, y)
             });
+            this.currentRelationshipAxisSignature = this.buildRelationshipAxisSignature(config);
+            this.updateRelationshipTitle(config.title);
         }
 
         if (impactContainer) {
@@ -287,6 +305,7 @@ export class ParameterAdjustmentPanel {
         const panel = document.getElementById('kriging-visualization-panel') as HTMLElement | null;
         const generatePreviewBtn = document.getElementById('generate-impact-preview-btn') as HTMLButtonElement | null;
         const modelSelect = document.getElementById('variogram-model') as HTMLSelectElement | null;
+        const relationshipSelect = document.getElementById('relationship-chart-select') as HTMLSelectElement | null;
 
         toggleButton?.addEventListener('click', () => {
             if (!panel) {
@@ -303,6 +322,11 @@ export class ParameterAdjustmentPanel {
 
         modelSelect?.addEventListener('change', () => {
             this.syncVisualization();
+        });
+
+        relationshipSelect?.addEventListener('change', () => {
+            const nextType = relationshipSelect.value as RelationshipType;
+            this.setRelationshipType(nextType);
         });
     }
 
@@ -330,7 +354,17 @@ export class ParameterAdjustmentPanel {
             </div>
             <div id="kriging-visualization-panel">
                 <div class="kriging-visual-card">
-                    <div class="kriging-visual-card-title">参数关系图（nugget-sill）</div>
+                    <div class="kriging-visual-card-head">
+                        <div id="parameter-relationship-title" class="kriging-visual-card-title">参数关系图（nugget-sill）</div>
+                        <label class="kriging-relationship-switch" for="relationship-chart-select">
+                            <span>关系类型</span>
+                            <select id="relationship-chart-select">
+                                <option value="nugget-sill">nugget-sill（块金值-基台值）</option>
+                                <option value="range-spatial">range-spatial（范围值-空间范围）</option>
+                                <option value="grid-performance">grid-performance（网格分辨率-性能）</option>
+                            </select>
+                        </label>
+                    </div>
                     <div id="parameter-relationship-chart" class="kriging-visual-chart"></div>
                 </div>
                 <div class="kriging-visual-card">
@@ -345,6 +379,10 @@ export class ParameterAdjustmentPanel {
         `;
 
         container.insertBefore(section, startBtn);
+        const relationshipSelect = section.querySelector('#relationship-chart-select') as HTMLSelectElement | null;
+        if (relationshipSelect) {
+            relationshipSelect.value = this.relationshipType;
+        }
         panel = section.querySelector('#kriging-visualization-panel') as HTMLElement | null;
         return panel;
     }
@@ -403,12 +441,158 @@ export class ParameterAdjustmentPanel {
         };
     }
 
-    private syncVisualization(): void {
-        const nugget = this.parameters.get('nugget') ?? 0;
-        const sill = this.parameters.get('sill') ?? 1;
+    private buildRelationshipConfig(type: RelationshipType): RelationshipChartViewConfig {
+        const spatialRange = this.getSpatialRange();
+        const maxSpatialAxis = Math.max(200, Math.ceil(spatialRange * 1.2));
 
-        this.relationshipChart?.update(nugget, sill);
-        this.relationshipChart?.highlightRegion(nugget <= sill ? 'valid' : 'invalid');
+        const configs: Record<RelationshipType, RelationshipChartViewConfig> = {
+            'nugget-sill': {
+                id: 'nugget-sill',
+                title: '参数关系图（nugget-sill）',
+                axisX: { key: 'nugget', label: 'nugget', min: PARAM_META.nugget.min, max: PARAM_META.nugget.max },
+                axisY: { key: 'sill', label: 'sill', min: PARAM_META.sill.min, max: PARAM_META.sill.max },
+                constraint: {
+                    label: 'nugget ≤ sill',
+                    validate: (x, y) => x <= y
+                }
+            },
+            'range-spatial': {
+                id: 'range-spatial',
+                title: '参数关系图（range-spatial）',
+                axisX: { key: 'range', label: 'range', min: PARAM_META.range.min, max: PARAM_META.range.max },
+                axisY: { key: 'spatialRange', label: '空间范围', min: 0, max: maxSpatialAxis },
+                constraint: {
+                    label: '推荐范围: 15%-40%',
+                    validate: (x, y) => y <= 0 ? x === 0 : x >= y * 0.15 && x <= y * 0.4
+                }
+            },
+            'grid-performance': {
+                id: 'grid-performance',
+                title: '参数关系图（grid-performance）',
+                axisX: {
+                    key: 'gridResolution',
+                    label: '网格分辨率',
+                    min: PARAM_META['grid-resolution'].min,
+                    max: PARAM_META['grid-resolution'].max
+                },
+                axisY: { key: 'estimatedTime', label: '预估耗时(s)', min: 0, max: 30 },
+                constraint: {
+                    label: '推荐耗时 < 10s',
+                    validate: (_x, y) => y < 10
+                }
+            }
+        };
+
+        return configs[type];
+    }
+
+    private buildRelationshipAxisSignature(config: RelationshipChartViewConfig): string {
+        return [
+            config.id,
+            config.axisX.key,
+            config.axisX.min,
+            config.axisX.max,
+            config.axisY.key,
+            config.axisY.min,
+            config.axisY.max
+        ].join('|');
+    }
+
+    private applyRelationshipSelection(x: number, y: number): void {
+        if (this.relationshipType === 'nugget-sill') {
+            this.setParameter('nugget', x);
+            this.setParameter('sill', y);
+            return;
+        }
+
+        if (this.relationshipType === 'range-spatial') {
+            this.setParameter('range', x);
+            return;
+        }
+
+        if (this.relationshipType === 'grid-performance') {
+            this.setParameter('grid-resolution', x);
+        }
+    }
+
+    private updateRelationshipTitle(title: string): void {
+        const titleEl = document.getElementById('parameter-relationship-title');
+        if (titleEl) {
+            titleEl.textContent = title;
+        }
+    }
+
+    private loadRelationshipType(): RelationshipType {
+        const raw = localStorage.getItem(RELATIONSHIP_STORAGE_KEY);
+        if (raw === 'nugget-sill' || raw === 'range-spatial' || raw === 'grid-performance') {
+            return raw;
+        }
+        return 'nugget-sill';
+    }
+
+    private setRelationshipType(type: RelationshipType): void {
+        this.relationshipType = type;
+        localStorage.setItem(RELATIONSHIP_STORAGE_KEY, type);
+        const select = document.getElementById('relationship-chart-select') as HTMLSelectElement | null;
+        if (select) {
+            select.value = type;
+        }
+        this.currentRelationshipAxisSignature = '';
+        this.syncVisualization();
+    }
+
+    private getSpatialRange(): number {
+        if (this.samplingContext.length < 2) {
+            return 200;
+        }
+
+        const xValues = this.samplingContext.map((point) => point.x);
+        const yValues = this.samplingContext.map((point) => point.y);
+        const xSpan = Math.max(...xValues) - Math.min(...xValues);
+        const ySpan = Math.max(...yValues) - Math.min(...yValues);
+        return Number(Math.sqrt((xSpan ** 2) + (ySpan ** 2)).toFixed(3));
+    }
+
+    private estimateGridTimeSeconds(gridResolution: number): number {
+        const nlags = this.parameters.get('nlags') ?? 12;
+        const range = this.parameters.get('range') ?? 30;
+        const estimate = gridResolution * 0.032 + nlags * 0.22 + range * 0.06;
+        return Number(Math.max(0.2, Math.min(30, estimate)).toFixed(3));
+    }
+
+    private getRelationshipPoint(type: RelationshipType): { x: number; y: number; region: 'valid' | 'invalid' | 'warning' } {
+        if (type === 'nugget-sill') {
+            const x = this.parameters.get('nugget') ?? 0;
+            const y = this.parameters.get('sill') ?? 1;
+            return { x, y, region: x <= y ? 'valid' : 'invalid' };
+        }
+
+        if (type === 'range-spatial') {
+            const x = this.parameters.get('range') ?? 10;
+            const y = this.getSpatialRange();
+            const valid = y <= 0 ? x === 0 : x >= y * 0.15 && x <= y * 0.4;
+            return { x, y, region: valid ? 'valid' : 'warning' };
+        }
+
+        const x = this.parameters.get('grid-resolution') ?? 100;
+        const y = this.estimateGridTimeSeconds(x);
+        return { x, y, region: y < 10 ? 'valid' : 'warning' };
+    }
+
+    private syncVisualization(): void {
+        const relationshipConfig = this.buildRelationshipConfig(this.relationshipType);
+        const signature = this.buildRelationshipAxisSignature(relationshipConfig);
+
+        if (this.relationshipChart && this.currentRelationshipAxisSignature !== signature) {
+            this.relationshipChart.setAxes(relationshipConfig.axisX, relationshipConfig.axisY);
+            this.relationshipChart.setConstraint(relationshipConfig.constraint);
+            this.currentRelationshipAxisSignature = signature;
+        }
+
+        this.updateRelationshipTitle(relationshipConfig.title);
+        const relationPoint = this.getRelationshipPoint(this.relationshipType);
+        this.relationshipChart?.update(relationPoint.x, relationPoint.y);
+        this.relationshipChart?.highlightRegion(relationPoint.region);
         this.variogramChart?.updateFitting(this.buildVariogramParams());
     }
 
