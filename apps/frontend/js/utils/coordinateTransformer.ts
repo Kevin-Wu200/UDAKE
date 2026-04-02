@@ -1,7 +1,7 @@
 /**
  * 坐标转换工具
  * 处理不同坐标系统之间的转换
- * 支持 ArcGIS 和独立的坐标转换
+ * 支持 GeoScene 和独立的坐标转换
  */
 import type {
     MercatorCoordinate,
@@ -32,7 +32,7 @@ export class CoordinateTransformer {
     }
 
     /**
-     * 转换点坐标到目标投影（使用 ArcGIS）
+     * 转换点坐标到目标投影（使用 GeoScene）
      */
     static async transformPoint(
         x: number,
@@ -40,8 +40,8 @@ export class CoordinateTransformer {
         sourceSR: SpatialReference,
         targetSR: SpatialReference
     ): Promise<MercatorCoordinate> {
-        const projection = await import('https://js.arcgis.com/4.28/@arcgis/core/geometry/projection.js' as any);
-        const Point = (await import('https://js.arcgis.com/4.28/@arcgis/core/geometry/Point.js' as any)).default;
+        const projection = await import('@geoscene/core/geometry/projection' as any);
+        const Point = (await import('@geoscene/core/geometry/Point' as any)).default;
 
         await projection.load();
 
@@ -56,15 +56,15 @@ export class CoordinateTransformer {
     }
 
     /**
-     * 批量转换点坐标（使用 ArcGIS）
+     * 批量转换点坐标（使用 GeoScene）
      */
     static async transformPoints(
         points: PointWithValue[],
         sourceSR: SpatialReference,
         targetSR: SpatialReference
     ): Promise<PointWithValue[]> {
-        const projection = await import('https://js.arcgis.com/4.28/@arcgis/core/geometry/projection.js' as any);
-        const Point = (await import('https://js.arcgis.com/4.28/@arcgis/core/geometry/Point.js' as any)).default;
+        const projection = await import('@geoscene/core/geometry/projection' as any);
+        const Point = (await import('@geoscene/core/geometry/Point' as any)).default;
 
         await projection.load();
 

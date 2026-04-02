@@ -221,11 +221,11 @@ export class SinglePointSampling {
      * 创建点对象
      */
     private async createPoint(x: number, y: number): Promise<PointData> {
-        // 动态导入 ArcGIS Point 类
+        // 动态导入 GeoScene Point 类
         // @ts-ignore
-        const Point = (await import('https://js.arcgis.com/4.28/@arcgis/core/geometry/Point.js')).default;
+        const Point = (await import('@geoscene/core/geometry/Point')).default;
         // @ts-ignore
-        const projection = await import('https://js.arcgis.com/4.28/@arcgis/core/geometry/projection.js');
+        const projection = await import('@geoscene/core/geometry/projection');
 
         // 检测是否需要转换
         const xFormat = this.detectFormat(String(x));

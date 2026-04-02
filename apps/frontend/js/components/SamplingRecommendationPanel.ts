@@ -646,7 +646,7 @@ export class SamplingRecommendationPanel {
         if (this.mapProvider === 'amap') {
             this._showMarkersAMap(toShow);
         } else {
-            this._showMarkersArcGIS(toShow);
+            this._showMarkersGeoScene(toShow);
         }
         this._updateClusterHint(hiddenCount);
     }
@@ -682,7 +682,7 @@ export class SamplingRecommendationPanel {
         if (this.mapProvider === 'amap') {
             await this._showMarkersAMap(toShow);
         } else {
-            await this._showMarkersArcGIS(toShow);
+            await this._showMarkersGeoScene(toShow);
         }
         this._updateClusterHint(hiddenCount);
     }
@@ -711,7 +711,7 @@ export class SamplingRecommendationPanel {
         }
     }
 
-    private async _showMarkersArcGIS(recs: Recommendation[]): Promise<void> {
+    private async _showMarkersGeoScene(recs: Recommendation[]): Promise<void> {
         const [Graphic, GraphicsLayer, Point, SimpleMarkerSymbol] = await Promise.all([
             (window as any).esri.require('esri/Graphic'),
             (window as any).esri.require('esri/layers/GraphicsLayer'),

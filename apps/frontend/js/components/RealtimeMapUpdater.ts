@@ -381,7 +381,7 @@ export class RealtimeMapUpdater {
      */
     private async createHeatmapLayer(): Promise<void> {
         // 这里需要根据实际的地图引擎创建热力图层
-        // ArcGIS JS API的实现示例
+        // GeoScene Maps SDK的实现示例
         console.log('创建热力图层');
     }
 
@@ -390,7 +390,7 @@ export class RealtimeMapUpdater {
      */
     private async updateHeatmapLayer(data: any): Promise<void> {
         // 这里需要根据实际的地图引擎更新热力图层
-        // ArcGIS JS API的实现示例
+        // GeoScene Maps SDK的实现示例
         console.log('更新热力图层:', data);
     }
 

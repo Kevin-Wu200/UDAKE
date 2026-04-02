@@ -1,7 +1,7 @@
 /**
  * 区域采样组件
  * 支持上传 GeoJSON 边界，仅允许在边界内添加采样点
- * 支持多种地图引擎（ArcGIS、高德地图）
+ * 支持多种地图引擎（GeoScene、高德地图）
  */
 
 import { CoordinateInput } from './CoordinateInput';
@@ -20,7 +20,7 @@ import type { MapAdapter } from '../../types/adapter';
 /**
  * 区域采样组件
  * 支持上传 GeoJSON 边界，仅允许在边界内添加采样点
- * 支持多种地图引擎（ArcGIS、高德地图）
+ * 支持多种地图引擎（GeoScene、高德地图）
  */
 export class RegionSampling {
     /** 地图视图或适配器 */
@@ -220,8 +220,8 @@ export class RegionSampling {
             // 高德地图实现
             await this.displayBoundaryAMap(polygon);
         } else {
-            // ArcGIS 实现
-            await this.displayBoundaryArcGIS(polygon);
+            // GeoScene 实现
+            await this.displayBoundaryGeoScene(polygon);
         }
     }
 
@@ -251,14 +251,13 @@ export class RegionSampling {
     }
 
     /**
-     * ArcGIS 显示边界
+     * GeoScene 显示边界
      */
-    protected async displayBoundaryArcGIS(polygon: BoundaryPolygon): Promise<void> {
-        // 使用 ArcGIS API 创建图层
-        // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
+    protected async displayBoundaryGeoScene(polygon: BoundaryPolygon): Promise<void> {
+        // 使用 GeoScene API 创建图层
         const [Graphic, GraphicsLayer] = await Promise.all([
-            (window as any).esri.require('esri/Graphic'),
-            (window as any).esri.require('esri/layers/GraphicsLayer')
+            import('@geoscene/core/Graphic').then((m: any) => m.default),
+            import('@geoscene/core/layers/GraphicsLayer').then((m: any) => m.default)
         ]);
 
         // 创建图形
