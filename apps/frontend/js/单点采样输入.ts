@@ -242,7 +242,11 @@ export class SinglePointSampling {
             });
 
             const projectedPoint = projection.project(wgs84Point, this.view.spatialReference);
-            return projectedPoint;
+            if (!projectedPoint) {
+                throw new Error('坐标转换失败');
+            }
+            // @ts-ignore - projection.project 返回的几何对象包含 x 和 y 属性
+            return { x: projectedPoint.x, y: projectedPoint.y };
         } else {
             // 投影坐标，直接使用
             return new Point({

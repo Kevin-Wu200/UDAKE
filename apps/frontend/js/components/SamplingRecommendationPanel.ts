@@ -713,10 +713,10 @@ export class SamplingRecommendationPanel {
 
     private async _showMarkersGeoScene(recs: Recommendation[]): Promise<void> {
         const [Graphic, GraphicsLayer, Point, SimpleMarkerSymbol] = await Promise.all([
-            (window as any).esri.require('esri/Graphic'),
-            (window as any).esri.require('esri/layers/GraphicsLayer'),
-            (window as any).esri.require('esri/geometry/Point'),
-            (window as any).esri.require('esri/symbols/SimpleMarkerSymbol')
+            import('@geoscene/core/Graphic').then((m: any) => m.default),
+            import('@geoscene/core/layers/GraphicsLayer').then((m: any) => m.default),
+            import('@geoscene/core/geometry/Point').then((m: any) => m.default),
+            import('@geoscene/core/symbols/SimpleMarkerSymbol').then((m: any) => m.default)
         ]);
         const markerLayer = new GraphicsLayer({ title: '采样建议' });
         for (const rec of recs) {
