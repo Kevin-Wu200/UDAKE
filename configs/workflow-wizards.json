@@ -6,8 +6,8 @@
       "title": "数据导入向导",
       "description": "指导完成导入格式选择、字段映射和质量检查。",
       "help": {
-        "doc": "https://docs.udake.local/workflow/data-import",
-        "video": "https://video.udake.local/tutorials/data-import"
+        "doc": "${OFFICIAL_WEB}/docs/workflow/data-import",
+        "video": "${OFFICIAL_WEB}/videos/tutorials/data-import"
       },
       "steps": [
         {
@@ -117,8 +117,8 @@
       "title": "采样优化向导",
       "description": "配置采样策略、区域和预算以快速形成可执行采样计划。",
       "help": {
-        "doc": "https://docs.udake.local/workflow/sampling-optimization",
-        "video": "https://video.udake.local/tutorials/sampling-optimization"
+        "doc": "${OFFICIAL_WEB}/docs/workflow/sampling-optimization",
+        "video": "${OFFICIAL_WEB}/videos/tutorials/sampling-optimization"
       },
       "steps": [
         {
@@ -217,8 +217,8 @@
       "title": "插值分析向导",
       "description": "快速设定方法、变异函数和计算精度。",
       "help": {
-        "doc": "https://docs.udake.local/workflow/interpolation-analysis",
-        "video": "https://video.udake.local/tutorials/interpolation-analysis"
+        "doc": "${OFFICIAL_WEB}/docs/workflow/interpolation-analysis",
+        "video": "${OFFICIAL_WEB}/videos/tutorials/interpolation-analysis"
       },
       "steps": [
         {
@@ -317,8 +317,8 @@
       "title": "结果导出向导",
       "description": "指导结果格式、样式与打包方式配置。",
       "help": {
-        "doc": "https://docs.udake.local/workflow/result-export",
-        "video": "https://video.udake.local/tutorials/result-export"
+        "doc": "${OFFICIAL_WEB}/docs/workflow/result-export",
+        "video": "${OFFICIAL_WEB}/videos/tutorials/result-export"
       },
       "steps": [
         {
@@ -400,8 +400,8 @@
       "title": "移动端采集向导",
       "description": "引导完成 GPS 设置、采集表单和同步策略。",
       "help": {
-        "doc": "https://docs.udake.local/workflow/mobile-collection",
-        "video": "https://video.udake.local/tutorials/mobile-collection"
+        "doc": "${OFFICIAL_WEB}/docs/workflow/mobile-collection",
+        "video": "${OFFICIAL_WEB}/videos/tutorials/mobile-collection"
       },
       "steps": [
         {
