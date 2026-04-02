@@ -437,4 +437,33 @@ describe('ErrorHandler', () => {
             expect(ErrorHandler.ErrorDetails.network_error.message).toBe('网络连接失败');
         });
     });
+
+    describe('统一错误模型增强', () => {
+        it('每个错误类型都应有错误码和等级', () => {
+            Object.values(ErrorHandler.ErrorTypes).forEach(type => {
+                expect(ErrorHandler.ErrorCodes[type]).toBeTruthy();
+                expect(ErrorHandler.ErrorLevels[type]).toBeTruthy();
+            });
+        });
+
+        it('应统计错误出现频次', () => {
+            ErrorHandler.clearErrorStats();
+            ErrorHandler._log('network_error', '网络错误A');
+            ErrorHandler._log('network_error', '网络错误B');
+
+            const stats = ErrorHandler.getErrorStats();
+            const networkStat = stats.find(item => item.type === 'network_error');
+            expect(networkStat.count).toBe(2);
+        });
+
+        it('应支持错误处理中间件', () => {
+            const middleware = vi.fn((errorType, message, context, next) => next());
+            const dispose = ErrorHandler.use(middleware);
+
+            ErrorHandler.showError('network_error');
+            expect(middleware).toHaveBeenCalled();
+
+            dispose();
+        });
+    });
 });

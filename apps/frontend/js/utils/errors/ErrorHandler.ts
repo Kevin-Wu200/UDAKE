@@ -3,9 +3,9 @@
  * 提供统一的错误处理机制
  */
 
-import type { AppError } from '../../types/errors';
-import { ErrorType, ErrorSeverity } from '../../types/errors';
-import { ApplicationError, NetworkError, ValidationError, AuthenticationError, AuthorizationError, NotFoundError, ServerError, PluginError, CacheError } from './AppError';
+import type { AppError, ErrorAction } from '../../types/errors';
+import { ErrorType, ErrorSeverity, ErrorLevel } from '../../types/errors';
+import { ApplicationError } from './AppError';
 import { I18n } from '../I18n';
 import { Logger } from '../Logger';
 import { I18nDialog } from '../../components/I18nDialog.js';
@@ -15,8 +15,47 @@ export interface ErrorHandlerConfig {
   enableReporting: boolean;
   enableUserNotification: boolean;
   logLevel: ErrorSeverity;
+  autoUploadThreshold: number;
   reporter?: (error: AppError, payload: SerializedAppError) => void;
-  notifier?: (message: string, error: AppError) => void;
+  notifier?: (message: string, error: AppError, guide: ErrorGuide) => void;
+}
+
+export interface ErrorProcessingContext {
+  source?: string;
+  operation?: string;
+  userId?: string;
+  requestId?: string;
+  [key: string]: unknown;
+}
+
+interface ErrorStat {
+  type: ErrorType;
+  code: string;
+  level: ErrorLevel;
+  count: number;
+  lastSeenAt: string;
+}
+
+interface ErrorLogRecord {
+  type: ErrorType;
+  code: string;
+  level: ErrorLevel;
+  message: string;
+  timestamp: string;
+  context?: unknown;
+  stack?: string;
+}
+
+interface ErrorGuide {
+  message: string;
+  solutions: string[];
+  actions: ErrorAction[];
+  helpLink?: string;
+}
+
+interface MiddlewareContext {
+  timestamp: string;
+  context: ErrorProcessingContext;
 }
 
 interface SerializedAppError {
@@ -24,10 +63,22 @@ interface SerializedAppError {
   code: string;
   message: string;
   severity: ErrorSeverity;
+  level: ErrorLevel;
+  userMessage?: string;
   details?: unknown;
+  solutions?: string[];
+  actions?: ErrorAction[];
+  helpLink?: string;
   context?: unknown;
   stack?: string;
+  occurrenceCount?: number;
 }
+
+type ErrorMiddleware = (
+  error: AppError,
+  middlewareContext: MiddlewareContext,
+  next: () => Promise<void>
+) => Promise<void> | void;
 
 declare global {
   interface Window {
@@ -41,6 +92,9 @@ export class ErrorHandler {
   private config: ErrorHandlerConfig;
   private errorHandlers: Map<ErrorType, (error: AppError) => void>;
   private globalHandlers: Array<(error: AppError) => void>;
+  private middlewares: ErrorMiddleware[];
+  private stats: Map<string, ErrorStat>;
+  private errorLogs: ErrorLogRecord[];
 
   constructor(config: Partial<ErrorHandlerConfig> = {}) {
     this.config = {
@@ -48,11 +102,15 @@ export class ErrorHandler {
       enableReporting: true,
       enableUserNotification: true,
       logLevel: ErrorSeverity.MEDIUM,
+      autoUploadThreshold: 50,
       ...config
     };
 
     this.errorHandlers = new Map();
     this.globalHandlers = [];
+    this.middlewares = [];
+    this.stats = new Map();
+    this.errorLogs = [];
 
     this.initializeDefaultHandlers();
     this.setupGlobalErrorHandlers();
@@ -70,87 +128,169 @@ export class ErrorHandler {
   }
 
   private setupGlobalErrorHandlers(): void {
-    // 捕获未处理的 Promise 拒绝
+    if (typeof window === 'undefined') {
+      return;
+    }
+
     window.addEventListener('unhandledrejection', (event) => {
       this.handle(
         new ApplicationError(
           ErrorType.UNKNOWN,
-          'UNHANDLED_PROMISE_REJECTION',
-          '未处理的 Promise 拒绝',
+          'E-SYS-UNHANDLED-REJECTION',
+          '应用出现未处理的异步错误，请稍后重试',
           ErrorSeverity.HIGH,
-          { reason: event.reason }
-        )
+          { reason: event.reason },
+          { source: 'global.unhandledrejection' }
+        ),
+        { source: 'global.unhandledrejection' }
       );
     });
 
-    // 捕获全局错误
     window.addEventListener('error', (event) => {
       this.handle(
         new ApplicationError(
           ErrorType.UNKNOWN,
-          'GLOBAL_ERROR',
-          event.message,
+          'E-SYS-GLOBAL-ERROR',
+          event.message || '应用出现异常错误',
           ErrorSeverity.HIGH,
           { filename: event.filename, lineno: event.lineno },
+          { source: 'global.error' },
           event.error
-        )
+        ),
+        { source: 'global.error' }
       );
     });
   }
 
-  handle(error: Error | AppError): void {
-    let appError: AppError;
+  handle(error: Error | AppError, context: ErrorProcessingContext = {}): void {
+    const appError = error instanceof ApplicationError ? error : this.convertToAppError(error);
+    const middlewareContext: MiddlewareContext = {
+      timestamp: new Date().toISOString(),
+      context
+    };
 
-    // 转换为 AppError
-    if (error instanceof ApplicationError) {
-      appError = error;
-    } else {
-      appError = this.convertToAppError(error);
+    void this.runMiddlewares(appError, middlewareContext, async () => {
+      this.processError(appError, context);
+    });
+  }
+
+  async withErrorBoundary<T>(
+    task: () => Promise<T> | T,
+    fallbackValue: T,
+    context: ErrorProcessingContext = {}
+  ): Promise<T> {
+    try {
+      return await task();
+    } catch (error) {
+      this.handle(error instanceof Error ? error : new Error(String(error)), context);
+      return fallbackValue;
     }
+  }
 
-    // 记录错误
+  registerMiddleware(middleware: ErrorMiddleware): () => void {
+    this.middlewares.push(middleware);
+    return () => {
+      this.middlewares = this.middlewares.filter((item) => item !== middleware);
+    };
+  }
+
+  clearMiddlewares(): void {
+    this.middlewares = [];
+  }
+
+  getErrorStats(): ErrorStat[] {
+    return Array.from(this.stats.values()).sort((a, b) => b.count - a.count);
+  }
+
+  clearErrorStats(): void {
+    this.stats.clear();
+  }
+
+  getErrorLogs(limit = 100): ErrorLogRecord[] {
+    if (limit <= 0) {
+      return [];
+    }
+    return this.errorLogs.slice(-limit);
+  }
+
+  clearErrorLogs(): void {
+    this.errorLogs = [];
+  }
+
+  private async runMiddlewares(
+    appError: AppError,
+    middlewareContext: MiddlewareContext,
+    finalHandler: () => Promise<void>
+  ): Promise<void> {
+    let index = -1;
+    const dispatch = async (currentIndex: number): Promise<void> => {
+      if (currentIndex <= index) {
+        return;
+      }
+      index = currentIndex;
+
+      if (currentIndex === this.middlewares.length) {
+        await finalHandler();
+        return;
+      }
+
+      const middleware = this.middlewares[currentIndex];
+      await middleware(appError, middlewareContext, () => dispatch(currentIndex + 1));
+    };
+
+    await dispatch(0);
+  }
+
+  private processError(appError: AppError, context: ErrorProcessingContext): void {
+    this.recordStats(appError);
+    this.recordErrorLog(appError, context);
+
     if (this.shouldLog(appError)) {
-      this.logError(appError);
+      this.logError(appError, context);
     }
 
-    // 报告错误
     if (this.shouldReport(appError)) {
       this.reportError(appError);
     }
 
-    // 通知用户
     if (this.shouldNotifyUser(appError)) {
       this.notifyUser(appError);
     }
 
-    // 调用特定类型的处理器
     const handler = this.errorHandlers.get(appError.type);
     if (handler) {
       handler(appError);
     }
 
-    // 调用全局处理器
-    this.globalHandlers.forEach(handler => handler(appError));
+    this.globalHandlers.forEach(handlerFn => handlerFn(appError));
+
+    if (this.config.enableReporting && this.errorLogs.length >= this.config.autoUploadThreshold) {
+      this.uploadErrorLogs();
+    }
   }
 
   private convertToAppError(error: Error): AppError {
-    // 根据错误信息推断错误类型
     const message = error.message.toLowerCase();
     let type = ErrorType.UNKNOWN;
+    let code = 'E-APP-UNKNOWN';
 
     if (message.includes('network') || message.includes('fetch')) {
       type = ErrorType.NETWORK;
+      code = 'E-NET-REQUEST';
     } else if (message.includes('validation') || message.includes('invalid')) {
       type = ErrorType.VALIDATION;
+      code = 'E-VAL-INPUT';
     } else if (message.includes('authentication') || message.includes('unauthorized')) {
       type = ErrorType.AUTHENTICATION;
+      code = 'E-AUTH-LOGIN';
     } else if (message.includes('not found') || message.includes('404')) {
       type = ErrorType.NOT_FOUND;
+      code = 'E-HTTP-404';
     }
 
     return new ApplicationError(
       type,
-      'UNKNOWN_ERROR',
+      code,
       error.message,
       ErrorSeverity.MEDIUM,
       undefined,
@@ -185,12 +325,53 @@ export class ErrorHandler {
     return severityOrder[severity1] - severityOrder[severity2];
   }
 
-  private logError(error: AppError): void {
+  private recordStats(error: AppError): void {
+    const key = `${error.type}:${error.code}`;
+    const current = this.stats.get(key);
+    const nextCount = current ? current.count + 1 : 1;
+
+    this.stats.set(key, {
+      type: error.type,
+      code: error.code,
+      level: error.level,
+      count: nextCount,
+      lastSeenAt: new Date().toISOString()
+    });
+  }
+
+  private recordErrorLog(error: AppError, context: ErrorProcessingContext): void {
+    const payload = this.serializeError(error);
+    this.errorLogs.push({
+      type: payload.type,
+      code: payload.code,
+      level: payload.level,
+      message: payload.userMessage || payload.message,
+      timestamp: new Date().toISOString(),
+      context: {
+        ...(payload.context || {}),
+        ...context
+      },
+      stack: payload.stack
+    });
+
+    if (this.errorLogs.length > 500) {
+      this.errorLogs.shift();
+    }
+  }
+
+  private logError(error: AppError, context: ErrorProcessingContext): void {
     const logMethod = this.getLogMethod(error.severity);
     logMethod(
-      `[${error.type.toUpperCase()}] ${error.code}: ${error.message}`,
-      error.details,
-      error.context
+      `[${error.level}] [${error.code}] ${error.message}`,
+      {
+        details: error.details,
+        context: {
+          ...(error.context || {}),
+          ...context
+        },
+        solutions: error.solutions,
+        helpLink: error.helpLink
+      }
     );
   }
 
@@ -218,120 +399,217 @@ export class ErrorHandler {
       return;
     }
 
-    if (window.Sentry?.captureException) {
+    if (typeof window !== 'undefined' && window.Sentry?.captureException) {
       window.Sentry.captureException(error, { extra: payload });
       return;
     }
 
-    window.dispatchEvent(new CustomEvent('app:error:reported', { detail: payload }));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('app:error:reported', { detail: payload }));
+    }
   }
 
   private notifyUser(error: AppError): void {
-    const message = this.getUserFriendlyMessage(error);
+    const guide = this.buildErrorGuide(error);
     if (this.config.notifier) {
-      this.config.notifier(message, error);
+      this.config.notifier(guide.message, error, guide);
       return;
     }
 
     const payload = this.serializeError(error);
-    window.dispatchEvent(
-      new CustomEvent('app:error:notify', {
-        detail: {
-          message,
-          error: payload
-        }
-      })
-    );
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('app:error:notify', {
+          detail: {
+            message: guide.message,
+            guide,
+            error: payload
+          }
+        })
+      );
+    }
 
-    // 在未接入统一通知中心时，回退为基础提示，避免静默失败。
     if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
-      I18nDialog.alert(message);
+      I18nDialog.alert(`${guide.message}\n${guide.solutions[0] || ''}`.trim());
     }
   }
 
   private serializeError(error: AppError): SerializedAppError {
     const serializableError = error as AppError & { toJSON?: () => SerializedAppError };
-    if (typeof serializableError.toJSON === 'function') {
-      return serializableError.toJSON();
-    }
+    const basePayload = typeof serializableError.toJSON === 'function'
+      ? serializableError.toJSON()
+      : {
+          type: error.type,
+          code: error.code,
+          message: error.message,
+          severity: error.severity,
+          level: error.level,
+          userMessage: error.userMessage,
+          details: error.details,
+          solutions: error.solutions,
+          actions: error.actions,
+          helpLink: error.helpLink,
+          context: error.context,
+          stack: error.stack
+        };
 
+    const statKey = `${error.type}:${error.code}`;
+    const occurrenceCount = this.stats.get(statKey)?.count || 1;
     return {
-      type: error.type,
-      code: error.code,
-      message: error.message,
-      severity: error.severity,
-      details: error.details,
-      context: error.context,
-      stack: error.stack
+      ...basePayload,
+      occurrenceCount
     };
   }
 
-  private getUserFriendlyMessage(error: AppError): string {
-    const rawMessage = (error.message || '').trim();
+  private buildErrorGuide(error: AppError): ErrorGuide {
+    const rawMessage = (error.userMessage || error.message || '').trim();
     const translatedUnknown = I18n.t('error.common.unknown');
     const isGenericUnknownMessage = !rawMessage ||
       rawMessage === translatedUnknown ||
       rawMessage.toLowerCase() === 'unknown error' ||
       rawMessage.toLowerCase() === '未知错误';
 
-    if (!isGenericUnknownMessage) {
-      return rawMessage;
-    }
+    const defaultGuide = this.getDefaultGuide(error.type);
+    const message = isGenericUnknownMessage ? defaultGuide.message : rawMessage;
 
-    const errorMessages: Record<ErrorType, string> = {
-      [ErrorType.NETWORK]: I18n.t('error.network_error.message'),
-      [ErrorType.VALIDATION]: I18n.t('error.validation_error.message'),
-      [ErrorType.AUTHENTICATION]: I18n.t('error.permission_denied.message'),
-      [ErrorType.AUTHORIZATION]: I18n.t('error.permission_denied.message'),
-      [ErrorType.NOT_FOUND]: '请求的资源不存在',
-      [ErrorType.SERVER]: I18n.t('error.server_error.message'),
-      [ErrorType.PLUGIN]: '插件执行失败，请稍后重试',
-      [ErrorType.CACHE]: '缓存处理失败，请稍后重试',
-      [ErrorType.UNKNOWN]: translatedUnknown
+    return {
+      message,
+      solutions: error.solutions && error.solutions.length > 0 ? error.solutions : defaultGuide.solutions,
+      actions: error.actions && error.actions.length > 0 ? error.actions : defaultGuide.actions,
+      helpLink: error.helpLink || defaultGuide.helpLink
     };
-
-    return errorMessages[error.type] || translatedUnknown;
   }
 
-  // 特定类型的错误处理器
+  private getDefaultGuide(errorType: ErrorType): ErrorGuide {
+    const unknownMessage = I18n.t('error.common.unknown');
+    const actionRetry: ErrorAction = {
+      key: 'retry',
+      labelKey: 'error.common.retryButton',
+      fallbackLabel: '重试',
+      primary: true
+    };
+
+    const actionRefresh: ErrorAction = {
+      key: 'refresh',
+      labelKey: 'error.common.refreshButton',
+      fallbackLabel: '刷新'
+    };
+
+    const actionHelp: ErrorAction = {
+      key: 'open_help',
+      labelKey: 'error.common.helpButton',
+      fallbackLabel: '查看帮助'
+    };
+
+    const fallback: Record<ErrorType, ErrorGuide> = {
+      [ErrorType.NETWORK]: {
+        message: I18n.t('error.network_error.message'),
+        solutions: [
+          I18n.t('error.network_error.suggestion'),
+          I18n.t('error.solution.check_network')
+        ],
+        actions: [actionRetry, actionRefresh, actionHelp],
+        helpLink: '/help/network'
+      },
+      [ErrorType.VALIDATION]: {
+        message: I18n.t('error.validation_error.message'),
+        solutions: [I18n.t('error.validation_error.suggestion')],
+        actions: [actionRefresh],
+        helpLink: '/help/data-validation'
+      },
+      [ErrorType.AUTHENTICATION]: {
+        message: I18n.t('error.permission_denied.message'),
+        solutions: [I18n.t('error.solution.relogin')],
+        actions: [actionRefresh],
+        helpLink: '/help/login'
+      },
+      [ErrorType.AUTHORIZATION]: {
+        message: I18n.t('error.permission_denied.message'),
+        solutions: [I18n.t('error.solution.request_permission')],
+        actions: [actionHelp],
+        helpLink: '/help/permission'
+      },
+      [ErrorType.NOT_FOUND]: {
+        message: I18n.t('error.not_found.message'),
+        solutions: [I18n.t('error.solution.check_resource_path')],
+        actions: [actionRefresh],
+        helpLink: '/help/resource'
+      },
+      [ErrorType.SERVER]: {
+        message: I18n.t('error.server_error.message'),
+        solutions: [I18n.t('error.server_error.suggestion')],
+        actions: [actionRetry, actionHelp],
+        helpLink: '/help/server'
+      },
+      [ErrorType.PLUGIN]: {
+        message: I18n.t('error.plugin_error.message'),
+        solutions: [I18n.t('error.solution.disable_plugin')],
+        actions: [actionRefresh, actionHelp],
+        helpLink: '/help/plugin'
+      },
+      [ErrorType.CACHE]: {
+        message: I18n.t('error.cache_error.message'),
+        solutions: [I18n.t('error.solution.clear_cache')],
+        actions: [actionRefresh],
+        helpLink: '/help/cache'
+      },
+      [ErrorType.UNKNOWN]: {
+        message: unknownMessage,
+        solutions: [I18n.t('error.solution.try_again_later')],
+        actions: [actionRetry, actionHelp],
+        helpLink: '/help/general'
+      }
+    };
+
+    return fallback[errorType] || fallback[ErrorType.UNKNOWN];
+  }
+
+  uploadErrorLogs(): void {
+    if (this.errorLogs.length === 0 || !this.config.enableReporting) {
+      return;
+    }
+
+    const payload = {
+      generatedAt: new Date().toISOString(),
+      logs: this.errorLogs,
+      stats: this.getErrorStats()
+    };
+
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('app:error:batch-report', { detail: payload }));
+    }
+  }
+
   private handleNetworkError(error: AppError): void {
     Logger.info('ErrorHandler', '处理网络错误', error);
-    // 可以在这里实现特定的处理逻辑，如重试
   }
 
   private handleValidationError(error: AppError): void {
     Logger.info('ErrorHandler', '处理验证错误', error);
-    // 可以在这里实现表单验证错误的特殊处理
   }
 
   private handleAuthenticationError(error: AppError): void {
     Logger.info('ErrorHandler', '处理认证错误', error);
-    // 可以在这里实现重定向到登录页面
   }
 
   private handleAuthorizationError(error: AppError): void {
     Logger.info('ErrorHandler', '处理授权错误', error);
-    // 可以在这里实现权限提示
   }
 
   private handleNotFoundError(error: AppError): void {
     Logger.info('ErrorHandler', '处理未找到错误', error);
-    // 可以在这里实现404页面
   }
 
   private handleServerError(error: AppError): void {
     Logger.info('ErrorHandler', '处理服务器错误', error);
-    // 可以在这里实现错误页面
   }
 
   private handlePluginError(error: AppError): void {
     Logger.info('ErrorHandler', '处理插件错误', error);
-    // 可以在这里实现插件错误处理
   }
 
   private handleCacheError(error: AppError): void {
     Logger.info('ErrorHandler', '处理缓存错误', error);
-    // 可以在这里实现缓存清理
   }
 
   registerHandler(errorType: ErrorType, handler: (error: AppError) => void): void {
@@ -340,7 +618,6 @@ export class ErrorHandler {
 
   registerGlobalHandler(handler: (error: AppError) => void): () => void {
     this.globalHandlers.push(handler);
-    // 返回取消注册函数
     return () => {
       const index = this.globalHandlers.indexOf(handler);
       if (index > -1) {
@@ -354,5 +631,4 @@ export class ErrorHandler {
   }
 }
 
-// 导出单例
 export const errorHandler = new ErrorHandler();

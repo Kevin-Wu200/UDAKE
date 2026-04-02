@@ -4,12 +4,17 @@
  */
 
 import type { AppError, ErrorContext } from '../../types/errors';
-import { ErrorType, ErrorSeverity } from '../../types/errors';
+import { ErrorType, ErrorSeverity, ErrorLevel } from '../../types/errors';
 
 export class ApplicationError extends Error implements AppError {
   public readonly type: ErrorType;
   public readonly severity: ErrorSeverity;
+  public readonly level: ErrorLevel;
   public readonly code: string;
+  public readonly userMessage?: string;
+  public readonly solutions?: string[];
+  public readonly actions?: Array<{ key: string; labelKey: string; fallbackLabel: string; primary?: boolean }>;
+  public readonly helpLink?: string;
   public readonly details?: unknown;
   public readonly context?: ErrorContext;
   public readonly originalError?: Error;
@@ -29,6 +34,7 @@ export class ApplicationError extends Error implements AppError {
     this.name = this.constructor.name;
     this.type = type;
     this.severity = severity;
+    this.level = ApplicationError.mapSeverityToLevel(severity);
     this.code = code;
     this.details = details;
     this.context = {
@@ -50,11 +56,30 @@ export class ApplicationError extends Error implements AppError {
       code: this.code,
       message: this.message,
       severity: this.severity,
+      level: this.level,
+      userMessage: this.userMessage,
+      solutions: this.solutions,
+      actions: this.actions,
+      helpLink: this.helpLink,
       details: this.details,
       context: this.context,
       originalError: this.originalError?.message,
       stack: this.stack
     };
+  }
+
+  static mapSeverityToLevel(severity: ErrorSeverity): ErrorLevel {
+    switch (severity) {
+      case ErrorSeverity.CRITICAL:
+        return ErrorLevel.FATAL;
+      case ErrorSeverity.HIGH:
+        return ErrorLevel.SEVERE;
+      case ErrorSeverity.MEDIUM:
+        return ErrorLevel.WARNING;
+      case ErrorSeverity.LOW:
+      default:
+        return ErrorLevel.INFO;
+    }
   }
 }
 

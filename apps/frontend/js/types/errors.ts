@@ -22,7 +22,22 @@ export enum ErrorSeverity {
   CRITICAL = 'critical'
 }
 
+export enum ErrorLevel {
+  INFO = 'INFO',
+  WARNING = 'WARNING',
+  SEVERE = 'SEVERE',
+  FATAL = 'FATAL'
+}
+
+export interface ErrorAction {
+  key: 'retry' | 'refresh' | 'open_help' | 'dismiss' | string;
+  labelKey: string;
+  fallbackLabel: string;
+  primary?: boolean;
+}
+
 export interface ErrorContext {
+  source?: string;
   url?: string;
   method?: string;
   status?: number;
@@ -37,8 +52,13 @@ export interface ErrorContext {
 export interface AppError extends Error {
   type: ErrorType;
   severity: ErrorSeverity;
+  level: ErrorLevel;
   code: string;
   message: string;
+  userMessage?: string;
+  solutions?: string[];
+  actions?: ErrorAction[];
+  helpLink?: string;
   details?: unknown;
   context?: ErrorContext;
   originalError?: Error;

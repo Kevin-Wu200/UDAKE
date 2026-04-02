@@ -166,20 +166,34 @@ export type ErrorType =
     | 'insufficient_points'
     | 'export_failed';
 
+/** 错误等级 */
+export type ErrorLevel = 'FATAL' | 'SEVERE' | 'WARNING' | 'INFO';
+
 /** 错误详情 */
 export interface ErrorDetail {
+    code?: string;
+    level?: ErrorLevel;
     message: string;
     suggestion?: string;
     example?: string;
+    icon?: string;
+    solutions?: string[];
+    helpLink?: string;
     retryable?: boolean;
 }
 
 /** 错误日志条目 */
 export interface ErrorLogEntry {
     type: ErrorType;
+    code?: string;
+    level?: ErrorLevel;
     message: string;
     timestamp: string;
     url: string;
+    stack?: string;
+    count?: number;
+    firstSeenAt?: string;
+    lastSeenAt?: string;
     suggestion?: string;
 }
 
