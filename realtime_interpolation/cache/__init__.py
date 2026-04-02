@@ -19,6 +19,7 @@ from .cache_manager import (
     CacheManager,
     DistributedCacheManager
 )
+from .redis_cache_manager import RedisCacheManager
 
 __all__ = [
     # Cache Strategy
@@ -33,4 +34,5 @@ __all__ = [
     'CacheStats',
     'CacheManager',
     'DistributedCacheManager',
+    'RedisCacheManager',
 ]

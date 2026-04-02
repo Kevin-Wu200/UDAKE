@@ -37,6 +37,7 @@ from .core import (
 from .cache import (
     CacheManager,
     DistributedCacheManager,
+    RedisCacheManager,
     MultiLevelCacheStrategy,
     CachePreWarmer
 )
@@ -91,6 +92,7 @@ __all__ = [
     # Cache
     "CacheManager",
     "DistributedCacheManager",
+    "RedisCacheManager",
     "MultiLevelCacheStrategy",
     "CachePreWarmer",
 

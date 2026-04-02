@@ -26,7 +26,8 @@ from ..core import (
     BatchUpdateManager,
     ThrottleController
 )
-from ..cache import CacheManager, MultiLevelCacheStrategy
+from ..cache import CacheManager, MultiLevelCacheStrategy, RedisCacheManager
+from ..config import get_config
 from ..events import (
     EventBus, EventType, EventPriority, Event, EventMonitor
 )
@@ -152,7 +153,8 @@ class RealtimeInterpolationService:
         self,
         max_workers: int = 10,
         enable_cache: bool = True,
-        enable_events: bool = True
+        enable_events: bool = True,
+        prefer_redis_cache: bool = True,
     ):
         """
         初始化实时插值服务
@@ -165,6 +167,7 @@ class RealtimeInterpolationService:
         self.max_workers = max_workers
         self.enable_cache = enable_cache
         self.enable_events = enable_events
+        self.prefer_redis_cache = prefer_redis_cache
 
         # 线程池
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
@@ -179,16 +182,34 @@ class RealtimeInterpolationService:
 
         # 缓存系统
         if enable_cache:
+            cache_conf = get_config().cache
             cache_strategy = MultiLevelCacheStrategy(
-                l1_size=1000,
+                l1_size=max(100, int(cache_conf.l1_capacity)),
                 l2_size=10000,
                 l3_size=100000
             )
-            self.cache_manager = CacheManager(
-                cache_strategy=cache_strategy,
-                enable_auto_cleanup=True,
-                cleanup_interval=300
-            )
+            if self.prefer_redis_cache and bool(cache_conf.l2_enabled):
+                self.cache_manager = RedisCacheManager(
+                    cache_strategy=cache_strategy,
+                    redis_url=(cache_conf.l2_url or None),
+                    host=cache_conf.l2_host,
+                    port=int(cache_conf.l2_port),
+                    db=int(cache_conf.l2_db),
+                    password=(cache_conf.l2_password or None),
+                    pool_size=int(cache_conf.l2_pool_size),
+                    socket_timeout=int(cache_conf.l2_timeout),
+                    retry_times=int(cache_conf.l2_retry_times),
+                    strict_redis=bool(cache_conf.l2_strict),
+                    ttl=int(cache_conf.l2_ttl),
+                    cleanup_interval=300,
+                )
+            else:
+                self.cache_manager = CacheManager(
+                    cache_strategy=cache_strategy,
+                    enable_auto_cleanup=True,
+                    cleanup_interval=300,
+                    ttl=int(cache_conf.l1_ttl),
+                )
         else:
             self.cache_manager = None
 

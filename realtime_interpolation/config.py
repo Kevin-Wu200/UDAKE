@@ -20,6 +20,12 @@ class CacheConfig:
     l2_host: str = "localhost"
     l2_port: int = 6379
     l2_db: int = 0
+    l2_password: str = ""
+    l2_url: str = ""
+    l2_pool_size: int = 20
+    l2_timeout: int = 5
+    l2_retry_times: int = 3
+    l2_strict: bool = False
     l2_ttl: int = 3600  # 默认过期时间（秒）
 
     # L3缓存（磁盘）
@@ -137,6 +143,20 @@ class Config:
             config.cache.l2_host = os.getenv("REDIS_HOST")
         if os.getenv("REDIS_PORT"):
             config.cache.l2_port = int(os.getenv("REDIS_PORT"))
+        if os.getenv("REDIS_DB"):
+            config.cache.l2_db = int(os.getenv("REDIS_DB"))
+        if os.getenv("REDIS_PASSWORD"):
+            config.cache.l2_password = os.getenv("REDIS_PASSWORD", "")
+        if os.getenv("REDIS_URL"):
+            config.cache.l2_url = os.getenv("REDIS_URL", "")
+        if os.getenv("REDIS_POOL_SIZE"):
+            config.cache.l2_pool_size = int(os.getenv("REDIS_POOL_SIZE"))
+        if os.getenv("REDIS_TIMEOUT"):
+            config.cache.l2_timeout = int(os.getenv("REDIS_TIMEOUT"))
+        if os.getenv("REDIS_RETRY_TIMES"):
+            config.cache.l2_retry_times = int(os.getenv("REDIS_RETRY_TIMES"))
+        if os.getenv("REDIS_STRICT"):
+            config.cache.l2_strict = os.getenv("REDIS_STRICT", "").strip().lower() in {"1", "true", "yes", "on"}
         if os.getenv("LOG_LEVEL"):
             config.logging.level = os.getenv("LOG_LEVEL")
         if os.getenv("MAX_MEMORY_GB"):

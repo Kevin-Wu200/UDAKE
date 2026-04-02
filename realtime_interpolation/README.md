@@ -32,7 +32,7 @@
 - [x] 测试与验证（单元测试、集成测试、性能测试、准确性验证）
 
 ### 待完成功能
-- [ ] Redis缓存集成
+- [x] Redis缓存集成
 - [ ] WebSocket服务集成
 - [ ] 前端与地图可视化集成
 - [ ] 文档完善
@@ -187,10 +187,36 @@ print(f"更新时间: {result.statistics['update_time_ms']}ms")
 5. ✓ 编写测试（单元测试、集成测试、性能测试、准确性验证）
 
 ### 近期任务
-1. 集成Redis缓存
-2. 集成WebSocket服务
-3. 前端与地图可视化集成
-4. 完善文档
+1. 集成WebSocket服务
+2. 前端与地图可视化集成
+3. 完善文档
+4. 生产环境部署
+
+## Redis 缓存集成
+
+系统已提供 `RedisCacheManager`，支持：
+- Redis 连接池、重试、健康检查、内存降级
+- `Hash` 存储插值网格（`kriging:grid:{task_id}`）
+- `Sorted Set` 存储采样点（`kriging:points:{task_id}`）
+- `List` 存储历史记录（`kriging:history:{task_id}`）
+- TTL + 手动失效 + 分布式失效通知
+- 分布式锁 + 版本控制 + CAS 冲突检测
+
+可通过环境变量配置：
+
+```bash
+REDIS_HOST=127.0.0.1
+REDIS_PORT=6379
+REDIS_DB=0
+REDIS_PASSWORD=
+REDIS_URL=redis://127.0.0.1:6379/0
+REDIS_POOL_SIZE=20
+REDIS_TIMEOUT=5
+REDIS_RETRY_TIMES=3
+REDIS_STRICT=false
+```
+
+`RealtimeInterpolationService` 默认优先使用 Redis 缓存，不可用时自动降级到内存缓存。
 
 ### 中期任务
 1. 生产环境部署
