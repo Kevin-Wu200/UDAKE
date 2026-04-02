@@ -22,6 +22,25 @@ export interface VariogramChartData {
   bestModel?: VariogramModel;
 }
 
+export interface VariogramParams {
+  modelType: 'spherical' | 'exponential' | 'gaussian' | 'linear';
+  nugget: number;
+  sill: number;
+  range: number;
+}
+
+export interface FitQuality {
+  r2: number;
+  rmse: number;
+  recommendation: string;
+}
+
+export interface VariogramFit {
+  model: VariogramModel;
+  curve: number[];
+  quality: FitQuality;
+}
+
 export class VariogramChart {
   private container: HTMLElement;
   private chart: any;
@@ -29,15 +48,16 @@ export class VariogramChart {
   private data: VariogramChartData;
   private selectedModel: string | null = null;
   private visibleModels: Set<string> = new Set();
+  private chartHost: HTMLElement | null = null;
+  private qualityPanel: HTMLElement | null = null;
+  private currentFit: VariogramFit | null = null;
 
   constructor(config: VariogramChartConfig) {
     this.container = config.container;
     this.config = config;
 
-    // 处理数据
     this.data = this.processData();
 
-    // 设置默认选中的模型
     if (this.config.selectedModel) {
       this.selectedModel = this.config.selectedModel;
     } else if (this.data.models.size > 0) {
@@ -45,13 +65,12 @@ export class VariogramChart {
       this.selectedModel = firstModel !== undefined ? firstModel : null;
     }
 
-    // 初始化所有模型可见
     this.data.models.forEach((_, name) => {
       this.visibleModels.add(name);
     });
 
-    // 初始化图表
     this.initializeChart();
+    this.refreshFitQuality();
   }
 
   /**
@@ -59,33 +78,29 @@ export class VariogramChart {
    */
   private processData(): VariogramChartData {
     const { empiricalData, models } = this.config;
-
-    // 生成模型曲线
     const modelMap = new Map<string, { model: VariogramModel; curve: number[] }>();
 
-    if (models) {
-      const maxDistance = Math.max(...empiricalData.map((d) => d.distance));
-      const distance = Array.from({ length: 100 }, (_, i) => (maxDistance * i) / 99);
+    let bestModel: VariogramModel | undefined;
+
+    if (models && models.length > 0) {
+      const distance = this.buildDistanceAxis();
 
       models.forEach((model) => {
         const curve = ChartService.generateVariogramCurve(model, distance);
         modelMap.set(model.name, { model, curve });
       });
 
-      // 找出最佳模型
-      if (models.length > 0) {
-        const bestModel = models.reduce((best, current) => {
-          const currentScore = current.fitScore || 0;
-          const bestScore = best.fitScore || 0;
-          return currentScore > bestScore ? current : best;
-        });
-        this.data.bestModel = bestModel;
-      }
+      bestModel = models.reduce((best, current) => {
+        const currentScore = current.fitScore || 0;
+        const bestScore = best.fitScore || 0;
+        return currentScore > bestScore ? current : best;
+      });
     }
 
     return {
       empirical: empiricalData,
       models: modelMap,
+      bestModel
     };
   }
 
@@ -93,25 +108,29 @@ export class VariogramChart {
    * 初始化图表
    */
   private initializeChart() {
-    // 创建图表容器
-    const chartContainer = document.createElement('div');
-    chartContainer.className = 'variogram-chart';
-    chartContainer.style.width = '100%';
-    chartContainer.style.height = '100%';
+    const wrapper = document.createElement('div');
+    wrapper.className = 'variogram-chart';
+    wrapper.style.width = '100%';
+    wrapper.style.height = '100%';
     this.container.innerHTML = '';
-    this.container.appendChild(chartContainer);
+    this.container.appendChild(wrapper);
 
-    // 初始化 ECharts（如果可用）
+    this.chartHost = document.createElement('div');
+    this.chartHost.className = 'variogram-chart-host';
+    this.chartHost.style.minHeight = '250px';
+    wrapper.appendChild(this.chartHost);
+
     if (typeof window !== 'undefined' && (window as any).echarts) {
-      this.initECharts(chartContainer);
+      this.initECharts(this.chartHost);
     } else {
-      this.initHTMLChart(chartContainer);
+      this.initHTMLChart(this.chartHost);
     }
 
-    // 添加模型参数面板
-    if (this.config.models && this.config.models.length > 0) {
-      this.addModelParametersPanel();
-    }
+    this.qualityPanel = document.createElement('div');
+    this.qualityPanel.className = 'variogram-quality-panel';
+    wrapper.appendChild(this.qualityPanel);
+
+    this.addModelParametersPanel();
   }
 
   /**
@@ -120,167 +139,16 @@ export class VariogramChart {
   private initECharts(container: HTMLElement) {
     const echarts = (window as any).echarts;
     this.chart = echarts.init(container);
+    this.chart.setOption(this.buildEChartsOption());
 
-    const { title, showLegend } = this.config;
-
-    // 生成经验数据
-    const empiricalData = this.data.empirical.map((point) => ({
-      value: [point.distance, point.semivariance],
-      name: `h=${point.distance.toFixed(2)}, N=${point.count}`,
-    }));
-
-    // 生成模型曲线
-    const series: any[] = [
-      {
-        name: '经验变异函数',
-        type: 'scatter',
-        data: empiricalData,
-        symbolSize: (data: any) => {
-          const point = this.data.empirical.find(
-            (p) => p.distance === data.value[0]
-          );
-          return Math.min(20, Math.max(5, Math.sqrt(point?.count || 1) * 2));
-        },
-        itemStyle: {
-          color: '#333',
-          opacity: 0.7,
-        },
-        emphasis: {
-          focus: 'series',
-          itemStyle: {
-            opacity: 1,
-            borderColor: '#000',
-            borderWidth: 2,
-          },
-        },
-      },
-    ];
-
-    // 添加模型曲线
-    this.data.models.forEach((data, name) => {
-      if (this.visibleModels.has(name)) {
-        const isSelected = name === this.selectedModel;
-        const model = data.model;
-
-        const maxDistance = Math.max(...this.data.empirical.map((d) => d.distance));
-        const distance = Array.from({ length: 100 }, (_, i) => (maxDistance * i) / 99);
-
-        series.push({
-          name: name,
-          type: 'line',
-          data: distance.map((d, i) => [d, data.curve[i]]),
-          lineStyle: {
-            color: this.getModelColor(name),
-            width: isSelected ? 3 : 2,
-            type: isSelected ? 'solid' : 'dashed',
-          },
-          symbol: 'none',
-          smooth: false,
-        });
-      }
-    });
-
-    const option: any = {
-      title: {
-        text: title || '变异函数曲线',
-        left: 'center',
-      },
-      tooltip: {
-        trigger: 'item',
-        formatter: (params: any) => {
-          if (params.seriesName === '经验变异函数') {
-            const point = this.data.empirical[params.dataIndex];
-            return `
-              <div>
-                <strong>经验变异函数</strong><br/>
-                距离: ${point.distance.toFixed(4)}<br/>
-                半方差: ${point.semivariance.toFixed(4)}<br/>
-                样本对数: ${point.count}
-              </div>
-            `;
-          } else {
-            const modelData = this.data.models.get(params.seriesName);
-            if (modelData) {
-              const model = modelData.model;
-              return `
-                <div>
-                  <strong>${params.seriesName}</strong><br/>
-                  距离: ${params.value[0].toFixed(4)}<br/>
-                  半方差: ${params.value[1].toFixed(4)}<br/>
-                  模型: ${model.type}<br/>
-                  变差值: ${model.nugget.toFixed(4)}<br/>
-                  基台值: ${model.sill.toFixed(4)}<br/>
-                  范围值: ${model.range.toFixed(4)}
-                </div>
-              `;
-            }
-          }
-          return '';
-        },
-      },
-      legend: showLegend !== false ? {
-        bottom: 10,
-        data: ['经验变异函数', ...Array.from(this.data.models.keys())],
-        selected: {
-          '经验变异函数': true,
-          ...Object.fromEntries(
-            Array.from(this.data.models.keys()).map((name) => [
-              name,
-              this.visibleModels.has(name),
-            ])
-          ),
-        },
-      } : undefined,
-      grid: {
-        left: '10%',
-        right: '10%',
-        bottom: showLegend !== false ? '15%' : '10%',
-        top: '15%',
-        containLabel: true,
-      },
-      toolbox: {
-        feature: {
-          saveAsImage: {
-            title: '保存为图片',
-          },
-          dataZoom: {
-            title: {
-              zoom: '区域缩放',
-              back: '还原缩放',
-            },
-          },
-        },
-      },
-      xAxis: {
-        type: 'value',
-        name: '距离 (h)',
-        nameLocation: 'middle',
-        nameGap: 30,
-        scale: true,
-      },
-      yAxis: {
-        type: 'value',
-        name: '半方差 γ(h)',
-        nameLocation: 'middle',
-        nameGap: 30,
-        scale: true,
-        min: 0,
-      },
-      series,
-    };
-
-    this.chart.setOption(option);
-
-    // 添加事件监听
     this.chart.on('click', (params: any) => {
       if (params.componentType === 'legend') {
         this.toggleModel(params.name);
       }
     });
 
-    // 响应式调整
     window.addEventListener('resize', () => {
-      this.chart.resize();
+      this.chart?.resize();
     });
   }
 
@@ -306,40 +174,40 @@ export class VariogramChart {
 
     container.appendChild(chartDiv);
 
-    // 绑定事件
     const canvas = chartDiv.querySelector('#variogram-canvas') as HTMLCanvasElement;
     const ctx = canvas.getContext('2d');
     if (ctx) {
       this.drawHTMLChart(canvas, ctx);
     }
 
-    // 生成模型图例
     const legendDiv = chartDiv.querySelector('#model-legend');
     if (legendDiv) {
+      legendDiv.innerHTML = '';
       this.data.models.forEach((_, name) => {
         const legendItem = document.createElement('div');
         legendItem.className = 'legend-item';
         legendItem.innerHTML = `
           <input type="checkbox" id="model-${name}" checked>
-          <label for="model-${name}" style="color: ${this.getModelColor(name)}">
-            ${name}
-          </label>
+          <label for="model-${name}" style="color: ${this.getModelColor(name)}">${name}</label>
         `;
         legendDiv.appendChild(legendItem);
 
         const checkbox = legendItem.querySelector(`#model-${name}`) as HTMLInputElement;
         checkbox.addEventListener('change', (e) => {
           this.toggleModel(name, (e.target as HTMLInputElement).checked);
-          if (ctx) this.drawHTMLChart(canvas, ctx);
+          if (ctx) {
+            this.drawHTMLChart(canvas, ctx);
+          }
         });
       });
     }
 
-    // 按钮事件
     const resetBtn = chartDiv.querySelector('#reset-zoom');
     if (resetBtn) {
       resetBtn.addEventListener('click', () => {
-        if (ctx) this.drawHTMLChart(canvas, ctx);
+        if (ctx) {
+          this.drawHTMLChart(canvas, ctx);
+        }
       });
     }
 
@@ -356,7 +224,9 @@ export class VariogramChart {
    */
   private drawHTMLChart(canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D) {
     const rect = canvas.parentElement?.getBoundingClientRect();
-    if (!rect) return;
+    if (!rect) {
+      return;
+    }
 
     canvas.width = rect.width;
     canvas.height = rect.height;
@@ -365,64 +235,50 @@ export class VariogramChart {
     const chartWidth = canvas.width - padding.left - padding.right;
     const chartHeight = canvas.height - padding.top - padding.bottom;
 
-    // 计算数据范围
-    const allValues = [
-      ...this.data.empirical.map((d) => d.distance),
-      ...this.data.empirical.map((d) => d.semivariance),
-    ];
     const minX = 0;
-    const maxX = Math.max(...this.data.empirical.map((d) => d.distance));
+    const maxX = Math.max(...this.data.empirical.map((d) => d.distance), 1);
     const minY = 0;
-    const maxY = Math.max(...this.data.empirical.map((d) => d.semivariance));
+    const maxY = Math.max(...this.data.empirical.map((d) => d.semivariance), 1);
 
     const rangeX = maxX - minX || 1;
     const rangeY = maxY - minY || 1;
 
-    // 转换坐标函数
     const scaleX = (x: number) => padding.left + ((x - minX) / rangeX) * chartWidth;
     const scaleY = (y: number) => canvas.height - padding.bottom - ((y - minY) / rangeY) * chartHeight;
 
-    // 绘制背景
     ctx.fillStyle = '#fff';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // 绘制网格
     ctx.strokeStyle = '#e0e0e0';
     ctx.lineWidth = 1;
 
-    // 绘制模型曲线
     this.data.models.forEach((data, name) => {
-      if (this.visibleModels.has(name)) {
-        const isSelected = name === this.selectedModel;
-
-        ctx.beginPath();
-        ctx.strokeStyle = this.getModelColor(name);
-        ctx.lineWidth = isSelected ? 3 : 2;
-        if (!isSelected) {
-          ctx.setLineDash([5, 5]);
-        } else {
-          ctx.setLineDash([]);
-        }
-
-        const maxDistance = Math.max(...this.data.empirical.map((d) => d.distance));
-        const distance = Array.from({ length: 100 }, (_, i) => (maxDistance * i) / 99);
-
-        distance.forEach((d, i) => {
-          const x = scaleX(d);
-          const y = scaleY(data.curve[i]);
-          if (i === 0) {
-            ctx.moveTo(x, y);
-          } else {
-            ctx.lineTo(x, y);
-          }
-        });
-
-        ctx.stroke();
-        ctx.setLineDash([]);
+      if (!this.visibleModels.has(name)) {
+        return;
       }
+
+      const isSelected = name === this.selectedModel;
+
+      ctx.beginPath();
+      ctx.strokeStyle = this.getModelColor(name);
+      ctx.lineWidth = isSelected ? 3 : 2;
+      ctx.setLineDash(isSelected ? [] : [5, 5]);
+
+      const distance = this.buildDistanceAxis();
+      distance.forEach((d, i) => {
+        const x = scaleX(d);
+        const y = scaleY(data.curve[i]);
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+      });
+
+      ctx.stroke();
+      ctx.setLineDash([]);
     });
 
-    // 绘制经验数据点
     this.data.empirical.forEach((point) => {
       const x = scaleX(point.distance);
       const y = scaleY(point.semivariance);
@@ -435,7 +291,6 @@ export class VariogramChart {
       ctx.fill();
       ctx.globalAlpha = 1;
 
-      // 绘制误差线
       ctx.strokeStyle = '#666';
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -446,7 +301,6 @@ export class VariogramChart {
       ctx.stroke();
     });
 
-    // 绘制坐标轴
     ctx.strokeStyle = '#333';
     ctx.lineWidth = 1;
     ctx.beginPath();
@@ -455,22 +309,18 @@ export class VariogramChart {
     ctx.lineTo(canvas.width - padding.right, canvas.height - padding.bottom);
     ctx.stroke();
 
-    // 绘制坐标轴标签
     ctx.fillStyle = '#333';
     ctx.font = '12px Arial';
     ctx.textAlign = 'center';
 
-    // X 轴标签
     ctx.fillText('距离 (h)', canvas.width / 2, canvas.height - 10);
 
-    // Y 轴标签
     ctx.save();
     ctx.translate(15, canvas.height / 2);
     ctx.rotate(-Math.PI / 2);
     ctx.fillText('半方差 γ(h)', 0, 0);
     ctx.restore();
 
-    // 绘制刻度
     ctx.textAlign = 'right';
     for (let i = 0; i <= 5; i++) {
       const value = minX + (rangeX * i) / 5;
@@ -478,8 +328,6 @@ export class VariogramChart {
       const y = canvas.height - padding.bottom + 15;
 
       ctx.fillText(value.toFixed(2), x, y);
-
-      // X 轴刻度线
       ctx.beginPath();
       ctx.moveTo(x, canvas.height - padding.bottom);
       ctx.lineTo(x, canvas.height - padding.bottom + 5);
@@ -494,8 +342,6 @@ export class VariogramChart {
       const x = padding.left - 10;
 
       ctx.fillText(value.toFixed(2), x, y);
-
-      // Y 轴刻度线
       ctx.beginPath();
       ctx.moveTo(padding.left, y);
       ctx.lineTo(padding.left - 5, y);
@@ -507,16 +353,7 @@ export class VariogramChart {
    * 获取模型颜色
    */
   private getModelColor(name: string): string {
-    const colors = [
-      '#2196f3',
-      '#4caf50',
-      '#ff9800',
-      '#9c27b0',
-      '#f44336',
-      '#00bcd4',
-      '#8bc34a',
-      '#ffc107',
-    ];
+    const colors = ['#2196f3', '#4caf50', '#ff9800', '#9c27b0', '#f44336', '#00bcd4', '#8bc34a', '#ffc107'];
     const index = Array.from(this.data.models.keys()).indexOf(name);
     return colors[index % colors.length];
   }
@@ -531,15 +368,12 @@ export class VariogramChart {
       } else {
         this.visibleModels.delete(name);
       }
+    } else if (this.visibleModels.has(name)) {
+      this.visibleModels.delete(name);
     } else {
-      if (this.visibleModels.has(name)) {
-        this.visibleModels.delete(name);
-      } else {
-        this.visibleModels.add(name);
-      }
+      this.visibleModels.add(name);
     }
 
-    // 更新图表
     this.updateChart();
   }
 
@@ -552,29 +386,99 @@ export class VariogramChart {
   }
 
   /**
+   * 根据参数实时更新拟合曲线
+   */
+  public updateFitting(params: VariogramParams): void {
+    const selectedName = this.selectedModel || `${params.modelType}-实时拟合`;
+
+    const model: VariogramModel = {
+      name: selectedName,
+      type: params.modelType,
+      nugget: params.nugget,
+      sill: Math.max(params.sill, params.nugget + 0.001),
+      range: Math.max(0.001, params.range)
+    };
+
+    const curve = ChartService.generateVariogramCurve(model, this.buildDistanceAxis());
+
+    this.data.models.set(selectedName, { model, curve });
+    this.visibleModels.add(selectedName);
+    this.selectedModel = selectedName;
+
+    this.refreshFitQuality();
+    this.updateChart();
+  }
+
+  /**
+   * 计算拟合质量指标
+   */
+  public calculateFitQuality(
+    empirical: { distance: number; semivariance: number }[],
+    fitted: { distance: number; semivariance: number }[]
+  ): FitQuality {
+    if (empirical.length === 0 || fitted.length === 0) {
+      return {
+        r2: 0,
+        rmse: 0,
+        recommendation: '缺少经验点，建议先加载采样数据后再评估拟合质量'
+      };
+    }
+
+    const fittedAtEmpirical = empirical.map((point) => {
+      const nearest = fitted.reduce((best, item) => {
+        const bestDiff = Math.abs(best.distance - point.distance);
+        const currentDiff = Math.abs(item.distance - point.distance);
+        return currentDiff < bestDiff ? item : best;
+      }, fitted[0]);
+      return nearest.semivariance;
+    });
+
+    const actual = empirical.map((item) => item.semivariance);
+    const stats = ChartService.calculateStatistics(actual, fittedAtEmpirical);
+
+    return {
+      r2: stats.r2,
+      rmse: stats.rmse,
+      recommendation: this.generateRecommendation(stats.r2, stats.rmse)
+    };
+  }
+
+  /**
    * 更新图表
    */
   private updateChart() {
     if (this.chart) {
-      this.chart.setOption({
-        series: this.chart.getOption().series.map((s: any) => {
-          if (s.name !== '经验变异函数') {
-            s.lineStyle = {
-              ...s.lineStyle,
-              width: s.name === this.selectedModel ? 3 : 2,
-              type: s.name === this.selectedModel ? 'solid' : 'dashed',
-            };
-          }
-          return s;
-        }),
-      });
+      this.chart.setOption(this.buildEChartsOption(), true);
+    } else {
+      const canvas = this.container.querySelector('#variogram-canvas') as HTMLCanvasElement | null;
+      const ctx = canvas?.getContext('2d');
+      if (canvas && ctx) {
+        this.drawHTMLChart(canvas, ctx);
+      }
     }
+
+    this.addModelParametersPanel();
+    this.refreshFitQuality();
   }
 
   /**
    * 添加模型参数面板
    */
   private addModelParametersPanel() {
+    const host = this.container.querySelector('.variogram-chart');
+    if (!host) {
+      return;
+    }
+
+    const existing = host.querySelector('.model-parameters-panel');
+    if (existing) {
+      existing.remove();
+    }
+
+    if (this.data.models.size === 0) {
+      return;
+    }
+
     const paramsPanel = document.createElement('div');
     paramsPanel.className = 'model-parameters-panel';
 
@@ -606,7 +510,7 @@ export class VariogramChart {
       paramsPanel.appendChild(modelDiv);
     });
 
-    this.container.appendChild(paramsPanel);
+    host.appendChild(paramsPanel);
   }
 
   /**
@@ -617,7 +521,7 @@ export class VariogramChart {
       spherical: '球状模型',
       exponential: '指数模型',
       gaussian: '高斯模型',
-      linear: '线性模型',
+      linear: '线性模型'
     };
     return typeNames[type] || type;
   }
@@ -625,24 +529,16 @@ export class VariogramChart {
   /**
    * 调整模型参数
    */
-  public adjustModelParameter(
-    modelName: string,
-    parameter: 'nugget' | 'sill' | 'range',
-    value: number
-  ) {
+  public adjustModelParameter(modelName: string, parameter: 'nugget' | 'sill' | 'range', value: number) {
     const modelData = this.data.models.get(modelName);
-    if (modelData) {
-      modelData.model[parameter] = value;
-
-      // 重新生成曲线
-      const maxDistance = Math.max(...this.data.empirical.map((d) => d.distance));
-      const distance = Array.from({ length: 100 }, (_, i) => (maxDistance * i) / 99);
-      modelData.curve = ChartService.generateVariogramCurve(modelData.model, distance);
-
-      // 更新图表
-      this.updateChart();
-      this.addModelParametersPanel();
+    if (!modelData) {
+      return;
     }
+
+    modelData.model[parameter] = value;
+    modelData.curve = ChartService.generateVariogramCurve(modelData.model, this.buildDistanceAxis());
+
+    this.updateChart();
   }
 
   /**
@@ -650,12 +546,7 @@ export class VariogramChart {
    */
   public async exportAsImage(format: 'png' | 'svg' | 'pdf' = 'png') {
     try {
-      const blob = await ChartService.exportChartAsImage(
-        this.container,
-        format,
-        `variogram-chart.${format}`
-      );
-
+      const blob = await ChartService.exportChartAsImage(this.container, format, `variogram-chart.${format}`);
       ChartService.downloadFile(blob, `variogram-chart.${format}`);
     } catch (error) {
       console.error('导出图表失败:', error);
@@ -698,5 +589,173 @@ export class VariogramChart {
    */
   public getModels(): VariogramModel[] {
     return Array.from(this.data.models.values()).map((data) => data.model);
+  }
+
+  private buildDistanceAxis(): number[] {
+    const maxDistance = Math.max(...this.data?.empirical.map((d) => d.distance) || this.config.empiricalData.map((d) => d.distance), 1);
+    return Array.from({ length: 100 }, (_, i) => (maxDistance * i) / 99);
+  }
+
+  private buildEChartsOption(): any {
+    const { title, showLegend } = this.config;
+
+    const empiricalData = this.data.empirical.map((point) => ({
+      value: [point.distance, point.semivariance],
+      name: `h=${point.distance.toFixed(2)}, N=${point.count}`
+    }));
+
+    const distance = this.buildDistanceAxis();
+    const series: any[] = [
+      {
+        name: '经验变异函数',
+        type: 'scatter',
+        data: empiricalData,
+        symbolSize: (data: any) => {
+          const point = this.data.empirical.find((p) => p.distance === data.value[0]);
+          return Math.min(20, Math.max(5, Math.sqrt(point?.count || 1) * 2));
+        },
+        itemStyle: {
+          color: '#333',
+          opacity: 0.7
+        }
+      }
+    ];
+
+    this.data.models.forEach((item, name) => {
+      if (!this.visibleModels.has(name)) {
+        return;
+      }
+
+      const isSelected = name === this.selectedModel;
+      series.push({
+        name,
+        type: 'line',
+        data: distance.map((d, i) => [d, item.curve[i]]),
+        lineStyle: {
+          color: this.getModelColor(name),
+          width: isSelected ? 3 : 2,
+          type: isSelected ? 'solid' : 'dashed'
+        },
+        symbol: 'none',
+        smooth: false
+      });
+    });
+
+    return {
+      title: {
+        text: title || '变异函数曲线',
+        left: 'center'
+      },
+      tooltip: {
+        trigger: 'item',
+        formatter: (params: any) => {
+          if (params.seriesName === '经验变异函数') {
+            const point = this.data.empirical[params.dataIndex];
+            return `<div><strong>经验变异函数</strong><br/>距离: ${point.distance.toFixed(4)}<br/>半方差: ${point.semivariance.toFixed(4)}<br/>样本对数: ${point.count}</div>`;
+          }
+
+          const modelData = this.data.models.get(params.seriesName);
+          if (!modelData) {
+            return '';
+          }
+
+          const model = modelData.model;
+          return `<div><strong>${params.seriesName}</strong><br/>距离: ${params.value[0].toFixed(4)}<br/>半方差: ${params.value[1].toFixed(4)}<br/>模型: ${model.type}<br/>变差值: ${model.nugget.toFixed(4)}<br/>基台值: ${model.sill.toFixed(4)}<br/>范围值: ${model.range.toFixed(4)}</div>`;
+        }
+      },
+      legend: showLegend !== false ? {
+        bottom: 10,
+        data: ['经验变异函数', ...Array.from(this.data.models.keys())],
+        selected: {
+          '经验变异函数': true,
+          ...Object.fromEntries(Array.from(this.data.models.keys()).map((name) => [name, this.visibleModels.has(name)]))
+        }
+      } : undefined,
+      grid: {
+        left: '10%',
+        right: '10%',
+        bottom: showLegend !== false ? '15%' : '10%',
+        top: '15%',
+        containLabel: true
+      },
+      toolbox: {
+        feature: {
+          saveAsImage: {
+            title: '保存为图片'
+          },
+          dataZoom: {
+            title: {
+              zoom: '区域缩放',
+              back: '还原缩放'
+            }
+          }
+        }
+      },
+      xAxis: {
+        type: 'value',
+        name: '距离 (h)',
+        nameLocation: 'middle',
+        nameGap: 30,
+        scale: true
+      },
+      yAxis: {
+        type: 'value',
+        name: '半方差 γ(h)',
+        nameLocation: 'middle',
+        nameGap: 30,
+        scale: true,
+        min: 0
+      },
+      series
+    };
+  }
+
+  private refreshFitQuality(): void {
+    if (!this.qualityPanel) {
+      return;
+    }
+
+    const selected = this.selectedModel ? this.data.models.get(this.selectedModel) : null;
+    if (!selected) {
+      this.qualityPanel.innerHTML = '<span>拟合质量：暂无可用模型</span>';
+      return;
+    }
+
+    const fittedPoints = this.buildDistanceAxis().map((distance, index) => ({
+      distance,
+      semivariance: selected.curve[index]
+    }));
+    const empiricalPoints = this.data.empirical.map((point) => ({
+      distance: point.distance,
+      semivariance: point.semivariance
+    }));
+
+    const quality = this.calculateFitQuality(empiricalPoints, fittedPoints);
+    this.currentFit = {
+      model: selected.model,
+      curve: selected.curve,
+      quality
+    };
+
+    this.qualityPanel.innerHTML = `
+      <div class="variogram-quality-metrics">
+        <span>R²: ${quality.r2.toFixed(3)}</span>
+        <span>RMSE: ${quality.rmse.toFixed(4)}</span>
+      </div>
+      <div class="variogram-quality-recommendation">建议：${quality.recommendation}</div>
+    `;
+  }
+
+  private generateRecommendation(r2: number, rmse: number): string {
+    if (r2 >= 0.85 && rmse < 0.15) {
+      return '拟合表现良好，可保持当前参数进行插值';
+    }
+    if (r2 < 0.6) {
+      return '拟合偏弱，建议优先增大 range 或切换变异函数模型';
+    }
+    if (rmse > 0.3) {
+      return '误差偏高，可适当减小 nugget 并增加 nlags';
+    }
+    return '拟合中等，建议微调 sill 与 range 观察曲线变化';
   }
 }

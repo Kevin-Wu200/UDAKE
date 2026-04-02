@@ -3,6 +3,10 @@
  * 提供双向绑定、模板管理、智能推荐、实时校验与警告聚合
  */
 
+import { ParameterRelationshipChart } from './ParameterRelationshipChart.js';
+import { ParameterImpactPreview, type KrigingPreviewConfig } from './ParameterImpactPreview.js';
+import { VariogramChart, type VariogramParams } from './VariogramChart.js';
+
 type ParamName = 'grid-resolution' | 'nlags' | 'nugget' | 'sill' | 'range';
 
 type TemplateConfig = {
@@ -115,6 +119,12 @@ export class ParameterAdjustmentPanel {
 
     private samplingContext: SamplingContextPoint[] = [];
 
+    private relationshipChart: ParameterRelationshipChart | null = null;
+
+    private impactPreview: ParameterImpactPreview | null = null;
+
+    private variogramChart: VariogramChart | null = null;
+
     private constructor() {
         this.initialize();
     }
@@ -136,10 +146,13 @@ export class ParameterAdjustmentPanel {
         this.loadCustomTemplates();
         this.bindTemplateControls();
         this.bindConfigApplyEvent();
+        this.initializeVisualizationComponents();
+        this.bindVisualizationControls();
 
         this.refreshTemplateSelector();
         this.updateRangeVisualization();
         this.updateWarningPanel();
+        this.syncVisualization();
     }
 
     private bindSlider(paramName: ParamName, min: number, max: number): void {
@@ -165,6 +178,7 @@ export class ParameterAdjustmentPanel {
                 this.updateRangeVisualization();
             }
             this.updateWarningPanel();
+            this.syncVisualization();
         };
 
         slider.addEventListener('input', () => {
@@ -227,6 +241,177 @@ export class ParameterAdjustmentPanel {
         });
     }
 
+    private initializeVisualizationComponents(): void {
+        const root = this.ensureVisualizationContainer();
+        if (!root) {
+            return;
+        }
+
+        const relationshipContainer = root.querySelector('#parameter-relationship-chart') as HTMLElement | null;
+        const impactContainer = root.querySelector('#parameter-impact-preview') as HTMLElement | null;
+        const variogramContainer = root.querySelector('#variogram-fitting-chart') as HTMLElement | null;
+
+        if (relationshipContainer) {
+            this.relationshipChart = new ParameterRelationshipChart(relationshipContainer, {
+                axisX: { key: 'nugget', label: 'nugget', min: PARAM_META.nugget.min, max: PARAM_META.nugget.max },
+                axisY: { key: 'sill', label: 'sill', min: PARAM_META.sill.min, max: PARAM_META.sill.max },
+                constraint: {
+                    label: 'nugget ≤ sill',
+                    validate: (x, y) => x <= y
+                },
+                onPointSelected: (x, y) => {
+                    this.setParameter('nugget', x);
+                    this.setParameter('sill', y);
+                }
+            });
+        }
+
+        if (impactContainer) {
+            this.impactPreview = new ParameterImpactPreview(impactContainer);
+        }
+
+        if (variogramContainer) {
+            this.variogramChart = new VariogramChart({
+                container: variogramContainer,
+                empiricalData: this.buildEmpiricalVariogramData(),
+                models: [],
+                selectedModel: 'spherical-实时拟合',
+                showLegend: true,
+                title: '实时变异函数拟合预览'
+            });
+        }
+    }
+
+    private bindVisualizationControls(): void {
+        const toggleButton = document.getElementById('toggle-kriging-visualization') as HTMLButtonElement | null;
+        const panel = document.getElementById('kriging-visualization-panel') as HTMLElement | null;
+        const generatePreviewBtn = document.getElementById('generate-impact-preview-btn') as HTMLButtonElement | null;
+        const modelSelect = document.getElementById('variogram-model') as HTMLSelectElement | null;
+
+        toggleButton?.addEventListener('click', () => {
+            if (!panel) {
+                return;
+            }
+            const hidden = panel.classList.toggle('collapsed');
+            panel.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+            toggleButton.textContent = hidden ? '显示可视化' : '隐藏可视化';
+        });
+
+        generatePreviewBtn?.addEventListener('click', async () => {
+            await this.generateCurrentPreview();
+        });
+
+        modelSelect?.addEventListener('change', () => {
+            this.syncVisualization();
+        });
+    }
+
+    private ensureVisualizationContainer(): HTMLElement | null {
+        let panel = document.getElementById('kriging-visualization-panel') as HTMLElement | null;
+        if (panel) {
+            return panel;
+        }
+
+        const startBtn = document.getElementById('start-kriging-btn');
+        const container = startBtn?.parentElement;
+        if (!container) {
+            return null;
+        }
+
+        const section = document.createElement('section');
+        section.className = 'kriging-visualization-wrapper';
+        section.innerHTML = `
+            <div class="kriging-visualization-toolbar">
+                <h3>参数可视化</h3>
+                <div class="kriging-template-actions">
+                    <button id="generate-impact-preview-btn" class="btn btn-secondary" type="button">生成预览</button>
+                    <button id="toggle-kriging-visualization" class="btn btn-secondary" type="button">隐藏可视化</button>
+                </div>
+            </div>
+            <div id="kriging-visualization-panel">
+                <div class="kriging-visual-card">
+                    <div class="kriging-visual-card-title">参数关系图（nugget-sill）</div>
+                    <div id="parameter-relationship-chart" class="kriging-visual-chart"></div>
+                </div>
+                <div class="kriging-visual-card">
+                    <div class="kriging-visual-card-title">参数影响预览</div>
+                    <div id="parameter-impact-preview"></div>
+                </div>
+                <div class="kriging-visual-card">
+                    <div class="kriging-visual-card-title">实时变异函数拟合</div>
+                    <div id="variogram-fitting-chart" class="kriging-variogram-chart"></div>
+                </div>
+            </div>
+        `;
+
+        container.insertBefore(section, startBtn);
+        panel = section.querySelector('#kriging-visualization-panel') as HTMLElement | null;
+        return panel;
+    }
+
+    private getCurrentPreviewConfig(): KrigingPreviewConfig {
+        const method = (document.getElementById('kriging-method') as HTMLSelectElement | null)?.value;
+        const variogramModel = (document.getElementById('variogram-model') as HTMLSelectElement | null)?.value;
+        return {
+            'grid-resolution': this.parameters.get('grid-resolution') ?? 100,
+            nlags: this.parameters.get('nlags') ?? 12,
+            nugget: this.parameters.get('nugget') ?? 0,
+            sill: this.parameters.get('sill') ?? 1,
+            range: this.parameters.get('range') ?? 10,
+            method: (method as KrigingPreviewConfig['method']) || 'ordinary',
+            variogramModel: (variogramModel as KrigingPreviewConfig['variogramModel']) || 'spherical'
+        };
+    }
+
+    private async generateCurrentPreview(): Promise<void> {
+        if (!this.impactPreview) {
+            return;
+        }
+        await this.impactPreview.generatePreview(this.getCurrentPreviewConfig(), '当前配置');
+    }
+
+    private buildEmpiricalVariogramData(): Array<{ distance: number; semivariance: number; count: number }> {
+        const range = this.parameters.get('range') ?? 30;
+        const sill = this.parameters.get('sill') ?? 1;
+        const nugget = this.parameters.get('nugget') ?? 0.1;
+        const points: Array<{ distance: number; semivariance: number; count: number }> = [];
+        const maxDistance = Math.max(1, range * 1.4);
+
+        for (let i = 1; i <= 12; i++) {
+            const distance = Number(((maxDistance / 12) * i).toFixed(2));
+            const ratio = distance / Math.max(1, range);
+            const trend = ratio <= 1
+                ? nugget + (sill - nugget) * (1.5 * ratio - 0.5 * ratio ** 3)
+                : sill;
+            const noise = ((i % 3) - 1) * Math.max(0.01, sill * 0.025);
+            points.push({
+                distance,
+                semivariance: Number(Math.max(0, trend + noise).toFixed(4)),
+                count: 5 + i
+            });
+        }
+        return points;
+    }
+
+    private buildVariogramParams(): VariogramParams {
+        const model = (document.getElementById('variogram-model') as HTMLSelectElement | null)?.value || 'spherical';
+        return {
+            modelType: (model as VariogramParams['modelType']) || 'spherical',
+            nugget: this.parameters.get('nugget') ?? 0,
+            sill: this.parameters.get('sill') ?? 1,
+            range: this.parameters.get('range') ?? 10
+        };
+    }
+
+    private syncVisualization(): void {
+        const nugget = this.parameters.get('nugget') ?? 0;
+        const sill = this.parameters.get('sill') ?? 1;
+
+        this.relationshipChart?.update(nugget, sill);
+        this.relationshipChart?.highlightRegion(nugget <= sill ? 'valid' : 'invalid');
+        this.variogramChart?.updateFitting(this.buildVariogramParams());
+    }
+
     private applyExternalParameters(params: Record<string, unknown>): void {
         const map: Record<ParamName, string> = {
             'grid-resolution': 'grid_resolution',
@@ -253,6 +438,7 @@ export class ParameterAdjustmentPanel {
         }
 
         this.updateWarningPanel();
+        this.syncVisualization();
     }
 
     private setSelectValue(id: string, value: string): void {
@@ -429,6 +615,7 @@ export class ParameterAdjustmentPanel {
         }
 
         this.updateWarningPanel();
+        this.syncVisualization();
     }
 
     public resetToDefaults(): void {
@@ -484,6 +671,7 @@ export class ParameterAdjustmentPanel {
     public setSamplingContext(points: SamplingContextPoint[]): void {
         this.samplingContext = points;
         this.updateWarningPanel();
+        this.syncVisualization();
     }
 
     public applyTemplate(templateId: string): boolean {

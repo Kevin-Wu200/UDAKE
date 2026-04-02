@@ -34,6 +34,7 @@ export class ParameterInfoPanel {
         this.createContainer();
         this.render();
         this.bindEvents();
+        this.renderRelationshipDiagram();
     }
 
     /**
@@ -104,6 +105,7 @@ export class ParameterInfoPanel {
             <div class="info-panel-header">
                 <h3 class="info-panel-title">参数说明</h3>
             </div>
+            <div id="parameter-relationship-mini"></div>
             <div id="parameter-info-list"></div>
         `;
 
@@ -152,8 +154,53 @@ export class ParameterInfoPanel {
         document.querySelectorAll('input[type="range"], input[type="number"]').forEach(input => {
             input.addEventListener('input', () => {
                 this.updateWarnings();
+                this.renderRelationshipDiagram();
             });
         });
+    }
+
+    /**
+     * 渲染参数关系图示
+     */
+    private renderRelationshipDiagram(): void {
+        if (!this.container) return;
+
+        const wrapper = this.container.querySelector('#parameter-relationship-mini');
+        if (!wrapper) return;
+
+        const nugget = parseFloat((document.getElementById('nugget') as HTMLInputElement)?.value || '0');
+        const sill = parseFloat((document.getElementById('sill') as HTMLInputElement)?.value || '1');
+        const range = parseFloat((document.getElementById('range') as HTMLInputElement)?.value || '10');
+        const grid = parseFloat((document.getElementById('grid-resolution') as HTMLInputElement)?.value || '100');
+
+        const ratio = sill > 0 ? Math.min(1, Math.max(0, nugget / sill)) : 0;
+        const rangeImpact = Math.min(100, Math.max(0, range));
+        const perfCost = Math.min(100, Math.max(0, ((grid - 50) / 450) * 100));
+        const valid = nugget <= sill;
+
+        wrapper.innerHTML = `
+            <div class="parameter-info-relationship-card ${valid ? 'valid' : 'warning'}">
+                <div class="parameter-info-relationship-title">参数关系图示</div>
+                <div class="parameter-info-relationship-row">
+                    <span>nugget/sill</span>
+                    <div class="meter"><i style="width:${(ratio * 100).toFixed(1)}%"></i></div>
+                    <strong>${ratio.toFixed(2)}</strong>
+                </div>
+                <div class="parameter-info-relationship-row">
+                    <span>range影响范围</span>
+                    <div class="meter"><i style="width:${rangeImpact.toFixed(1)}%"></i></div>
+                    <strong>${range.toFixed(1)}</strong>
+                </div>
+                <div class="parameter-info-relationship-row">
+                    <span>grid性能成本</span>
+                    <div class="meter"><i style="width:${perfCost.toFixed(1)}%"></i></div>
+                    <strong>${perfCost.toFixed(1)}%</strong>
+                </div>
+                <div class="parameter-info-relationship-note">
+                    ${valid ? '当前满足约束 nugget ≤ sill' : '当前违反约束：请降低 nugget 或提高 sill'}
+                </div>
+            </div>
+        `;
     }
 
     /**

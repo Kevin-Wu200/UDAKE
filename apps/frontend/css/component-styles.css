@@ -306,6 +306,230 @@
     display: none;
 }
 
+.kriging-visualization-wrapper {
+    margin-top: 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    background: var(--bg-primary);
+    padding: 10px;
+}
+
+.kriging-visualization-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+
+.kriging-visualization-toolbar h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+#kriging-visualization-panel {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+}
+
+#kriging-visualization-panel.collapsed {
+    display: none;
+}
+
+.kriging-visual-card {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    padding: 10px;
+}
+
+.kriging-visual-card-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 8px;
+}
+
+.kriging-visual-chart {
+    height: 220px;
+}
+
+.kriging-variogram-chart {
+    min-height: 300px;
+}
+
+.parameter-relationship-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.parameter-impact-preview {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.parameter-impact-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.parameter-impact-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.parameter-impact-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px;
+}
+
+.parameter-impact-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px;
+}
+
+.parameter-impact-card-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+}
+
+.parameter-impact-image {
+    width: 100%;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.parameter-impact-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-secondary);
+}
+
+.parameter-impact-summary {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.parameter-impact-score-row {
+    display: grid;
+    grid-template-columns: 70px 1fr 52px;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+}
+
+.parameter-impact-score-row .bar {
+    height: 8px;
+    border-radius: 999px;
+    background: var(--bg-secondary);
+    overflow: hidden;
+}
+
+.parameter-impact-score-row .bar i {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #1677ff, #52c41a);
+}
+
+.parameter-impact-empty {
+    font-size: 12px;
+    color: var(--text-tertiary);
+}
+
+.variogram-quality-panel {
+    margin-top: 8px;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    font-size: 12px;
+    color: var(--text-secondary);
+}
+
+.variogram-quality-metrics {
+    display: flex;
+    gap: 12px;
+    font-weight: 600;
+}
+
+.variogram-quality-recommendation {
+    margin-top: 4px;
+    color: var(--text-tertiary);
+}
+
+.variogram-chart .model-parameters-panel {
+    margin-top: 8px;
+    max-height: 220px;
+    overflow-y: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--bg-primary);
+    padding: 8px;
+}
+
+.variogram-chart .model-param-item {
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 8px;
+    margin-bottom: 6px;
+    cursor: pointer;
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+}
+
+.variogram-chart .model-param-item:hover {
+    border-color: var(--primary-color);
+}
+
+.variogram-chart .model-param-item.selected {
+    border-color: var(--primary-color);
+    background: var(--bg-secondary);
+}
+
+.variogram-chart .model-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.variogram-chart .best-model-badge {
+    font-size: 11px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(46, 204, 113, 0.2);
+    color: #1f8a4c;
+}
+
+.variogram-chart .fit-score {
+    font-size: 11px;
+    color: var(--text-tertiary);
+}
+
+.variogram-chart .model-details {
+    font-size: 12px;
+    color: var(--text-secondary);
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 4px;
+}
+
 @media (max-width: 768px) {
     .kriging-template-actions .btn {
         width: calc(50% - 4px);
@@ -1988,6 +2212,56 @@ input[type="number"] {
     display: flex;
     flex-direction: column;
     gap: 12px;
+}
+
+.parameter-info-relationship-card {
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 10px;
+    background: var(--bg-primary);
+}
+
+.parameter-info-relationship-card.valid {
+    border-color: rgba(30, 180, 90, 0.35);
+}
+
+.parameter-info-relationship-card.warning {
+    border-color: rgba(255, 77, 79, 0.4);
+}
+
+.parameter-info-relationship-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+}
+
+.parameter-info-relationship-row {
+    display: grid;
+    grid-template-columns: 86px 1fr 52px;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+.parameter-info-relationship-row .meter {
+    height: 7px;
+    border-radius: 999px;
+    overflow: hidden;
+    background: var(--bg-secondary);
+}
+
+.parameter-info-relationship-row .meter i {
+    display: block;
+    height: 100%;
+    background: linear-gradient(90deg, #ff9f43, #1677ff);
+}
+
+.parameter-info-relationship-note {
+    margin-top: 6px;
+    font-size: 11px;
+    color: var(--text-tertiary);
 }
 
 .parameter-info-item {
