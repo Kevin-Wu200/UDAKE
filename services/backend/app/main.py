@@ -27,11 +27,19 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from fastapi.openapi.utils import get_openapi
 from .config import settings
 from .security_middleware import security_guard_middleware
 from .startup_manager import StartupManager
 from .services.websocket_service import websocket_service
 from .services.智能工作流服务 import smart_workflow_service
+from .api_versioning import (
+    router as api_versioning_router,
+    api_versioning_middleware,
+    SUPPORTED_API_VERSIONS,
+    CURRENT_API_VERSION,
+    DEPRECATED_API_VERSIONS,
+)
 from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 分布式计算接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口, 数据质量接口, 数据安全接口, GPU加速接口, 数据反馈接口, 主动学习接口, 用户验证与自评估接口, 移动端GPS接口, 历史对比与趋势分析接口, 智能工作流接口
 from .api.app_download_api import router as download_router
 from .api.admin_api import router as admin_router
@@ -80,6 +88,27 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=app.title,
+        version=app.version,
+        description=app.description,
+        routes=app.routes,
+    )
+    info = openapi_schema.setdefault("info", {})
+    info["x-api-versions"] = list(SUPPORTED_API_VERSIONS)
+    info["x-current-version"] = CURRENT_API_VERSION
+    info["x-deprecated-versions"] = DEPRECATED_API_VERSIONS
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
+
 # CORS中间件 —— 开发环境放行所有来源，避免 Capacitor/局域网调试时 origin 不匹配
 if settings.is_development:
     app.add_middleware(
@@ -101,6 +130,13 @@ else:
 # 挂载静态文件
 app.mount("/results", StaticFiles(directory=str(settings.RESULTS_DIR)), name="results")
 app.mount("/android_downloads", StaticFiles(directory=str(settings.ANDROID_APK_DIR)), name="android_downloads")
+
+
+@app.middleware("http")
+async def api_version_middleware(request: Request, call_next):
+    """统一处理 API 版本解析、兼容重写与废弃告警。"""
+    return await api_versioning_middleware(request, call_next)
+
 
 # 注册路由
 app.include_router(数据上传接口.router, prefix="/api", tags=["数据上传"])
@@ -147,6 +183,7 @@ app.include_router(auth_router, prefix="/api", tags=["认证"])
 app.include_router(devices_router, prefix="/api", tags=["设备管理"])
 app.include_router(company_management_router, prefix="/api", tags=["企业管理"])
 app.include_router(admin_router, prefix="/api", tags=["管理员后台"])
+app.include_router(api_versioning_router)
 
 # 注册新增的系统路由
 app.include_router(realtime_routes.router, prefix="/api", tags=["实时插值"])
