@@ -43,7 +43,14 @@ export interface CacheStrategy {
    * 获取应该淘汰的键
    */
   getEvictionKey(): string | null;
+  /** 清理策略内部状态 */
+  clear?(): void;
 }
+
+/**
+ * 缓存策略类型
+ */
+export type CacheStrategyType = 'lru' | 'fifo' | 'lfu' | 'time-decay' | 'hybrid';
 
 /**
  * 缓存配置
@@ -54,7 +61,7 @@ export interface CacheConfig {
   /** 缓存存活时间（毫秒） */
   ttl: number;
   /** 缓存策略 */
-  strategy: 'lru' | 'lfu' | 'time-decay' | 'hybrid';
+  strategy: CacheStrategyType;
   /** 是否持久化 */
   persistence?: boolean;
   /** 持久化存储键 */
@@ -65,6 +72,8 @@ export interface CacheConfig {
   enableAutoCleanup?: boolean;
   /** 自动清理间隔（毫秒） */
   cleanupInterval?: number;
+  /** 最大内存占用（字节） */
+  maxMemoryBytes?: number;
 }
 
 /**
@@ -85,6 +94,10 @@ export interface CacheStats {
   totalRequests: number;
   /** 平均响应时间（毫秒） */
   avgResponseTime: number;
+  /** 估算内存占用（字节） */
+  memoryUsage: number;
+  /** 最大内存上限（字节，0表示无限制） */
+  maxMemoryBytes: number;
 }
 
 /**

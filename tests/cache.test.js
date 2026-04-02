@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { SmartCache } from '../apps/frontend/js/utils/cache/SmartCache';
 import { TwoLevelCache } from '../apps/frontend/js/utils/cache/TwoLevelCache';
-import { LRUStrategy, LFUStrategy, TimeDecayStrategy, HybridStrategy } from '../apps/frontend/js/utils/cache/CacheStrategy';
+import { LRUStrategy, FIFOStrategy, LFUStrategy, TimeDecayStrategy, HybridStrategy } from '../apps/frontend/js/utils/cache/CacheStrategy';
 
 describe('SmartCache', () => {
   let cache;
@@ -78,6 +78,66 @@ describe('SmartCache', () => {
       cache.set('key2', 'value2', 100); // 100ms
       expect(cache.has('key1')).toBe(true);
       expect(cache.has('key2')).toBe(true);
+    });
+  });
+
+  describe('容量与策略', () => {
+    it('LRU 应淘汰最久未访问的数据', () => {
+      const lruCache = new SmartCache({
+        maxSize: 2,
+        ttl: 5000,
+        strategy: 'lru',
+        persistence: false
+      });
+
+      lruCache.set('a', 'A');
+      lruCache.set('b', 'B');
+      lruCache.get('a');
+      lruCache.set('c', 'C');
+
+      expect(lruCache.get('a')).toBe('A');
+      expect(lruCache.get('b')).toBeUndefined();
+      expect(lruCache.get('c')).toBe('C');
+      lruCache.destroy();
+    });
+
+    it('FIFO 应淘汰最早写入的数据', () => {
+      const fifoCache = new SmartCache({
+        maxSize: 2,
+        ttl: 5000,
+        strategy: 'fifo',
+        persistence: false
+      });
+
+      fifoCache.set('a', 'A');
+      fifoCache.set('b', 'B');
+      fifoCache.get('a');
+      fifoCache.set('c', 'C');
+
+      expect(fifoCache.get('a')).toBeUndefined();
+      expect(fifoCache.get('b')).toBe('B');
+      expect(fifoCache.get('c')).toBe('C');
+      fifoCache.destroy();
+    });
+
+    it('应遵守内存上限并统计内存占用', () => {
+      const memCache = new SmartCache({
+        maxSize: 10,
+        ttl: 5000,
+        strategy: 'lru',
+        persistence: false,
+        maxMemoryBytes: 120
+      });
+
+      memCache.set('a', 'a'.repeat(20)); // 约40字节
+      memCache.set('b', 'b'.repeat(20)); // 约40字节
+      memCache.set('c', 'c'.repeat(20)); // 约40字节
+      memCache.set('d', 'd'.repeat(20)); // 触发回收
+
+      const stats = memCache.getStats();
+      expect(stats.memoryUsage).toBeLessThanOrEqual(120);
+      expect(stats.maxMemoryBytes).toBe(120);
+      memCache.destroy();
     });
   });
 
@@ -363,6 +423,22 @@ describe('缓存策略', () => {
 
       const evictKey = strategy.getEvictionKey();
       expect(evictKey).toBe('key1'); // key1是最久未使用的
+    });
+  });
+
+  describe('FIFOStrategy', () => {
+    it('应该返回最早插入的键', () => {
+      const strategy = new FIFOStrategy(3);
+      const entry1 = { value: 'v1', timestamp: 1, accessCount: 0, lastAccessTime: 1, expiresAt: Date.now() + 1000 };
+      const entry2 = { value: 'v2', timestamp: 2, accessCount: 0, lastAccessTime: 2, expiresAt: Date.now() + 1000 };
+      const entry3 = { value: 'v3', timestamp: 3, accessCount: 0, lastAccessTime: 3, expiresAt: Date.now() + 1000 };
+
+      strategy.onInsert(entry1, 'key1');
+      strategy.onInsert(entry2, 'key2');
+      strategy.onAccess(entry1, 'key1');
+      strategy.onInsert(entry3, 'key3');
+
+      expect(strategy.getEvictionKey()).toBe('key1');
     });
   });
 

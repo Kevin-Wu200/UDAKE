@@ -258,7 +258,9 @@ export class TwoLevelCache<K = string, V = any> {
         hitRate: total > 0 ? totalHits / total : 0,
         evictionCount: memoryStats.evictionCount + diskStats.evictionCount,
         totalRequests: memoryStats.totalRequests + diskStats.totalRequests,
-        avgResponseTime: this._calculateAvgResponseTime(memoryStats, diskStats)
+        avgResponseTime: this._calculateAvgResponseTime(memoryStats, diskStats),
+        memoryUsage: memoryStats.memoryUsage + diskStats.memoryUsage,
+        maxMemoryBytes: (memoryStats.maxMemoryBytes || 0) + (diskStats.maxMemoryBytes || 0)
       },
       promotionCount: this.promotionCount
     };

@@ -7,6 +7,7 @@ import type {
   CacheEntry,
   CacheConfig,
   CacheStats,
+  CacheStrategy as ICacheStrategy,
   CacheEventListener,
   CacheEventType,
   CacheHealthStatus
@@ -16,7 +17,7 @@ import { CacheStrategyFactory } from './CacheStrategy';
 export class SmartCache<K = string, V = any> {
   private cache: Map<K, CacheEntry<V>>;
   private config: CacheConfig;
-  private strategy: any;
+  private strategy: ICacheStrategy;
   private stats: CacheStats;
   private cleanupTimer: number | null = null;
   private eventListeners: Map<CacheEventType, Set<CacheEventListener>>;
@@ -37,7 +38,8 @@ export class SmartCache<K = string, V = any> {
       storageKey: config.storageKey || 'smart-cache',
       enableStats: config.enableStats !== false,
       enableAutoCleanup: config.enableAutoCleanup !== false,
-      cleanupInterval: config.cleanupInterval || 60 * 1000 // 1分钟
+      cleanupInterval: config.cleanupInterval || 60 * 1000, // 1分钟
+      maxMemoryBytes: config.maxMemoryBytes || 0
     };
 
     // 初始化策略
@@ -54,7 +56,9 @@ export class SmartCache<K = string, V = any> {
       hitRate: 0,
       evictionCount: 0,
       totalRequests: 0,
-      avgResponseTime: 0
+      avgResponseTime: 0,
+      memoryUsage: 0,
+      maxMemoryBytes: this.config.maxMemoryBytes || 0
     };
 
     // 初始化事件监听器
@@ -156,12 +160,29 @@ export class SmartCache<K = string, V = any> {
       this.evict({ checkExpired: false });
     }
 
+    // 受内存上限约束时，写入前先回收
+    const currentEntry = this.cache.get(key);
+    const currentSize = currentEntry?.size || 0;
+    const memoryLimit = this.config.maxMemoryBytes || 0;
+    if (memoryLimit > 0 && size > memoryLimit) {
+      // 单条记录超过上限，拒绝写入，避免内存失控
+      return;
+    }
+
+    let nextMemoryUsage = this.stats.memoryUsage - currentSize + size;
+    while (memoryLimit > 0 && nextMemoryUsage > memoryLimit && this.cache.size > 0) {
+      const deleted = this._evictOneByStrategy(true);
+      if (!deleted) {
+        break;
+      }
+      nextMemoryUsage = this.stats.memoryUsage - currentSize + size;
+    }
+
     this.cache.set(key, entry);
     this.strategy.onInsert(entry, String(key));
 
-    if (this.config.enableStats) {
-      this.stats.size = this.cache.size;
-    }
+    this.stats.size = this.cache.size;
+    this.stats.memoryUsage = nextMemoryUsage;
 
     this._onEvent('set', String(key), entry);
 
@@ -181,13 +202,13 @@ export class SmartCache<K = string, V = any> {
     }
 
     const entry = this.cache.get(key);
+    const entrySize = entry?.size || 0;
     const deleted = this.cache.delete(key);
 
     if (deleted) {
       this._rebuildStrategyIndex();
-      if (this.config.enableStats) {
-        this.stats.size = this.cache.size;
-      }
+      this.stats.size = this.cache.size;
+      this.stats.memoryUsage = Math.max(0, this.stats.memoryUsage - entrySize);
       this._onEvent('delete', String(key), entry);
     }
 
@@ -208,11 +229,10 @@ export class SmartCache<K = string, V = any> {
     this.accessFrequency.clear();
     this.lastAccessedKey = null;
     this.pendingWarmups.clear();
-    this.strategy.clear();
+    this.strategy.clear?.();
 
-    if (this.config.enableStats) {
-      this.stats.size = 0;
-    }
+    this.stats.size = 0;
+    this.stats.memoryUsage = 0;
 
     if (this.config.persistence) {
       this.clearPersistence();
@@ -321,6 +341,7 @@ export class SmartCache<K = string, V = any> {
       for (const [key, entry] of this.cache.entries()) {
         if (now > entry.expiresAt) {
           this.cache.delete(key);
+          this.stats.memoryUsage = Math.max(0, this.stats.memoryUsage - (entry.size || 0));
           strategyChanged = true;
           if (this.config.enableStats) {
             this.stats.evictionCount++;
@@ -339,6 +360,7 @@ export class SmartCache<K = string, V = any> {
         const deleted = this.cache.delete(evictKey as K);
         if (deleted) {
           strategyChanged = true;
+          this.stats.memoryUsage = Math.max(0, this.stats.memoryUsage - (entry?.size || 0));
         }
         if (this.config.enableStats) {
           this.stats.evictionCount++;
@@ -498,7 +520,9 @@ export class SmartCache<K = string, V = any> {
       hitRate: 0,
       evictionCount: 0,
       totalRequests: 0,
-      avgResponseTime: 0
+      avgResponseTime: 0,
+      memoryUsage: this._calculateTotalMemoryUsage(),
+      maxMemoryBytes: this.config.maxMemoryBytes || 0
     };
     this.responseTimeHistory = [];
   }
@@ -538,16 +562,15 @@ export class SmartCache<K = string, V = any> {
       return;
     }
 
-    this.isDestroyed = true;
-
     if (this.cleanupTimer !== null) {
       clearInterval(this.cleanupTimer);
       this.cleanupTimer = null;
     }
 
     this.clear();
-    this.strategy.clear();
+    this.strategy.clear?.();
     this.eventListeners.clear();
+    this.isDestroyed = true;
   }
 
   /**
@@ -558,7 +581,8 @@ export class SmartCache<K = string, V = any> {
       clearInterval(this.cleanupTimer);
     }
 
-    this.cleanupTimer = window.setInterval(() => {
+    const timerHost = typeof window !== 'undefined' ? window : globalThis;
+    this.cleanupTimer = timerHost.setInterval(() => {
       this.evict();
     }, this.config.cleanupInterval!);
   }
@@ -602,15 +626,63 @@ export class SmartCache<K = string, V = any> {
     });
   }
 
+  private _evictOneByStrategy(checkExpired: boolean): boolean {
+    if (checkExpired) {
+      const now = Date.now();
+      for (const [key, entry] of this.cache.entries()) {
+        if (now > entry.expiresAt) {
+          this.cache.delete(key);
+          this.stats.memoryUsage = Math.max(0, this.stats.memoryUsage - (entry.size || 0));
+          if (this.config.enableStats) {
+            this.stats.evictionCount++;
+          }
+          this._onEvent('expire', String(key), entry);
+          this._rebuildStrategyIndex();
+          this.stats.size = this.cache.size;
+          return true;
+        }
+      }
+    }
+
+    const evictKey = this.strategy.getEvictionKey();
+    if (!evictKey) {
+      return false;
+    }
+
+    const entry = this.cache.get(evictKey as K);
+    const deleted = this.cache.delete(evictKey as K);
+    if (!deleted) {
+      return false;
+    }
+
+    this.stats.memoryUsage = Math.max(0, this.stats.memoryUsage - (entry?.size || 0));
+    if (this.config.enableStats) {
+      this.stats.evictionCount++;
+    }
+    this._onEvent('evict', evictKey, entry);
+    this._rebuildStrategyIndex();
+    this.stats.size = this.cache.size;
+    return true;
+  }
+
   /**
    * 获取生效缓存容量
    * 混合策略在高频场景下允许短时弹性容量，提升命中率
    */
   private _getEffectiveMaxSize(): number {
     if (this.config.strategy === 'hybrid') {
-      return Math.max(this.config.maxSize, this.config.maxSize * 10);
+      // 混合策略允许弹性容量，但保持明确硬上限，避免无界增长
+      return Math.max(this.config.maxSize, Math.min(this.config.maxSize * 10, this.config.maxSize + 10_000));
     }
     return this.config.maxSize;
+  }
+
+  private _calculateTotalMemoryUsage(): number {
+    let total = 0;
+    this.cache.forEach((entry) => {
+      total += entry.size || 0;
+    });
+    return total;
   }
 
   /**
@@ -689,9 +761,8 @@ export class SmartCache<K = string, V = any> {
             this.cache.set(key as K, entry as CacheEntry<V>);
           }
         }
-        if (this.config.enableStats) {
-          this.stats.size = this.cache.size;
-        }
+        this.stats.size = this.cache.size;
+        this.stats.memoryUsage = this._calculateTotalMemoryUsage();
         this._rebuildStrategyIndex();
       }
     } catch (error) {

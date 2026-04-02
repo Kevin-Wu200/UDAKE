@@ -12,6 +12,7 @@ import type {
 
 import { OfflineManager } from '../utils/OfflineManager';
 import { TwoLevelCache } from '../utils/cache/TwoLevelCache';
+import { CacheManager } from '../utils/cache/CacheManager';
 import { errorHandler } from '../utils/errors/ErrorHandler';
 import { ApplicationError, NetworkError, ValidationError, AuthenticationError, NotFoundError, ServerError } from '../utils/errors/AppError';
 import { ErrorSeverity, ErrorType, type AppError, type ErrorContext } from '../types/errors';
@@ -174,8 +175,11 @@ export class APIService implements IAPIService {
     public baseURL: string;
     private pendingRequests: Map<string, Promise<unknown>>;
     private cache: TwoLevelCache<string, unknown>;
+    private readonly cacheManager: CacheManager;
     private readonly apiVersion: string;
     private readonly apiVersionHeader: string;
+    private cacheLookupCount: number = 0;
+    private readonly cacheMetricsLogInterval: number = 50;
 
     // 重试配置
     private readonly maxRetries: number;
@@ -188,25 +192,29 @@ export class APIService implements IAPIService {
         this.retryableStatusCodes = new Set([408, 429, 500, 502, 503, 504]);
         this.baseURL = baseURL;
         this.pendingRequests = new Map();
+        this.cacheManager = new CacheManager();
         this.apiVersion = AppConfig.api.version;
         this.apiVersionHeader = AppConfig.api.versionHeader;
-        this.cache = new TwoLevelCache(
-            {
+        this.cache = this.cacheManager.create('api-service', {
+            type: 'two-level',
+            memoryConfig: {
                 maxSize: 100,
                 ttl: 5 * 60 * 1000, // 5分钟
-                strategy: 'lru'
+                strategy: 'lru',
+                maxMemoryBytes: 5 * 1024 * 1024 // 5MB
             },
-            {
+            diskConfig: {
                 maxSize: 500,
                 ttl: 60 * 60 * 1000, // 1小时
                 strategy: 'lfu',
-                storageKey: 'api-cache'
+                storageKey: 'api-cache',
+                maxMemoryBytes: 20 * 1024 * 1024 // 20MB
             },
-            {
+            options: {
                 enableAutoPromote: true,
                 promoteThreshold: 3
             }
-        );
+        }) as TwoLevelCache<string, unknown>;
     }
 
     /**
@@ -227,11 +235,14 @@ export class APIService implements IAPIService {
     }
 
     private async _getFromCache<T>(key: string): Promise<T | null> {
+        this.cacheLookupCount++;
         const value = await this.cache.get(key);
         if (value !== undefined) {
             Logger.debug('APIService', `缓存命中: ${key}`);
+            this._logCacheMetricsIfNeeded('hit');
             return value as T;
         }
+        this._logCacheMetricsIfNeeded('miss');
         return null;
     }
 
@@ -254,6 +265,18 @@ export class APIService implements IAPIService {
 
     public resetCacheStats(): void {
         this.cache.resetStats();
+        this.cacheLookupCount = 0;
+    }
+
+    private _logCacheMetricsIfNeeded(lastResult: 'hit' | 'miss'): void {
+        if (this.cacheLookupCount % this.cacheMetricsLogInterval !== 0) {
+            return;
+        }
+        const stats = this.cache.getStats();
+        Logger.info(
+            'APIService',
+            `缓存监控: requests=${stats.total.totalRequests}, hitRate=${(stats.total.hitRate * 100).toFixed(2)}%, last=${lastResult}, size=${stats.total.size}`
+        );
     }
 
     public getApiVersion(): string {

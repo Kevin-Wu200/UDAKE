@@ -10,11 +10,11 @@ import type { CacheEntry, CacheStrategy as ICacheStrategy } from '../../types/ca
  * 淘汰最久未使用的条目
  */
 export class LRUStrategy implements ICacheStrategy {
-  private accessQueue: Map<string, number>;
+  private accessOrder: Map<string, true>;
   private maxSize: number;
 
   constructor(maxSize: number = 100) {
-    this.accessQueue = new Map();
+    this.accessOrder = new Map();
     this.maxSize = maxSize;
   }
 
@@ -24,25 +24,16 @@ export class LRUStrategy implements ICacheStrategy {
   }
 
   onAccess(entry: CacheEntry<any>, key: string): void {
-    this.accessQueue.set(key, Date.now());
+    this._touch(key);
   }
 
   onInsert(entry: CacheEntry<any>, key: string): void {
-    this.accessQueue.set(key, Date.now());
+    this._touch(key);
   }
 
   getEvictionKey(): string | null {
-    let oldestKey: string | null = null;
-    let oldestTime = Infinity;
-
-    this.accessQueue.forEach((time, key) => {
-      if (time < oldestTime) {
-        oldestTime = time;
-        oldestKey = key;
-      }
-    });
-
-    return oldestKey;
+    const oldest = this.accessOrder.keys().next();
+    return oldest.done ? null : oldest.value;
   }
 
   /**
@@ -56,7 +47,55 @@ export class LRUStrategy implements ICacheStrategy {
    * 清除策略数据
    */
   clear(): void {
-    this.accessQueue.clear();
+    this.accessOrder.clear();
+  }
+
+  private _touch(key: string): void {
+    if (this.accessOrder.has(key)) {
+      this.accessOrder.delete(key);
+    }
+    this.accessOrder.set(key, true);
+  }
+}
+
+/**
+ * FIFO (First In First Out) 策略
+ * 淘汰最早写入的条目，访问不会改变顺序
+ */
+export class FIFOStrategy implements ICacheStrategy {
+  private insertionOrder: Map<string, true>;
+  private maxSize: number;
+
+  constructor(maxSize: number = 100) {
+    this.insertionOrder = new Map();
+    this.maxSize = maxSize;
+  }
+
+  shouldEvict(entry: CacheEntry<any>): boolean {
+    return false;
+  }
+
+  onAccess(entry: CacheEntry<any>, key: string): void {
+    // FIFO 访问不改变淘汰顺序
+  }
+
+  onInsert(entry: CacheEntry<any>, key: string): void {
+    if (!this.insertionOrder.has(key)) {
+      this.insertionOrder.set(key, true);
+    }
+  }
+
+  getEvictionKey(): string | null {
+    const first = this.insertionOrder.keys().next();
+    return first.done ? null : first.value;
+  }
+
+  updateMaxSize(newSize: number): void {
+    this.maxSize = newSize;
+  }
+
+  clear(): void {
+    this.insertionOrder.clear();
   }
 }
 
@@ -325,12 +364,14 @@ export class CacheStrategyFactory {
    * 创建策略实例
    */
   static create(
-    strategy: 'lru' | 'lfu' | 'time-decay' | 'hybrid',
+    strategy: 'lru' | 'fifo' | 'lfu' | 'time-decay' | 'hybrid',
     maxSize: number = 100
   ): ICacheStrategy {
     switch (strategy) {
       case 'lru':
         return new LRUStrategy(maxSize);
+      case 'fifo':
+        return new FIFOStrategy(maxSize);
       case 'lfu':
         return new LFUStrategy(maxSize);
       case 'time-decay':
