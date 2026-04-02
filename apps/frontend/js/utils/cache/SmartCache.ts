@@ -27,6 +27,9 @@ export class SmartCache<K = string, V = any> {
   private accessTransitions: Map<K, Map<K, number>> = new Map();
   private lastAccessedKey: K | null = null;
   private pendingWarmups: Set<string> = new Set();
+  private listenerRegistry: WeakMap<CacheEventListener, Set<CacheEventType>> = new WeakMap();
+  private idleWarmupTimeouts: Set<ReturnType<typeof setTimeout>> = new Set();
+  private idleWarmupRequestIds: Set<number> = new Set();
 
   constructor(config: Partial<CacheConfig> = {}) {
     this.cache = new Map();
@@ -39,7 +42,8 @@ export class SmartCache<K = string, V = any> {
       enableStats: config.enableStats !== false,
       enableAutoCleanup: config.enableAutoCleanup !== false,
       cleanupInterval: config.cleanupInterval || 60 * 1000, // 1分钟
-      maxMemoryBytes: config.maxMemoryBytes || 0
+      maxMemoryBytes: config.maxMemoryBytes || 0,
+      onPersistenceError: config.onPersistenceError
     };
 
     // 初始化策略
@@ -58,12 +62,13 @@ export class SmartCache<K = string, V = any> {
       totalRequests: 0,
       avgResponseTime: 0,
       memoryUsage: 0,
-      maxMemoryBytes: this.config.maxMemoryBytes || 0
+      maxMemoryBytes: this.config.maxMemoryBytes || 0,
+      persistenceErrorCount: 0
     };
 
     // 初始化事件监听器
     this.eventListeners = new Map();
-    const eventTypes: CacheEventType[] = ['hit', 'miss', 'set', 'delete', 'evict', 'clear', 'expire'];
+    const eventTypes: CacheEventType[] = ['hit', 'miss', 'set', 'delete', 'evict', 'clear', 'expire', 'persistence-error'];
     eventTypes.forEach(type => {
       this.eventListeners.set(type, new Set());
     });
@@ -382,10 +387,16 @@ export class SmartCache<K = string, V = any> {
    * 添加事件监听器
    */
   on(event: CacheEventType, listener: CacheEventListener): void {
+    if (this.isDestroyed) {
+      return;
+    }
     const listeners = this.eventListeners.get(event);
     if (listeners) {
       listeners.add(listener);
     }
+    const events = this.listenerRegistry.get(listener) || new Set<CacheEventType>();
+    events.add(event);
+    this.listenerRegistry.set(listener, events);
   }
 
   /**
@@ -396,6 +407,16 @@ export class SmartCache<K = string, V = any> {
     if (listeners) {
       listeners.delete(listener);
     }
+    const events = this.listenerRegistry.get(listener);
+    if (!events) {
+      return;
+    }
+    events.delete(event);
+    if (events.size === 0) {
+      this.listenerRegistry.delete(listener);
+      return;
+    }
+    this.listenerRegistry.set(listener, events);
   }
 
   /**
@@ -495,11 +516,19 @@ export class SmartCache<K = string, V = any> {
     };
 
     if (typeof window !== 'undefined' && 'requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(runWarmup, { timeout: 120 });
+      const idleId = (window as any).requestIdleCallback(() => {
+        this.idleWarmupRequestIds.delete(idleId);
+        runWarmup();
+      }, { timeout: 120 });
+      this.idleWarmupRequestIds.add(idleId);
       return;
     }
 
-    setTimeout(runWarmup, 0);
+    const timeoutId = setTimeout(() => {
+      this.idleWarmupTimeouts.delete(timeoutId);
+      runWarmup();
+    }, 0);
+    this.idleWarmupTimeouts.add(timeoutId);
   }
 
   /**
@@ -522,7 +551,8 @@ export class SmartCache<K = string, V = any> {
       totalRequests: 0,
       avgResponseTime: 0,
       memoryUsage: this._calculateTotalMemoryUsage(),
-      maxMemoryBytes: this.config.maxMemoryBytes || 0
+      maxMemoryBytes: this.config.maxMemoryBytes || 0,
+      persistenceErrorCount: 0
     };
     this.responseTimeHistory = [];
   }
@@ -544,6 +574,9 @@ export class SmartCache<K = string, V = any> {
     }
     if (this.stats.evictionCount > this.stats.hits * 0.2) {
       recommendations.push('淘汰频率过高，建议调整缓存策略');
+    }
+    if (this.stats.persistenceErrorCount > 0) {
+      recommendations.push(`检测到 ${this.stats.persistenceErrorCount} 次持久化失败，建议检查存储可用性`);
     }
 
     return {
@@ -567,9 +600,10 @@ export class SmartCache<K = string, V = any> {
       this.cleanupTimer = null;
     }
 
+    this._cancelScheduledWarmups();
     this.clear();
     this.strategy.clear?.();
-    this.eventListeners.clear();
+    this._clearEventListeners();
     this.isDestroyed = true;
   }
 
@@ -766,7 +800,7 @@ export class SmartCache<K = string, V = any> {
         this._rebuildStrategyIndex();
       }
     } catch (error) {
-      console.error('[SmartCache] 加载持久化缓存失败:', error);
+      this._handlePersistenceError('load', error);
     }
   }
 
@@ -781,7 +815,7 @@ export class SmartCache<K = string, V = any> {
       });
       localStorage.setItem(this.config.storageKey!, JSON.stringify(entries));
     } catch (error) {
-      console.error('[SmartCache] 保存持久化缓存失败:', error);
+      this._handlePersistenceError('save', error);
     }
   }
 
@@ -792,7 +826,32 @@ export class SmartCache<K = string, V = any> {
     try {
       localStorage.removeItem(this.config.storageKey!);
     } catch (error) {
-      console.error('[SmartCache] 清除持久化缓存失败:', error);
+      this._handlePersistenceError('clear', error);
     }
+  }
+
+  private _handlePersistenceError(operation: 'load' | 'save' | 'clear', error: unknown): void {
+    this.stats.persistenceErrorCount++;
+    this.config.onPersistenceError?.(operation, error);
+    this._onEvent('persistence-error', operation);
+    console.error(`[SmartCache] ${operation} 持久化缓存失败:`, error);
+  }
+
+  private _cancelScheduledWarmups(): void {
+    this.idleWarmupTimeouts.forEach(timeoutId => clearTimeout(timeoutId));
+    this.idleWarmupTimeouts.clear();
+
+    if (typeof window !== 'undefined' && 'cancelIdleCallback' in window) {
+      this.idleWarmupRequestIds.forEach(idleId => {
+        (window as any).cancelIdleCallback(idleId);
+      });
+    }
+    this.idleWarmupRequestIds.clear();
+  }
+
+  private _clearEventListeners(): void {
+    this.eventListeners.forEach(listeners => listeners.clear());
+    this.eventListeners.clear();
+    this.listenerRegistry = new WeakMap();
   }
 }

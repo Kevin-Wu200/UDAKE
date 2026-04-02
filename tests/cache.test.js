@@ -3,7 +3,7 @@
  * 测试SmartCache、TwoLevelCache和缓存策略
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SmartCache } from '../apps/frontend/js/utils/cache/SmartCache';
 import { TwoLevelCache } from '../apps/frontend/js/utils/cache/TwoLevelCache';
 import { LRUStrategy, FIFOStrategy, LFUStrategy, TimeDecayStrategy, HybridStrategy } from '../apps/frontend/js/utils/cache/CacheStrategy';
@@ -211,6 +211,58 @@ describe('SmartCache', () => {
       cache.delete('key1');
       expect(deleteEventTriggered).toBe(true);
     });
+
+    it('destroy后应停止触发事件并拒绝新增监听器', () => {
+      let triggerCount = 0;
+      const listener = () => {
+        triggerCount++;
+      };
+      cache.on('set', listener);
+      cache.set('k1', 'v1');
+      expect(triggerCount).toBe(1);
+
+      cache.destroy();
+      cache.on('set', () => {
+        triggerCount += 100;
+      });
+      cache.set('k2', 'v2');
+      expect(triggerCount).toBe(1);
+    });
+  });
+
+  describe('持久化错误处理', () => {
+    it('应通过回调和事件上报持久化失败', () => {
+      const persistenceErrors = [];
+      const eventErrors = [];
+      const setItemSpy = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+        throw new Error('quota exceeded');
+      });
+
+      const persistentCache = new SmartCache({
+        maxSize: 3,
+        ttl: 1000,
+        strategy: 'lru',
+        persistence: true,
+        storageKey: 'smart-cache-test',
+        onPersistenceError: (operation, error) => {
+          persistenceErrors.push({ operation, error });
+        }
+      });
+      persistentCache.on('persistence-error', (event, key) => {
+        eventErrors.push({ event, key });
+      });
+
+      persistentCache.set('k1', 'v1');
+
+      const stats = persistentCache.getStats();
+      expect(stats.persistenceErrorCount).toBe(1);
+      expect(persistenceErrors).toHaveLength(1);
+      expect(persistenceErrors[0].operation).toBe('save');
+      expect(eventErrors).toContainEqual({ event: 'persistence-error', key: 'save' });
+
+      persistentCache.destroy();
+      setItemSpy.mockRestore();
+    });
   });
 
   describe('健康状态', () => {
@@ -334,6 +386,28 @@ describe('TwoLevelCache', () => {
       const stats = cache.getStats();
       expect(stats.memory.hits).toBe(0);
       expect(stats.disk.hits).toBe(0);
+      expect(stats.total.persistenceErrorCount).toBe(0);
+    });
+  });
+
+  describe('持久化错误处理', () => {
+    it('应统计并通知磁盘层持久化失败', async () => {
+      const captured = [];
+      const setItemSpy = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
+        throw new Error('quota exceeded');
+      });
+      const unsubscribe = cache.onPersistenceError((operation) => {
+        captured.push(operation);
+      });
+
+      await cache.set('key-persist', 'value-persist');
+
+      const stats = cache.getStats();
+      expect(stats.total.persistenceErrorCount).toBeGreaterThan(0);
+      expect(captured).toContain('save');
+
+      unsubscribe();
+      setItemSpy.mockRestore();
     });
   });
 

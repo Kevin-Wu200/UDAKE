@@ -1,5 +1,5 @@
-export { APIService } from './api/APIService';
-export { resolveRuntimeApiBaseUrl } from './api/runtime';
+export { APIService } from './APIService';
+export { resolveRuntimeApiBaseUrl } from './runtime';
 export type {
   HistoryTimeSeriesRecord,
   HistorySnapshotCreatePayload,
@@ -11,4 +11,4 @@ export type {
   HistoryExportPayload,
   HistoryImportPayload,
   HistoryArchivePayload
-} from './api/types';
+} from './types';

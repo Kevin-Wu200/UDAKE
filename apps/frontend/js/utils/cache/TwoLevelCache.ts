@@ -21,6 +21,8 @@ export class TwoLevelCache<K = string, V = any> {
   private prefetchMinConfidence: number;
   private prefetchTTLFactor: number;
   private prefetchInFlight: boolean = false;
+  private persistenceErrorCount: number = 0;
+  private persistenceErrorHandlers: Set<(operation: 'load' | 'save' | 'clear', error: unknown) => void> = new Set();
 
   constructor(
     memoryConfig: Partial<CacheConfig> = {},
@@ -43,7 +45,8 @@ export class TwoLevelCache<K = string, V = any> {
       strategy: diskConfig.strategy || 'lfu',
       persistence: true,
       storageKey: diskConfig.storageKey || 'disk-cache',
-      enableStats: true
+      enableStats: true,
+      onPersistenceError: (operation, error) => this._handlePersistenceError(operation, error)
     });
 
     // 提升追踪
@@ -260,7 +263,8 @@ export class TwoLevelCache<K = string, V = any> {
         totalRequests: memoryStats.totalRequests + diskStats.totalRequests,
         avgResponseTime: this._calculateAvgResponseTime(memoryStats, diskStats),
         memoryUsage: memoryStats.memoryUsage + diskStats.memoryUsage,
-        maxMemoryBytes: (memoryStats.maxMemoryBytes || 0) + (diskStats.maxMemoryBytes || 0)
+        maxMemoryBytes: (memoryStats.maxMemoryBytes || 0) + (diskStats.maxMemoryBytes || 0),
+        persistenceErrorCount: this.persistenceErrorCount
       },
       promotionCount: this.promotionCount
     };
@@ -273,6 +277,14 @@ export class TwoLevelCache<K = string, V = any> {
     this.memoryCache.resetStats();
     this.diskCache.resetStats();
     this.promotionCount = 0;
+    this.persistenceErrorCount = 0;
+  }
+
+  onPersistenceError(handler: (operation: 'load' | 'save' | 'clear', error: unknown) => void): () => void {
+    this.persistenceErrorHandlers.add(handler);
+    return () => {
+      this.persistenceErrorHandlers.delete(handler);
+    };
   }
 
   /**
@@ -386,6 +398,7 @@ export class TwoLevelCache<K = string, V = any> {
     this.ttlStore.clear();
     this.prefetchLoader = null;
     this.prefetchInFlight = false;
+    this.persistenceErrorHandlers.clear();
   }
 
   /**
@@ -536,5 +549,16 @@ export class TwoLevelCache<K = string, V = any> {
     const weightedDisk = diskStats.avgResponseTime * diskStats.totalRequests;
 
     return (weightedMemory + weightedDisk) / totalRequests;
+  }
+
+  private _handlePersistenceError(operation: 'load' | 'save' | 'clear', error: unknown): void {
+    this.persistenceErrorCount++;
+    this.persistenceErrorHandlers.forEach(handler => {
+      try {
+        handler(operation, error);
+      } catch (handlerError) {
+        console.error('[TwoLevelCache] 持久化错误回调执行失败:', handlerError);
+      }
+    });
   }
 }

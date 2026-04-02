@@ -74,6 +74,8 @@ export interface CacheConfig {
   cleanupInterval?: number;
   /** 最大内存占用（字节） */
   maxMemoryBytes?: number;
+  /** 持久化失败回调 */
+  onPersistenceError?: (operation: 'load' | 'save' | 'clear', error: unknown) => void;
 }
 
 /**
@@ -98,6 +100,8 @@ export interface CacheStats {
   memoryUsage: number;
   /** 最大内存上限（字节，0表示无限制） */
   maxMemoryBytes: number;
+  /** 持久化失败次数 */
+  persistenceErrorCount: number;
 }
 
 /**
@@ -110,7 +114,8 @@ export type CacheEventType =
   | 'delete'
   | 'evict'
   | 'clear'
-  | 'expire';
+  | 'expire'
+  | 'persistence-error';
 
 /**
  * 缓存事件监听器
