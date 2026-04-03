@@ -23,6 +23,7 @@ export interface RelationshipChartConfig {
     constraint?: RelationshipConstraintConfig;
     maxHistoryPoints?: number;
     onPointSelected?: (x: number, y: number) => void;
+    statusResolver?: (x: number, y: number) => RelationshipRegionType;
 }
 
 export class ParameterRelationshipChart {
@@ -35,6 +36,8 @@ export class ParameterRelationshipChart {
     private currentPoint: { x: number; y: number } | null = null;
     private historyPoints: Array<{ x: number; y: number }> = [];
     private regionHighlight: RelationshipRegionType | null = null;
+    private hoveredPoint: { x: number; y: number; source: 'current' | 'history' } | null = null;
+    private tooltipEl: HTMLDivElement;
 
     public constructor(container: HTMLElement, config: RelationshipChartConfig) {
         this.container = container;
@@ -46,9 +49,11 @@ export class ParameterRelationshipChart {
         this.canvas = document.createElement('canvas');
         this.canvas.className = 'parameter-relationship-canvas';
         this.ctx = this.getContext(this.canvas);
+        this.tooltipEl = this.createTooltip();
 
         this.container.innerHTML = '';
         this.container.appendChild(this.canvas);
+        this.container.appendChild(this.tooltipEl);
 
         this.bindEvents();
         this.resize();
@@ -118,6 +123,34 @@ export class ParameterRelationshipChart {
             const point = this.pixelToData(px, py);
             this.config.onPointSelected(point.x, point.y);
         });
+
+        this.canvas.addEventListener('mousemove', (event) => {
+            this.handlePointerMove(event.clientX, event.clientY, false);
+        });
+
+        this.canvas.addEventListener('mouseleave', () => {
+            this.clearHover();
+        });
+
+        this.canvas.addEventListener('touchstart', (event) => {
+            if (event.touches.length === 0) {
+                return;
+            }
+            const touch = event.touches[0];
+            this.handlePointerMove(touch.clientX, touch.clientY, true);
+        }, { passive: true });
+
+        this.canvas.addEventListener('touchmove', (event) => {
+            if (event.touches.length === 0) {
+                return;
+            }
+            const touch = event.touches[0];
+            this.handlePointerMove(touch.clientX, touch.clientY, true);
+        }, { passive: true });
+
+        this.canvas.addEventListener('touchend', () => {
+            this.clearHover();
+        }, { passive: true });
     }
 
     private render(): void {
@@ -136,6 +169,7 @@ export class ParameterRelationshipChart {
         this.drawConstraintRegion(ctx, padding, plotWidth, plotHeight);
         this.drawHistory(ctx, padding, plotWidth, plotHeight);
         this.drawCurrentPoint(ctx, padding, plotWidth, plotHeight);
+        this.drawHoveredPoint(ctx, padding, plotWidth, plotHeight);
         this.drawAxes(ctx, padding, plotWidth, plotHeight);
         this.drawConstraintLabel(ctx, width);
     }
@@ -225,6 +259,15 @@ export class ParameterRelationshipChart {
             }
         });
         ctx.stroke();
+
+        ctx.fillStyle = 'rgba(148, 163, 184, 0.9)';
+        this.historyPoints.forEach((point) => {
+            const x = this.dataToPixelX(point.x, padding.left, plotWidth);
+            const y = this.dataToPixelY(point.y, padding.top, plotHeight);
+            ctx.beginPath();
+            ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+            ctx.fill();
+        });
     }
 
     private drawCurrentPoint(
@@ -253,6 +296,25 @@ export class ParameterRelationshipChart {
         ctx.arc(x, y, 9, 0, Math.PI * 2);
         ctx.strokeStyle = isValid ? 'rgba(22, 119, 255, 0.35)' : 'rgba(255, 77, 79, 0.35)';
         ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+
+    private drawHoveredPoint(
+        ctx: CanvasRenderingContext2D,
+        padding: { top: number; right: number; bottom: number; left: number },
+        plotWidth: number,
+        plotHeight: number
+    ): void {
+        if (!this.hoveredPoint) {
+            return;
+        }
+
+        const x = this.dataToPixelX(this.hoveredPoint.x, padding.left, plotWidth);
+        const y = this.dataToPixelY(this.hoveredPoint.y, padding.top, plotHeight);
+        ctx.beginPath();
+        ctx.arc(x, y, this.hoveredPoint.source === 'current' ? 11 : 8, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(17, 24, 39, 0.45)';
+        ctx.lineWidth = 2;
         ctx.stroke();
     }
 
@@ -320,5 +382,121 @@ export class ParameterRelationshipChart {
 
     private clamp(value: number, min: number, max: number): number {
         return Math.min(max, Math.max(min, value));
+    }
+
+    private createTooltip(): HTMLDivElement {
+        const tooltip = document.createElement('div');
+        tooltip.className = 'parameter-relationship-tooltip';
+        tooltip.style.position = 'absolute';
+        tooltip.style.pointerEvents = 'none';
+        tooltip.style.display = 'none';
+        tooltip.style.background = 'rgba(17, 24, 39, 0.92)';
+        tooltip.style.color = '#fff';
+        tooltip.style.fontSize = '12px';
+        tooltip.style.lineHeight = '1.4';
+        tooltip.style.padding = '6px 8px';
+        tooltip.style.borderRadius = '6px';
+        tooltip.style.whiteSpace = 'nowrap';
+        tooltip.style.zIndex = '2';
+        if (this.container.style.position === '') {
+            this.container.style.position = 'relative';
+        }
+        return tooltip;
+    }
+
+    private handlePointerMove(clientX: number, clientY: number, isTouch: boolean): void {
+        const rect = this.canvas.getBoundingClientRect();
+        const px = clientX - rect.left;
+        const py = clientY - rect.top;
+        const nearest = this.findNearestHistoryPoint(px, py);
+        const current = this.currentPoint;
+        let hover: { x: number; y: number; source: 'current' | 'history' } | null = null;
+
+        if (nearest && nearest.distance <= 10) {
+            hover = { x: nearest.point.x, y: nearest.point.y, source: 'history' };
+        }
+
+        if (current) {
+            const currentX = this.dataToPixelX(current.x, ParameterRelationshipChart.PADDING.left, this.canvas.width - ParameterRelationshipChart.PADDING.left - ParameterRelationshipChart.PADDING.right);
+            const currentY = this.dataToPixelY(current.y, ParameterRelationshipChart.PADDING.top, this.canvas.height - ParameterRelationshipChart.PADDING.top - ParameterRelationshipChart.PADDING.bottom);
+            const dist = Math.hypot(px - currentX, py - currentY);
+            if (dist <= 12 || !hover) {
+                hover = { x: current.x, y: current.y, source: 'current' };
+            }
+        }
+
+        if (!hover && !isTouch) {
+            const dataPoint = this.pixelToData(px, py);
+            hover = { x: dataPoint.x, y: dataPoint.y, source: 'current' };
+        }
+
+        if (!hover) {
+            this.clearHover();
+            return;
+        }
+
+        this.hoveredPoint = hover;
+        this.tooltipEl.innerHTML = this.formatTooltip(hover.x, hover.y, hover.source);
+        this.tooltipEl.style.display = 'block';
+        this.positionTooltip(px, py);
+        this.render();
+    }
+
+    private clearHover(): void {
+        if (!this.hoveredPoint && this.tooltipEl.style.display === 'none') {
+            return;
+        }
+        this.hoveredPoint = null;
+        this.tooltipEl.style.display = 'none';
+        this.render();
+    }
+
+    private findNearestHistoryPoint(px: number, py: number): { point: { x: number; y: number }; distance: number } | null {
+        if (this.historyPoints.length === 0) {
+            return null;
+        }
+
+        const plotWidth = this.canvas.width - ParameterRelationshipChart.PADDING.left - ParameterRelationshipChart.PADDING.right;
+        const plotHeight = this.canvas.height - ParameterRelationshipChart.PADDING.top - ParameterRelationshipChart.PADDING.bottom;
+
+        let nearest: { point: { x: number; y: number }; distance: number } | null = null;
+        this.historyPoints.forEach((point) => {
+            const hx = this.dataToPixelX(point.x, ParameterRelationshipChart.PADDING.left, plotWidth);
+            const hy = this.dataToPixelY(point.y, ParameterRelationshipChart.PADDING.top, plotHeight);
+            const distance = Math.hypot(px - hx, py - hy);
+            if (!nearest || distance < nearest.distance) {
+                nearest = { point, distance };
+            }
+        });
+
+        return nearest;
+    }
+
+    private formatTooltip(x: number, y: number, source: 'current' | 'history'): string {
+        const status = this.getRegionStatus(x, y);
+        const statusLabel = status === 'valid' ? '有效' : status === 'warning' ? '警告' : '无效';
+        const prefix = source === 'history' ? '历史轨迹点' : '当前点';
+        return `${prefix}<br/>X: ${x.toFixed(3)}<br/>Y: ${y.toFixed(3)}<br/>状态: ${statusLabel}`;
+    }
+
+    private getRegionStatus(x: number, y: number): RelationshipRegionType {
+        if (this.config.statusResolver) {
+            return this.config.statusResolver(x, y);
+        }
+        if (!this.config.constraint) {
+            return 'valid';
+        }
+        return this.config.constraint.validate(x, y) ? 'valid' : 'invalid';
+    }
+
+    private positionTooltip(px: number, py: number): void {
+        const offset = 12;
+        const tooltipRect = this.tooltipEl.getBoundingClientRect();
+        const maxLeft = this.canvas.width - tooltipRect.width - 4;
+        const maxTop = this.canvas.height - tooltipRect.height - 4;
+        const left = this.clamp(px + offset, 4, Math.max(4, maxLeft));
+        const top = this.clamp(py + offset, 4, Math.max(4, maxTop));
+        this.tooltipEl.style.left = `${left}px`;
+        this.tooltipEl.style.top = `${top}px`;
     }
 }

@@ -84,4 +84,32 @@ describe('ParameterRelationshipChart', () => {
 
         canvasMock.restore();
     });
+
+    it('应支持悬浮提示并显示状态文本', () => {
+        const canvasMock = installCanvasMock();
+        const container = document.createElement('div');
+        container.getBoundingClientRect = vi.fn(() => ({ width: 420, height: 260 } as DOMRect));
+        document.body.appendChild(container);
+
+        const chart = new ParameterRelationshipChart(container, {
+            axisX: { key: 'range', label: 'range', min: 0, max: 100 },
+            axisY: { key: 'spatialRange', label: '空间范围', min: 0, max: 200 },
+            constraint: { label: '推荐范围', validate: (x, y) => x >= y * 0.15 && x <= y * 0.4 },
+            statusResolver: (x, y) => (x >= y * 0.15 && x <= y * 0.4 ? 'valid' : 'warning')
+        });
+        chart.update(10, 180);
+
+        const canvas = (chart as unknown as { canvas: HTMLCanvasElement }).canvas;
+        canvas.getBoundingClientRect = vi.fn(() => ({ left: 0, top: 0, width: 420, height: 260 } as DOMRect));
+        canvas.dispatchEvent(new MouseEvent('mousemove', { clientX: 220, clientY: 120 }));
+
+        const tooltip = container.querySelector('.parameter-relationship-tooltip') as HTMLDivElement;
+        expect(tooltip.style.display).toBe('block');
+        expect(tooltip.innerHTML).toContain('状态:');
+
+        canvas.dispatchEvent(new MouseEvent('mouseleave'));
+        expect(tooltip.style.display).toBe('none');
+
+        canvasMock.restore();
+    });
 });

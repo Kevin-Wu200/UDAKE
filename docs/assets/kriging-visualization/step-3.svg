@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#e6f4ff"/>
+      <stop offset="100%" stop-color="#f9f0ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="720" fill="url(#bg)"/>
+  <rect x="120" y="90" width="1040" height="540" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <text x="160" y="170" font-size="42" fill="#1f2937" font-family="Arial, sans-serif">克里金参数可视化操作截图占位</text>
+  <text x="160" y="240" font-size="28" fill="#475569" font-family="Arial, sans-serif">步骤 3</text>
+  <text x="160" y="300" font-size="24" fill="#64748b" font-family="Arial, sans-serif">请在回归测试时替换为真实系统截图</text>
+</svg>

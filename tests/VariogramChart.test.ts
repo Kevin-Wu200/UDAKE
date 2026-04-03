@@ -86,4 +86,56 @@ describe('VariogramChart', () => {
         chart.destroy();
         canvasMock.restore();
     });
+
+    it('应覆盖无模型场景与显隐切换分支', () => {
+        const canvasMock = installCanvasMock();
+        const container = document.createElement('div');
+        document.body.appendChild(container);
+        const chart = new VariogramChart({
+            container,
+            empiricalData: [],
+            models: [],
+            showLegend: false
+        });
+
+        expect(chart.getModels()).toEqual([]);
+        expect(chart.getSelectedModel()).toBeNull();
+        chart.toggleModel('missing-model', false);
+        chart.toggleModel('missing-model', true);
+        chart.selectModel('missing-model');
+        expect(chart.getSelectedModel()).toBeNull();
+
+        const quality = chart.calculateFitQuality([], []);
+        expect(quality.recommendation).toContain('缺少经验点');
+
+        chart.destroy();
+        canvasMock.restore();
+    });
+
+    it('应覆盖拟合建议分支与导出成功路径', async () => {
+        const canvasMock = installCanvasMock();
+        const chart = buildChart();
+
+        const recommendation = (chart as unknown as {
+            generateRecommendation: (r2: number, rmse: number) => string;
+        }).generateRecommendation;
+        expect(recommendation(0.9, 0.1)).toContain('拟合表现良好');
+        expect(recommendation(0.5, 0.12)).toContain('拟合偏弱');
+        expect(recommendation(0.7, 0.35)).toContain('误差偏高');
+        expect(recommendation(0.7, 0.2)).toContain('拟合中等');
+
+        const exportSpy = vi.spyOn(ChartService, 'exportChartAsImage').mockResolvedValue(new Blob(['x'], { type: 'image/png' }));
+        const downloadSpy = vi.spyOn(ChartService, 'downloadFile').mockImplementation(() => {});
+        await chart.exportAsImage('svg');
+        expect(exportSpy).toHaveBeenCalledTimes(1);
+        expect(downloadSpy).toHaveBeenCalledTimes(1);
+
+        chart.adjustModelParameter('not-exists', 'sill', 1.2);
+        chart.resize();
+
+        downloadSpy.mockRestore();
+        exportSpy.mockRestore();
+        chart.destroy();
+        canvasMock.restore();
+    });
 });

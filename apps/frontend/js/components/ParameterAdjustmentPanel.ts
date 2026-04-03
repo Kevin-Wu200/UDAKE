@@ -278,6 +278,7 @@ export class ParameterAdjustmentPanel {
                 axisX: config.axisX,
                 axisY: config.axisY,
                 constraint: config.constraint,
+                statusResolver: (x, y) => this.resolveRelationshipRegion(this.relationshipType, x, y),
                 onPointSelected: (x, y) => this.applyRelationshipSelection(x, y)
             });
             this.currentRelationshipAxisSignature = this.buildRelationshipAxisSignature(config);
@@ -306,6 +307,7 @@ export class ParameterAdjustmentPanel {
         const generatePreviewBtn = document.getElementById('generate-impact-preview-btn') as HTMLButtonElement | null;
         const modelSelect = document.getElementById('variogram-model') as HTMLSelectElement | null;
         const relationshipSelect = document.getElementById('relationship-chart-select') as HTMLSelectElement | null;
+        const restoreBtn = document.getElementById('restore-recommended-center-btn') as HTMLButtonElement | null;
 
         toggleButton?.addEventListener('click', () => {
             if (!panel) {
@@ -327,6 +329,10 @@ export class ParameterAdjustmentPanel {
         relationshipSelect?.addEventListener('change', () => {
             const nextType = relationshipSelect.value as RelationshipType;
             this.setRelationshipType(nextType);
+        });
+
+        restoreBtn?.addEventListener('click', () => {
+            this.restoreToRecommendedCenter();
         });
     }
 
@@ -356,6 +362,11 @@ export class ParameterAdjustmentPanel {
                 <div class="kriging-visual-card">
                     <div class="kriging-visual-card-head">
                         <div id="parameter-relationship-title" class="kriging-visual-card-title">参数关系图（nugget-sill）</div>
+                        <div class="kriging-relationship-actions">
+                            <span id="relationship-constraint-label" class="relationship-constraint-label">约束: nugget ≤ sill</span>
+                            <span id="relationship-status-badge" class="relationship-status-badge valid">有效</span>
+                            <button id="restore-recommended-center-btn" class="btn btn-secondary" type="button">恢复到推荐区</button>
+                        </div>
                         <label class="kriging-relationship-switch" for="relationship-chart-select">
                             <span>关系类型</span>
                             <select id="relationship-chart-select">
@@ -564,19 +575,29 @@ export class ParameterAdjustmentPanel {
         if (type === 'nugget-sill') {
             const x = this.parameters.get('nugget') ?? 0;
             const y = this.parameters.get('sill') ?? 1;
-            return { x, y, region: x <= y ? 'valid' : 'invalid' };
+            return { x, y, region: this.resolveRelationshipRegion(type, x, y) };
         }
 
         if (type === 'range-spatial') {
             const x = this.parameters.get('range') ?? 10;
             const y = this.getSpatialRange();
-            const valid = y <= 0 ? x === 0 : x >= y * 0.15 && x <= y * 0.4;
-            return { x, y, region: valid ? 'valid' : 'warning' };
+            return { x, y, region: this.resolveRelationshipRegion(type, x, y) };
         }
 
         const x = this.parameters.get('grid-resolution') ?? 100;
         const y = this.estimateGridTimeSeconds(x);
-        return { x, y, region: y < 10 ? 'valid' : 'warning' };
+        return { x, y, region: this.resolveRelationshipRegion(type, x, y) };
+    }
+
+    private resolveRelationshipRegion(type: RelationshipType, x: number, y: number): 'valid' | 'invalid' | 'warning' {
+        if (type === 'nugget-sill') {
+            return x <= y ? 'valid' : 'invalid';
+        }
+        if (type === 'range-spatial') {
+            const valid = y <= 0 ? x === 0 : x >= y * 0.15 && x <= y * 0.4;
+            return valid ? 'valid' : 'warning';
+        }
+        return y < 10 ? 'valid' : 'warning';
     }
 
     private syncVisualization(): void {
@@ -593,7 +614,104 @@ export class ParameterAdjustmentPanel {
         const relationPoint = this.getRelationshipPoint(this.relationshipType);
         this.relationshipChart?.update(relationPoint.x, relationPoint.y);
         this.relationshipChart?.highlightRegion(relationPoint.region);
+        this.updateRelationshipActions(relationshipConfig.constraint?.label || '未设置约束', relationPoint.region);
         this.variogramChart?.updateFitting(this.buildVariogramParams());
+    }
+
+    private updateRelationshipActions(constraintLabel: string, region: 'valid' | 'invalid' | 'warning'): void {
+        const label = document.getElementById('relationship-constraint-label');
+        if (label) {
+            label.textContent = `约束: ${constraintLabel}`;
+        }
+
+        const badge = document.getElementById('relationship-status-badge');
+        if (badge) {
+            badge.className = `relationship-status-badge ${region}`;
+            badge.textContent = region === 'valid' ? '有效' : region === 'warning' ? '警告' : '无效';
+        }
+
+        const restoreBtn = document.getElementById('restore-recommended-center-btn') as HTMLButtonElement | null;
+        if (restoreBtn) {
+            restoreBtn.disabled = region === 'valid';
+            restoreBtn.textContent = region === 'valid' ? '已在推荐区' : '恢复到推荐区';
+        }
+    }
+
+    private restoreToRecommendedCenter(): void {
+        const config = this.buildRelationshipConfig(this.relationshipType);
+        const center = this.calculateRecommendedCenter(config);
+        if (!center) {
+            this.showTemplateOperationResult('未找到推荐区中心点', 'warning');
+            return;
+        }
+
+        if (this.relationshipType === 'nugget-sill') {
+            this.animateParameter('nugget', center.x);
+            this.animateParameter('sill', center.y);
+            this.showTemplateOperationResult('已恢复到推荐区中心点', 'success');
+            return;
+        }
+
+        if (this.relationshipType === 'range-spatial') {
+            this.animateParameter('range', center.x);
+            this.showTemplateOperationResult('已恢复到推荐区中心点', 'success');
+            return;
+        }
+
+        this.animateParameter('grid-resolution', center.x);
+        this.showTemplateOperationResult('已恢复到推荐区中心点', 'success');
+    }
+
+    private calculateRecommendedCenter(config: RelationshipChartViewConfig): { x: number; y: number } | null {
+        const sampleCount = 30;
+        let count = 0;
+        let sumX = 0;
+        let sumY = 0;
+        const rangeX = Math.max(1e-6, config.axisX.max - config.axisX.min);
+        const rangeY = Math.max(1e-6, config.axisY.max - config.axisY.min);
+
+        for (let xi = 0; xi <= sampleCount; xi++) {
+            for (let yi = 0; yi <= sampleCount; yi++) {
+                const x = config.axisX.min + (rangeX * xi) / sampleCount;
+                const y = config.axisY.min + (rangeY * yi) / sampleCount;
+                if (config.constraint.validate(x, y)) {
+                    count += 1;
+                    sumX += x;
+                    sumY += y;
+                }
+            }
+        }
+
+        if (count === 0) {
+            return null;
+        }
+
+        return {
+            x: sumX / count,
+            y: sumY / count
+        };
+    }
+
+    private animateParameter(paramName: ParamName, targetValue: number): void {
+        const sourceValue = this.parameters.get(paramName) ?? targetValue;
+        const delta = targetValue - sourceValue;
+        if (Math.abs(delta) < 1e-6) {
+            this.setParameter(paramName, targetValue);
+            return;
+        }
+
+        const duration = 280;
+        const start = Date.now();
+        const frame = (): void => {
+            const elapsed = Date.now() - start;
+            const progress = Math.max(0, Math.min(1, elapsed / duration));
+            const eased = 1 - ((1 - progress) ** 3);
+            this.setParameter(paramName, sourceValue + delta * eased);
+            if (progress < 1) {
+                window.requestAnimationFrame(frame);
+            }
+        };
+        window.requestAnimationFrame(frame);
     }
 
     private applyExternalParameters(params: Record<string, unknown>): void {

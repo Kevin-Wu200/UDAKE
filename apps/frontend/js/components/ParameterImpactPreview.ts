@@ -74,7 +74,12 @@ export class ParameterImpactPreview {
 
     public async generatePreview(config: KrigingPreviewConfig, label: string = '当前配置'): Promise<PreviewData> {
         const metrics = this.estimateMetrics(config);
-        const imageDataUrl = this.generatePreviewImage(config, metrics);
+        let imageDataUrl = '';
+        try {
+            imageDataUrl = this.generatePreviewImage(config, metrics);
+        } catch (error) {
+            console.warn('生成参数预览图失败，将以无图模式继续:', error);
+        }
         const id = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
 
         const result: PreviewData = {
@@ -233,11 +238,18 @@ export class ParameterImpactPreview {
         }
 
         const anchor = document.createElement('a');
-        anchor.href = latest.imageDataUrl;
-        anchor.download = `kriging-preview-${Date.now()}.png`;
-        document.body.appendChild(anchor);
-        anchor.click();
-        document.body.removeChild(anchor);
+        try {
+            anchor.href = latest.imageDataUrl;
+            anchor.download = `kriging-preview-${Date.now()}.png`;
+            document.body.appendChild(anchor);
+            anchor.click();
+        } catch (error) {
+            console.warn('导出预览图失败:', error);
+        } finally {
+            if (anchor.parentElement) {
+                anchor.parentElement.removeChild(anchor);
+            }
+        }
     }
 
     private calculateSeed(config: KrigingPreviewConfig): number {

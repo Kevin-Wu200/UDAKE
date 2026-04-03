@@ -126,4 +126,76 @@ describe('ParameterAdjustmentPanel 可视化扩展', () => {
 
         canvasMock.restore();
     });
+
+    it('应支持外部参数事件应用与告警面板更新', () => {
+        const canvasMock = installCanvasMock();
+        const panel = ParameterAdjustmentPanel.getInstance();
+
+        document.dispatchEvent(new CustomEvent('applyParameterConfig', {
+            detail: {
+                krigingParams: {
+                    grid_resolution: 180,
+                    nlags: 16,
+                    nugget: 0.2,
+                    sill: 0.5,
+                    range: 2,
+                    method: 'block',
+                    variogram_model: 'exponential'
+                }
+            }
+        }));
+
+        const params = panel.getParameters();
+        expect(params['grid-resolution']).toBe(180);
+        expect(params.nlags).toBe(16);
+        expect((document.getElementById('kriging-method') as HTMLSelectElement).value).toBe('block');
+        expect((document.getElementById('variogram-model') as HTMLSelectElement).value).toBe('exponential');
+
+        panel.setParameter('nugget', 0.9);
+        panel.setParameter('sill', 0.2);
+        const warningPanel = document.getElementById('kriging-warning-panel') as HTMLElement;
+        expect(warningPanel.textContent).toContain('块金值不能大于基台值');
+
+        canvasMock.restore();
+    });
+
+    it('warning 状态下应可一键恢复到推荐区中心点', async () => {
+        const canvasMock = installCanvasMock();
+        const panel = ParameterAdjustmentPanel.getInstance();
+        const select = document.getElementById('relationship-chart-select') as HTMLSelectElement;
+        const restoreBtn = document.getElementById('restore-recommended-center-btn') as HTMLButtonElement;
+        const badge = document.getElementById('relationship-status-badge') as HTMLElement;
+
+        select.value = 'grid-performance';
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+        panel.setParameter('grid-resolution', 500);
+
+        expect(badge.textContent).toBe('警告');
+        expect(restoreBtn.disabled).toBe(false);
+
+        restoreBtn.click();
+        await new Promise((resolve) => setTimeout(resolve, 420));
+
+        const value = panel.getParameters()['grid-resolution'];
+        expect(value).toBeGreaterThanOrEqual(50);
+        expect(value).toBeLessThan(500);
+
+        canvasMock.restore();
+    });
+
+    it('有效状态时恢复按钮应禁用并显示已在推荐区', () => {
+        const canvasMock = installCanvasMock();
+        const panel = ParameterAdjustmentPanel.getInstance();
+        const restoreBtn = document.getElementById('restore-recommended-center-btn') as HTMLButtonElement;
+        const badge = document.getElementById('relationship-status-badge') as HTMLElement;
+
+        panel.setParameter('nugget', 0.1);
+        panel.setParameter('sill', 1.0);
+
+        expect(badge.textContent).toBe('有效');
+        expect(restoreBtn.disabled).toBe(true);
+        expect(restoreBtn.textContent).toContain('已在推荐区');
+
+        canvasMock.restore();
+    });
 });
