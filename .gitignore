@@ -33,6 +33,8 @@ __pycache__/
 logs/tests/*.log
 logs/tests/*.json
 logs/*.log
+logs/tensorboard/
+reports/memory/
 npm-debug.log*
 playwright-report/
 playwright-report-*/
