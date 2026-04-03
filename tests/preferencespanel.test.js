@@ -152,7 +152,7 @@ describe('PreferencesPanel', () => {
             expect(prefs.theme).toBe('auto');
             expect(prefs.language).toBe('zh-CN');
             expect(prefs.notifications).toBe(true);
-            expect(prefs.mapEngine).toBe('arcgis');
+            expect(prefs.mapEngine).toBe('geoscene');
             expect(prefs.gridResolution).toBe(100);
             expect(prefs.exportFormat).toBe('geojson');
             expect(prefs.autoSave).toBe(true);

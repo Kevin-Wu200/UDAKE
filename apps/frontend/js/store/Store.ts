@@ -199,7 +199,7 @@ export const appStore = new Store<AppState>(
         taskId: null,
         taskStatus: null,
         dataId: null,
-        mapEngine: 'arcgis',
+        mapEngine: 'geoscene',
         darkMode:
             typeof window !== 'undefined' && window.matchMedia
                 ? window.matchMedia('(prefers-color-scheme: dark)').matches

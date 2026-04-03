@@ -52,7 +52,7 @@ export class MapManager {
 
     /**
      * 初始化地图
-     * @param provider - 'arcgis' 或 'amap'
+     * @param provider - 'geoscene' 或 'amap'
      * @param containerId - 容器 ID
      * @param options - 初始化选项
      */
@@ -62,7 +62,7 @@ export class MapManager {
         this.currentProvider = provider;
 
         // 创建地图引擎
-        if (provider === 'arcgis') {
+        if (provider === 'geoscene') {
             this.mapEngine = new ArcGISEngine(options);
         } else if (provider === 'amap') {
             this.mapEngine = new AMapEngine(options);
@@ -87,7 +87,7 @@ export class MapManager {
 
     /**
      * 切换地图引擎
-     * @param provider - 目标地图引擎 'arcgis' 或 'amap'
+     * @param provider - 目标地图引擎 'geoscene' 或 'amap'
      * @param options - 初始化选项（可选）
      */
     async switchEngine(provider: MapProvider, options: MapManagerOptions = {}): Promise<void> {

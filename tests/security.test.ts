@@ -23,7 +23,7 @@ describe('安全测试套件', () => {
     });
 
     it('CSP 策略应限制外部脚本来源', async () => {
-      const mockCSP = "script-src 'self' 'unsafe-inline' blob: https://js.arcgis.com;";
+      const mockCSP = "script-src 'self' 'unsafe-inline' blob:;";
 
       expect(mockCSP).toContain('script-src');
       // 确保只允许特定的外部来源

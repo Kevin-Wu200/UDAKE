@@ -104,3 +104,5 @@ export const ArcGISConfig = {
         };
     }
 };
+
+export const GeoSceneConfig = ArcGISConfig;

@@ -7,7 +7,7 @@ interface UserPreferences {
     theme: 'light' | 'dark' | 'auto';
     language: string;
     notifications: boolean;
-    mapEngine: 'arcgis';
+    mapEngine: 'geoscene';
     gridResolution: number;
     exportFormat: 'geojson' | 'shp' | 'tif';
     autoSave: boolean;
@@ -19,7 +19,7 @@ const DEFAULT_PREFS: UserPreferences = {
     theme: 'auto',
     language: 'zh-CN',
     notifications: true,
-    mapEngine: 'arcgis',
+    mapEngine: 'geoscene',
     gridResolution: 100,
     exportFormat: 'geojson',
     autoSave: true,

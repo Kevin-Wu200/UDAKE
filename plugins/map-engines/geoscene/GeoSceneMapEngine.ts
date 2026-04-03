@@ -1,6 +1,6 @@
 /**
- * ArcGIS 地图引擎插件
- * 提供基于 ArcGIS 的地图渲染和交互功能
+ * GeoScene 地图引擎插件
+ * 提供基于 GeoScene 的地图渲染和交互功能
  */
 
 import type {
@@ -47,14 +47,14 @@ interface LayerOptions {
 }
 
 /**
- * ArcGIS 地图引擎插件类
+ * GeoScene 地图引擎插件类
  */
-export default class ArcGISMapEngine implements Plugin {
-  id = 'arcgis-engine';
-  name = 'ArcGIS 地图引擎';
+export default class GeoSceneMapEngine implements Plugin {
+  id = 'geoscene-engine';
+  name = 'GeoScene 地图引擎';
   version = '1.0.0';
   type: PluginType = 'map-engine' as any;
-  description = 'ArcGIS 地图引擎插件，提供专业的地理空间数据可视化功能';
+  description = 'GeoScene 地图引擎插件，提供专业的地理空间数据可视化功能';
 
   private context?: PluginContext;
   private config?: MapConfig;
@@ -68,7 +68,7 @@ export default class ArcGISMapEngine implements Plugin {
     this.context = context;
     this.config = context.config as MapConfig;
 
-    console.log('[ArcGISMapEngine] 初始化 ArcGIS 地图引擎');
+    console.log('[GeoSceneMapEngine] 初始化 GeoScene 地图引擎');
 
     // 注册地图服务
     context.app.registerService('map-engine', this, true);
@@ -83,10 +83,10 @@ export default class ArcGISMapEngine implements Plugin {
    * 激活插件
    */
   async activate(): Promise<void> {
-    console.log('[ArcGISMapEngine] 激活 ArcGIS 地图引擎');
+    console.log('[GeoSceneMapEngine] 激活 GeoScene 地图引擎');
 
-    // 初始化 ArcGIS API
-    await this.initializeArcGIS();
+    // 初始化 GeoScene API
+    await this.initializeGeoScene();
 
     // 发射激活事件
     this.context?.events.emit('plugin:map-engine:activated', {
@@ -99,7 +99,7 @@ export default class ArcGISMapEngine implements Plugin {
    * 停用插件
    */
   async deactivate(): Promise<void> {
-    console.log('[ArcGISMapEngine] 停用 ArcGIS 地图引擎');
+    console.log('[GeoSceneMapEngine] 停用 GeoScene 地图引擎');
 
     // 清理地图实例
     if (this.mapInstance) {
@@ -120,23 +120,23 @@ export default class ArcGISMapEngine implements Plugin {
    * 销毁插件
    */
   async destroy(): Promise<void> {
-    console.log('[ArcGISMapEngine] 销毁 ArcGIS 地图引擎');
+    console.log('[GeoSceneMapEngine] 销毁 GeoScene 地图引擎');
 
     await this.deactivate();
   }
 
   /**
-   * 初始化 ArcGIS API
+   * 初始化 GeoScene API
    */
-  private async initializeArcGIS(): Promise<void> {
-    // 这里应该加载 ArcGIS API
-    // 示例代码（实际实现需要根据 ArcGIS API 文档调整）
-    console.log('[ArcGISMapEngine] 初始化 ArcGIS API');
+  private async initializeGeoScene(): Promise<void> {
+    // 这里应该加载 GeoScene API
+    // 示例代码（实际实现需要根据 GeoScene API 文档调整）
+    console.log('[GeoSceneMapEngine] 初始化 GeoScene API');
 
     // 模拟异步加载
     return new Promise((resolve) => {
       setTimeout(() => {
-        console.log('[ArcGISMapEngine] ArcGIS API 加载完成');
+        console.log('[GeoSceneMapEngine] GeoScene API 加载完成');
         resolve();
       }, 100);
     });
@@ -147,9 +147,9 @@ export default class ArcGISMapEngine implements Plugin {
    * @param options 渲染选项
    */
   render(options: RenderOptions): void {
-    console.log('[ArcGISMapEngine] 渲染地图', options);
+    console.log('[GeoSceneMapEngine] 渲染地图', options);
 
-    // 这里应该使用 ArcGIS API 创建地图实例
+    // 这里应该使用 GeoScene API 创建地图实例
     // 示例代码
     this.mapInstance = {
       container: options.container,
@@ -172,7 +172,7 @@ export default class ArcGISMapEngine implements Plugin {
    * @param options 图层选项
    */
   addLayer(options: LayerOptions): void {
-    console.log('[ArcGISMapEngine] 添加图层', options);
+    console.log('[GeoSceneMapEngine] 添加图层', options);
 
     const layer = {
       id: options.id,
@@ -197,7 +197,7 @@ export default class ArcGISMapEngine implements Plugin {
    * @param layerId 图层ID
    */
   removeLayer(layerId: string): void {
-    console.log('[ArcGISMapEngine] 移除图层', layerId);
+    console.log('[GeoSceneMapEngine] 移除图层', layerId);
 
     const layer = this.layers.get(layerId);
     if (layer) {
@@ -217,7 +217,7 @@ export default class ArcGISMapEngine implements Plugin {
    * @param zoom 缩放级别
    */
   zoom(zoom: number): void {
-    console.log('[ArcGISMapEngine] 缩放地图', zoom);
+    console.log('[GeoSceneMapEngine] 缩放地图', zoom);
 
     if (this.mapInstance) {
       this.mapInstance.zoom = zoom;
@@ -236,7 +236,7 @@ export default class ArcGISMapEngine implements Plugin {
    * @param center 中心点坐标
    */
   pan(center: { longitude: number; latitude: number }): void {
-    console.log('[ArcGISMapEngine] 平移地图', center);
+    console.log('[GeoSceneMapEngine] 平移地图', center);
 
     if (this.mapInstance) {
       this.mapInstance.center = center;
@@ -270,7 +270,7 @@ export default class ArcGISMapEngine implements Plugin {
    * 处理地图渲染事件
    */
   private onMapRender(data: any): void {
-    console.log('[ArcGISMapEngine] 收到地图渲染事件', data);
+    console.log('[GeoSceneMapEngine] 收到地图渲染事件', data);
     // 这里可以根据需要处理地图渲染事件
   }
 
@@ -278,7 +278,7 @@ export default class ArcGISMapEngine implements Plugin {
    * 处理地图缩放事件
    */
   private onMapZoom(data: any): void {
-    console.log('[ArcGISMapEngine] 收到地图缩放事件', data);
+    console.log('[GeoSceneMapEngine] 收到地图缩放事件', data);
     // 这里可以根据需要处理地图缩放事件
   }
 
@@ -286,7 +286,7 @@ export default class ArcGISMapEngine implements Plugin {
    * 处理地图平移事件
    */
   private onMapPan(data: any): void {
-    console.log('[ArcGISMapEngine] 收到地图平移事件', data);
+    console.log('[GeoSceneMapEngine] 收到地图平移事件', data);
     // 这里可以根据需要处理地图平移事件
   }
 
@@ -305,7 +305,7 @@ export default class ArcGISMapEngine implements Plugin {
   updateConfig(config: Partial<MapConfig>): void {
     if (this.config) {
       this.config = { ...this.config, ...config };
-      console.log('[ArcGISMapEngine] 配置已更新', this.config);
+      console.log('[GeoSceneMapEngine] 配置已更新', this.config);
     }
   }
 
@@ -333,7 +333,7 @@ export default class ArcGISMapEngine implements Plugin {
     east: number;
     west: number;
   }): void {
-    console.log('[ArcGISMapEngine] 设置地图边界', bounds);
+    console.log('[GeoSceneMapEngine] 设置地图边界', bounds);
     // 这里应该实现设置地图边界的逻辑
   }
 
@@ -366,7 +366,7 @@ export default class ArcGISMapEngine implements Plugin {
    * 调整地图尺寸
    */
   resize(): void {
-    console.log('[ArcGISMapEngine] 调整地图尺寸');
+    console.log('[GeoSceneMapEngine] 调整地图尺寸');
     // 这里应该实现调整地图尺寸的逻辑
   }
 
@@ -375,7 +375,7 @@ export default class ArcGISMapEngine implements Plugin {
    * @param style 样式名称
    */
   setStyle(style: string): void {
-    console.log('[ArcGISMapEngine] 设置地图样式', style);
+    console.log('[GeoSceneMapEngine] 设置地图样式', style);
     if (this.mapInstance) {
       this.mapInstance.style = style;
     }

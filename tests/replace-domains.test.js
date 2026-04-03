@@ -38,7 +38,7 @@ describe('replace-domains 脚本', () => {
             help: {
               doc: 'https://docs.udake.local/workflow/data-import',
               video: 'https://video.udake.local/tutorials/data-import',
-              thirdParty: 'https://js.arcgis.com/4.30/'
+              thirdParty: '@geoscene/core'
             }
           }
         ]
@@ -52,7 +52,7 @@ describe('replace-domains 脚本', () => {
     expect(result.total).toBe(2);
     expect(result.content).toContain('${OFFICIAL_WEB}/docs/workflow/data-import');
     expect(result.content).toContain('${OFFICIAL_WEB}/videos/tutorials/data-import');
-    expect(result.content).toContain('https://js.arcgis.com/4.30/');
+    expect(result.content).toContain('@geoscene/core');
   });
 
   it('应正确替换 Markdown 不同格式中的硬编码链接', () => {

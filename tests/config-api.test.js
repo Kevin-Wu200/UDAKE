@@ -27,9 +27,9 @@ describe('配置接口测试', () => {
             const mockConfig = {
                 success: true,
                 config: {
-                    arcgis: {
-                        apiKey: 'test-arcgis-key',
-                        portalUrl: 'https://portal.arcgis.com',
+                    geoscene: {
+                        apiKey: 'test-geoscene-key',
+                        portalUrl: 'https://portal.geoscene.cn',
                         env: 'prod',
                         defaultBasemap: 'streets-navigation-vector',
                         defaultCenter: [0, 0],
@@ -58,7 +58,7 @@ describe('配置接口测试', () => {
 
             expect(result).toEqual(mockConfig);
             expect(result.success).toBe(true);
-            expect(result.config.arcgis).toBeDefined();
+            expect(result.config.geoscene).toBeDefined();
             expect(result.config.amap).toBeDefined();
             expect(result.config.tianditu).toBeDefined();
         });
@@ -145,9 +145,9 @@ describe('配置接口测试', () => {
                         debug: false
                     },
                     map: {
-                        arcgis: {
+                        geoscene: {
                             apiKey: 'test-key',
-                            portalUrl: 'https://portal.arcgis.com',
+                            portalUrl: 'https://portal.geoscene.cn',
                             env: 'prod',
                             defaultBasemap: 'streets-navigation-vector',
                             defaultCenter: [0, 0],
@@ -202,7 +202,7 @@ describe('配置接口测试', () => {
                         debug: false
                     },
                     map: {
-                        arcgis: null,
+                        geoscene: null,
                         amap: null,
                         tianditu: null
                     }
@@ -216,7 +216,7 @@ describe('配置接口测试', () => {
 
             const result = await api.request(TEST_BACKEND_ROOT + '/api/config/all');
 
-            expect(result.config.map.arcgis).toBeNull();
+            expect(result.config.map.geoscene).toBeNull();
         });
     });
 

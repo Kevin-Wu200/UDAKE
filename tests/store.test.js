@@ -338,7 +338,7 @@ describe('Store', () => {
         it('应该有默认状态', () => {
             expect(appStore.get('project')).toBeNull();
             expect(appStore.get('taskId')).toBeNull();
-            expect(appStore.get('mapEngine')).toBe('arcgis');
+            expect(appStore.get('mapEngine')).toBe('geoscene');
         });
 
         it('应该启用持久化', () => {

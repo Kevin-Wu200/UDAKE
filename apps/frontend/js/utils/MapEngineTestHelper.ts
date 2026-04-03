@@ -44,8 +44,8 @@ interface MapConfigModule {
     getProvider(): string;
 }
 
-/** ArcGIS 配置模块 */
-interface ArcGISConfigModule {
+/** GeoScene 配置模块 */
+interface GeoSceneConfigModule {
     getConfig(): any;
 }
 
@@ -308,15 +308,15 @@ export class MapEngineTestHelper {
             const { MapConfig } = await import('../config/map.config.js') as { MapConfig: MapConfigModule };
 
             const provider = MapConfig.getProvider();
-            if (!provider || (provider !== 'arcgis' && provider !== 'amap')) {
+            if (!provider || (provider !== 'geoscene' && provider !== 'amap')) {
                 throw new Error('地图引擎配置无效');
             }
 
-            if (provider === 'arcgis') {
-                const { ArcGISConfig } = await import('../config/geoscene.config.js') as { ArcGISConfig: ArcGISConfigModule };
-                const config = ArcGISConfig.getConfig();
+            if (provider === 'geoscene') {
+                const { GeoSceneConfig } = await import('../config/geoscene.config.js') as { GeoSceneConfig: GeoSceneConfigModule };
+                const config = GeoSceneConfig.getConfig();
                 if (!config) {
-                    throw new Error('ArcGIS 配置加载失败');
+                    throw new Error('GeoScene 配置加载失败');
                 }
             } else if (provider === 'amap') {
                 // 高德地图配置直接导出函数，不需要 getConfig

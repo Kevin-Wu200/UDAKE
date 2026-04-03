@@ -37,6 +37,6 @@ UDAKE（Uncertainty-Driven Adaptive Kriging Engine）是一个智能不确定性
 ### 前端
 
 - 原生 JavaScript（ES6 模块）
-- 地图引擎：高德地图 / ArcGIS / 天地图（可切换）
+- 地图引擎：高德地图 / GeoScene / 天地图（可切换）
 - CSS3：Apple 风格设计系统
 - Electron：桌面应用框架
