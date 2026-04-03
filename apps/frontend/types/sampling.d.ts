@@ -246,7 +246,7 @@ export class RegionSampling {
 // ========== 地图管理器类型 ==========
 
 /** 地图提供者 */
-export type MapProvider = 'arcgis';
+export type MapProvider = 'arcgis' | 'geoscene' | 'amap';
 
 /** 地图模式 */
 export type MapMode = 'normal' | 'areaSampling';

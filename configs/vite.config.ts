@@ -86,8 +86,13 @@ export default defineConfig(({ mode }) => {
             }
 
             // 将地图引擎分离为独立 chunk（按不同引擎）
-            if (id.includes('ArcGISEngine') || id.includes('arcgis')) {
-              return 'map-arcgis';
+            if (
+              id.includes('GeoSceneEngine') ||
+              id.includes('geoscene') ||
+              id.includes('ArcGISEngine') ||
+              id.includes('arcgis')
+            ) {
+              return 'map-geoscene';
             }
             if (id.includes('AMapEngine') || id.includes('amap')) {
               return 'map-amap';
@@ -173,7 +178,7 @@ export default defineConfig(({ mode }) => {
 
     // 依赖预构建配置
     optimizeDeps: {
-      exclude: ['@arcgis/core'],
+      exclude: ['@geoscene/core'],
       // 预构建大型依赖
       include: [
         'echarts',
@@ -194,7 +199,9 @@ export default defineConfig(({ mode }) => {
         '@utils': resolve(__dirname, '../apps/frontend/js/utils'),
         '@models': resolve(__dirname, '../apps/frontend/js/models'),
         '@map': resolve(__dirname, '../apps/frontend/js/map'),
+        '@geoscene-engine': resolve(__dirname, '../apps/frontend/js/map/core'),
         '@adapters': resolve(__dirname, '../apps/frontend/js/adapters'),
+        '@geoscene-adapters': resolve(__dirname, '../apps/frontend/js/adapters'),
         '@sampling': resolve(__dirname, '../apps/frontend/js/sampling'),
         '@config': resolve(__dirname, '../apps/frontend/js/config'),
         '@types': resolve(__dirname, '../apps/frontend/types'),

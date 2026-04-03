@@ -110,9 +110,9 @@ export const defaultResourceOptimizationConfig: ResourceOptimizationConfig = {
             'FrontendIntegrationHub'
         ],
         modules: [
-            'map/core/ArcGISEngine',
+            'map/core/GeoSceneEngine',
             'map/core/AMapEngine',
-            'adapters/ArcGISAdapter',
+            'adapters/GeoSceneAdapter',
             'adapters/AMapAdapter',
             'workers/compute'
         ],
@@ -165,11 +165,14 @@ export class ResourceOptimizationManager {
     private lastHeapUsage: number | null = null;
 
     private readonly moduleLoaders: Record<string, () => Promise<unknown>> = {
-        'map/core/ArcGISEngine': () => import('../map/core/ArcGISEngine.js'),
+        'map/core/GeoSceneEngine': () => import('../map/core/ArcGISEngine.js'),
         'map/core/AMapEngine': () => import('../map/core/AMapEngine.js'),
-        'adapters/ArcGISAdapter': () => import('../adapters/ArcGISAdapter.js'),
+        'adapters/GeoSceneAdapter': () => import('../adapters/ArcGISAdapter.js'),
         'adapters/AMapAdapter': () => import('../adapters/AMapAdapter.js'),
-        'workers/compute': () => import('../workers/WorkerPoolManager.js')
+        'workers/compute': () => import('../workers/WorkerPoolManager.js'),
+        // 兼容旧模块标识，避免历史调用失败
+        'map/core/ArcGISEngine': () => import('../map/core/ArcGISEngine.js'),
+        'adapters/ArcGISAdapter': () => import('../adapters/ArcGISAdapter.js')
     };
 
     private readonly componentLoaders: Record<string, () => Promise<unknown>> = {
