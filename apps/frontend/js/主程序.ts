@@ -240,6 +240,12 @@ class App {
     private computationService: ComputationService;
     private formValidator: FormValidator | null = null;
     private locationServiceIntegration: { initialize: () => Promise<void> } | null = null;
+    private isSidebarOpen: boolean = true;
+    private isSidebarTransitioning: boolean = false;
+    private readonly sidebarTransitionMs: number = 300;
+    private sidebarTransitionTimer: number | null = null;
+    private rightSidebarToggleBound: boolean = false;
+    private mobileSidebarViewportSyncBound: boolean = false;
 
     constructor() {
         Logger.debug('主程序', 'App 构造函数执行');
@@ -1018,10 +1024,14 @@ class App {
                 mobileToggle.setAttribute('aria-expanded', 'false');
                 overlay.setAttribute('aria-hidden', 'true');
             });
+            console.log('[Sidebar] 移动端主侧边栏事件绑定成功');
+        } else {
+            console.warn('[Sidebar] 移动端主侧边栏元素不完整，已跳过绑定');
         }
 
-        // 侧边栏切换
-        this.eventBinder.bindBySelector('#sidebar-toggle', 'click', () => this.toggleRightSidebar());
+        // 右侧侧边栏切换按钮（确保在 DOM 可用后再绑定）
+        this.bindRightSidebarToggleWhenReady();
+        this.bindMobileSidebarViewportSync();
     }
 
     /**
@@ -1049,17 +1059,122 @@ class App {
         const rightSidebar = document.getElementById('right-sidebar');
         const sidebarToggle = document.getElementById('sidebar-toggle');
 
-        if (rightSidebar && sidebarToggle) {
-            if (rightSidebar.classList.contains('hidden')) {
-                rightSidebar.classList.remove('hidden');
-                sidebarToggle.classList.remove('open');
-                sidebarToggle.setAttribute('aria-expanded', 'true');
-            } else {
-                rightSidebar.classList.add('hidden');
-                sidebarToggle.classList.add('open');
-                sidebarToggle.setAttribute('aria-expanded', 'false');
-            }
+        if (!rightSidebar || !sidebarToggle) {
+            console.warn('[Sidebar] 切换失败：未找到 right-sidebar 或 sidebar-toggle');
+            return;
         }
+
+        if (this.isSidebarTransitioning) {
+            console.log('[Sidebar] 动画进行中，忽略本次点击');
+            return;
+        }
+
+        const domIsOpen = !rightSidebar.classList.contains('hidden');
+        if (domIsOpen !== this.isSidebarOpen) {
+            console.warn(`[Sidebar] 状态不一致，使用 DOM 状态纠正：state=${this.isSidebarOpen}, dom=${domIsOpen}`);
+            this.isSidebarOpen = domIsOpen;
+        }
+
+        const nextOpen = !this.isSidebarOpen;
+        console.log(`[Sidebar] 切换前: isSidebarOpen=${this.isSidebarOpen}, rightSidebar.className="${rightSidebar.className}", toggle.className="${sidebarToggle.className}"`);
+
+        this.isSidebarOpen = nextOpen;
+        this.isSidebarTransitioning = true;
+        rightSidebar.classList.toggle('hidden', !this.isSidebarOpen);
+        sidebarToggle.classList.toggle('open', this.isSidebarOpen);
+        sidebarToggle.setAttribute('aria-expanded', String(this.isSidebarOpen));
+
+        if (window.innerWidth > 767) {
+            rightSidebar.classList.remove('mobile-keyboard-open');
+        }
+
+        console.log(`[Sidebar] 切换后: isSidebarOpen=${this.isSidebarOpen}, rightSidebar.className="${rightSidebar.className}", toggle.className="${sidebarToggle.className}"`);
+
+        if (this.sidebarTransitionTimer !== null) {
+            window.clearTimeout(this.sidebarTransitionTimer);
+        }
+        this.sidebarTransitionTimer = window.setTimeout(() => {
+            this.isSidebarTransitioning = false;
+            this.sidebarTransitionTimer = null;
+            console.log(`[Sidebar] 过渡结束，当前状态 isSidebarOpen=${this.isSidebarOpen}`);
+        }, this.sidebarTransitionMs);
+    }
+
+    private bindRightSidebarToggleWhenReady(): void {
+        const bindToggle = () => {
+            if (this.rightSidebarToggleBound) {
+                return;
+            }
+
+            const rightSidebar = document.getElementById('right-sidebar');
+            const sidebarToggle = document.getElementById('sidebar-toggle');
+
+            if (!rightSidebar || !sidebarToggle) {
+                console.warn('[Sidebar] 右侧侧边栏元素未就绪，稍后重试绑定');
+                window.setTimeout(() => this.bindRightSidebarToggleWhenReady(), 100);
+                return;
+            }
+
+            this.syncRightSidebarState(rightSidebar, sidebarToggle);
+            this.eventBinder.bind(sidebarToggle, 'click', () => this.toggleRightSidebar());
+            this.rightSidebarToggleBound = true;
+            console.log('[Sidebar] 右侧侧边栏切换事件绑定成功');
+        };
+
+        if (document.readyState === 'loading') {
+            this.eventBinder.bind(document, 'DOMContentLoaded', bindToggle, { once: true });
+            return;
+        }
+
+        bindToggle();
+    }
+
+    private syncRightSidebarState(rightSidebar?: HTMLElement, sidebarToggle?: HTMLElement): void {
+        const sidebarElement = rightSidebar ?? document.getElementById('right-sidebar');
+        const toggleElement = sidebarToggle ?? document.getElementById('sidebar-toggle');
+
+        if (!sidebarElement || !toggleElement) {
+            return;
+        }
+
+        this.isSidebarOpen = !sidebarElement.classList.contains('hidden');
+        toggleElement.classList.toggle('open', this.isSidebarOpen);
+        toggleElement.setAttribute('aria-expanded', String(this.isSidebarOpen));
+
+        console.log(`[Sidebar] 状态同步完成: isSidebarOpen=${this.isSidebarOpen}, aria-expanded=${toggleElement.getAttribute('aria-expanded')}`);
+    }
+
+    private bindMobileSidebarViewportSync(): void {
+        if (this.mobileSidebarViewportSyncBound) {
+            return;
+        }
+
+        const updateKeyboardState = () => {
+            const rightSidebar = document.getElementById('right-sidebar');
+            if (!rightSidebar) {
+                return;
+            }
+
+            const viewport = window.visualViewport;
+            const isMobileLayout = window.innerWidth <= 767;
+            const keyboardVisible = Boolean(
+                isMobileLayout &&
+                viewport &&
+                window.innerHeight - viewport.height > 120
+            );
+
+            rightSidebar.classList.toggle('mobile-keyboard-open', keyboardVisible && this.isSidebarOpen);
+        };
+
+        this.eventBinder.bind(window, 'resize', updateKeyboardState);
+        if (window.visualViewport) {
+            this.eventBinder.bind(window.visualViewport, 'resize', updateKeyboardState);
+            this.eventBinder.bind(window.visualViewport, 'scroll', updateKeyboardState);
+        }
+
+        updateKeyboardState();
+        this.mobileSidebarViewportSyncBound = true;
+        console.log('[Sidebar] 移动端视口/键盘状态监听已绑定');
     }
 
     private handleQuickAction(command: string): void {

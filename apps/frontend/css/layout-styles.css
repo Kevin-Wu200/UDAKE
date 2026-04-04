@@ -1270,3 +1270,28 @@ select {
         transform: scale(0.98);
     }
 }
+
+/* 移动端右侧推荐面板适配 */
+@media screen and (max-width: 767px) {
+    .right-sidebar {
+        position: fixed;
+        top: 50px;
+        right: 0;
+        width: min(86vw, 360px);
+        max-width: 360px;
+        height: calc(100vh - 50px);
+        z-index: 1001;
+        box-shadow: -8px 0 24px rgba(0, 0, 0, 0.12);
+    }
+
+    .right-sidebar.mobile-keyboard-open {
+        height: auto;
+        max-height: calc(100vh - 62px);
+        bottom: 12px;
+    }
+
+    .sidebar-toggle {
+        top: calc(50px + 50%);
+        z-index: 1002;
+    }
+}
