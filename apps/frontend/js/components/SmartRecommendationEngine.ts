@@ -31,6 +31,8 @@ export class SmartRecommendationEngine {
     private root: HTMLDivElement | null;
     private listEl: HTMLDivElement | null;
     private hintEl: HTMLParagraphElement | null;
+    private collapseBtn: HTMLButtonElement | null;
+    private isCollapsed: boolean;
 
     constructor(actions: RecommendationActionMeta[]) {
         this.actionMap = new Map(actions.map((item) => [item.id, item]));
@@ -38,6 +40,8 @@ export class SmartRecommendationEngine {
         this.root = null;
         this.listEl = null;
         this.hintEl = null;
+        this.collapseBtn = null;
+        this.isCollapsed = false;
     }
 
     public mount(container: HTMLElement): void {
@@ -50,20 +54,33 @@ export class SmartRecommendationEngine {
         this.root.innerHTML = `
             <div class="smart-recommendation-header">
                 <h3>智能推荐</h3>
-                <span class="smart-recommendation-score" id="smart-recommendation-score">--</span>
+                <div class="smart-recommendation-header-tools">
+                    <span class="smart-recommendation-score" id="smart-recommendation-score">--</span>
+                    <button
+                        type="button"
+                        class="smart-recommendation-toggle"
+                        aria-label="收起或展开智能推荐"
+                        aria-expanded="true"
+                        title="收起/展开"
+                    >▾</button>
+                </div>
             </div>
-            <p class="smart-recommendation-hint"></p>
-            <div class="smart-recommendation-list"></div>
-            <div class="smart-recommendation-help">
-                <a href="${import.meta.env.VITE_OFFICIAL_WEB}/docs/workflow/quick-actions" target="_blank" rel="noreferrer">快捷操作帮助</a>
-                <a href="${import.meta.env.VITE_OFFICIAL_WEB}/videos/tutorials/wizard-overview" target="_blank" rel="noreferrer">向导视频</a>
+            <div class="smart-recommendation-content">
+                <p class="smart-recommendation-hint"></p>
+                <div class="smart-recommendation-list"></div>
+                <div class="smart-recommendation-help">
+                    <a href="${import.meta.env.VITE_OFFICIAL_WEB}/docs/workflow/quick-actions" target="_blank" rel="noreferrer">快捷操作帮助</a>
+                    <a href="${import.meta.env.VITE_OFFICIAL_WEB}/videos/tutorials/wizard-overview" target="_blank" rel="noreferrer">向导视频</a>
+                </div>
             </div>
         `;
 
         this.listEl = this.root.querySelector('.smart-recommendation-list');
         this.hintEl = this.root.querySelector('.smart-recommendation-hint');
+        this.collapseBtn = this.root.querySelector('.smart-recommendation-toggle');
 
         container.appendChild(this.root);
+        this.bindCollapseToggle();
         this.bindEvents();
         this.render();
     }
@@ -73,6 +90,7 @@ export class SmartRecommendationEngine {
         this.root = null;
         this.listEl = null;
         this.hintEl = null;
+        this.collapseBtn = null;
     }
 
     public recordAction(actionId: string, context: string[] = this.collectContext()): void {
@@ -157,6 +175,22 @@ export class SmartRecommendationEngine {
             }
             this.recordAction(`wizard:${detail.wizardId}`);
         });
+    }
+
+    private bindCollapseToggle(): void {
+        if (!this.root || !this.collapseBtn) {
+            return;
+        }
+        this.collapseBtn.addEventListener('click', () => this.toggleCollapse());
+    }
+
+    private toggleCollapse(): void {
+        if (!this.root || !this.collapseBtn) {
+            return;
+        }
+        this.isCollapsed = !this.isCollapsed;
+        this.root.classList.toggle('collapsed', this.isCollapsed);
+        this.collapseBtn.setAttribute('aria-expanded', String(!this.isCollapsed));
     }
 
     private render(): void {

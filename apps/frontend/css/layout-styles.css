@@ -48,13 +48,13 @@ svg {
     overflow: hidden;
 }
 
-/* 顶部导航栏 - 精确56px */
+/* 顶部导航栏（含快捷操作栏） */
 .header {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
-    height: 56px;
+    height: 128px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -72,11 +72,25 @@ svg {
 
 .header-content {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    justify-content: center;
+    align-items: stretch;
+    gap: 10px;
     width: 100%;
     max-width: 1400px;
-    padding: 0 32px;
+    padding: 12px 32px 10px;
+}
+
+.header-main-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    min-height: 44px;
+}
+
+.header-quick-action-container {
+    width: 100%;
+    min-height: 44px;
 }
 
 .header-left {
@@ -152,11 +166,11 @@ svg {
     position: relative;
 }
 
-/* 地图区域 - 100vw x calc(100vh - 56px) */
+/* 地图区域 - 100vw x calc(100vh - 128px) */
 .map-container {
     width: 100vw;
-    height: calc(100vh - 56px);
-    margin-top: 56px;
+    height: calc(100vh - 128px);
+    margin-top: 128px;
     position: relative;
 }
 
@@ -170,9 +184,9 @@ svg {
 .sidebar {
     position: absolute;
     left: 32px;
-    top: 88px;
+    top: 160px;
     width: 320px;
-    max-height: calc(100vh - 88px - 32px);
+    max-height: calc(100vh - 160px - 32px);
     overflow-y: auto;
     overflow-x: hidden;
     z-index: 100;
@@ -219,7 +233,7 @@ svg {
 .info-panel {
     position: absolute;
     right: 32px;
-    top: 88px;
+    top: 160px;
     width: 260px;
     padding: 16px;
     background-color: var(--bg-panel);
@@ -302,7 +316,18 @@ svg {
     }
 
     .header-content {
+        flex-direction: row;
+        align-items: center;
+        gap: 0;
         padding: 0 var(--container-padding-mobile);
+    }
+
+    .header-main-row {
+        width: 100%;
+    }
+
+    .header-quick-action-container {
+        display: none;
     }
 
     .header-left {
@@ -526,24 +551,20 @@ svg {
         --font-size-body-responsive: 0.9375rem;
     }
 
-    .header {
-        height: 54px;
-    }
-
     .header-content {
-        padding: 0 var(--container-padding-tablet);
+        padding: 10px var(--container-padding-tablet);
     }
 
     .sidebar {
         left: 20px;
-        top: 80px;
+        top: 152px;
         width: 280px;
-        max-height: calc(100vh - 100px);
+        max-height: calc(100vh - 172px);
     }
 
     .info-panel {
         right: 20px;
-        top: 80px;
+        top: 152px;
         width: 240px;
     }
 

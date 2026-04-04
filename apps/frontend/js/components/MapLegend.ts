@@ -127,12 +127,12 @@ export class MapLegend {
             }
 
             .map-legend[data-position="top-left"] {
-                top: 60px;
+                top: 124px;
                 left: 10px;
             }
 
             .map-legend[data-position="top-right"] {
-                top: 60px;
+                top: 124px;
                 right: 80px; /* 380px(侧边栏宽度) + 32px(切换按钮宽度) */
             }
 

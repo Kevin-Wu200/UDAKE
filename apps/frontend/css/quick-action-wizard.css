@@ -1,12 +1,11 @@
 .quick-action-bar {
-    position: absolute;
-    top: 66px;
-    left: 60px;
-    z-index: 965;
+    position: relative;
+    z-index: 1;
     display: flex;
     align-items: center;
     gap: 8px;
-    max-width: min(820px, calc(100vw - 120px));
+    width: 100%;
+    max-width: 100%;
     padding: 8px 10px;
     border-radius: 14px;
     border: 1px solid rgba(15, 23, 42, 0.14);
@@ -25,6 +24,8 @@
 .quick-action-list {
     display: flex;
     align-items: center;
+    flex: 1;
+    min-width: 0;
     gap: 6px;
     overflow-x: auto;
     scrollbar-width: thin;
@@ -159,9 +160,9 @@
 
 .smart-recommendation-panel {
     position: absolute;
-    top: 124px;
-    left: 60px;
-    z-index: 962;
+    top: 220px;
+    right: 80px;
+    z-index: 998;
     width: min(340px, calc(100vw - 24px));
     border-radius: 14px;
     border: 1px solid rgba(15, 23, 42, 0.14);
@@ -175,7 +176,41 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 8px;
+}
+
+.smart-recommendation-header-tools {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.smart-recommendation-toggle {
+    width: 24px;
+    height: 24px;
+    border: 1px solid rgba(15, 23, 42, 0.18);
+    border-radius: 6px;
+    background: #ffffff;
+    color: #334155;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    transition: transform 0.2s ease;
+}
+
+.smart-recommendation-content {
+    margin-top: 8px;
+}
+
+.smart-recommendation-panel.collapsed .smart-recommendation-content {
+    display: none;
+}
+
+.smart-recommendation-panel.collapsed .smart-recommendation-score {
+    display: none;
+}
+
+.smart-recommendation-panel.collapsed .smart-recommendation-toggle {
+    transform: rotate(-90deg);
 }
 
 .smart-recommendation-header h3 {
@@ -489,17 +524,13 @@
 
 @media (max-width: 900px) {
     .quick-action-bar {
-        left: 8px;
-        right: 8px;
-        max-width: none;
-        top: 62px;
+        max-width: 100%;
     }
 
     .smart-recommendation-panel {
-        left: 8px;
         right: 8px;
         width: auto;
-        top: 118px;
+        top: 188px;
     }
 
     .quick-action-bar-title {

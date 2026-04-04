@@ -354,7 +354,7 @@ export class ComponentInitializer {
         });
         const comparisonPanel = layerComparisonPanel.createPanel();
         comparisonPanel.style.position = 'absolute';
-        comparisonPanel.style.top = '70px';
+        comparisonPanel.style.top = '134px';
         comparisonPanel.style.right = '80px';
         comparisonPanel.style.zIndex = '999';
         mapContainer.appendChild(comparisonPanel);
@@ -427,9 +427,10 @@ export class ComponentInitializer {
         this.components.set('onboardingGuide', onboardingGuide);
 
         const mapContainer = document.querySelector('.map-container') as HTMLElement | null;
+        const headerQuickActionContainer = document.querySelector('#header-quick-action-container') as HTMLElement | null;
         if (mapContainer) {
             const quickActionBar = new QuickActionBar();
-            quickActionBar.mount(mapContainer);
+            quickActionBar.mount(headerQuickActionContainer || mapContainer);
             this.components.set('quickActionBar', quickActionBar);
 
             const recommendationEngine = new SmartRecommendationEngine(
