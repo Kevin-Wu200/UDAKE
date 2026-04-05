@@ -77,6 +77,7 @@ from .training import (
 from .st_gnn import STGNNPredictor, STGNNResult
 from .st_uncertainty import STUncertaintyQuantifier, STUncertaintyResult
 from .st_fusion import STModelFusion
+from .st_transformer import STTransformerPredictor, STTransformerResult
 
 __all__ = [
     "SpatioTemporalTransformer",
@@ -148,4 +149,6 @@ __all__ = [
     "STUncertaintyQuantifier",
     "STUncertaintyResult",
     "STModelFusion",
+    "STTransformerPredictor",
+    "STTransformerResult",
 ]

@@ -1,0 +1,17 @@
+{
+  "visualization": {
+    "timelineStepHours": 24,
+    "defaultSpeed": 1,
+    "maxFrames": 720
+  },
+  "interaction": {
+    "enableHoverQuery": true,
+    "enableRegionSelection": true,
+    "autoPlay": false
+  },
+  "performance": {
+    "chunkSize": 10,
+    "preloadCount": 1,
+    "maxCachedFrames": 300
+  }
+}

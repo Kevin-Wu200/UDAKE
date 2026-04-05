@@ -1,0 +1,19 @@
+.st-time-slider-panel {
+    padding: 8px;
+    border: 1px solid #d9e2ec;
+    border-radius: 8px;
+    background: #ffffff;
+}
+
+.st-time-slider-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.st-time-controls {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}

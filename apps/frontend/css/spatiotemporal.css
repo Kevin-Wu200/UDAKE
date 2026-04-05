@@ -1,0 +1,12 @@
+.st-visualizer-layout {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 12px;
+}
+
+.st-map-host {
+    min-height: 360px;
+    border: 1px solid #d9e2ec;
+    background: linear-gradient(180deg, #eef4fa, #f8fbff);
+    border-radius: 10px;
+}

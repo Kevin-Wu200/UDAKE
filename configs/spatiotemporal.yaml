@@ -1,0 +1,18 @@
+version: 1
+module: spatiotemporal_kriging
+training:
+  default_model: separated
+  max_iterations: 64
+  random_seed: 42
+prediction:
+  max_days: 15
+  cache_ttl_seconds: 300
+performance:
+  block_size: 500
+  low_rank: 100
+  temporal_window_size: 30
+cache:
+  enabled: true
+  l1_ttl_seconds: 300
+  l2_ttl_seconds: 900
+  l3_dir: /tmp/udake_spatiotemporal_cache
