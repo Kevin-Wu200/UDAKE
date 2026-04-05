@@ -15,7 +15,7 @@ source "$THRESHOLD_FILE"
 
 MIN_TEST_FILE_COUNT="${MIN_TEST_FILE_COUNT:-6}"
 MIN_ST_TEST_FILE_COUNT="${MIN_ST_TEST_FILE_COUNT:-6}"
-MIN_DOC_FILE_COUNT="${MIN_DOC_FILE_COUNT:-6}"
+MIN_DOC_FILE_COUNT="${MIN_DOC_FILE_COUNT:-7}"
 MIN_COVERAGE_PERCENT="${MIN_COVERAGE_PERCENT:-80}"
 MAX_API_LATENCY_MS="${MAX_API_LATENCY_MS:-2000}"
 
@@ -38,6 +38,7 @@ check_file_exists() {
 check_file_exists "$ROOT_DIR/monitoring/quality_thresholds.env.example" "质量阈值模板"
 check_file_exists "$ROOT_DIR/scripts/risk_check.sh" "风险巡检脚本"
 check_file_exists "$ROOT_DIR/scripts/quality_check.sh" "质量巡检脚本"
+check_file_exists "$ROOT_DIR/scripts/optimization_check.sh" "后续优化巡检脚本"
 
 required_docs=(
   "$PROJECT_ROOT/docs/spatiotemporal/API接口文档.md"
@@ -46,6 +47,7 @@ required_docs=(
   "$PROJECT_ROOT/docs/spatiotemporal/ops/运维手册.md"
   "$PROJECT_ROOT/docs/spatiotemporal/ops/故障排查指南.md"
   "$PROJECT_ROOT/docs/spatiotemporal/ops/质量标准手册.md"
+  "$PROJECT_ROOT/docs/spatiotemporal/ops/后续优化手册.md"
 )
 
 doc_count=0
