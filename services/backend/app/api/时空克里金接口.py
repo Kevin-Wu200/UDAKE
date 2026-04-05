@@ -57,6 +57,12 @@ class STAutoSelectRequest(BaseModel):
     prediction_results: Optional[Dict[str, List[Dict[str, float]]]] = None
     options: Dict[str, Any] = Field(default_factory=dict)
 
+class STIncrementalUpdateRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_id: str
+    new_data: STSeries
+
 
 @router.post("/train")
 async def train_spatiotemporal_kriging(payload: STTrainRequest) -> Dict[str, Any]:
@@ -98,3 +104,15 @@ async def auto_select_spatiotemporal_model(payload: STAutoSelectRequest) -> Dict
         return {"success": True, "data": result, "message": "模型自动选择完成"}
     except Exception as exc:  # pylint: disable=broad-except
         raise_api_error(exc, default_message="模型自动选择失败")
+
+
+@router.post("/incremental-update")
+async def incremental_update_spatiotemporal_model(payload: STIncrementalUpdateRequest) -> Dict[str, Any]:
+    try:
+        result = spatiotemporal_kriging_service.incremental_update_model(
+            model_id=payload.model_id,
+            new_data=payload.new_data.model_dump(),
+        )
+        return {"success": True, "data": result, "message": "增量更新成功"}
+    except Exception as exc:  # pylint: disable=broad-except
+        raise_api_error(exc, default_message="模型增量更新失败")

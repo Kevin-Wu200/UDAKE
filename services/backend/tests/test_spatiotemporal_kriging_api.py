@@ -46,6 +46,7 @@ def test_spatiotemporal_train_api(client: TestClient) -> None:
     assert body["data"]["model_type"] == "product"
     assert body["data"]["model_id"].startswith("st_model_")
     assert "parameters" in body["data"]
+    assert "variogram_charts" in body["data"]
 
 
 def test_spatiotemporal_predict_online_offline(client: TestClient) -> None:
@@ -125,3 +126,28 @@ def test_spatiotemporal_auto_select_api(client: TestClient) -> None:
     assert body["success"] is True
     assert body["data"]["best_model"] == "nonseparable"
     assert set(body["data"]["evaluation"].keys()) == {"separated", "product", "nonseparable"}
+
+
+def test_spatiotemporal_incremental_update_api(client: TestClient) -> None:
+    train_resp = client.post("/api/spatiotemporal/train", json=_train_payload("separated"))
+    model_id = train_resp.json()["data"]["model_id"]
+
+    resp = client.post(
+        "/api/spatiotemporal/incremental-update",
+        json={
+            "model_id": model_id,
+            "new_data": {
+                "x": [120.6, 120.7, 120.8],
+                "y": [30.6, 30.7, 30.8],
+                "z": [11.8, 12.0, 12.2],
+                "t": [1712361600, 1712448000, 1712534400],
+                "value": [89.0, 90.5, 91.2],
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["success"] is True
+    assert body["data"]["model_id"] == model_id
+    assert body["data"]["data_stats"]["total_samples"] == 8
+    assert "update_report" in body["data"]

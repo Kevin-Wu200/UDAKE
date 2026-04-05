@@ -1,45 +1,50 @@
-"""时空克里金服务：训练、预测、模型自动选择。"""
+"""时空克里金服务：对外聚合训练、预测、自动选择与增量更新。"""
 
 from __future__ import annotations
 
-import hashlib
-import math
-import statistics
 import threading
-import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Literal, Sequence, Tuple
+from typing import Any, Dict, List, Literal, Sequence
 
 import numpy as np
 
-from .cache_service import get_cache_service
-
-ModelType = Literal["separated", "product", "nonseparable"]
+from .spatiotemporal_core import (
+    IncrementalSTKrigingEngine,
+    ModelType,
+    STDataset,
+    SpatiotemporalKrigingSolver,
+    SpatiotemporalModelAutoSelector,
+    SpatiotemporalPredictionEngine,
+    SpatiotemporalVariogramModeler,
+)
 
 
 @dataclass
 class TrainedModel:
     model_id: str
     model_type: ModelType
+    dataset: STDataset
     parameters: Dict[str, float]
     trained_at: str
     training_report: Dict[str, Any]
     data_stats: Dict[str, Any]
-    x: np.ndarray
-    y: np.ndarray
-    z: np.ndarray
-    t: np.ndarray
-    value: np.ndarray
+    charts: Dict[str, Any]
 
 
 class SpatiotemporalKrigingService:
-    """自定义时空克里金引擎（轻量实现）。"""
+    """自定义时空克里金引擎服务层。"""
 
     def __init__(self) -> None:
         self._models: Dict[str, TrainedModel] = {}
         self._lock = threading.Lock()
+
+        self.modeler = SpatiotemporalVariogramModeler()
+        self.solver = SpatiotemporalKrigingSolver(block_size=500, temporal_window_size=30, low_rank=100)
+        self.selector = SpatiotemporalModelAutoSelector()
+        self.prediction_engine = SpatiotemporalPredictionEngine()
+        self.incremental_engine = IncrementalSTKrigingEngine()
 
     def train_model(
         self,
@@ -47,65 +52,42 @@ class SpatiotemporalKrigingService:
         model_type: ModelType,
         options: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
-        start = time.perf_counter()
         options = options or {}
+        raw_data = STDataset.from_dict(data)
 
-        x, y, z, t, value = self._extract_and_validate_data(data)
-        data_stats = self._build_data_stats(x, y, z, t, value)
+        fitted = self.modeler.fit(raw_data, model_type)
+        params = dict(fitted["parameters"])
+        if "coupling" in options:
+            params["coupling"] = float(options["coupling"])
+        if "beta" in options:
+            params["beta"] = float(options["beta"])
 
-        spatial_range = self._estimate_range(np.stack([x, y, z], axis=1))
-        temporal_range = self._estimate_range(t.reshape(-1, 1))
-        value_var = float(np.var(value))
-        value_std = float(np.std(value))
-
-        nugget = max(value_std * 0.05, 1e-6)
-        spatial_sill = max(value_var * 0.8, 1e-6)
-        temporal_sill = max(value_var * 0.5, 1e-6)
-
-        parameters = {
-            "spatial_sill": spatial_sill,
-            "spatial_range": float(max(spatial_range, 1e-6)),
-            "spatial_nugget": nugget,
-            "temporal_sill": temporal_sill,
-            "temporal_range": float(max(temporal_range, 1e-6)),
-            "temporal_nugget": nugget * 0.5,
-            "coupling": float(options.get("coupling", 0.6)),
-            "beta": float(options.get("beta", 1.5)),
-        }
+        report = dict(fitted["fitting_report"])
+        report["training_time"] = float(options.get("training_time", report.get("training_time", 0.0)))
+        report["iterations"] = int(options.get("optimization", {}).get("max_iterations", report.get("iterations", 64)))
 
         model_id = f"st_model_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
-        elapsed = time.perf_counter() - start
-        training_report = {
-            "converged": True,
-            "iterations": int(options.get("optimization", {}).get("max_iterations", 200)),
-            "log_likelihood": float(-np.mean((value - np.mean(value)) ** 2)),
-            "aic": float(2 * len(parameters) + len(value) * math.log(max(value_var, 1e-8))),
-            "bic": float(len(parameters) * math.log(max(len(value), 2)) + len(value) * math.log(max(value_var, 1e-8))),
-            "training_time": round(elapsed, 4),
-        }
-
         trained = TrainedModel(
             model_id=model_id,
             model_type=model_type,
-            parameters=parameters,
+            dataset=raw_data,
+            parameters=params,
             trained_at=datetime.now(timezone.utc).isoformat(),
-            training_report=training_report,
-            data_stats=data_stats,
-            x=x,
-            y=y,
-            z=z,
-            t=t,
-            value=value,
+            training_report=report,
+            data_stats=self._build_data_stats(raw_data),
+            charts=fitted["charts"],
         )
+
         with self._lock:
             self._models[model_id] = trained
 
         return {
             "model_id": model_id,
             "model_type": model_type,
-            "parameters": parameters,
-            "training_report": training_report,
-            "data_stats": data_stats,
+            "parameters": params,
+            "training_report": report,
+            "data_stats": trained.data_stats,
+            "variogram_charts": trained.charts,
         }
 
     async def predict(
@@ -122,42 +104,69 @@ class SpatiotemporalKrigingService:
         if prediction_days < 1 or prediction_days > 15:
             raise ValueError("prediction_days 必须在 1-15 天范围内")
 
-        backend_available = bool(options.get("backend_available", True))
-        online_preferred = bool(options.get("online_preferred", True))
-
-        cache_hit = False
-        cache_key = self._build_prediction_cache_key(model_id, target_positions, target_times, prediction_days, options)
-        if bool(options.get("use_cache", True)):
-            cache_service = get_cache_service()
-            cached = await cache_service.get(cache_key)
-            if isinstance(cached, dict) and cached.get("model_id") == model_id:
-                cached["summary"]["cache_hit"] = True
-                return cached
-
-        if online_preferred and backend_available:
-            predictions = self._predict_online(model, target_positions, target_times, prediction_days)
-            mode = "online"
-        else:
-            predictions = self._predict_offline(model, target_positions, target_times, prediction_days)
-            mode = "offline"
-
-        summary = {
-            "total_predictions": len(predictions),
-            "prediction_days": prediction_days,
-            "prediction_time": round(0.001 * len(predictions), 4),
-            "cache_hit": cache_hit,
-            "mode": mode,
-        }
-        result = {
+        payload = {
             "model_id": model_id,
-            "predictions": predictions,
-            "summary": summary,
+            "target_positions": {
+                "x": [float(v) for v in target_positions.get("x", [])],
+                "y": [float(v) for v in target_positions.get("y", [])],
+                "z": [float(v) for v in target_positions.get("z", [])],
+            },
+            "target_times": [float(v) for v in target_times],
+            "prediction_days": int(prediction_days),
+            "mode": {
+                "online_preferred": bool(options.get("online_preferred", True)),
+                "backend_available": bool(options.get("backend_available", True)),
+            },
         }
 
-        if bool(options.get("use_cache", True)):
-            cache_service = get_cache_service()
-            await cache_service.set(cache_key, result, ttl=300)
+        def online_predictor() -> Dict[str, Any]:
+            prediction = self.solver.predict(
+                train_data=model.dataset,
+                targets=target_positions,
+                target_times=target_times,
+                params=model.parameters,
+                model_type=model.model_type,
+                covariance_builder=self.modeler.build_covariance_function,
+            )
+            rows = self._annotate_prediction_rows(
+                rows=prediction["predictions"],
+                model_type=model.model_type,
+                prediction_days=prediction_days,
+            )
+            return {
+                "model_id": model_id,
+                "predictions": rows,
+                "summary": {
+                    "total_predictions": len(rows),
+                    "prediction_days": prediction_days,
+                    "solver": prediction["solver_info"],
+                },
+            }
 
+        def offline_predictor() -> Dict[str, Any]:
+            rows = self._offline_predict(model, target_positions, target_times, prediction_days)
+            return {
+                "model_id": model_id,
+                "predictions": rows,
+                "summary": {
+                    "total_predictions": len(rows),
+                    "prediction_days": prediction_days,
+                    "solver": {"low_rank_used": False, "rank": 0},
+                },
+            }
+
+        result, mode, cache_hit = await self.prediction_engine.predict(
+            model_id=model_id,
+            payload=payload,
+            online_predictor=online_predictor,
+            offline_predictor=offline_predictor,
+            use_cache=bool(options.get("use_cache", True)),
+            online_preferred=bool(options.get("online_preferred", True)),
+            backend_available=bool(options.get("backend_available", True)),
+        )
+
+        result.setdefault("summary", {})["mode"] = mode
+        result["summary"]["cache_hit"] = cache_hit
         return result
 
     def auto_select_model(
@@ -168,310 +177,181 @@ class SpatiotemporalKrigingService:
         options: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         options = options or {}
-        weight_rmse = float(options.get("weight_rmse", 0.4))
-        weight_mae = float(options.get("weight_mae", 0.3))
-        weight_crps = float(options.get("weight_crps", 0.3))
-
-        _, _, _, _, y_true = self._extract_and_validate_data(new_samples)
-        evaluation: Dict[str, Dict[str, float]] = {}
+        hist = STDataset.from_dict(historical_data)
+        new_data = STDataset.from_dict(new_samples)
 
         candidate_models: List[ModelType] = ["separated", "product", "nonseparable"]
+        evaluations: Dict[str, Dict[str, float]] = {}
         provided = prediction_results or {}
 
-        for name in candidate_models:
-            preds = provided.get(name)
-            if preds:
-                y_pred = np.array([float(item.get("predicted", item.get("value", 0.0))) for item in preds], dtype=np.float64)
+        metric_weights = {
+            "rmse": float(options.get("weight_rmse", 0.35)),
+            "mae": float(options.get("weight_mae", 0.25)),
+            "crps": float(options.get("weight_crps", 0.25)),
+            "calibration": float(options.get("weight_calibration", 0.15)),
+        }
+
+        for model_name in candidate_models:
+            rows = provided.get(model_name)
+            if rows:
+                y_pred = np.array([float(item.get("predicted", item.get("value", 0.0))) for item in rows], dtype=np.float64)
+                variance = np.array([float(item.get("variance", 1.0)) for item in rows], dtype=np.float64)
             else:
-                train_result = self.train_model(historical_data, name, options={})
-                model = self._get_model(train_result["model_id"])
-                y_pred = self._predict_values_only(model, new_samples)
+                trained = self.train_model(hist.to_dict(), model_name, options={})
+                model = self._get_model(trained["model_id"])
+                inferred = self.solver.predict(
+                    train_data=model.dataset,
+                    targets={"x": new_data.x.tolist(), "y": new_data.y.tolist(), "z": new_data.z.tolist()},
+                    target_times=new_data.t.tolist(),
+                    params=model.parameters,
+                    model_type=model.model_type,
+                    covariance_builder=self.modeler.build_covariance_function,
+                )
+                y_pred = np.array([float(item["value"]) for item in inferred["predictions"]], dtype=np.float64)
+                variance = np.array([float(item["variance"]) for item in inferred["predictions"]], dtype=np.float64)
 
-            if len(y_pred) == 0:
-                raise ValueError("prediction_results 不能为空")
+            aligned_true = np.tile(new_data.value, max(1, len(y_pred) // max(len(new_data.value), 1) + 1))[: len(y_pred)]
+            evaluations[model_name] = self.selector.evaluate(aligned_true, y_pred, variance=variance, weights=metric_weights)
 
-            n = min(len(y_true), len(y_pred))
-            aligned_true = y_true[:n]
-            aligned_pred = y_pred[:n]
-
-            rmse = float(np.sqrt(np.mean((aligned_pred - aligned_true) ** 2)))
-            mae = float(np.mean(np.abs(aligned_pred - aligned_true)))
-            sigma = max(float(np.std(aligned_true - aligned_pred)), 1e-6)
-            crps = float(np.mean([self._gaussian_crps(mu, sigma, obs) for mu, obs in zip(aligned_pred, aligned_true)]))
-            score = weight_rmse * rmse + weight_mae * mae + weight_crps * crps
-
-            evaluation[name] = {
-                "rmse": round(rmse, 6),
-                "mae": round(mae, 6),
-                "crps": round(crps, 6),
-                "score": round(score, 6),
-            }
-
-        best_model = min(evaluation.items(), key=lambda item: item[1]["score"])[0]
+        best_model = self.selector.select_best(evaluations)
+        report = self.selector.generate_report(best_model, evaluations)
         return {
             "best_model": best_model,
-            "evaluation": evaluation,
-            "weights": {
-                "rmse": weight_rmse,
-                "mae": weight_mae,
-                "crps": weight_crps,
-            },
+            "evaluation": evaluations,
+            "report": report,
+            "weights": metric_weights,
         }
 
-    def _predict_online(
-        self,
-        model: TrainedModel,
-        target_positions: Dict[str, Sequence[float]],
-        target_times: Sequence[float],
-        prediction_days: int,
-    ) -> List[Dict[str, Any]]:
-        xs, ys, zs, times = self._expand_targets(target_positions, target_times)
-        results: List[Dict[str, Any]] = []
-        min_target_t = min(times) if times else float(np.min(model.t))
-
-        for idx, (tx, ty, tz, tt) in enumerate(zip(xs, ys, zs, times), start=1):
-            pred, variance = self._predict_single(model, tx, ty, tz, tt)
-            prediction_day = self._compute_prediction_day(tt, min_target_t, prediction_days)
-            decay = self._precision_decay(prediction_day)
-            variance = float(max(variance * (1.0 + decay), 1e-9))
-            uncertainty = float(math.sqrt(variance))
-            ci_low = pred - 1.96 * uncertainty
-            ci_high = pred + 1.96 * uncertainty
-
-            results.append(
-                {
-                    "x": float(tx),
-                    "y": float(ty),
-                    "z": float(tz),
-                    "t": float(tt),
-                    "prediction_time": datetime.fromtimestamp(float(tt), tz=timezone.utc).isoformat(),
-                    "value": float(pred),
-                    "variance": variance,
-                    "uncertainty": uncertainty,
-                    "confidence_interval": [float(ci_low), float(ci_high)],
-                    "precision_decay": decay,
-                    "prediction_day": prediction_day,
-                    "method": model.model_type,
-                    "sequence": idx,
-                }
-            )
-        return results
-
-    def _predict_offline(
-        self,
-        model: TrainedModel,
-        target_positions: Dict[str, Sequence[float]],
-        target_times: Sequence[float],
-        prediction_days: int,
-    ) -> List[Dict[str, Any]]:
-        xs, ys, zs, times = self._expand_targets(target_positions, target_times)
-
-        value_mean = float(np.mean(model.value))
-        value_std = float(np.std(model.value))
-        if len(model.t) > 1:
-            trend = float((model.value[-1] - model.value[0]) / max(model.t[-1] - model.t[0], 1.0))
-        else:
-            trend = 0.0
-
-        min_target_t = min(times) if times else float(np.min(model.t))
-        base_time = float(np.max(model.t))
-        results: List[Dict[str, Any]] = []
-
-        for idx, (tx, ty, tz, tt) in enumerate(zip(xs, ys, zs, times), start=1):
-            prediction_day = self._compute_prediction_day(tt, min_target_t, prediction_days)
-            decay = self._precision_decay(prediction_day)
-            dt = float(tt - base_time)
-
-            pred = value_mean + trend * dt
-            variance = float((value_std ** 2) * (1.0 + decay + 0.1))
-            uncertainty = float(math.sqrt(max(variance, 1e-9)))
-
-            results.append(
-                {
-                    "x": float(tx),
-                    "y": float(ty),
-                    "z": float(tz),
-                    "t": float(tt),
-                    "prediction_time": datetime.fromtimestamp(float(tt), tz=timezone.utc).isoformat(),
-                    "value": float(pred),
-                    "variance": variance,
-                    "uncertainty": uncertainty,
-                    "confidence_interval": [float(pred - 1.96 * uncertainty), float(pred + 1.96 * uncertainty)],
-                    "precision_decay": decay,
-                    "prediction_day": prediction_day,
-                    "method": f"{model.model_type}_offline",
-                    "sequence": idx,
-                }
-            )
-        return results
-
-    def _predict_values_only(self, model: TrainedModel, samples: Dict[str, Sequence[float]]) -> np.ndarray:
-        x, y, z, t, _ = self._extract_and_validate_data(samples)
-        preds: List[float] = []
-        for tx, ty, tz, tt in zip(x, y, z, t):
-            pred, _ = self._predict_single(model, float(tx), float(ty), float(tz), float(tt))
-            preds.append(float(pred))
-        return np.asarray(preds, dtype=np.float64)
-
-    def _predict_single(self, model: TrainedModel, tx: float, ty: float, tz: float, tt: float) -> Tuple[float, float]:
-        dx = model.x - tx
-        dy = model.y - ty
-        dz = model.z - tz
-        dt = np.abs(model.t - tt)
-
-        spatial_distance = np.sqrt(dx * dx + dy * dy + dz * dz)
-        temporal_distance = dt
-
-        sr = max(model.parameters["spatial_range"], 1e-6)
-        tr = max(model.parameters["temporal_range"], 1e-6)
-        coupling = max(model.parameters.get("coupling", 0.6), 1e-6)
-
-        if model.model_type == "separated":
-            kernel = 0.5 * np.exp(-spatial_distance / sr) + 0.5 * np.exp(-temporal_distance / tr)
-        elif model.model_type == "product":
-            kernel = np.exp(-(spatial_distance / sr + temporal_distance / tr))
-        else:
-            st_norm = np.sqrt((spatial_distance / sr) ** 2 + (temporal_distance / tr) ** 2)
-            kernel = np.exp(-np.power(st_norm, coupling))
-
-        kernel = np.maximum(kernel, 1e-12)
-        weights = kernel / np.sum(kernel)
-
-        pred = float(np.sum(weights * model.value))
-        variance = float(np.sum(weights * (model.value - pred) ** 2) + model.parameters["spatial_nugget"])
-        return pred, variance
-
-    def _build_prediction_cache_key(
+    def incremental_update_model(
         self,
         model_id: str,
+        new_data: Dict[str, Sequence[float]],
+    ) -> Dict[str, Any]:
+        model = self._get_model(model_id)
+        update_data = STDataset.from_dict(new_data)
+
+        updated = self.incremental_engine.incremental_update(
+            existing=model.dataset,
+            new_data=update_data,
+            old_params=model.parameters,
+        )
+
+        model.dataset = updated["dataset"]
+        model.parameters = updated["parameters"]
+        model.training_report = {
+            **model.training_report,
+            "incremental_updated_at": datetime.now(timezone.utc).isoformat(),
+        }
+        model.data_stats = self._build_data_stats(model.dataset)
+
+        return {
+            "model_id": model_id,
+            "parameters": model.parameters,
+            "data_stats": model.data_stats,
+            "update_report": updated["update_report"],
+        }
+
+    def _annotate_prediction_rows(
+        self,
+        rows: List[Dict[str, Any]],
+        model_type: str,
+        prediction_days: int,
+    ) -> List[Dict[str, Any]]:
+        if not rows:
+            return rows
+        min_t = min(float(item["t"]) for item in rows)
+        annotated: List[Dict[str, Any]] = []
+        for seq, item in enumerate(rows, start=1):
+            day = int(max(0.0, float(item["t"]) - min_t) // 86400) + 1
+            day = max(1, min(day, prediction_days))
+            decay = self.prediction_engine.precision_decay(day)
+            variance = float(max(float(item["variance"]) * (1.0 + decay), 1e-9))
+            uncertainty = float(np.sqrt(variance))
+            value = float(item["value"])
+            annotated.append(
+                {
+                    "x": float(item["x"]),
+                    "y": float(item["y"]),
+                    "z": float(item["z"]),
+                    "t": float(item["t"]),
+                    "prediction_time": datetime.fromtimestamp(float(item["t"]), tz=timezone.utc).isoformat(),
+                    "value": value,
+                    "variance": variance,
+                    "uncertainty": uncertainty,
+                    "confidence_interval": [float(value - 1.96 * uncertainty), float(value + 1.96 * uncertainty)],
+                    "precision_decay": decay,
+                    "prediction_day": day,
+                    "method": model_type,
+                    "sequence": seq,
+                }
+            )
+        return annotated
+
+    def _offline_predict(
+        self,
+        model: TrainedModel,
         target_positions: Dict[str, Sequence[float]],
         target_times: Sequence[float],
         prediction_days: int,
-        options: Dict[str, Any],
-    ) -> str:
-        payload = {
-            "model_id": model_id,
-            "target_positions": {
-                "x": list(target_positions.get("x", [])),
-                "y": list(target_positions.get("y", [])),
-                "z": list(target_positions.get("z", [])),
-            },
-            "target_times": list(target_times),
-            "prediction_days": prediction_days,
-            "mode": {
-                "online_preferred": bool(options.get("online_preferred", True)),
-                "backend_available": bool(options.get("backend_available", True)),
-            },
-        }
-        digest = hashlib.sha256(repr(payload).encode("utf-8")).hexdigest()
-        return f"spatiotemporal:predict:{digest}"
-
-    def _compute_prediction_day(self, target_t: float, base_t: float, max_days: int) -> int:
-        delta = max(float(target_t - base_t), 0.0)
-        day = int(delta // 86400) + 1
-        return max(1, min(day, max_days))
-
-    def _precision_decay(self, day: int) -> float:
-        if day <= 1:
-            return 0.05
-        if day <= 7:
-            return round(0.05 + (day - 1) * (0.10 / 6.0), 6)
-        if day <= 15:
-            return round(0.15 + (day - 7) * (0.15 / 8.0), 6)
-        return 0.30
-
-    def _expand_targets(
-        self,
-        target_positions: Dict[str, Sequence[float]],
-        target_times: Sequence[float],
-    ) -> Tuple[List[float], List[float], List[float], List[float]]:
-        x = [float(v) for v in target_positions.get("x", [])]
-        y = [float(v) for v in target_positions.get("y", [])]
-        z = [float(v) for v in target_positions.get("z", [])]
-        t = [float(v) for v in target_times]
-
-        if not x or not y or not z or not t:
+    ) -> List[Dict[str, Any]]:
+        tx = np.asarray(target_positions.get("x", []), dtype=np.float64)
+        ty = np.asarray(target_positions.get("y", []), dtype=np.float64)
+        tz = np.asarray(target_positions.get("z", []), dtype=np.float64)
+        tt = np.asarray(target_times, dtype=np.float64)
+        if len(tx) == 0 or len(tt) == 0:
             raise ValueError("target_positions 和 target_times 不能为空")
-        if not (len(x) == len(y) == len(z)):
-            raise ValueError("target_positions.x/y/z 长度必须一致")
 
-        xs: List[float] = []
-        ys: List[float] = []
-        zs: List[float] = []
-        ts: List[float] = []
+        mean = float(np.mean(model.dataset.value))
+        std = float(np.std(model.dataset.value))
+        if len(model.dataset.t) > 1:
+            trend = float((model.dataset.value[-1] - model.dataset.value[0]) / max(model.dataset.t[-1] - model.dataset.t[0], 1.0))
+        else:
+            trend = 0.0
+        base_t = float(np.max(model.dataset.t))
+        min_t = float(np.min(tt))
 
-        for tt in t:
-            for tx, ty, tz in zip(x, y, z):
-                xs.append(tx)
-                ys.append(ty)
-                zs.append(tz)
-                ts.append(tt)
-        return xs, ys, zs, ts
+        rows: List[Dict[str, Any]] = []
+        seq = 1
+        for t_value in tt:
+            for x, y, z in zip(tx, ty, tz):
+                day = int(max(0.0, float(t_value) - min_t) // 86400) + 1
+                day = max(1, min(day, prediction_days))
+                decay = self.prediction_engine.precision_decay(day)
 
-    def _extract_and_validate_data(
-        self,
-        data: Dict[str, Sequence[float]],
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        x = np.asarray(data.get("x", []), dtype=np.float64)
-        y = np.asarray(data.get("y", []), dtype=np.float64)
-        z = np.asarray(data.get("z", []), dtype=np.float64)
-        t = np.asarray(data.get("t", []), dtype=np.float64)
-        value = np.asarray(data.get("value", []), dtype=np.float64)
+                value = mean + trend * float(t_value - base_t)
+                variance = float(max((std**2) * (1.1 + decay), 1e-9))
+                unc = float(np.sqrt(variance))
+                rows.append(
+                    {
+                        "x": float(x),
+                        "y": float(y),
+                        "z": float(z),
+                        "t": float(t_value),
+                        "prediction_time": datetime.fromtimestamp(float(t_value), tz=timezone.utc).isoformat(),
+                        "value": float(value),
+                        "variance": variance,
+                        "uncertainty": unc,
+                        "confidence_interval": [float(value - 1.96 * unc), float(value + 1.96 * unc)],
+                        "precision_decay": decay,
+                        "prediction_day": day,
+                        "method": f"{model.model_type}_offline",
+                        "sequence": seq,
+                    }
+                )
+                seq += 1
+        return rows
 
-        n = len(x)
-        if n < 3:
-            raise ValueError("至少需要 3 个样本点")
-        if not (len(y) == n and len(z) == n and len(t) == n and len(value) == n):
-            raise ValueError("x/y/z/t/value 长度必须一致")
-        if np.any(~np.isfinite(value)):
-            raise ValueError("value 存在非法值")
-
-        return x, y, z, t, value
-
-    def _build_data_stats(
-        self,
-        x: np.ndarray,
-        y: np.ndarray,
-        z: np.ndarray,
-        t: np.ndarray,
-        value: np.ndarray,
-    ) -> Dict[str, Any]:
-        spatial_points = len({(round(float(a), 6), round(float(b), 6), round(float(c), 6)) for a, b, c in zip(x, y, z)})
-        temporal_points = len({round(float(v), 3) for v in t})
+    def _build_data_stats(self, data: STDataset) -> Dict[str, Any]:
+        spatial_points = len({(round(float(a), 6), round(float(b), 6), round(float(c), 6)) for a, b, c in zip(data.x, data.y, data.z)})
+        temporal_points = len({round(float(v), 3) for v in data.t})
         return {
             "n_spatial_points": int(spatial_points),
             "n_temporal_points": int(temporal_points),
-            "total_samples": int(len(value)),
-            "value_range": [float(np.min(value)), float(np.max(value))],
-            "value_mean": float(np.mean(value)),
-            "value_std": float(np.std(value)),
+            "total_samples": int(len(data.value)),
+            "value_range": [float(np.min(data.value)), float(np.max(data.value))],
+            "value_mean": float(np.mean(data.value)),
+            "value_std": float(np.std(data.value)),
         }
-
-    def _estimate_range(self, points: np.ndarray) -> float:
-        n = len(points)
-        if n <= 1:
-            return 1.0
-
-        # 限制配对数，保障大规模数据下训练耗时。
-        if n > 500:
-            step = max(1, n // 500)
-            points = points[::step]
-            n = len(points)
-
-        distances: List[float] = []
-        for i in range(n - 1):
-            diff = points[i + 1 :] - points[i]
-            d = np.sqrt(np.sum(diff * diff, axis=1))
-            if len(d) > 0:
-                distances.append(float(np.median(d)))
-
-        return float(max(statistics.median(distances) if distances else 1.0, 1e-6))
-
-    def _gaussian_crps(self, mu: float, sigma: float, obs: float) -> float:
-        z = (obs - mu) / sigma
-        phi = (1.0 / math.sqrt(2.0 * math.pi)) * math.exp(-0.5 * z * z)
-        phi_cdf = 0.5 * (1.0 + math.erf(z / math.sqrt(2.0)))
-        return sigma * (z * (2.0 * phi_cdf - 1.0) + 2.0 * phi - 1.0 / math.sqrt(math.pi))
 
     def _get_model(self, model_id: str) -> TrainedModel:
         with self._lock:
