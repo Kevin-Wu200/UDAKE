@@ -323,8 +323,8 @@
             try {
                 // 显示系统信息
                 const engine = MapConfig.getProvider();
-                document.getElementById('current-engine').textContent = engine === 'arcgis'
-                    ? t('test.mapEngine.engine.arcgis')
+                document.getElementById('current-engine').textContent = engine === 'geoscene'
+                    ? t('test.mapEngine.engine.geoscene')
                     : t('test.mapEngine.engine.tianditu');
                 document.getElementById('browser-info').textContent = navigator.userAgent.split(' ').pop();
 

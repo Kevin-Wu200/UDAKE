@@ -101,8 +101,8 @@ class Settings(BaseSettings):
     GRID_RESOLUTION: int = 100
 
     # GeoScene配置
-    GEOSCENE_API_KEY: str = "YOUR_ARCGIS_API_KEY_HERE"
-    GEOSCENE_PORTAL_URL: str = "https://www.arcgis.com"
+    GEOSCENE_API_KEY: str = "YOUR_GEOSCENE_API_KEY_HERE"
+    GEOSCENE_PORTAL_URL: str = "https://www.geoscene.cn"
     GEOSCENE_ENV: str = "development"
     GEOSCENE_DEFAULT_BASEMAP: str = "streets-vector"
     GEOSCENE_DEFAULT_CENTER: Union[str, List[float]] = "[139.767125,35.681236]"

@@ -45,7 +45,7 @@ class EnvironmentService {
       import.meta.env.VITE_API_BASE_URL ||
       import.meta.env.VITE_API_URL ||
       `http://${backendHost}:${backendPort}`;
-    const mapProvider = import.meta.env.VITE_MAP_PROVIDER || 'arcgis';
+    const mapProvider = import.meta.env.VITE_MAP_PROVIDER || 'geoscene';
     const enableDebug = import.meta.env.VITE_ENABLE_DEBUG === 'true';
     const enablePerformanceMonitor = import.meta.env.VITE_ENABLE_PERFORMANCE_MONITOR === 'true';
     const logLevel = (import.meta.env.VITE_LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error';

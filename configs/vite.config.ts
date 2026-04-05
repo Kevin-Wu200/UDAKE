@@ -88,9 +88,7 @@ export default defineConfig(({ mode }) => {
             // 将地图引擎分离为独立 chunk（按不同引擎）
             if (
               id.includes('GeoSceneEngine') ||
-              id.includes('geoscene') ||
-              id.includes('ArcGISEngine') ||
-              id.includes('arcgis')
+              id.includes('geoscene')
             ) {
               return 'map-geoscene';
             }

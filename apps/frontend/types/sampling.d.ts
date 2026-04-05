@@ -196,7 +196,7 @@ export class RegionSampling {
     boundaryLayer: BoundaryLayer | null;
 
     /** 地图提供者 */
-    mapProvider: 'arcgis';
+    mapProvider: 'geoscene';
 
     constructor(viewOrAdapter: any, onPointAdded?: PointAddedCallback);
 
@@ -246,7 +246,7 @@ export class RegionSampling {
 // ========== 地图管理器类型 ==========
 
 /** 地图提供者 */
-export type MapProvider = 'arcgis' | 'geoscene' | 'amap';
+export type MapProvider = 'geoscene' | 'geoscene' | 'amap';
 
 /** 地图模式 */
 export type MapMode = 'normal' | 'areaSampling';

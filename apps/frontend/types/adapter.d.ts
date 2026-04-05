@@ -77,7 +77,7 @@ export abstract class MapAdapter {
 // ========== ArcGIS 适配器特定类型 ==========
 
 /** ArcGIS 适配器图层存储 */
-export interface ArcGISLayerStore {
+export interface GeoSceneLayerStore {
     [layerName: string]: any;
 }
 
@@ -90,7 +90,7 @@ export interface GraphicsLayer {
 }
 
 /** ArcGIS 适配器 */
-export class ArcGISAdapter extends MapAdapter {
+export class GeoSceneAdapter extends MapAdapter {
     /** ArcGIS 地图引擎 */
     engine: any;
 
@@ -101,7 +101,7 @@ export class ArcGISAdapter extends MapAdapter {
     map: any;
 
     /** 图层存储 */
-    layers: ArcGISLayerStore;
+    layers: GeoSceneLayerStore;
 
     /** 图形图层 */
     graphicsLayer: GraphicsLayer | null;

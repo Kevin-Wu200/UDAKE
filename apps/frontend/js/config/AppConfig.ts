@@ -82,8 +82,8 @@ export const AppConfig: RuntimeAppConfig = {
 
 export const DEFAULT_MAP_CONFIG = {
     geoscene: {
-        apiKey: 'YOUR_ARCGIS_API_KEY_HERE',
-        portalUrl: 'https://www.arcgis.com',
+        apiKey: 'YOUR_GEOSCENE_API_KEY_HERE',
+        portalUrl: 'https://www.geoscene.cn',
         env: 'development',
         defaultBasemap: 'arcgis-topographic',
         defaultCenter: [139.767125, 35.681236] as [number, number],

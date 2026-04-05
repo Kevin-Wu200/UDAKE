@@ -27,7 +27,7 @@ const DEFAULT_CONFIG = {
 // 当前配置（从后端获取或使用默认值）
 let currentConfig = { ...DEFAULT_CONFIG };
 
-export const ArcGISConfig = {
+export const GeoSceneConfig = {
     // API Key配置
     get API_KEY() {
         return currentConfig.API_KEY;
@@ -104,5 +104,3 @@ export const ArcGISConfig = {
         };
     }
 };
-
-export const GeoSceneConfig = ArcGISConfig;

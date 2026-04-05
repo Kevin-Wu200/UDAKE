@@ -1936,14 +1936,14 @@ class App {
     /**
      * 处理地图引擎切换
      */
-    private async handleMapEngineSwitch(newProvider: 'arcgis' | 'amap'): Promise<void> {
+    private async handleMapEngineSwitch(newProvider: 'geoscene' | 'amap'): Promise<void> {
         // 检查是否正在切换，防止重复切换
         if (this.isSwitchingMap) {
             Logger.warn('主程序', '地图引擎正在切换中，请稍候');
             return;
         }
 
-        const previousProvider: 'arcgis' | 'amap' = newProvider === 'arcgis' ? 'amap' : 'arcgis';
+        const previousProvider: 'geoscene' | 'amap' = newProvider === 'geoscene' ? 'amap' : 'geoscene';
         let samplingPoints: SamplingPoint[] = [];
         let projectPoints: SamplingPoint[] = [];
         let currentCenter: [number, number] | { lng: number; lat: number } | null = null;
@@ -2037,12 +2037,12 @@ class App {
             }
 
             LoadingManager.hide();
-            this.showStatus(`已切换到 ${newProvider === 'arcgis' ? 'ArcGIS' : '高德'} 地图引擎`, 'success');
+            this.showStatus(`已切换到 ${newProvider === 'geoscene' ? 'GeoScene' : '高德'} 地图引擎`, 'success');
 
             HistoryManager.record({
                 action: '切换地图引擎',
                 type: 'map',
-                detail: `切换到 ${newProvider === 'arcgis' ? 'ArcGIS' : '高德'} 地图引擎`,
+                detail: `切换到 ${newProvider === 'geoscene' ? 'GeoScene' : '高德'} 地图引擎`,
                 undoable: false
             });
 

@@ -165,14 +165,14 @@ export class ResourceOptimizationManager {
     private lastHeapUsage: number | null = null;
 
     private readonly moduleLoaders: Record<string, () => Promise<unknown>> = {
-        'map/core/GeoSceneEngine': () => import('../map/core/ArcGISEngine.js'),
+        'map/core/GeoSceneEngine': () => import('../map/core/GeoSceneEngine.js'),
         'map/core/AMapEngine': () => import('../map/core/AMapEngine.js'),
-        'adapters/GeoSceneAdapter': () => import('../adapters/ArcGISAdapter.js'),
+        'adapters/GeoSceneAdapter': () => import('../adapters/GeoSceneAdapter.js'),
         'adapters/AMapAdapter': () => import('../adapters/AMapAdapter.js'),
         'workers/compute': () => import('../workers/WorkerPoolManager.js'),
         // 兼容旧模块标识，避免历史调用失败
-        'map/core/ArcGISEngine': () => import('../map/core/ArcGISEngine.js'),
-        'adapters/ArcGISAdapter': () => import('../adapters/ArcGISAdapter.js')
+        'map/core/ArcGISEngine': () => import('../map/core/GeoSceneEngine.js'),
+        'adapters/ArcGISAdapter': () => import('../adapters/GeoSceneAdapter.js')
     };
 
     private readonly componentLoaders: Record<string, () => Promise<unknown>> = {

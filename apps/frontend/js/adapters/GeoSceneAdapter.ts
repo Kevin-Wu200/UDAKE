@@ -1,11 +1,11 @@
 /**
  * ArcGIS 地图适配器
- * 使用 ArcGISEngine，封装 ArcGIS API for JavaScript 的地图操作
+ * 使用 GeoSceneEngine，封装 ArcGIS API for JavaScript 的地图操作
  */
 
 import { MapAdapter } from './MapAdapter';
-import { ArcGISConfig } from '../config/geoscene.config';
-import { ArcGISEngine } from '../map/core/ArcGISEngine';
+import { GeoSceneConfig } from '../config/geoscene.config';
+import { GeoSceneEngine } from '../map/core/GeoSceneEngine';
 import { MockMapEngine } from '../map/core/MockMapEngine';
 import type {
     GeoJSONFeatureCollection,
@@ -14,7 +14,7 @@ import type {
 } from '../../types/core';
 import type {
     AdapterOptions,
-    ArcGISLayerStore,
+    GeoSceneLayerStore,
     GraphicsLayer,
     ClickHandler
 } from '../../types/adapter';
@@ -22,11 +22,11 @@ import type { BaseMapEngine } from '../../types/map-engine';
 
 /**
  * ArcGIS 地图适配器
- * 使用 ArcGISEngine 或 MockMapEngine，封装地图操作
+ * 使用 GeoSceneEngine 或 MockMapEngine，封装地图操作
  */
-export class ArcGISAdapter extends MapAdapter {
+export class GeoSceneAdapter extends MapAdapter {
     /** 地图引擎 */
-    engine: ArcGISEngine | MockMapEngine | null;
+    engine: GeoSceneEngine | MockMapEngine | null;
 
     /** 是否使用 Mock 模式 */
     isMock: boolean;
@@ -38,7 +38,7 @@ export class ArcGISAdapter extends MapAdapter {
     map: any;
 
     /** 图层存储 */
-    layers: ArcGISLayerStore;
+    layers: GeoSceneLayerStore;
 
     /** 图形图层 */
     graphicsLayer: GraphicsLayer | null;
@@ -50,7 +50,7 @@ export class ArcGISAdapter extends MapAdapter {
         super();
 
         // 根据配置选择引擎
-        const config = ArcGISConfig.getConfig();
+        const config = GeoSceneConfig.getConfig();
         this.isMock = config.isMock;
         this.engine = null;
 
@@ -65,20 +65,20 @@ export class ArcGISAdapter extends MapAdapter {
 
     /**
      * 初始化地图
-     * 根据 isMock 标志选择使用 ArcGISEngine 或 MockMapEngine
+     * 根据 isMock 标志选择使用 GeoSceneEngine 或 MockMapEngine
      */
     async initMap(containerId: string, _options?: AdapterOptions): Promise<any> {
         // 初始化 ArcGIS 配置
-        const config = ArcGISConfig.getConfig();
+        const config = GeoSceneConfig.getConfig();
 
         if (this.isMock) {
             // 使用 Mock 引擎
             console.log('🗺️ 使用 Mock 地图引擎');
             this.engine = new MockMapEngine({
-                center: ArcGISConfig.GEOSCENE_DEFAULT_CENTER as any,
-                zoom: ArcGISConfig.GEOSCENE_DEFAULT_ZOOM,
-                minZoom: ArcGISConfig.VIEW_OPTIONS.constraints.minZoom,
-                maxZoom: ArcGISConfig.VIEW_OPTIONS.constraints.maxZoom
+                center: GeoSceneConfig.GEOSCENE_DEFAULT_CENTER as any,
+                zoom: GeoSceneConfig.GEOSCENE_DEFAULT_ZOOM,
+                minZoom: GeoSceneConfig.VIEW_OPTIONS.constraints.minZoom,
+                maxZoom: GeoSceneConfig.VIEW_OPTIONS.constraints.maxZoom
             });
 
             // 初始化引擎
@@ -105,12 +105,12 @@ export class ArcGISAdapter extends MapAdapter {
                 console.warn('GeoScene 配置设置失败，使用默认配置', error);
             }
 
-            // 创建 ArcGISEngine
-            this.engine = new ArcGISEngine({
-                center: ArcGISConfig.GEOSCENE_DEFAULT_CENTER as any,
-                zoom: ArcGISConfig.GEOSCENE_DEFAULT_ZOOM,
-                minZoom: ArcGISConfig.VIEW_OPTIONS.constraints.minZoom,
-                maxZoom: ArcGISConfig.VIEW_OPTIONS.constraints.maxZoom
+            // 创建 GeoSceneEngine
+            this.engine = new GeoSceneEngine({
+                center: GeoSceneConfig.GEOSCENE_DEFAULT_CENTER as any,
+                zoom: GeoSceneConfig.GEOSCENE_DEFAULT_ZOOM,
+                minZoom: GeoSceneConfig.VIEW_OPTIONS.constraints.minZoom,
+                maxZoom: GeoSceneConfig.VIEW_OPTIONS.constraints.maxZoom
             });
 
             // 初始化引擎

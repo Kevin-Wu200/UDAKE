@@ -11,17 +11,17 @@ export class MapEngineSwitcher {
     private button: HTMLElement | null = null;
 
     /** 当前地图引擎 */
-    private currentProvider: 'arcgis' | 'amap' = 'arcgis';
+    private currentProvider: 'geoscene' | 'amap' = 'geoscene';
 
     /** 切换回调函数 */
-    private onSwitch: ((provider: 'arcgis' | 'amap') => Promise<void>) | null = null;
+    private onSwitch: ((provider: 'geoscene' | 'amap') => Promise<void>) | null = null;
 
     /** 是否正在切换 */
     private isSwitching: boolean = false;
 
     constructor(
-        currentProvider: 'arcgis' | 'amap' = 'arcgis',
-        onSwitch?: (provider: 'arcgis' | 'amap') => Promise<void>
+        currentProvider: 'geoscene' | 'amap' = 'geoscene',
+        onSwitch?: (provider: 'geoscene' | 'amap') => Promise<void>
     ) {
         this.currentProvider = currentProvider;
         this.onSwitch = onSwitch || null;
@@ -99,7 +99,7 @@ export class MapEngineSwitcher {
      * 更新按钮文本
      */
     private updateButtonText(textElement: HTMLElement): void {
-        const engineName = this.currentProvider === 'arcgis' ? 'ArcGIS' : '高德';
+        const engineName = this.currentProvider === 'geoscene' ? 'GeoScene' : '高德';
         textElement.textContent = `${engineName}`;
     }
 
@@ -111,7 +111,7 @@ export class MapEngineSwitcher {
             return;
         }
 
-        const newProvider: 'arcgis' | 'amap' = this.currentProvider === 'arcgis' ? 'amap' : 'arcgis';
+        const newProvider: 'geoscene' | 'amap' = this.currentProvider === 'geoscene' ? 'amap' : 'geoscene';
 
         // 更新状态
         this.isSwitching = true;
@@ -205,14 +205,14 @@ export class MapEngineSwitcher {
     /**
      * 设置切换回调
      */
-    setOnSwitch(callback: (provider: 'arcgis' | 'amap') => Promise<void>): void {
+    setOnSwitch(callback: (provider: 'geoscene' | 'amap') => Promise<void>): void {
         this.onSwitch = callback;
     }
 
     /**
      * 更新当前提供商
      */
-    setCurrentProvider(provider: 'arcgis' | 'amap'): void {
+    setCurrentProvider(provider: 'geoscene' | 'amap'): void {
         this.currentProvider = provider;
 
         const textElement = this.button?.querySelector('.switcher-text') as HTMLElement;

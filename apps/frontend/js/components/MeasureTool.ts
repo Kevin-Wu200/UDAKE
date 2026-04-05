@@ -84,7 +84,7 @@ export class MeasureTool {
             snapToFeatures: config.snapToFeatures ?? false
         };
         this.events = events;
-        this.mapProvider = 'arcgis'; // 默认值，会在 init 时更新
+        this.mapProvider = 'geoscene'; // 默认值，会在 init 时更新
         this.mapEngine = null;
     }
 
@@ -413,7 +413,7 @@ export class MeasureTool {
         };
 
         // 根据不同的地图引擎绑定事件
-        if (this.mapProvider === 'arcgis') {
+        if (this.mapProvider === 'geoscene') {
             const view = this.mapEngine.view;
             if (view) {
                 view.on('click', clickHandler);
@@ -436,7 +436,7 @@ export class MeasureTool {
     private removeMapClickHandler(): void {
         if (!this.mapEngine) return;
 
-        if (this.mapProvider === 'arcgis') {
+        if (this.mapProvider === 'geoscene') {
             const view = this.mapEngine.view;
             if (view && (view as any)._measureClickHandler) {
                 view.off('click', (view as any)._measureClickHandler);
@@ -457,7 +457,7 @@ export class MeasureTool {
      * @returns 地图点
      */
     private extractMapPoint(event: any): MapPoint | null {
-        if (this.mapProvider === 'arcgis') {
+        if (this.mapProvider === 'geoscene') {
             return {
                 longitude: event.mapPoint.longitude,
                 latitude: event.mapPoint.latitude
@@ -515,7 +515,7 @@ export class MeasureTool {
      * @returns 标记对象
      */
     private createMarker(mapPoint: MapPoint): any {
-        if (this.mapProvider === 'arcgis') {
+        if (this.mapProvider === 'geoscene') {
             // 动态导入 ArcGIS 模块
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
             return import('@geoscene/core/Graphic').then(({ default: Graphic }) => {
@@ -608,7 +608,7 @@ export class MeasureTool {
      * @returns 线对象
      */
     private createLine(from: MapPoint, to: MapPoint): any {
-        if (this.mapProvider === 'arcgis') {
+        if (this.mapProvider === 'geoscene') {
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
             return import('@geoscene/core/Graphic').then(({ default: Graphic }) => {
                 // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
@@ -654,7 +654,7 @@ export class MeasureTool {
     private updatePolygon(): void {
         if (this.polygon && this.polygon.polygon) {
             // 移除旧的多边形
-            if (this.mapProvider === 'arcgis') {
+            if (this.mapProvider === 'geoscene') {
                 this.mapEngine.view.graphics.remove(this.polygon.polygon);
             } else if (this.mapProvider === 'amap') {
                 this.mapEngine.map.remove(this.polygon.polygon);
@@ -681,7 +681,7 @@ export class MeasureTool {
      * @returns 多边形对象
      */
     private createPolygon(path: number[][]): any {
-        if (this.mapProvider === 'arcgis') {
+        if (this.mapProvider === 'geoscene') {
             // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
             return import('@geoscene/core/Graphic').then(({ default: Graphic }) => {
                 // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
@@ -797,7 +797,7 @@ export class MeasureTool {
     private mapPointToScreen(mapPoint: MapPoint): { x: number; y: number } | null {
         if (!this.mapEngine) return null;
 
-        if (this.mapProvider === 'arcgis') {
+        if (this.mapProvider === 'geoscene') {
             const view = this.mapEngine.view;
             if (view && view.toScreen) {
                 const screenPoint = view.toScreen({
@@ -882,7 +882,7 @@ export class MeasureTool {
         // 移除标记和标签
         if (lastPoint) {
             if (lastPoint.marker) {
-                if (this.mapProvider === 'arcgis') {
+                if (this.mapProvider === 'geoscene') {
                     this.mapEngine.view.graphics.remove(lastPoint.marker);
                 } else if (this.mapProvider === 'amap') {
                     this.mapEngine.map.remove(lastPoint.marker);
@@ -898,7 +898,7 @@ export class MeasureTool {
             const lastSegment = this.segments.pop();
             if (lastSegment) {
                 if (lastSegment.line) {
-                    if (this.mapProvider === 'arcgis') {
+                    if (this.mapProvider === 'geoscene') {
                         this.mapEngine.view.graphics.remove(lastSegment.line);
                     } else if (this.mapProvider === 'amap') {
                         this.mapEngine.map.remove(lastSegment.line);
@@ -916,7 +916,7 @@ export class MeasureTool {
         } else if (this.currentType === 'area' && this.polygon) {
             // 移除多边形
             if (this.polygon.polygon) {
-                if (this.mapProvider === 'arcgis') {
+                if (this.mapProvider === 'geoscene') {
                     this.mapEngine.view.graphics.remove(this.polygon.polygon);
                 } else if (this.mapProvider === 'amap') {
                     this.mapEngine.map.remove(this.polygon.polygon);
@@ -944,7 +944,7 @@ export class MeasureTool {
         // 移除所有标记
         this.points.forEach(point => {
             if (point.marker) {
-                if (this.mapProvider === 'arcgis') {
+                if (this.mapProvider === 'geoscene') {
                     this.mapEngine.view.graphics.remove(point.marker);
                 } else if (this.mapProvider === 'amap') {
                     this.mapEngine.map.remove(point.marker);
@@ -958,7 +958,7 @@ export class MeasureTool {
         // 移除所有线段
         this.segments.forEach(segment => {
             if (segment.line) {
-                if (this.mapProvider === 'arcgis') {
+                if (this.mapProvider === 'geoscene') {
                     this.mapEngine.view.graphics.remove(segment.line);
                 } else if (this.mapProvider === 'amap') {
                     this.mapEngine.map.remove(segment.line);
@@ -972,7 +972,7 @@ export class MeasureTool {
         // 移除多边形
         if (this.polygon) {
             if (this.polygon.polygon) {
-                if (this.mapProvider === 'arcgis') {
+                if (this.mapProvider === 'geoscene') {
                     this.mapEngine.view.graphics.remove(this.polygon.polygon);
                 } else if (this.mapProvider === 'amap') {
                     this.mapEngine.map.remove(this.polygon.polygon);

@@ -1,4 +1,4 @@
-import { ArcGISEngine } from '../map/core/ArcGISEngine';
+import { GeoSceneEngine } from '../map/core/GeoSceneEngine';
 import { AMapEngine } from '../map/core/AMapEngine';
 import { offlineMapService, type OfflineMapDownloadProgress, type TileCoordinate } from '../map/services/OfflineMapService';
 import { GeoUtils } from '../utils/GeoUtils';
@@ -63,7 +63,7 @@ export class MapManager {
 
         // 创建地图引擎
         if (provider === 'geoscene') {
-            this.mapEngine = new ArcGISEngine(options);
+            this.mapEngine = new GeoSceneEngine(options);
         } else if (provider === 'amap') {
             this.mapEngine = new AMapEngine(options);
         } else {

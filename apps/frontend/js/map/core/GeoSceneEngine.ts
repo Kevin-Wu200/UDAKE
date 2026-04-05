@@ -4,13 +4,13 @@
  */
 
 import { BaseMapEngine } from './BaseMapEngine';
-import type { Bounds, MapInitOptions, ArcGISConfig, IMapView, IMap } from '../../../types/map-engine';
+import type { Bounds, MapInitOptions, GeoSceneConfig, IMapView, IMap } from '../../../types/map-engine';
 
 /**
  * ArcGIS 地图引擎
  * 使用 ArcGIS API for JavaScript 实现地图功能
  */
-export class ArcGISEngine extends BaseMapEngine {
+export class GeoSceneEngine extends BaseMapEngine {
     /** ArcGIS MapView 实例 */
     view: IMapView | null;
 
@@ -18,9 +18,9 @@ export class ArcGISEngine extends BaseMapEngine {
     map: IMap | null;
 
     /** 配置选项 */
-    options: ArcGISConfig;
+    options: GeoSceneConfig;
 
-    constructor(options: ArcGISConfig = {}) {
+    constructor(options: GeoSceneConfig = {}) {
         super();
         this.supportsCustomReset = false;
 

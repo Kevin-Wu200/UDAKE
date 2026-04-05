@@ -1,6 +1,6 @@
 /**
  * 地图引擎基类
- * 定义统一的地图操作接口，供 ArcGISEngine 和 AMapEngine 实现
+ * 定义统一的地图操作接口，供 GeoSceneEngine 和 AMapEngine 实现
  */
 
 import type { Bounds, MapInitOptions, ZoomCallback, MoveCallback } from '../../../types/map-engine';

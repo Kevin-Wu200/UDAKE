@@ -101,7 +101,7 @@ export interface BaseMapEngine {
 // ========== ArcGIS 特定类型 ==========
 
 /** ArcGIS 地图引擎配置 */
-export interface ArcGISConfig {
+export interface GeoSceneConfig {
     basemap?: string;
     center?: [number, number];
     zoom?: number;
@@ -119,7 +119,7 @@ export interface ArcGISExtent {
 }
 
 /** ArcGIS 地图引擎 */
-export class ArcGISEngine extends BaseMapEngine {
+export class GeoSceneEngine extends BaseMapEngine {
     /** ArcGIS MapView 实例 */
     view: IMapView | null;
 
@@ -127,9 +127,9 @@ export class ArcGISEngine extends BaseMapEngine {
     map: IMap | null;
 
     /** 配置选项 */
-    options: ArcGISConfig;
+    options: GeoSceneConfig;
 
-    constructor(options?: ArcGISConfig);
+    constructor(options?: GeoSceneConfig);
 
     init(container: HTMLElement | string, options?: MapInitOptions): Promise<void>;
     setCenter(center: [number, number]): void;

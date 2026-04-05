@@ -5,7 +5,7 @@
  */
 
 import { BaseMapEngine } from './BaseMapEngine';
-import type { Bounds, MapInitOptions, IMapView, IMap, ArcGISConfig } from '../../../types/map-engine';
+import type { Bounds, MapInitOptions, IMapView, IMap, GeoSceneConfig } from '../../../types/map-engine';
 
 /**
  * Mock 视图对象
@@ -57,12 +57,12 @@ export class MockMapEngine extends BaseMapEngine {
     map: MockMap | null;
 
     /** 配置选项 */
-    options: ArcGISConfig;
+    options: GeoSceneConfig;
 
     /** DOM 元素 */
     container: HTMLElement | null;
 
-    constructor(options: ArcGISConfig = {}) {
+    constructor(options: GeoSceneConfig = {}) {
         super();
         this.supportsCustomReset = true;
 

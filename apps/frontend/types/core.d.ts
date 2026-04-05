@@ -207,7 +207,7 @@ export interface ValidationResult {
 // ========== 地图引擎 ==========
 
 /** 地图引擎类型 */
-export type MapEngineType = 'arcgis' | 'geoscene' | 'amap';
+export type MapEngineType = 'geoscene' | 'geoscene' | 'amap';
 
 /** 地图初始化选项 */
 export interface MapInitOptions {

@@ -289,7 +289,7 @@ export class ComponentInitializer {
 
         // 初始化地图引擎切换器
         const mapEngineSwitcher = new MapEngineSwitcher(
-            provider as 'arcgis' | 'amap',
+            provider as 'geoscene' | 'amap',
             async (newProvider) => await this.handleMapEngineSwitch(newProvider)
         );
         mapEngineSwitcher.addToContainer(mapContainer);
@@ -379,7 +379,7 @@ export class ComponentInitializer {
                 }
             }
         );
-        measureTool.init(this.config!.view, provider as 'arcgis' | 'amap');
+        measureTool.init(this.config!.view, provider as 'geoscene' | 'amap');
         const measurePanel = measureTool.createPanel();
         measurePanel.style.display = 'none';
         mapContainer.appendChild(measurePanel);
@@ -618,7 +618,7 @@ export class ComponentInitializer {
     /**
      * 处理地图引擎切换
      */
-    private async handleMapEngineSwitch(newProvider: 'arcgis' | 'amap'): Promise<void> {
+    private async handleMapEngineSwitch(newProvider: 'geoscene' | 'amap'): Promise<void> {
         console.log('切换地图引擎:', newProvider);
         const event = new CustomEvent('map-engine-switch', { detail: newProvider });
         document.dispatchEvent(event);

@@ -9,8 +9,8 @@
  */
 
 export const MapConfig = {
-    // 地图引擎选择：'arcgis' 或 'amap'
-    MAP_PROVIDER: 'arcgis',
+    // 地图引擎选择：'geoscene' 或 'amap'
+    MAP_PROVIDER: 'geoscene',
 
     // 获取当前地图引擎
     getProvider() {
@@ -19,7 +19,7 @@ export const MapConfig = {
 
     // 检查是否使用 GeoScene
     isGeoScene() {
-        return this.MAP_PROVIDER === 'arcgis';
+        return this.MAP_PROVIDER === 'geoscene';
     },
 
     // 检查是否使用高德地图
