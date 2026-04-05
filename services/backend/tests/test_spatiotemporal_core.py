@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import sys
+import uuid
 from pathlib import Path
 
 import numpy as np
@@ -56,6 +57,7 @@ def test_kriging_solver_predict():
     assert len(result["predictions"]) == 4
     assert len(result["weights"]) == 4
     assert "low_rank_used" in result["solver_info"]
+    assert "target_rank" in result["solver_info"]
 
 
 def test_auto_selector_metrics_and_report():
@@ -81,7 +83,7 @@ def test_prediction_engine_cache_and_mode_switch():
     engine = SpatiotemporalPredictionEngine()
 
     async def _run_once():
-        payload = {"model_id": "m1", "target": [1, 2, 3]}
+        payload = {"model_id": "m1", "target": [1, 2, 3], "nonce": uuid.uuid4().hex}
 
         def online_predictor():
             return {"model_id": "m1", "predictions": [{"value": 1}], "summary": {"total_predictions": 1}}
@@ -142,3 +144,26 @@ def test_incremental_engine_update():
     v = np.array([0.2, 0.1, 0.4], dtype=np.float64)
     updated_inv = engine.sherman_morrison_update(inv_a, u, v)
     assert updated_inv.shape == (3, 3)
+
+    u_batch = np.array([[0.2, 0.1], [0.1, 0.3], [0.0, 0.2]], dtype=np.float64)
+    c_batch = np.eye(2, dtype=np.float64)
+    v_batch = u_batch.T
+    woodbury_inv = engine.woodbury_batch_update(inv_a, u_batch, c_batch, v_batch)
+    assert woodbury_inv.shape == (3, 3)
+
+
+def test_solver_rank_and_windows_utilities():
+    solver = SpatiotemporalKrigingSolver(block_size=6, temporal_window_size=4, low_rank=5)
+    matrix = np.eye(10, dtype=np.float64) * 2.0
+    landmarks = solver.sample_landmarks(matrix, rank=4)
+    assert len(landmarks) == 4
+
+    rank = solver.adaptive_rank(n_samples=1000, target_accuracy=0.95, memory_limit_mb=2000)
+    assert 20 <= rank <= 300
+
+    t = np.array([10, 20, 30, 40, 50, 60], dtype=np.float64)
+    windows = solver.temporal_windows(t, step=2, overlap=1)
+    assert len(windows) >= 2
+
+    merged = solver.merge_window_predictions([np.array([1, 2, 3]), np.array([2, 3, 4])])
+    assert merged.tolist() == [1.5, 2.5, 3.5]

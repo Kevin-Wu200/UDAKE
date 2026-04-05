@@ -7,13 +7,32 @@ import json
 import math
 import time
 import copy
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Callable, Dict, List, Literal, Sequence, Tuple
 
 import numpy as np
 
 from .cache_service import get_cache_service
+
+try:  # pragma: no cover - 可选依赖
+    import scipy.sparse as scipy_sparse
+    import scipy.sparse.linalg as scipy_sparse_linalg
+except Exception:  # pragma: no cover - 可选依赖
+    scipy_sparse = None
+    scipy_sparse_linalg = None
+
+try:  # pragma: no cover - 可选依赖
+    import psutil
+except Exception:  # pragma: no cover - 可选依赖
+    psutil = None
+
+try:  # pragma: no cover - 可选依赖
+    import cupy as cp
+except Exception:  # pragma: no cover - 可选依赖
+    cp = None
 
 ModelType = Literal["separated", "product", "nonseparable"]
 
@@ -52,6 +71,121 @@ class STDataset:
     @property
     def coords(self) -> np.ndarray:
         return np.stack([self.x, self.y, self.z], axis=1)
+
+
+class SpatiotemporalPerformanceMonitor:
+    """性能监控：耗时、CPU、内存、缓存命中率。"""
+
+    def __init__(self) -> None:
+        self._events: List[Dict[str, Any]] = []
+        self._cache_hits = 0
+        self._cache_total = 0
+
+    def record(
+        self,
+        *,
+        stage: str,
+        elapsed_seconds: float,
+        cache_hit: bool | None = None,
+        extra: Dict[str, Any] | None = None,
+    ) -> None:
+        payload: Dict[str, Any] = {
+            "stage": stage,
+            "elapsed_seconds": float(elapsed_seconds),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+        if psutil is not None:
+            process = psutil.Process()
+            mem = process.memory_info()
+            payload.update(
+                {
+                    "memory_rss_mb": round(mem.rss / (1024 * 1024), 3),
+                    "cpu_percent": float(psutil.cpu_percent(interval=None)),
+                }
+            )
+        if extra:
+            payload.update(extra)
+        self._events.append(payload)
+        if cache_hit is not None:
+            self._cache_total += 1
+            if cache_hit:
+                self._cache_hits += 1
+
+    def snapshot(self) -> Dict[str, Any]:
+        hit_rate = (self._cache_hits / self._cache_total) if self._cache_total else 0.0
+        return {
+            "events": list(self._events[-200:]),
+            "cache": {
+                "hits": self._cache_hits,
+                "total": self._cache_total,
+                "hit_rate": round(hit_rate, 6),
+            },
+        }
+
+
+class DiskCacheStore:
+    """L3 磁盘缓存。"""
+
+    def __init__(self, cache_dir: str = "/tmp/udake_spatiotemporal_cache") -> None:
+        self.cache_dir = Path(cache_dir)
+        self.cache_dir.mkdir(parents=True, exist_ok=True)
+
+    def _entry_path(self, key: str) -> Path:
+        digest = hashlib.sha256(key.encode("utf-8")).hexdigest()
+        return self.cache_dir / f"{digest}.json"
+
+    def get(self, key: str) -> Dict[str, Any] | None:
+        path = self._entry_path(key)
+        if not path.exists():
+            return None
+        try:
+            raw = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            return None
+        expires_at = float(raw.get("expires_at", 0.0))
+        if expires_at and expires_at < time.time():
+            try:
+                path.unlink(missing_ok=True)
+            except Exception:
+                pass
+            return None
+        return raw.get("payload")
+
+    def set(self, key: str, payload: Dict[str, Any], ttl: int) -> None:
+        path = self._entry_path(key)
+        expires_at = time.time() + max(1, int(ttl))
+        wrapper = {"expires_at": expires_at, "payload": payload}
+        path.write_text(json.dumps(wrapper, ensure_ascii=False), encoding="utf-8")
+
+
+class SpatiotemporalMemoryManager:
+    """内存监控与预警。"""
+
+    def __init__(self, warning_threshold_mb: float = 2800.0) -> None:
+        self.warning_threshold_mb = warning_threshold_mb
+        self.snapshots: List[Dict[str, Any]] = []
+
+    def snapshot(self) -> Dict[str, Any]:
+        rss_mb = 0.0
+        if psutil is not None:
+            rss_mb = psutil.Process().memory_info().rss / (1024 * 1024)
+        info = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "rss_mb": round(float(rss_mb), 3),
+            "warning": bool(rss_mb >= self.warning_threshold_mb),
+        }
+        self.snapshots.append(info)
+        if len(self.snapshots) > 500:
+            self.snapshots = self.snapshots[-500:]
+        return info
+
+    def leak_growth_rate(self, recent: int = 20) -> float:
+        if len(self.snapshots) < 2:
+            return 0.0
+        sample = self.snapshots[-recent:]
+        first = sample[0]["rss_mb"]
+        last = sample[-1]["rss_mb"]
+        return float((last - first) / max(len(sample) - 1, 1))
 
 
 class SpatiotemporalVariogramModeler:
@@ -341,6 +475,32 @@ class SpatiotemporalKrigingSolver:
             start = max(start + step - overlap, start + 1)
         return windows
 
+    def merge_window_predictions(self, window_predictions: List[np.ndarray]) -> np.ndarray:
+        if not window_predictions:
+            return np.array([], dtype=np.float64)
+        cleaned = [arr.reshape(-1) for arr in window_predictions if len(arr) > 0]
+        if not cleaned:
+            return np.array([], dtype=np.float64)
+        min_len = min(len(arr) for arr in cleaned)
+        stack = np.stack([arr[:min_len] for arr in cleaned], axis=0)
+        return np.mean(stack, axis=0)
+
+    def sample_landmarks(self, matrix: np.ndarray, rank: int, seed: int = 42) -> np.ndarray:
+        n = len(matrix)
+        m = min(max(1, rank), n)
+        rng = np.random.default_rng(seed)
+        diag = np.clip(np.diag(matrix), 1e-12, None)
+        probs = diag / np.sum(diag)
+        selected = rng.choice(n, size=m, replace=False, p=probs)
+        return np.sort(selected.astype(np.int64))
+
+    def adaptive_rank(self, n_samples: int, target_accuracy: float = 0.95, memory_limit_mb: float = 3000.0) -> int:
+        base = max(40, min(300, int(math.sqrt(max(n_samples, 1)) * 2.0)))
+        accuracy_factor = float(np.clip((target_accuracy - 0.85) / 0.15, 0.4, 1.2))
+        memory_factor = float(np.clip(memory_limit_mb / 3000.0, 0.3, 1.5))
+        rank = int(base * accuracy_factor * memory_factor)
+        return int(max(20, min(rank, n_samples)))
+
     def covariance_matrix(
         self,
         points: np.ndarray,
@@ -351,25 +511,47 @@ class SpatiotemporalKrigingSolver:
     ) -> Tuple[np.ndarray, Dict[str, Any]]:
         covariance_fn = covariance_builder(params, model_type)
         k = covariance_fn(points, points)
+        k = np.nan_to_num(k, nan=0.0, posinf=1e6, neginf=-1e6)
         jitter = max(float(params.get("spatial_nugget", 1e-6)), 1e-8)
         k = k + np.eye(len(k)) * jitter
 
-        info: Dict[str, Any] = {"low_rank_used": False, "rank": len(k)}
+        info: Dict[str, Any] = {"low_rank_used": False, "rank": len(k), "target_rank": self.low_rank}
         if use_low_rank and len(k) > self.low_rank:
-            k = self.nystrom_approximation(k, self.low_rank)
+            dynamic_rank = self.adaptive_rank(len(k), target_accuracy=0.95, memory_limit_mb=3000.0)
+            rank = min(self.low_rank, dynamic_rank)
+            k = self.nystrom_approximation(k, rank)
             k = k + np.eye(len(k)) * jitter
             info["low_rank_used"] = True
-            info["rank"] = self.low_rank
+            info["rank"] = rank
         return k, info
 
     def nystrom_approximation(self, matrix: np.ndarray, rank: int) -> np.ndarray:
         n = len(matrix)
         m = min(rank, n)
-        landmarks = np.linspace(0, n - 1, m, dtype=int)
+        landmarks = self.sample_landmarks(matrix, m)
         c = matrix[:, landmarks]
         w = matrix[np.ix_(landmarks, landmarks)] + np.eye(m) * 1e-8
-        w_inv = np.linalg.pinv(w)
+        w_inv = self.woodbury_inverse(w)
         return c @ w_inv @ c.T
+
+    def woodbury_inverse(
+        self,
+        a: np.ndarray,
+        u: np.ndarray | None = None,
+        c: np.ndarray | None = None,
+        v: np.ndarray | None = None,
+    ) -> np.ndarray:
+        if u is None or c is None or v is None:
+            return np.linalg.pinv(a)
+        a_inv = np.linalg.pinv(a)
+        inner = np.linalg.pinv(c) + v @ a_inv @ u
+        return a_inv - a_inv @ u @ np.linalg.pinv(inner) @ v @ a_inv
+
+    def solve_sparse_cholesky(self, matrix: np.ndarray, rhs: np.ndarray) -> np.ndarray:
+        if scipy_sparse is None or scipy_sparse_linalg is None:
+            return self.solve_cholesky(matrix, rhs)
+        sparse_matrix = scipy_sparse.csc_matrix(matrix)
+        return scipy_sparse_linalg.spsolve(sparse_matrix, rhs)
 
     def solve_cholesky(self, matrix: np.ndarray, rhs: np.ndarray) -> np.ndarray:
         jitter = 1e-8
@@ -380,7 +562,28 @@ class SpatiotemporalKrigingSolver:
                 return np.linalg.solve(l.T, y)
             except np.linalg.LinAlgError:
                 jitter *= 10.0
-        return np.linalg.pinv(matrix) @ rhs
+        try:
+            return np.linalg.pinv(matrix) @ rhs
+        except np.linalg.LinAlgError:
+            solution, *_ = np.linalg.lstsq(matrix, rhs, rcond=None)
+            return solution
+
+    def solve_parallel_cholesky(self, matrix: np.ndarray, rhs_list: List[np.ndarray], max_workers: int = 4) -> List[np.ndarray]:
+        if not rhs_list:
+            return []
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = [executor.submit(self.solve_cholesky, matrix, rhs) for rhs in rhs_list]
+            return [future.result() for future in futures]
+
+    def maybe_gpu_matrix_multiply(self, a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        if cp is None:
+            return a @ b
+        try:  # pragma: no cover - 依赖 GPU 环境
+            ga = cp.asarray(a)
+            gb = cp.asarray(b)
+            return cp.asnumpy(ga @ gb)
+        except Exception:
+            return a @ b
 
     def predict(
         self,
@@ -408,27 +611,36 @@ class SpatiotemporalKrigingSolver:
 
         pred_rows: List[Dict[str, Any]] = []
         weights_rows: List[List[float]] = []
+        jobs: List[Tuple[float, float, float, float]] = []
         for t_value in tt:
             for x, y, z in zip(tx, ty, tz):
-                target = np.array([[x, y, z, float(t_value)]], dtype=np.float64)
-                k_vec = covariance_fn(train_points, target).reshape(-1)
-                pred = float(k_vec @ alpha)
+                jobs.append((float(x), float(y), float(z), float(t_value)))
 
-                solve_k = self.solve_cholesky(k_train, k_vec)
-                variance = float(max(covariance_fn(target, target)[0, 0] - k_vec @ solve_k, 1e-9))
-                weights = solve_k.tolist()
+        def _predict_one(job: Tuple[float, float, float, float]) -> Tuple[Dict[str, Any], List[float]]:
+            x, y, z, t_value = job
+            target = np.array([[x, y, z, t_value]], dtype=np.float64)
+            k_vec = covariance_fn(train_points, target).reshape(-1)
+            pred = float(k_vec @ alpha)
 
-                pred_rows.append(
-                    {
-                        "x": float(x),
-                        "y": float(y),
-                        "z": float(z),
-                        "t": float(t_value),
-                        "value": pred,
-                        "variance": variance,
-                    }
-                )
+            solve_k = self.solve_cholesky(k_train, k_vec)
+            variance = float(max(covariance_fn(target, target)[0, 0] - k_vec @ solve_k, 1e-9))
+            row = {"x": x, "y": y, "z": z, "t": t_value, "value": pred, "variance": variance}
+            return row, solve_k.tolist()
+
+        if len(jobs) >= 8:
+            with ThreadPoolExecutor(max_workers=min(8, len(jobs))) as executor:
+                for row, weights in executor.map(_predict_one, jobs):
+                    pred_rows.append(row)
+                    weights_rows.append(weights)
+        else:
+            for job in jobs:
+                row, weights = _predict_one(job)
+                pred_rows.append(row)
                 weights_rows.append(weights)
+
+        # 及时释放大对象，降低内存峰值
+        del k_train
+        del alpha
 
         return {
             "predictions": pred_rows,
@@ -518,6 +730,11 @@ class SpatiotemporalModelAutoSelector:
 class SpatiotemporalPredictionEngine:
     """4.4 预测引擎：实时/离线、精度衰减、缓存。"""
 
+    def __init__(self, disk_cache_dir: str = "/tmp/udake_spatiotemporal_cache") -> None:
+        self.disk_cache = DiskCacheStore(cache_dir=disk_cache_dir)
+        self.monitor = SpatiotemporalPerformanceMonitor()
+        self._hot_payloads: List[Dict[str, Any]] = []
+
     def precision_decay(self, day: int) -> float:
         if day <= 1:
             return 0.05
@@ -551,7 +768,14 @@ class SpatiotemporalPredictionEngine:
             if isinstance(cached, dict) and cached.get("model_id") == model_id:
                 cached_copy = copy.deepcopy(cached)
                 cached_copy.setdefault("summary", {})["cache_hit"] = True
+                self.monitor.record(stage="predict_cache_l1_l2_hit", elapsed_seconds=0.0, cache_hit=True)
                 return cached_copy, "cache", True
+            disk_cached = self.disk_cache.get(cache_key)
+            if isinstance(disk_cached, dict) and disk_cached.get("model_id") == model_id:
+                disk_copy = copy.deepcopy(disk_cached)
+                disk_copy.setdefault("summary", {})["cache_hit"] = True
+                self.monitor.record(stage="predict_cache_l3_hit", elapsed_seconds=0.0, cache_hit=True)
+                return disk_copy, "cache", True
 
         start = time.perf_counter()
         if online_preferred and backend_available:
@@ -568,8 +792,51 @@ class SpatiotemporalPredictionEngine:
 
         if use_cache:
             await cache_service.set(cache_key, copy.deepcopy(result), ttl=cache_ttl)
+            self.disk_cache.set(cache_key, copy.deepcopy(result), ttl=cache_ttl)
+            self.monitor.record(stage="predict_cache_store", elapsed_seconds=0.0, cache_hit=False)
+        else:
+            self.monitor.record(stage="predict_no_cache", elapsed_seconds=elapsed, cache_hit=False)
+
+        # 记录热点请求（用于预热/预取）
+        self._hot_payloads.append(copy.deepcopy(payload))
+        if len(self._hot_payloads) > 100:
+            self._hot_payloads = self._hot_payloads[-100:]
+        self.monitor.record(stage=f"predict_{mode}", elapsed_seconds=elapsed, cache_hit=False)
 
         return result, mode, False
+
+    async def warm_cache(
+        self,
+        entries: List[Dict[str, Any]],
+        predictor: Callable[[Dict[str, Any]], Dict[str, Any]],
+        ttl: int = 300,
+    ) -> int:
+        cache_service = get_cache_service()
+        count = 0
+        for payload in entries:
+            key = self.build_cache_key(payload)
+            cached = await cache_service.get(key)
+            if cached is not None:
+                continue
+            result = predictor(payload)
+            await cache_service.set(key, copy.deepcopy(result), ttl=ttl)
+            self.disk_cache.set(key, copy.deepcopy(result), ttl=ttl)
+            count += 1
+        return count
+
+    def prefetch_candidates(self, max_items: int = 5) -> List[Dict[str, Any]]:
+        if not self._hot_payloads:
+            return []
+        return self._hot_payloads[-max_items:]
+
+    def smart_cache_policy(self, payload: Dict[str, Any]) -> Dict[str, Any]:
+        target_times = payload.get("target_times", [])
+        complexity = len(payload.get("target_positions", {}).get("x", [])) * max(1, len(target_times))
+        if complexity >= 500:
+            return {"cache_ttl": 900, "priority": "high"}
+        if complexity >= 100:
+            return {"cache_ttl": 600, "priority": "medium"}
+        return {"cache_ttl": 300, "priority": "normal"}
 
 
 class IncrementalSTKrigingEngine:
@@ -581,6 +848,11 @@ class IncrementalSTKrigingEngine:
         if abs(denominator) < 1e-8:
             raise ValueError("Sherman-Morrison 更新失败：分母接近 0")
         return inv_a - numerator / denominator
+
+    def woodbury_batch_update(self, inv_a: np.ndarray, u: np.ndarray, c: np.ndarray, v: np.ndarray) -> np.ndarray:
+        c_inv = np.linalg.pinv(c)
+        middle = np.linalg.pinv(c_inv + v @ inv_a @ u)
+        return inv_a - inv_a @ u @ middle @ v @ inv_a
 
     def incremental_update(
         self,

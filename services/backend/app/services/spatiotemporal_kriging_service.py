@@ -15,6 +15,7 @@ from .spatiotemporal_core import (
     ModelType,
     STDataset,
     SpatiotemporalKrigingSolver,
+    SpatiotemporalMemoryManager,
     SpatiotemporalModelAutoSelector,
     SpatiotemporalPredictionEngine,
     SpatiotemporalVariogramModeler,
@@ -45,6 +46,7 @@ class SpatiotemporalKrigingService:
         self.selector = SpatiotemporalModelAutoSelector()
         self.prediction_engine = SpatiotemporalPredictionEngine()
         self.incremental_engine = IncrementalSTKrigingEngine()
+        self.memory_manager = SpatiotemporalMemoryManager()
 
     def train_model(
         self,
@@ -81,6 +83,7 @@ class SpatiotemporalKrigingService:
         with self._lock:
             self._models[model_id] = trained
 
+        memory = self.memory_manager.snapshot()
         return {
             "model_id": model_id,
             "model_type": model_type,
@@ -88,6 +91,7 @@ class SpatiotemporalKrigingService:
             "training_report": report,
             "data_stats": trained.data_stats,
             "variogram_charts": trained.charts,
+            "resource": {"memory": memory},
         }
 
     async def predict(
@@ -155,6 +159,7 @@ class SpatiotemporalKrigingService:
                 },
             }
 
+        cache_policy = self.prediction_engine.smart_cache_policy(payload)
         result, mode, cache_hit = await self.prediction_engine.predict(
             model_id=model_id,
             payload=payload,
@@ -163,10 +168,14 @@ class SpatiotemporalKrigingService:
             use_cache=bool(options.get("use_cache", True)),
             online_preferred=bool(options.get("online_preferred", True)),
             backend_available=bool(options.get("backend_available", True)),
+            cache_ttl=int(options.get("cache_ttl", cache_policy["cache_ttl"])),
         )
 
         result.setdefault("summary", {})["mode"] = mode
         result["summary"]["cache_hit"] = cache_hit
+        result["summary"]["cache_policy"] = cache_policy
+        result["summary"]["performance"] = self.prediction_engine.monitor.snapshot()["cache"]
+        result["summary"]["memory"] = self.memory_manager.snapshot()
         return result
 
     def auto_select_model(
@@ -249,6 +258,41 @@ class SpatiotemporalKrigingService:
             "parameters": model.parameters,
             "data_stats": model.data_stats,
             "update_report": updated["update_report"],
+            "memory": self.memory_manager.snapshot(),
+        }
+
+    async def warm_prediction_cache(self, model_id: str, payloads: List[Dict[str, Any]]) -> Dict[str, Any]:
+        model = self._get_model(model_id)
+
+        def _predictor(payload: Dict[str, Any]) -> Dict[str, Any]:
+            target_positions = payload.get("target_positions", {})
+            target_times = payload.get("target_times", [])
+            prediction_days = int(payload.get("prediction_days", 7))
+            rows = self._offline_predict(model, target_positions, target_times, prediction_days)
+            return {
+                "model_id": model_id,
+                "predictions": rows,
+                "summary": {
+                    "total_predictions": len(rows),
+                    "prediction_days": prediction_days,
+                    "solver": {"low_rank_used": False, "rank": 0},
+                },
+            }
+
+        warmed = await self.prediction_engine.warm_cache(payloads, _predictor, ttl=600)
+        return {
+            "model_id": model_id,
+            "warmed_count": warmed,
+            "prefetch_candidates": self.prediction_engine.prefetch_candidates(max_items=5),
+        }
+
+    def performance_metrics(self) -> Dict[str, Any]:
+        return {
+            "prediction_engine": self.prediction_engine.monitor.snapshot(),
+            "memory": {
+                "latest": self.memory_manager.snapshot(),
+                "leak_growth_rate": self.memory_manager.leak_growth_rate(),
+            },
         }
 
     def _annotate_prediction_rows(

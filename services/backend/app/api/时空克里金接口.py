@@ -63,6 +63,12 @@ class STIncrementalUpdateRequest(BaseModel):
     model_id: str
     new_data: STSeries
 
+class STCacheWarmupRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_id: str
+    payloads: List[Dict[str, Any]] = Field(default_factory=list)
+
 
 @router.post("/train")
 async def train_spatiotemporal_kriging(payload: STTrainRequest) -> Dict[str, Any]:
@@ -116,3 +122,24 @@ async def incremental_update_spatiotemporal_model(payload: STIncrementalUpdateRe
         return {"success": True, "data": result, "message": "增量更新成功"}
     except Exception as exc:  # pylint: disable=broad-except
         raise_api_error(exc, default_message="模型增量更新失败")
+
+
+@router.post("/cache/warmup")
+async def warmup_spatiotemporal_cache(payload: STCacheWarmupRequest) -> Dict[str, Any]:
+    try:
+        result = await spatiotemporal_kriging_service.warm_prediction_cache(
+            model_id=payload.model_id,
+            payloads=payload.payloads,
+        )
+        return {"success": True, "data": result, "message": "缓存预热完成"}
+    except Exception as exc:  # pylint: disable=broad-except
+        raise_api_error(exc, default_message="缓存预热失败")
+
+
+@router.get("/performance/metrics")
+async def get_spatiotemporal_performance_metrics() -> Dict[str, Any]:
+    try:
+        result = spatiotemporal_kriging_service.performance_metrics()
+        return {"success": True, "data": result, "message": "性能指标查询成功"}
+    except Exception as exc:  # pylint: disable=broad-except
+        raise_api_error(exc, default_message="性能指标查询失败")

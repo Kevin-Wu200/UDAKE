@@ -47,6 +47,7 @@ def test_spatiotemporal_train_api(client: TestClient) -> None:
     assert body["data"]["model_id"].startswith("st_model_")
     assert "parameters" in body["data"]
     assert "variogram_charts" in body["data"]
+    assert "resource" in body["data"]
 
 
 def test_spatiotemporal_predict_online_offline(client: TestClient) -> None:
@@ -151,3 +152,36 @@ def test_spatiotemporal_incremental_update_api(client: TestClient) -> None:
     assert body["data"]["model_id"] == model_id
     assert body["data"]["data_stats"]["total_samples"] == 8
     assert "update_report" in body["data"]
+
+
+def test_spatiotemporal_performance_metrics_and_cache_warmup_api(client: TestClient) -> None:
+    train_resp = client.post("/api/spatiotemporal/train", json=_train_payload("separated"))
+    model_id = train_resp.json()["data"]["model_id"]
+
+    warmup_resp = client.post(
+        "/api/spatiotemporal/cache/warmup",
+        json={
+            "model_id": model_id,
+            "payloads": [
+                {
+                    "target_positions": {
+                        "x": [120.2, 120.3],
+                        "y": [30.2, 30.3],
+                        "z": [10.6, 10.9],
+                    },
+                    "target_times": [1712620800, 1712707200],
+                    "prediction_days": 7,
+                }
+            ],
+        },
+    )
+    assert warmup_resp.status_code == 200, warmup_resp.text
+    warmup_data = warmup_resp.json()["data"]
+    assert warmup_data["model_id"] == model_id
+    assert warmup_data["warmed_count"] >= 0
+
+    metrics_resp = client.get("/api/spatiotemporal/performance/metrics")
+    assert metrics_resp.status_code == 200, metrics_resp.text
+    metrics = metrics_resp.json()["data"]
+    assert "prediction_engine" in metrics
+    assert "memory" in metrics
