@@ -49,7 +49,7 @@ python-socketio>=5.8.0
 # 深度学习基础架构（CI 环境使用 CPU 版本）
 torch==2.0.1
 torch-geometric==2.3.0
-lightning==2.0.0
+lightning==2.3.0
 tensorboard==2.13.0
 stable-baselines3==2.1.0
 gymnasium==0.28.0
