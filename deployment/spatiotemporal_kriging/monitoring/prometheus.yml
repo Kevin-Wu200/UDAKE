@@ -1,0 +1,16 @@
+global:
+  scrape_interval: 15s
+
+rule_files:
+  - /etc/prometheus/alert_rules.yml
+
+scrape_configs:
+  - job_name: "backend-health"
+    metrics_path: /health
+    static_configs:
+      - targets: ["backend:8000"]
+
+  - job_name: "nginx-health"
+    metrics_path: /health
+    static_configs:
+      - targets: ["nginx:80"]

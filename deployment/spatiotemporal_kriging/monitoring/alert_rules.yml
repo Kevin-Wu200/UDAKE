@@ -1,0 +1,20 @@
+groups:
+  - name: udake-kriging-alerts
+    rules:
+      - alert: BackendDown
+        expr: up{job="backend-health"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "后端服务不可用"
+          description: "backend:8000 连续 2 分钟健康检查失败"
+
+      - alert: NginxDown
+        expr: up{job="nginx-health"} == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nginx 不可用"
+          description: "nginx:80 连续 2 分钟健康检查失败"
