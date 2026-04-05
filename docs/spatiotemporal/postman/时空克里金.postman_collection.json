@@ -1,0 +1,60 @@
+{
+  "info": {
+    "name": "时空克里金 API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "训练模型",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/api/spatiotemporal/train",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"data\": {\n    \"x\": [120.1, 120.2, 120.3],\n    \"y\": [30.1, 30.2, 30.3],\n    \"z\": [10.0, 10.2, 10.4],\n    \"t\": [1711929600, 1712016000, 1712102400],\n    \"value\": [80.0, 82.5, 84.2]\n  },\n  \"model_type\": \"nonseparable\",\n  \"options\": {\n    \"optimization\": {\n      \"method\": \"mle\",\n      \"max_iterations\": 120\n    }\n  }\n}"
+        }
+      }
+    },
+    {
+      "name": "模型预测",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/api/spatiotemporal/predict",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"model_id\": \"{{modelId}}\",\n  \"target_positions\": {\n    \"x\": [120.4],\n    \"y\": [30.4],\n    \"z\": [10.6]\n  },\n  \"target_times\": [1712188800],\n  \"prediction_days\": 7,\n  \"options\": {\n    \"use_cache\": true\n  }\n}"
+        }
+      }
+    },
+    {
+      "name": "自动选择",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/api/spatiotemporal/auto-select",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"historical_data\": {\n    \"x\": [120.1,120.2,120.3],\n    \"y\": [30.1,30.2,30.3],\n    \"z\": [10.0,10.2,10.4],\n    \"t\": [1711929600,1712016000,1712102400],\n    \"value\": [80,82,84]\n  },\n  \"new_samples\": {\n    \"x\": [120.4,120.5,120.6],\n    \"y\": [30.4,30.5,30.6],\n    \"z\": [10.6,10.8,11.0],\n    \"t\": [1712188800,1712275200,1712361600],\n    \"value\": [85,86,87]\n  },\n  \"options\": {\n    \"weight_rmse\": 0.4,\n    \"weight_mae\": 0.3,\n    \"weight_crps\": 0.3\n  }\n}"
+        }
+      }
+    },
+    {
+      "name": "增量更新",
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{baseUrl}}/api/spatiotemporal/update",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"model_id\": \"{{modelId}}\",\n  \"new_data\": {\n    \"x\": [120.7,120.8,120.9],\n    \"y\": [30.7,30.8,30.9],\n    \"z\": [11.2,11.4,11.6],\n    \"t\": [1712448000,1712534400,1712620800],\n    \"value\": [88,89,90]\n  }\n}"
+        }
+      }
+    }
+  ],
+  "variable": [
+    {"key": "baseUrl", "value": "http://127.0.0.1:8000"},
+    {"key": "modelId", "value": "st_model_xxx"}
+  ]
+}

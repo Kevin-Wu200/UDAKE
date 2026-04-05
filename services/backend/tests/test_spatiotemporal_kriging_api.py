@@ -154,6 +154,89 @@ def test_spatiotemporal_incremental_update_api(client: TestClient) -> None:
     assert "update_report" in body["data"]
 
 
+def test_spatiotemporal_update_model_api(client: TestClient) -> None:
+    train_resp = client.post("/api/spatiotemporal/train", json=_train_payload("separated"))
+    model_id = train_resp.json()["data"]["model_id"]
+
+    resp = client.post(
+        "/api/spatiotemporal/update",
+        json={
+            "model_id": model_id,
+            "new_data": {
+                "x": [120.6, 120.7, 120.8],
+                "y": [30.6, 30.7, 30.8],
+                "z": [11.8, 12.0, 12.2],
+                "t": [1712361600, 1712448000, 1712534400],
+                "value": [89.0, 90.5, 91.2],
+            },
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()["data"]
+    assert data["old_model_id"] == model_id
+    assert data["new_model_id"] != model_id
+    assert "update_report" in data
+
+
+def test_spatiotemporal_models_crud_and_evaluate_api(client: TestClient) -> None:
+    train_resp = client.post("/api/spatiotemporal/train", json=_train_payload("nonseparable"))
+    model_id = train_resp.json()["data"]["model_id"]
+
+    list_resp = client.get("/api/spatiotemporal/models?page=1&page_size=10&status=active")
+    assert list_resp.status_code == 200, list_resp.text
+    list_data = list_resp.json()["data"]
+    assert list_data["total"] >= 1
+    assert any(row["model_id"] == model_id for row in list_data["models"])
+
+    detail_resp = client.get(f"/api/spatiotemporal/models/{model_id}")
+    assert detail_resp.status_code == 200, detail_resp.text
+    detail_data = detail_resp.json()["data"]
+    assert detail_data["model_id"] == model_id
+    assert detail_data["model_type"] == "nonseparable"
+
+    eval_resp = client.get(f"/api/spatiotemporal/evaluate/{model_id}?metrics=rmse,mae,r2,crps")
+    assert eval_resp.status_code == 200, eval_resp.text
+    eval_data = eval_resp.json()["data"]
+    assert set(eval_data["metrics"].keys()) == {"rmse", "mae", "r2", "crps"}
+    assert "calibration" in eval_data
+    assert "diagnostics" in eval_data
+
+    del_resp = client.delete(f"/api/spatiotemporal/models/{model_id}")
+    assert del_resp.status_code == 200, del_resp.text
+    assert del_resp.json()["data"]["model_id"] == model_id
+
+    missing_resp = client.get(f"/api/spatiotemporal/models/{model_id}")
+    assert missing_resp.status_code == 404, missing_resp.text
+    missing_body = missing_resp.json()
+    assert missing_body["success"] is False
+    assert missing_body["error"]["code"] == "1001"
+    assert "request_id" in missing_body["error"]
+
+
+def test_spatiotemporal_error_response_format(client: TestClient) -> None:
+    resp = client.post(
+        "/api/spatiotemporal/predict",
+        json={
+            "model_id": "st_model_not_exists",
+            "target_positions": {
+                "x": [120.15],
+                "y": [30.15],
+                "z": [10.2],
+            },
+            "target_times": [1712016000],
+            "prediction_days": 7,
+            "options": {"include_uncertainty": True},
+        },
+        headers={"X-Request-ID": "req_test_custom"},
+    )
+    assert resp.status_code == 404, resp.text
+    body = resp.json()
+    assert body["success"] is False
+    assert body["error"]["code"] == "1001"
+    assert body["error"]["request_id"] == "req_test_custom"
+    assert "timestamp" in body["error"]
+
+
 def test_spatiotemporal_performance_metrics_and_cache_warmup_api(client: TestClient) -> None:
     train_resp = client.post("/api/spatiotemporal/train", json=_train_payload("separated"))
     model_id = train_resp.json()["data"]["model_id"]

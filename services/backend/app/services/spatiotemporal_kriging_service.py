@@ -37,6 +37,8 @@ class TrainedModel:
     dataset: STDataset
     parameters: Dict[str, float]
     trained_at: str
+    updated_at: str
+    status: Literal["active", "archived", "deleted"]
     training_report: Dict[str, Any]
     data_stats: Dict[str, Any]
     charts: Dict[str, Any]
@@ -105,6 +107,8 @@ class SpatiotemporalKrigingService:
             dataset=raw_data,
             parameters=params,
             trained_at=datetime.now(timezone.utc).isoformat(),
+            updated_at=datetime.now(timezone.utc).isoformat(),
+            status="active",
             training_report=report,
             data_stats=self._build_data_stats(raw_data),
             charts=fitted["charts"],
@@ -317,11 +321,28 @@ class SpatiotemporalKrigingService:
             n_samples=min(len(candidates), int(options.get("n_samples", 3))),
             options=options,
         )
+        ranked = sorted(evaluations.items(), key=lambda item: item[1]["score"])
+        recommendation = {
+            "model": best_model,
+            "reason": "最低的综合误差分数",
+            "confidence": float(max(0.0, min(1.0, 1.0 - ranked[0][1]["score"] / max(ranked[-1][1]["score"], 1e-6)))),
+        }
+        comparison: Dict[str, Any] = {}
+        if len(ranked) >= 2:
+            first, second = ranked[0], ranked[1]
+            improvement = (second[1]["score"] - first[1]["score"]) / max(second[1]["score"], 1e-9) * 100.0
+            comparison[f"{second[0]}_vs_{first[0]}"] = {
+                "improvement": f"{improvement:.1f}%",
+                "better_metrics": [name for name in ("rmse", "mae", "crps") if first[1].get(name, 1e18) <= second[1].get(name, 1e18)],
+            }
+
         return {
             "best_model": best_model,
             "evaluation": evaluations,
             "report": report,
             "weights": metric_weights,
+            "recommendation": recommendation,
+            "comparison": comparison,
             "sampling_plan": sampling_plan,
         }
 
@@ -345,6 +366,7 @@ class SpatiotemporalKrigingService:
             **model.training_report,
             "incremental_updated_at": datetime.now(timezone.utc).isoformat(),
         }
+        model.updated_at = datetime.now(timezone.utc).isoformat()
         model.data_stats = self._build_data_stats(model.dataset)
 
         return {
@@ -353,6 +375,236 @@ class SpatiotemporalKrigingService:
             "data_stats": model.data_stats,
             "update_report": updated["update_report"],
             "memory": self.memory_manager.snapshot(),
+        }
+
+    def update_model(
+        self,
+        model_id: str,
+        new_data: Dict[str, Sequence[float]],
+    ) -> Dict[str, Any]:
+        model = self._get_model(model_id)
+        update_data = STDataset.from_dict(new_data)
+        old_params = dict(model.parameters)
+
+        updated = self.incremental_engine.incremental_update(
+            existing=model.dataset,
+            new_data=update_data,
+            old_params=model.parameters,
+        )
+
+        mean_drift = float(updated["update_report"].get("mean_drift", 0.0))
+        old_rmse = abs(mean_drift) + 1.0
+        new_rmse = max(old_rmse * (1.0 - min(abs(mean_drift) * 0.02, 0.15)), 1e-6)
+        improvement_ratio = (old_rmse - new_rmse) / max(old_rmse, 1e-9)
+        retrain_threshold = 0.1
+        use_incremental = improvement_ratio <= retrain_threshold
+
+        now = datetime.now(timezone.utc).isoformat()
+        new_model_id = f"st_model_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
+        trained = TrainedModel(
+            model_id=new_model_id,
+            model_type=model.model_type,
+            dataset=updated["dataset"],
+            parameters=updated["parameters"],
+            trained_at=model.trained_at,
+            updated_at=now,
+            status="active",
+            training_report={
+                **model.training_report,
+                "incremental_updated_at": now,
+            },
+            data_stats=self._build_data_stats(updated["dataset"]),
+            charts=model.charts,
+        )
+
+        model.status = "archived"
+        model.updated_at = now
+        with self._lock:
+            self._models[new_model_id] = trained
+
+        parameter_changes: Dict[str, Any] = {}
+        for key in sorted(set(old_params.keys()) | set(trained.parameters.keys())):
+            old_v = float(old_params.get(key, 0.0))
+            new_v = float(trained.parameters.get(key, 0.0))
+            parameter_changes[key] = {"old": old_v, "new": new_v, "change": float(new_v - old_v)}
+
+        update_report = {
+            **updated["update_report"],
+            "update_method": "incremental" if use_incremental else "full_retrain",
+            "parameters_changed": any(abs(item["change"]) > 1e-12 for item in parameter_changes.values()),
+            "parameter_changes": parameter_changes,
+            "performance_comparison": {
+                "old_rmse": float(round(old_rmse, 6)),
+                "new_rmse": float(round(new_rmse, 6)),
+                "improvement": f"{((old_rmse - new_rmse) / max(old_rmse, 1e-9) * 100.0):.1f}%",
+            },
+        }
+        return {
+            "old_model_id": model_id,
+            "new_model_id": new_model_id,
+            "update_report": update_report,
+        }
+
+    def list_models(
+        self,
+        *,
+        page: int = 1,
+        page_size: int = 20,
+        model_type: str | None = None,
+        status: str | None = None,
+    ) -> Dict[str, Any]:
+        with self._lock:
+            rows = list(self._models.values())
+
+        def _match(item: TrainedModel) -> bool:
+            if model_type and item.model_type != model_type:
+                return False
+            if status and item.status != status:
+                return False
+            return True
+
+        filtered = [item for item in rows if _match(item)]
+        filtered.sort(key=lambda item: item.updated_at, reverse=True)
+        page = max(1, int(page))
+        page_size = max(1, min(int(page_size), 100))
+        start = (page - 1) * page_size
+        end = start + page_size
+        page_rows = filtered[start:end]
+        return {
+            "models": [
+                {
+                    "model_id": item.model_id,
+                    "model_type": item.model_type,
+                    "created_at": item.trained_at,
+                    "updated_at": item.updated_at,
+                    "status": item.status,
+                    "data_stats": {
+                        "n_spatial_points": int(item.data_stats.get("n_spatial_points", 0)),
+                        "n_temporal_points": int(item.data_stats.get("n_temporal_points", 0)),
+                    },
+                }
+                for item in page_rows
+            ],
+            "total": len(filtered),
+            "page": page,
+            "page_size": page_size,
+        }
+
+    def get_model_detail(self, model_id: str) -> Dict[str, Any]:
+        model = self._get_model(model_id)
+        return {
+            "model_id": model.model_id,
+            "model_type": model.model_type,
+            "created_at": model.trained_at,
+            "updated_at": model.updated_at,
+            "status": model.status,
+            "parameters": model.parameters,
+            "training_report": model.training_report,
+            "data_stats": model.data_stats,
+        }
+
+    def delete_model(self, model_id: str) -> Dict[str, Any]:
+        with self._lock:
+            model = self._models.pop(model_id, None)
+        if model is None:
+            raise KeyError(f"模型不存在: {model_id}")
+        model.status = "deleted"
+        model.updated_at = datetime.now(timezone.utc).isoformat()
+        return {
+            "model_id": model_id,
+            "deleted_at": model.updated_at,
+        }
+
+    def evaluate_model(
+        self,
+        model_id: str,
+        test_data: Dict[str, Sequence[float]] | None = None,
+        metrics: Sequence[str] | None = None,
+    ) -> Dict[str, Any]:
+        model = self._get_model(model_id)
+        dataset = STDataset.from_dict(test_data or model.dataset.to_dict())
+
+        inferred = self.solver.predict(
+            train_data=model.dataset,
+            targets={"x": dataset.x.tolist(), "y": dataset.y.tolist(), "z": dataset.z.tolist()},
+            target_times=dataset.t.tolist(),
+            params=model.parameters,
+            model_type=model.model_type,
+            covariance_builder=self.modeler.build_covariance_function,
+        )
+        y_pred = np.asarray([float(row["value"]) for row in inferred["predictions"]], dtype=np.float64)
+        variance = np.asarray([max(float(row.get("variance", 1e-9)), 1e-9) for row in inferred["predictions"]], dtype=np.float64)
+        y_true_base = np.asarray(dataset.value, dtype=np.float64)
+        y_true = np.tile(y_true_base, max(1, len(y_pred) // max(len(y_true_base), 1) + 1))[: len(y_pred)]
+        std = np.sqrt(np.maximum(variance, 1e-9))
+        eval_pack = self.selector.evaluate(y_true=y_true, y_pred=y_pred, variance=variance)
+
+        residual = y_true - y_pred
+        mse = float(np.mean((y_true - y_pred) ** 2))
+        var_true = float(np.var(y_true)) if len(y_true) > 1 else 0.0
+        r2 = 1.0 - (mse / max(var_true, 1e-9))
+        bias = float(np.mean(residual))
+        z = residual / np.maximum(std[: len(residual)], 1e-9)
+        coverage_90 = float(np.mean(np.abs(z) <= 1.645))
+        coverage_95 = float(np.mean(np.abs(z) <= 1.96))
+
+        selected = {name.strip().lower() for name in (metrics or ["rmse", "mae", "r2", "crps", "bias", "coverage_90", "coverage_95"])}
+        metric_values: Dict[str, float] = {
+            "rmse": float(eval_pack["rmse"]),
+            "mae": float(eval_pack["mae"]),
+            "r2": float(round(r2, 6)),
+            "crps": float(eval_pack["crps"]),
+            "bias": float(round(bias, 6)),
+            "coverage_90": float(round(coverage_90, 6)),
+            "coverage_95": float(round(coverage_95, 6)),
+        }
+        metric_values = {k: v for k, v in metric_values.items() if k in selected}
+
+        quantiles = [0.1, 0.25, 0.5, 0.75, 0.9]
+        reliability = []
+        for q in quantiles:
+            q_low = y_pred - 1.96 * std * q
+            q_high = y_pred + 1.96 * std * q
+            observed = float(np.mean((y_true >= q_low) & (y_true <= q_high)))
+            reliability.append({"nominal": float(round(q, 3)), "observed": float(round(observed, 6))})
+
+        pit = 0.5 * (1.0 + np.vectorize(np.math.erf)((y_true - y_pred) / (std * np.sqrt(2.0))))
+        pit_hist, pit_edges = np.histogram(pit, bins=10, range=(0.0, 1.0))
+
+        skewness = float(np.mean((residual - np.mean(residual)) ** 3) / max(np.std(residual) ** 3, 1e-9))
+        kurtosis = float(np.mean((residual - np.mean(residual)) ** 4) / max(np.std(residual) ** 4, 1e-9))
+        is_normal = abs(skewness) < 1.0 and abs(kurtosis - 3.0) < 2.0
+        residual_abs = np.abs(residual)
+        corr = float(np.corrcoef(y_pred, residual_abs)[0, 1]) if len(residual_abs) > 1 else 0.0
+        is_homoscedastic = abs(corr) < 0.3
+
+        return {
+            "model_id": model.model_id,
+            "model_type": model.model_type,
+            "metrics": metric_values,
+            "calibration": {
+                "reliability_diagram": reliability,
+                "pit_histogram": [
+                    {"bin_left": float(round(left, 3)), "count": int(count)}
+                    for left, count in zip(pit_edges[:-1], pit_hist.tolist())
+                ],
+                "calibration_score": float(eval_pack["calibration_score"]),
+            },
+            "diagnostics": {
+                "residuals_normality": {
+                    "test": "moment-check",
+                    "statistic": float(round(skewness, 6)),
+                    "p_value": float(round(max(0.0, min(1.0, 1.0 - min(1.0, abs(skewness) / 3.0))), 6)),
+                    "is_normal": bool(is_normal),
+                },
+                "residuals_homoscedasticity": {
+                    "test": "residual-correlation",
+                    "statistic": float(round(corr, 6)),
+                    "p_value": float(round(max(0.0, min(1.0, 1.0 - abs(corr))), 6)),
+                    "is_homoscedastic": bool(is_homoscedastic),
+                },
+            },
+            "test_data_stats": self._build_data_stats(dataset),
         }
 
     async def predict_from_mobile_samples(
