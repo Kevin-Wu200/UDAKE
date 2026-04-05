@@ -23,6 +23,7 @@ from .config import KrigingConfig
 # Core
 from .core import (
     IncrementalKriging,
+    IncrementalSTKriging,
     ShermanMorrisonUpdater,
     WoodburyUpdater,
     BlockMatrixUpdater,
@@ -80,6 +81,7 @@ __all__ = [
 
     # Core
     "IncrementalKriging",
+    "IncrementalSTKriging",
     "ShermanMorrisonUpdater",
     "WoodburyUpdater",
     "BlockMatrixUpdater",

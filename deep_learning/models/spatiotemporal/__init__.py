@@ -74,6 +74,9 @@ from .training import (
     cosine_with_warmup,
     train_spatiotemporal_model,
 )
+from .st_gnn import STGNNPredictor, STGNNResult
+from .st_uncertainty import STUncertaintyQuantifier, STUncertaintyResult
+from .st_fusion import STModelFusion
 
 __all__ = [
     "SpatioTemporalTransformer",
@@ -140,4 +143,9 @@ __all__ = [
     "fft_spectrum",
     "detect_temporal_anomalies",
     "detect_spatiotemporal_anomalies",
+    "STGNNPredictor",
+    "STGNNResult",
+    "STUncertaintyQuantifier",
+    "STUncertaintyResult",
+    "STModelFusion",
 ]

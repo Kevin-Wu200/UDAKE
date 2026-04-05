@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import importlib
 import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
+import sys
 from typing import Any, Dict, List, Literal, Sequence
 
 import numpy as np
@@ -20,6 +23,11 @@ from .spatiotemporal_core import (
     SpatiotemporalPredictionEngine,
     SpatiotemporalVariogramModeler,
 )
+from .gpu_service import gpu_service
+
+_REPO_ROOT = Path(__file__).resolve().parents[4]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.append(str(_REPO_ROOT))
 
 
 @dataclass
@@ -47,6 +55,28 @@ class SpatiotemporalKrigingService:
         self.prediction_engine = SpatiotemporalPredictionEngine()
         self.incremental_engine = IncrementalSTKrigingEngine()
         self.memory_manager = SpatiotemporalMemoryManager()
+        self.gpu_service = gpu_service
+
+    def _load_sampling_optimizer(self):
+        try:
+            module = importlib.import_module("multi_objective_optimization.st_sampling_optimizer")
+            obj_module = importlib.import_module("multi_objective_optimization.st_objectives")
+            return module.STSamplingOptimizer, obj_module.STSamplingPoint
+        except Exception:
+            return None, None
+
+    def _gpu_probe(self, values: np.ndarray) -> Dict[str, Any]:
+        vec = np.asarray(values, dtype=np.float64).reshape(-1, 1)
+        try:
+            # 走 GPU 计算引擎接口，自动 CPU/GPU 回退。
+            probe = self.gpu_service.matrix_multiply(vec.T, vec, prefer_gpu=True)
+            return {
+                "enabled": True,
+                "backend": str(probe.get("backend", "cpu")),
+                "elapsed_ms": float(probe.get("elapsed_ms", 0.0)),
+            }
+        except Exception:
+            return {"enabled": False, "backend": "cpu", "elapsed_ms": 0.0}
 
     def train_model(
         self,
@@ -84,6 +114,7 @@ class SpatiotemporalKrigingService:
             self._models[model_id] = trained
 
         memory = self.memory_manager.snapshot()
+        gpu = self._gpu_probe(raw_data.value)
         return {
             "model_id": model_id,
             "model_type": model_type,
@@ -92,6 +123,7 @@ class SpatiotemporalKrigingService:
             "data_stats": trained.data_stats,
             "variogram_charts": trained.charts,
             "resource": {"memory": memory},
+            "gpu_acceleration": gpu,
         }
 
     async def predict(
@@ -176,7 +208,54 @@ class SpatiotemporalKrigingService:
         result["summary"]["cache_policy"] = cache_policy
         result["summary"]["performance"] = self.prediction_engine.monitor.snapshot()["cache"]
         result["summary"]["memory"] = self.memory_manager.snapshot()
+        result["summary"]["gpu"] = self._gpu_probe(model.dataset.value)
         return result
+
+    def optimize_sampling_points(
+        self,
+        candidates: Sequence[Dict[str, float]],
+        n_samples: int = 12,
+        options: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        options = options or {}
+        optimizer_cls, point_cls = self._load_sampling_optimizer()
+        if optimizer_cls is None or point_cls is None:
+            sorted_rows = sorted(candidates, key=lambda row: float(row.get("uncertainty", row.get("variance", 0.0))), reverse=True)
+            selected = sorted_rows[: max(1, int(n_samples))]
+            return {
+                "selected_indices": list(range(len(selected))),
+                "selected_points": selected,
+                "objectives": {
+                    "uncertainty": float(np.mean([float(item.get("uncertainty", item.get("variance", 0.0))) for item in selected])) if selected else 0.0,
+                    "cost": 0.0,
+                },
+                "pareto_size": 1,
+                "optimizer": "fallback-greedy",
+            }
+
+        points = [
+            point_cls(
+                x=float(row.get("x", 0.0)),
+                y=float(row.get("y", 0.0)),
+                t=float(row.get("t", 0.0)),
+                uncertainty=float(row.get("uncertainty", row.get("variance", 0.0))),
+            )
+            for row in candidates
+        ]
+        optimizer = optimizer_cls(random_seed=int(options.get("random_seed", 42)))
+        result = optimizer.optimize(
+            candidates=points,
+            n_samples=int(n_samples),
+            population_size=int(options.get("population_size", 40)),
+            n_generations=int(options.get("n_generations", 30)),
+        )
+        return {
+            "selected_indices": result.selected_indices,
+            "selected_points": result.selected_points,
+            "objectives": result.objectives,
+            "pareto_size": result.pareto_size,
+            "optimizer": "nsga2-st",
+        }
 
     def auto_select_model(
         self,
@@ -224,11 +303,26 @@ class SpatiotemporalKrigingService:
 
         best_model = self.selector.select_best(evaluations)
         report = self.selector.generate_report(best_model, evaluations)
+        candidates = [
+            {
+                "x": float(x),
+                "y": float(y),
+                "t": float(t),
+                "uncertainty": float(abs(v - float(np.mean(new_data.value)))),
+            }
+            for x, y, t, v in zip(new_data.x, new_data.y, new_data.t, new_data.value)
+        ]
+        sampling_plan = self.optimize_sampling_points(
+            candidates=candidates,
+            n_samples=min(len(candidates), int(options.get("n_samples", 3))),
+            options=options,
+        )
         return {
             "best_model": best_model,
             "evaluation": evaluations,
             "report": report,
             "weights": metric_weights,
+            "sampling_plan": sampling_plan,
         }
 
     def incremental_update_model(
@@ -259,6 +353,50 @@ class SpatiotemporalKrigingService:
             "data_stats": model.data_stats,
             "update_report": updated["update_report"],
             "memory": self.memory_manager.snapshot(),
+        }
+
+    async def predict_from_mobile_samples(
+        self,
+        *,
+        project_id: str,
+        target_positions: Dict[str, Sequence[float]],
+        target_times: Sequence[float],
+        prediction_days: int,
+        options: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        from .mobile_gps_service import mobile_gps_service
+
+        options = options or {}
+        rows = mobile_gps_service.get_samples(project_id=project_id, limit=int(options.get("max_samples", 5000)))
+        if len(rows) < 3:
+            raise ValueError("移动端GPS样本不足，至少需要 3 条")
+
+        x = [float(item.get("longitude", 0.0)) for item in rows]
+        y = [float(item.get("latitude", 0.0)) for item in rows]
+        z = [float(item.get("altitude", 0.0) or 0.0) for item in rows]
+        t = [float(item.get("collected_at", 0)) / 1000.0 for item in rows]
+        value = [float((item.get("accuracy", 0.0) or 0.0) + (item.get("speed", 0.0) or 0.0)) for item in rows]
+
+        trained = self.train_model(
+            data={"x": x, "y": y, "z": z, "t": t, "value": value},
+            model_type=str(options.get("model_type", "nonseparable")),
+            options=options,
+        )
+        predicted = await self.predict(
+            model_id=trained["model_id"],
+            target_positions=target_positions,
+            target_times=target_times,
+            prediction_days=prediction_days,
+            options=options,
+        )
+        return {
+            "project_id": project_id,
+            "trained_model_id": trained["model_id"],
+            "train_summary": {
+                "total_samples": len(rows),
+                "gpu_acceleration": trained.get("gpu_acceleration", {}),
+            },
+            "prediction": predicted,
         }
 
     async def warm_prediction_cache(self, model_id: str, payloads: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -293,6 +431,7 @@ class SpatiotemporalKrigingService:
                 "latest": self.memory_manager.snapshot(),
                 "leak_growth_rate": self.memory_manager.leak_growth_rate(),
             },
+            "gpu": self.gpu_service.get_metrics(),
         }
 
     def _annotate_prediction_rows(

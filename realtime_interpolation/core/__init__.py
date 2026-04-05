@@ -13,6 +13,7 @@ from .matrix_update import (
 )
 
 from .incremental_kriging import IncrementalKriging
+from .incremental_st_kriging import IncrementalSTKriging
 
 from .update_strategy import (
     UpdatePriority,
@@ -33,6 +34,7 @@ __all__ = [
 
     # Incremental Kriging
     'IncrementalKriging',
+    'IncrementalSTKriging',
 
     # Update Strategy
     'UpdatePriority',

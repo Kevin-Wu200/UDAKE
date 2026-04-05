@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 
 from .common import raise_api_error
 from ..services.mobile_gps_service import mobile_gps_service
+from ..services.spatiotemporal_kriging_service import spatiotemporal_kriging_service
 
 try:
     import brotli  # type: ignore
@@ -75,6 +76,14 @@ class BackupCreateRequest(BaseModel):
 class BackupRestoreRequest(BaseModel):
     user_id: str = Field(default="system", max_length=80)
     verification_token: str = Field(default="", max_length=160)
+
+
+class MobileSTPredictRequest(BaseModel):
+    project_id: str = Field(..., min_length=1, max_length=120)
+    target_positions: Dict[str, List[float]] = Field(default_factory=dict)
+    target_times: List[float] = Field(default_factory=list)
+    prediction_days: int = Field(default=7, ge=1, le=15)
+    options: Dict[str, Any] = Field(default_factory=dict)
 
 
 @router.post("/sync/batch")
@@ -233,6 +242,21 @@ async def export_project(project_id: str, format: Literal["geojson", "csv"] = Qu
         content=mobile_gps_service.export_csv(project_id),
         media_type="text/csv; charset=utf-8"
     )
+
+
+@router.post("/spatiotemporal/predict")
+async def predict_with_mobile_samples(payload: MobileSTPredictRequest) -> Dict[str, Any]:
+    try:
+        result = await spatiotemporal_kriging_service.predict_from_mobile_samples(
+            project_id=payload.project_id,
+            target_positions=payload.target_positions,
+            target_times=payload.target_times,
+            prediction_days=payload.prediction_days,
+            options=payload.options,
+        )
+        return {"success": True, "data": result, "message": "基于移动端GPS样本的时空预测完成"}
+    except Exception as exc:  # pylint: disable=broad-except
+        raise_api_error(exc, default_message="移动端时空预测失败")
 
 
 def _decode_compressed_payload(payload: GPSSampleSyncRequest) -> Dict[str, Any]:

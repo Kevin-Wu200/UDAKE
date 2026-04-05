@@ -104,12 +104,12 @@ class ShermanMorrisonUpdater:
 
         # 1. 计算 A^(-1) * u
         Au = np.zeros((n + 1, 1))
-        Au[:n, 0] = K_inv @ k_new
+        Au[:n, 0] = (K_inv @ k_new).reshape(-1)
         Au[n, 0] = c_new
 
         # 2. 构造v
         v = np.zeros((n + 1, 1))
-        v[:n, 0] = -K_inv @ k_new
+        v[:n, 0] = (-(K_inv @ k_new)).reshape(-1)
         v[n, 0] = 1.0
 
         # 3. 扩展原逆矩阵
