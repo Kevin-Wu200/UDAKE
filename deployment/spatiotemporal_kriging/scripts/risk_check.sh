@@ -17,13 +17,35 @@ MAX_BACKUP_AGE_HOURS="${MAX_BACKUP_AGE_HOURS:-24}"
 
 errors=0
 warnings=0
+health_ok=0
 
 echo "[风险巡检] 开始执行..."
 
-if curl -fsS http://127.0.0.1/health >/dev/null 2>&1; then
-  echo "[PASS] 后端健康检查通过"
-else
-  echo "[FAIL] 后端健康检查失败"
+# 健康检查优先级：
+# 1) Docker Compose 后端容器内部 /health
+# 2) 宿主机本地后端 127.0.0.1:8000/health
+# 3) Nginx 入口 127.0.0.1/health
+if command -v docker >/dev/null 2>&1 && docker compose -f "$ROOT_DIR/docker-compose.yml" ps backend >/dev/null 2>&1; then
+  if docker compose -f "$ROOT_DIR/docker-compose.yml" ps --status running backend 2>/dev/null | grep -q backend; then
+    if docker compose -f "$ROOT_DIR/docker-compose.yml" exec -T backend curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1; then
+      echo "[PASS] 后端健康检查通过（docker compose: backend）"
+      health_ok=1
+    fi
+  fi
+fi
+
+if [[ "$health_ok" -eq 0 ]] && curl -fsS http://127.0.0.1:8000/health >/dev/null 2>&1; then
+  echo "[PASS] 后端健康检查通过（host:127.0.0.1:8000）"
+  health_ok=1
+fi
+
+if [[ "$health_ok" -eq 0 ]] && curl -fsS http://127.0.0.1/health >/dev/null 2>&1; then
+  echo "[PASS] 后端健康检查通过（nginx:127.0.0.1）"
+  health_ok=1
+fi
+
+if [[ "$health_ok" -eq 0 ]]; then
+  echo "[FAIL] 后端健康检查失败：未检测到可用后端（compose/backend、127.0.0.1:8000、127.0.0.1）"
   errors=$((errors + 1))
 fi
 
