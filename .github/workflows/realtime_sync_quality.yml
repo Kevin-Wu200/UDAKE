@@ -44,9 +44,14 @@ on:
       - 'package-lock.json'
       - '.github/workflows/realtime_sync_quality.yml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   realtime-sync-quality:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     env:
       CI: true
       TYPE_COMPLETENESS_THRESHOLD: '85'

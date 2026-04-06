@@ -26,9 +26,14 @@ on:
       - 'scripts/e2e-flakiness-report.js'
       - '.github/workflows/workflow_e2e.yml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   workflow-e2e:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     env:
       CI: true
     steps:
@@ -40,6 +45,9 @@ jobs:
         with:
           node-version: '20'
           cache: 'npm'
+          cache-dependency-path: |
+            package-lock.json
+            apps/admin-frontend/package-lock.json
 
       - name: Install dependencies
         run: |

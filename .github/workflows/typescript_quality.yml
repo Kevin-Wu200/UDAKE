@@ -18,9 +18,14 @@ on:
       - 'package-lock.json'
       - '.github/workflows/typescript_quality.yml'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   typecheck:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     env:
       CI: true
       TYPE_COMPLETENESS_THRESHOLD: '85'
