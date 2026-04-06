@@ -416,6 +416,37 @@ def create_spatiotemporal_explain_task(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"创建任务失败: {exc}") from exc
 
 
+@router.get("/spatiotemporal/explain/monitor")
+def get_spatiotemporal_explain_monitor(
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+) -> dict:
+    _ = _auth_user(x_user_id, x_explain_token)
+    return explain_task_service.queue_metrics()
+
+
+@router.get("/spatiotemporal/explain/verify")
+def verify_spatiotemporal_explain_backend(
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+) -> dict:
+    _ = _auth_user(x_user_id, x_explain_token)
+    return explain_task_service.verify_celery_connection()
+
+
+@router.post("/spatiotemporal/explain/cleanup")
+def cleanup_spatiotemporal_explain_tasks(
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    _ = _auth_user(x_user_id, x_explain_token)
+    if not _is_admin(x_explain_admin):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="仅管理员可执行任务清理")
+    deleted = explain_task_service.cleanup_tasks()
+    return {"deleted_tasks": deleted}
+
+
 @router.get("/spatiotemporal/explain/{task_id}")
 def get_spatiotemporal_explain_task(
     task_id: str,

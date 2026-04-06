@@ -79,12 +79,28 @@
 7. `GET /spatiotemporal/explain/{task_id}`
 - 功能：查询解释任务状态与结果。
 - 状态：`queued/running/retrying/completed/failed/cancelled`
+- 状态机映射：
+  - `state=pending`：`queued/retrying`
+  - `state=running`：`running`
+  - `state=success`：`completed`
+  - `state=failed`：`failed`
+  - `state=cancelled`：`cancelled`
 
 8. `POST /spatiotemporal/explain/{task_id}/cancel`
 - 功能：取消解释任务。
 
 9. `DELETE /spatiotemporal/explain/{task_id}`
 - 功能：删除任务状态与结果缓存。
+
+10. `GET /spatiotemporal/explain/monitor`
+- 功能：获取解释任务队列监控指标（队列长度、并发占用、成功率、错误率、平均耗时、重试次数）。
+
+11. `GET /spatiotemporal/explain/verify`
+- 功能：校验异步后端连通性（Redis 缓存与 Celery broker）。
+
+12. `POST /spatiotemporal/explain/cleanup`
+- 功能：清理超出 TTL 的终态任务缓存。
+- 权限：仅 `x-explain-admin: true` 管理员可调用。
 
 ## 阶段11：用户验证与模型自评估 API
 

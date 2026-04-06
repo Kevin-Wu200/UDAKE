@@ -47,6 +47,7 @@ locust>=2.20.0
 websockets>=11.0
 python-socketio>=5.8.0
 redis>=4.0.0
+celery>=5.3.0
 
 # 深度学习基础架构（CI 环境使用 CPU 版本）
 torch==2.0.1

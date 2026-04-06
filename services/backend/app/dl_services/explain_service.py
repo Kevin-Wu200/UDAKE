@@ -44,6 +44,17 @@ class _ExplainTaskEnvelope:
     max_retries: int
 
 
+@dataclass
+class _ExplainMetrics:
+    created: int = 0
+    started: int = 0
+    succeeded: int = 0
+    failed: int = 0
+    cancelled: int = 0
+    retried: int = 0
+    total_duration_ms: float = 0.0
+
+
 class _SlidingWindowLimiter:
     """轻量限流器，优先 Redis，降级内存。"""
 
@@ -114,9 +125,12 @@ class SpatiotemporalExplainTaskService:
         self._dispatcher = threading.Thread(target=self._dispatch_loop, daemon=True, name="dl-explain-dispatcher")
         self._dispatcher.start()
         self._active_tasks = 0
+        self._counted_cancelled_tasks: set[str] = set()
+        self._metrics = _ExplainMetrics()
 
         self._celery_available = False
         self._celery_app = None
+        self._celery_task = None
         self._init_celery()
 
     def _init_celery(self) -> None:
@@ -149,7 +163,23 @@ class SpatiotemporalExplainTaskService:
             task_soft_time_limit=max(5, self.task_timeout - 5),
             worker_prefetch_multiplier=1,
         )
+        task_name = "udake.dl.spatiotemporal.explain.execute"
+
+        @app.task(name=task_name, bind=True)  # type: ignore[misc]
+        def _run_explain_task(_, envelope_data: dict[str, Any]) -> dict[str, Any]:
+            envelope = _ExplainTaskEnvelope(
+                task_id=str(envelope_data["task_id"]),
+                owner_id=str(envelope_data["owner_id"]),
+                payload=dict(envelope_data["payload"]),
+                priority=int(envelope_data["priority"]),
+                created_at=float(envelope_data["created_at"]),
+                timeout_seconds=int(envelope_data["timeout_seconds"]),
+                max_retries=int(envelope_data["max_retries"]),
+            )
+            return self._execute_envelope(envelope)
+
         self._celery_app = app
+        self._celery_task = _run_explain_task
         self._celery_available = True
         logger.info("Explain 任务 Celery 已初始化: broker=%s", broker)
 
@@ -223,18 +253,43 @@ class SpatiotemporalExplainTaskService:
             self._slots.acquire()
             with self._local_lock:
                 self._active_tasks += 1
-            self._executor.submit(self._execute_envelope, envelope)
+            self._executor.submit(self._execute_envelope, envelope, True)
 
-    def _execute_envelope(self, envelope: _ExplainTaskEnvelope) -> None:
+    def _mark_cancelled_metric_if_needed(self, status: dict[str, Any]) -> bool:
+        task_id = str(status.get("task_id", ""))
+        is_cancelled = str(status.get("status")) == "cancelled"
+        if is_cancelled and task_id:
+            with self._local_lock:
+                if task_id in self._counted_cancelled_tasks:
+                    return True
+                self._counted_cancelled_tasks.add(task_id)
+                self._metrics.cancelled += 1
+        return is_cancelled
+
+    def _execute_with_timeout(self, payload: dict[str, Any], timeout_seconds: int) -> dict[str, Any]:
+        if timeout_seconds <= 0:
+            return self._execute_explanation(payload)
+        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="dl-explain-timeout") as single:
+            future = single.submit(self._execute_explanation, payload)
+            return future.result(timeout=timeout_seconds)
+
+    def _execute_envelope(self, envelope: _ExplainTaskEnvelope, slot_managed: bool = False) -> dict[str, Any]:
         started = time.perf_counter()
         task_id = envelope.task_id
+        if not slot_managed:
+            self._slots.acquire()
+            with self._local_lock:
+                self._active_tasks += 1
+        with self._local_lock:
+            self._metrics.started += 1
         try:
             status = self._load_status(task_id) or {}
-            if str(status.get("status")) == "cancelled":
-                return
+            if self._mark_cancelled_metric_if_needed(status):
+                return {"task_id": task_id, "status": "cancelled"}
             status.update(
                 {
                     "status": "running",
+                    "state": "running",
                     "updated_at": self._utc_now_iso(),
                     "progress": 0.2,
                 }
@@ -245,13 +300,13 @@ class SpatiotemporalExplainTaskService:
             result: dict[str, Any] | None = None
             for attempt in range(envelope.max_retries + 1):
                 status = self._load_status(task_id) or status
-                if str(status.get("status")) == "cancelled":
-                    return
+                if self._mark_cancelled_metric_if_needed(status):
+                    return {"task_id": task_id, "status": "cancelled"}
                 try:
                     status["retry_count"] = attempt
                     status["updated_at"] = self._utc_now_iso()
                     self._store_status(task_id, status)
-                    result = self._execute_explanation(envelope.payload)
+                    result = self._execute_with_timeout(envelope.payload, envelope.timeout_seconds)
                     break
                 except Exception as exc:  # pragma: no cover - 异常路径
                     last_error = exc
@@ -260,12 +315,15 @@ class SpatiotemporalExplainTaskService:
                     status.update(
                         {
                             "status": "retrying",
+                            "state": "pending",
                             "progress": min(0.9, 0.35 + attempt * 0.2),
                             "updated_at": self._utc_now_iso(),
                             "error": str(exc),
                         }
                     )
                     self._store_status(task_id, status)
+                    with self._local_lock:
+                        self._metrics.retried += 1
                     time.sleep(min(1.5, 0.3 * (attempt + 1)))
             if result is None and last_error is not None:
                 raise last_error
@@ -275,18 +333,24 @@ class SpatiotemporalExplainTaskService:
             status.update(
                 {
                     "status": "completed",
+                    "state": "success",
                     "progress": 1.0,
                     "updated_at": self._utc_now_iso(),
                     "duration_ms": round(duration_ms, 3),
                 }
             )
             self._store_status(task_id, status)
+            with self._local_lock:
+                self._metrics.succeeded += 1
+                self._metrics.total_duration_ms += duration_ms
+            return {"task_id": task_id, "status": "completed", "duration_ms": round(duration_ms, 3)}
         except Exception as exc:  # pragma: no cover - 异常路径
             duration_ms = (time.perf_counter() - started) * 1000
             status = self._load_status(task_id) or {}
             status.update(
                 {
                     "status": "failed",
+                    "state": "failed",
                     "progress": 1.0,
                     "updated_at": self._utc_now_iso(),
                     "duration_ms": round(duration_ms, 3),
@@ -294,7 +358,11 @@ class SpatiotemporalExplainTaskService:
                 }
             )
             self._store_status(task_id, status)
+            with self._local_lock:
+                self._metrics.failed += 1
+                self._metrics.total_duration_ms += duration_ms
             logger.exception("Explain 任务执行失败 task_id=%s: %s", task_id, exc)
+            return {"task_id": task_id, "status": "failed", "error": str(exc)}
         finally:
             with self._local_lock:
                 self._active_tasks = max(0, self._active_tasks - 1)
@@ -357,6 +425,7 @@ class SpatiotemporalExplainTaskService:
         status_payload = {
             "task_id": task_id,
             "status": "queued",
+            "state": "pending",
             "owner_id": owner,
             "created_at": now_iso,
             "updated_at": now_iso,
@@ -378,7 +447,35 @@ class SpatiotemporalExplainTaskService:
             timeout_seconds=timeout,
             max_retries=max_retries,
         )
-        self._queue.put((prio, envelope.created_at, envelope))
+        submitted_to_celery = False
+        if self._celery_available and self._celery_task is not None:
+            try:
+                async_result = self._celery_task.apply_async(  # type: ignore[attr-defined]
+                    kwargs={
+                        "envelope_data": {
+                            "task_id": envelope.task_id,
+                            "owner_id": envelope.owner_id,
+                            "payload": envelope.payload,
+                            "priority": envelope.priority,
+                            "created_at": envelope.created_at,
+                            "timeout_seconds": envelope.timeout_seconds,
+                            "max_retries": envelope.max_retries,
+                        }
+                    },
+                    priority=max(0, 9 - prio),
+                    expires=max(60, self.task_ttl),
+                )
+                status_payload["celery_task_id"] = str(async_result.id)
+                self._store_status(task_id, status_payload)
+                submitted_to_celery = True
+            except Exception as exc:  # pragma: no cover - 依赖运行环境
+                logger.warning("Explain 任务提交 Celery 失败，回退本地线程池 task_id=%s: %s", task_id, exc)
+
+        if not submitted_to_celery:
+            self._queue.put((prio, envelope.created_at, envelope))
+
+        with self._local_lock:
+            self._metrics.created += 1
         queued = self._queue.qsize()
         return {
             "task_id": task_id,
@@ -413,6 +510,7 @@ class SpatiotemporalExplainTaskService:
         with self._local_lock:
             self._local_status.pop(task_id, None)
             self._local_result.pop(task_id, None)
+            self._counted_cancelled_tasks.discard(task_id)
         self.cache.delete(self._status_key(task_id))
         self.cache.delete(self._result_key(task_id))
         return True
@@ -429,24 +527,99 @@ class SpatiotemporalExplainTaskService:
         status.update(
             {
                 "status": "cancelled",
+                "state": "cancelled",
                 "progress": 1.0,
                 "updated_at": self._utc_now_iso(),
                 "error": "任务已被用户取消",
             }
         )
         self._store_status(task_id, status)
+        with self._local_lock:
+            self._counted_cancelled_tasks.add(task_id)
+            self._metrics.cancelled += 1
+        celery_task_id = status.get("celery_task_id")
+        if celery_task_id and self._celery_available and self._celery_app is not None:
+            try:
+                self._celery_app.control.revoke(str(celery_task_id), terminate=False)
+            except Exception as exc:  # pragma: no cover - 依赖运行环境
+                logger.warning("撤销 Celery explain 任务失败 task_id=%s celery_id=%s: %s", task_id, celery_task_id, exc)
         return True
 
     def queue_metrics(self) -> dict[str, Any]:
         with self._local_lock:
             active = int(self._active_tasks)
+            created = int(self._metrics.created)
+            started = int(self._metrics.started)
+            succeeded = int(self._metrics.succeeded)
+            failed = int(self._metrics.failed)
+            cancelled = int(self._metrics.cancelled)
+            retried = int(self._metrics.retried)
+            total_duration_ms = float(self._metrics.total_duration_ms)
+        done = succeeded + failed + cancelled
+        success_rate = float(succeeded / done) if done > 0 else 0.0
+        error_rate = float(failed / done) if done > 0 else 0.0
+        avg_duration_ms = float(total_duration_ms / max(1, succeeded + failed))
         return {
             "queue_size": self._queue.qsize(),
             "active_tasks": active,
             "max_concurrent_tasks": self.max_concurrent,
             "cache_backend": "memory" if self.cache.is_memory_backend else "redis",
             "celery_enabled": self._celery_available,
+            "created_tasks": created,
+            "started_tasks": started,
+            "completed_tasks": done,
+            "success_rate": round(success_rate, 4),
+            "error_rate": round(error_rate, 4),
+            "avg_duration_ms": round(avg_duration_ms, 3),
+            "retry_count": retried,
         }
+
+    def verify_celery_connection(self) -> dict[str, Any]:
+        backend_ok = bool(self.cache.ping())
+        payload = {
+            "celery_enabled": self._celery_available,
+            "redis_backend_ok": backend_ok,
+            "cache_backend": "memory" if self.cache.is_memory_backend else "redis",
+        }
+        if not self._celery_available or self._celery_app is None:
+            payload["broker_ok"] = False
+            payload["reason"] = "celery_disabled_or_not_available"
+            return payload
+        try:
+            conn = self._celery_app.connection()
+            conn.ensure_connection(max_retries=1)
+            conn.release()
+            payload["broker_ok"] = True
+            payload["reason"] = "ok"
+            return payload
+        except Exception as exc:  # pragma: no cover - 依赖运行环境
+            payload["broker_ok"] = False
+            payload["reason"] = str(exc)
+            return payload
+
+    def cleanup_tasks(self, *, only_terminal: bool = True) -> int:
+        now_ts = time.time()
+        keys: list[str] = []
+        with self._local_lock:
+            keys = list(self._local_status.keys())
+        deleted = 0
+        for task_id in keys:
+            status = self._load_status(task_id)
+            if status is None:
+                continue
+            task_status = str(status.get("status", ""))
+            if only_terminal and task_status not in {"completed", "failed", "cancelled"}:
+                continue
+            updated_at = str(status.get("updated_at", ""))
+            try:
+                updated_ts = datetime.fromisoformat(updated_at).timestamp()
+            except Exception:
+                updated_ts = now_ts
+            if now_ts - updated_ts < self.task_ttl:
+                continue
+            if self.delete_task(task_id, owner_id=str(status.get("owner_id", "anonymous")), is_admin=True):
+                deleted += 1
+        return deleted
 
     def warmup_model(self, model_type: str = "st_transformer") -> dict[str, Any]:
         started = time.perf_counter()
@@ -463,6 +636,8 @@ class SpatiotemporalExplainTaskService:
             self._local_status.clear()
             self._local_result.clear()
             self._active_tasks = 0
+            self._counted_cancelled_tasks.clear()
+            self._metrics = _ExplainMetrics()
         while True:
             try:
                 self._queue.get_nowait()
