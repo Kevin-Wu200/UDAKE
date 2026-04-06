@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.dl_services import api as dl_api
+from app.dl_services.explain_service import ExplainPermissionError, ExplainRateLimitError
 
 
 def _payload() -> dict:
@@ -158,3 +160,71 @@ def test_explain_cleanup_admin_only(client: TestClient) -> None:
     )
     assert allowed.status_code == 200, allowed.text
     assert "deleted_tasks" in allowed.json()
+
+
+def test_explain_token_auth(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(dl_api.settings, "EXPLAIN_API_TOKENS", ["token-1"])
+    monkeypatch.setattr(dl_api.settings, "EXPLAIN_REQUIRE_AUTH", True)
+
+    unauthorized = client.post("/api/dl/spatiotemporal/explain", json=_payload(), headers={"x-user-id": "alice"})
+    assert unauthorized.status_code == 401
+
+    created = client.post(
+        "/api/dl/spatiotemporal/explain",
+        json=_payload(),
+        headers={"x-user-id": "alice", "x-explain-token": "token-1"},
+    )
+    assert created.status_code == 200, created.text
+
+
+def test_explain_require_auth_rejects_anonymous(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(dl_api.settings, "EXPLAIN_REQUIRE_AUTH", True)
+    response = client.get("/api/dl/spatiotemporal/explain/monitor")
+    assert response.status_code == 401
+
+
+def test_explain_create_respects_allowed_creators(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(dl_api.settings, "EXPLAIN_ALLOWED_CREATORS", ["alice"])
+
+    forbidden = client.post("/api/dl/spatiotemporal/explain", json=_payload(), headers={"x-user-id": "bob"})
+    assert forbidden.status_code == 403
+
+    allowed = client.post("/api/dl/spatiotemporal/explain", json=_payload(), headers={"x-user-id": "alice"})
+    assert allowed.status_code == 200, allowed.text
+
+
+def test_explain_rate_limit_returns_429(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    def _raise_rate_limit(**_kwargs):  # type: ignore[no-untyped-def]
+        raise ExplainRateLimitError("请求过于频繁，请稍后重试")
+
+    monkeypatch.setattr(dl_api.explain_task_service, "create_task", _raise_rate_limit)
+
+    response = client.post("/api/dl/spatiotemporal/explain", json=_payload(), headers={"x-user-id": "alice"})
+    assert response.status_code == 429
+
+
+def test_explain_permission_error_returns_403(client: TestClient, monkeypatch: pytest.MonkeyPatch) -> None:
+    def _raise_permission(**_kwargs):  # type: ignore[no-untyped-def]
+        raise ExplainPermissionError("当前用户没有创建解释任务的权限")
+
+    monkeypatch.setattr(dl_api.explain_task_service, "create_task", _raise_permission)
+
+    response = client.post("/api/dl/spatiotemporal/explain", json=_payload(), headers={"x-user-id": "alice"})
+    assert response.status_code == 403
+
+
+def test_explain_create_supports_concurrent_requests(client: TestClient) -> None:
+    headers = {"x-user-id": "alice"}
+
+    def _submit() -> tuple[int, dict]:
+        resp = client.post("/api/dl/spatiotemporal/explain", json=_payload(), headers=headers)
+        return resp.status_code, resp.json()
+
+    with ThreadPoolExecutor(max_workers=6) as pool:
+        results = list(pool.map(lambda _: _submit(), range(6)))
+
+    status_codes = [item[0] for item in results]
+    assert all(code == 200 for code in status_codes)
+
+    task_ids = [item[1]["task_id"] for item in results]
+    assert len(set(task_ids)) == len(task_ids)
