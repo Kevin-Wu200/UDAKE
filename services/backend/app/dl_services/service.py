@@ -20,6 +20,7 @@ from deep_learning.training import LightningTrainer, SpatialTrainingConfig, Trai
 from deep_learning.utils.device import DeviceManager
 from deep_learning.utils.monitoring import AlertManager, AlertRule, MetricMonitor, SystemResourceMonitor
 from .lime_explainer import SpatiotemporalLIMEExplainer
+from .shap_explainer import SpatiotemporalSHAPExplainer
 
 
 @dataclass
@@ -77,6 +78,7 @@ class DeepLearningService:
         self._spatiotemporal_model_cache: dict[str, dict[str, Any]] = {}
         self.fusion_platform = fusion_platform_service
         self.lime_explainer = SpatiotemporalLIMEExplainer()
+        self.shap_explainer = SpatiotemporalSHAPExplainer()
 
     def health(self) -> dict[str, Any]:
         profile = self.device_manager.configure()
@@ -679,6 +681,15 @@ class DeepLearningService:
                 pred_mean=pred_mean,
                 top_k=top_k,
             )
+        shap_result: dict[str, Any] | None = None
+        if method in {"shap", "hybrid"}:
+            shap_result = self.shap_explainer.explain(
+                model_type=model_type,
+                coords=c,
+                series=s,
+                pred_mean=pred_mean,
+                top_k=top_k,
+            )
 
         feature_importance = heuristic_feature_importance.copy()
         top_features: list[dict[str, Any]] = []
@@ -687,11 +698,25 @@ class DeepLearningService:
             if lime_importance.size == feature_importance.size:
                 feature_importance = lime_importance
             top_features = list(lime_result.get("summary", {}).get("top_features", []))
+        elif method == "shap" and shap_result is not None:
+            shap_importance = np.asarray(shap_result.get("feature_importance", []), dtype=float)
+            if shap_importance.size == feature_importance.size:
+                feature_importance = shap_importance
+            top_features = list(shap_result.get("summary", {}).get("top_features", []))
         elif method == "hybrid" and lime_result is not None:
+            parts: list[np.ndarray] = [heuristic_feature_importance]
             lime_importance = np.asarray(lime_result.get("feature_importance", []), dtype=float)
             if lime_importance.size == feature_importance.size:
-                feature_importance = 0.5 * heuristic_feature_importance + 0.5 * lime_importance
-            top_features = list(lime_result.get("summary", {}).get("top_features", []))
+                parts.append(lime_importance)
+            if shap_result is not None:
+                shap_importance = np.asarray(shap_result.get("feature_importance", []), dtype=float)
+                if shap_importance.size == feature_importance.size:
+                    parts.append(shap_importance)
+            feature_importance = np.mean(np.vstack(parts), axis=0)
+            if shap_result is not None:
+                top_features = list(shap_result.get("summary", {}).get("top_features", []))
+            if not top_features:
+                top_features = list(lime_result.get("summary", {}).get("top_features", []))
         if not top_features:
             k = max(1, min(int(top_k), int(feature_importance.shape[0])))
             top_feature_idx = np.argsort(-feature_importance)[:k]
@@ -713,6 +738,9 @@ class DeepLearningService:
         if lime_result is not None:
             summary["lime_average_confidence"] = float(lime_result.get("summary", {}).get("average_confidence", 0.0))
             summary["lime_num_samples"] = int(lime_result.get("summary", {}).get("num_samples", 0))
+        if shap_result is not None:
+            summary["shap_average_confidence"] = float(shap_result.get("summary", {}).get("average_confidence", 0.0))
+            summary["shap_background_size"] = int(shap_result.get("summary", {}).get("background_size", 0))
 
         result: dict[str, Any] = {
             "model_type": model_type,
@@ -728,6 +756,14 @@ class DeepLearningService:
                 "global_feature_importance": lime_result.get("global_feature_importance", []),
                 "visualization": lime_result.get("visualization", {}),
                 "performance": lime_result.get("performance", {}),
+            }
+        if shap_result is not None:
+            result["shap"] = {
+                "batch_explanations": shap_result.get("batch_explanations", []),
+                "global_feature_importance": shap_result.get("global_feature_importance", []),
+                "interaction_values": shap_result.get("interaction_values", []),
+                "visualization": shap_result.get("visualization", {}),
+                "performance": shap_result.get("performance", {}),
             }
         if include_prediction:
             result["prediction"] = pred_mean.tolist()

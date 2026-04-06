@@ -70,11 +70,15 @@
   "coords": [[120.1, 30.2], [120.2, 30.3]],
   "series": [[[1.0], [1.1], [1.2], [1.3]], [[0.9], [1.0], [1.1], [1.2]]],
   "pred_horizon": 2,
-  "method": "lime",
+  "method": "shap",
   "top_k": 3,
   "max_retries": 1
 }
 ```
+- 结果补充：
+  - `method=lime`：返回 `lime.*`
+  - `method=shap`：返回 `shap.*`（含 `batch_explanations/global_feature_importance/interaction_values/visualization`）
+  - `method=hybrid`：同时返回 `lime.*` 与 `shap.*`
 
 7. `GET /spatiotemporal/explain/{task_id}`
 - 功能：查询解释任务状态与结果。
