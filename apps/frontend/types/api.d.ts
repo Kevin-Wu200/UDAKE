@@ -49,4 +49,10 @@ export interface IAPIService {
     recommendSamplingRL(data: any): Promise<any>;
     trainSpatiotemporal(data: any): Promise<any>;
     predictSpatiotemporal(data: any): Promise<any>;
+    createSpatiotemporalExplainTask(data: any): Promise<any>;
+    getSpatiotemporalExplainTask(taskId: string): Promise<any>;
+    cancelSpatiotemporalExplainTask(taskId: string): Promise<any>;
+    deleteSpatiotemporalExplainTask(taskId: string): Promise<any>;
+    getSpatiotemporalExplainMonitor(): Promise<any>;
+    verifySpatiotemporalExplainBackend(): Promise<any>;
 }

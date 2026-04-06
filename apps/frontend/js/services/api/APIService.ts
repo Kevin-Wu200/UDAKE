@@ -1264,6 +1264,68 @@ export class APIService implements IAPIService {
         });
     }
 
+    /**
+     * 创建时空解释任务
+     */
+    public async createSpatiotemporalExplainTask(data: {
+        model_type: 'st_transformer' | 'gcn_lstm' | 'convlstm' | 'stgcn';
+        coords: Array<[number, number]>;
+        series: number[][][];
+        pred_horizon: number;
+        method: 'lime' | 'shap' | 'hybrid';
+        top_k: number;
+        include_prediction?: boolean;
+        batch_size?: number;
+        timeout_seconds?: number;
+        priority?: number;
+        max_retries?: number;
+    }): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/dl/spatiotemporal/explain`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+    }
+
+    /**
+     * 查询时空解释任务
+     */
+    public async getSpatiotemporalExplainTask(taskId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/dl/spatiotemporal/explain/${encodeURIComponent(taskId)}`);
+    }
+
+    /**
+     * 取消时空解释任务
+     */
+    public async cancelSpatiotemporalExplainTask(taskId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/dl/spatiotemporal/explain/${encodeURIComponent(taskId)}/cancel`, {
+            method: 'POST'
+        });
+    }
+
+    /**
+     * 删除时空解释任务
+     */
+    public async deleteSpatiotemporalExplainTask(taskId: string): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/dl/spatiotemporal/explain/${encodeURIComponent(taskId)}`, {
+            method: 'DELETE'
+        });
+    }
+
+    /**
+     * 获取解释任务监控信息
+     */
+    public async getSpatiotemporalExplainMonitor(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/dl/spatiotemporal/explain/monitor`);
+    }
+
+    /**
+     * 校验解释异步后端
+     */
+    public async verifySpatiotemporalExplainBackend(): Promise<Record<string, unknown>> {
+        return this.request<Record<string, unknown>>(`${this.baseURL}/dl/spatiotemporal/explain/verify`);
+    }
+
     public cancelAllRequests(): void {
         this.pendingRequests.clear();
     }

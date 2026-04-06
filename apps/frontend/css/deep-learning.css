@@ -149,3 +149,360 @@
         width: 100%;
     }
 }
+
+/* 模型可解释性增强面板 */
+.explain-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.explain-method-switch {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.explain-method-switch .btn.active,
+.explain-result-tabs .btn.active {
+    border-color: #0284c7;
+    background: #e0f2fe;
+    color: #075985;
+}
+
+.explain-layout-grid {
+    display: grid;
+    grid-template-columns: 1.25fr 1fr;
+    gap: 12px;
+}
+
+.explain-submit-panel,
+.explain-task-panel,
+.explain-result-panel {
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 10px;
+    padding: 12px;
+    background: var(--panel-bg, #ffffff);
+}
+
+.explain-submit-panel h5,
+.explain-task-panel h5,
+.explain-result-panel h5 {
+    margin: 0 0 8px;
+    font-size: 14px;
+}
+
+.explain-guide {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-secondary, #6b7280);
+}
+
+.explain-task-header,
+.explain-result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.explain-task-tools,
+.explain-result-tabs {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.explain-monitor-info {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.monitor-chip {
+    font-size: 12px;
+    padding: 4px 8px;
+    border-radius: 999px;
+    border: 1px solid var(--border-color, #d1d5db);
+    background: #f8fafc;
+}
+
+.explain-task-list {
+    max-height: 380px;
+    overflow: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.explain-task-item {
+    border: 1px solid var(--border-color, #d1d5db);
+    border-radius: 10px;
+    padding: 10px;
+    background: #fafafa;
+}
+
+.explain-task-item.active {
+    border-color: #0284c7;
+    box-shadow: 0 0 0 1px rgba(2, 132, 199, 0.25);
+}
+
+.explain-task-top,
+.explain-task-meta,
+.explain-task-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.explain-task-top {
+    margin-bottom: 6px;
+}
+
+.task-id {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+}
+
+.task-method,
+.task-status {
+    font-size: 12px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: #e5e7eb;
+}
+
+.explain-task-progress {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: #e5e7eb;
+    overflow: hidden;
+    margin: 8px 0;
+}
+
+.explain-task-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #0891b2, #2563eb);
+}
+
+.explain-task-meta {
+    font-size: 12px;
+    color: var(--text-secondary, #6b7280);
+    justify-content: space-between;
+}
+
+.explain-result-content {
+    margin-top: 10px;
+}
+
+.explain-result-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.result-card {
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 10px;
+    padding: 10px;
+    background: #fcfcfd;
+}
+
+.result-card h6 {
+    margin: 0 0 8px;
+    font-size: 13px;
+}
+
+.result-card.full-width {
+    grid-column: 1 / -1;
+}
+
+.feature-bar-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.feature-bar-item {
+    display: grid;
+    grid-template-columns: 1fr 2fr auto;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+}
+
+.feature-bar-track,
+.dependence-track,
+.timeline-track {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: #e5e7eb;
+    overflow: hidden;
+}
+
+.feature-bar-fill,
+.dependence-fill,
+.timeline-fill {
+    height: 100%;
+    background: #0ea5e9;
+}
+
+.feature-bar-item.negative .feature-bar-fill,
+.dependence-fill.negative {
+    background: #ef4444;
+}
+
+.local-explain-list,
+.timeline-list,
+.dependence-list,
+.compare-chart-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.local-explain-item,
+.summary-card {
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 12px;
+}
+
+.local-explain-item header {
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.muted {
+    color: #6b7280;
+}
+
+.shap-filter-bar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+}
+
+.beeswarm-container {
+    position: relative;
+    min-height: 220px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 8px;
+    overflow: hidden;
+    background: linear-gradient(180deg, #f8fafc, #ffffff);
+}
+
+.beeswarm-point {
+    position: absolute;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    opacity: 0.8;
+}
+
+.beeswarm-point.positive {
+    background: #22c55e;
+}
+
+.beeswarm-point.negative {
+    background: #ef4444;
+}
+
+.dependence-item,
+.timeline-item,
+.compare-item {
+    display: grid;
+    grid-template-columns: 1fr 2fr auto;
+    gap: 8px;
+    align-items: center;
+    font-size: 12px;
+}
+
+.summary-table-wrap {
+    overflow: auto;
+}
+
+.summary-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.summary-table th,
+.summary-table td {
+    border: 1px solid #e5e7eb;
+    padding: 6px;
+    text-align: left;
+}
+
+.compare-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.compare-bar {
+    min-height: 18px;
+    border-radius: 6px;
+    color: #0f172a;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    padding: 0 6px;
+}
+
+.compare-bar.lime {
+    background: #bae6fd;
+}
+
+.compare-bar.shap {
+    background: #fecaca;
+}
+
+.compare-item.highlight,
+.summary-table tr.highlight {
+    background: rgba(250, 204, 21, 0.15);
+}
+
+.heatmap-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(64px, 1fr));
+    gap: 6px;
+}
+
+.heatmap-cell {
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 6px;
+    min-height: 42px;
+    font-size: 11px;
+    cursor: pointer;
+}
+
+@media (max-width: 1180px) {
+    .explain-layout-grid,
+    .explain-result-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .explain-task-header,
+    .explain-result-header {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .explain-task-actions .btn,
+    .explain-result-tabs .btn,
+    .explain-method-switch .btn {
+        flex: 1;
+        min-width: 96px;
+    }
+}

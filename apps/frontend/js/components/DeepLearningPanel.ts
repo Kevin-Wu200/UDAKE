@@ -3,6 +3,7 @@ import { SpatialInterpolationPanel } from './SpatialInterpolationPanel.js';
 import { AnomalyDetectionPanel } from './AnomalyDetectionPanel.js';
 import { SamplingRLPanel } from './SamplingRLPanel.js';
 import { SpatiotemporalPredictionPanel } from './SpatiotemporalPredictionPanel.js';
+import { SpatiotemporalExplainPanel } from './SpatiotemporalExplainPanel.js';
 
 /**
  * 深度学习总面板
@@ -17,6 +18,7 @@ export class DeepLearningPanel {
     private anomalyPanel: AnomalyDetectionPanel | null = null;
     private samplingRLPanel: SamplingRLPanel | null = null;
     private spatiotemporalPanel: SpatiotemporalPredictionPanel | null = null;
+    private spatiotemporalExplainPanel: SpatiotemporalExplainPanel | null = null;
 
     constructor(sectionId: string, containerId: string, apiService: IAPIService) {
         const section = document.getElementById(sectionId);
@@ -53,6 +55,7 @@ export class DeepLearningPanel {
                     <section class="dl-module" id="dl-anomaly-section"></section>
                     <section class="dl-module" id="dl-sampling-rl-section"></section>
                     <section class="dl-module" id="dl-spatiotemporal-section"></section>
+                    <section class="dl-module" id="dl-spatiotemporal-explain-section"></section>
                 </div>
             </div>
         `;
@@ -81,8 +84,9 @@ export class DeepLearningPanel {
         const anomalyContainer = this.container.querySelector('#dl-anomaly-section') as HTMLElement | null;
         const samplingRLContainer = this.container.querySelector('#dl-sampling-rl-section') as HTMLElement | null;
         const spatiotemporalContainer = this.container.querySelector('#dl-spatiotemporal-section') as HTMLElement | null;
+        const spatiotemporalExplainContainer = this.container.querySelector('#dl-spatiotemporal-explain-section') as HTMLElement | null;
 
-        if (!spatialContainer || !anomalyContainer || !samplingRLContainer || !spatiotemporalContainer) {
+        if (!spatialContainer || !anomalyContainer || !samplingRLContainer || !spatiotemporalContainer || !spatiotemporalExplainContainer) {
             throw new Error('深度学习子模块容器不完整');
         }
 
@@ -90,6 +94,7 @@ export class DeepLearningPanel {
         this.anomalyPanel = new AnomalyDetectionPanel(anomalyContainer, this.apiService);
         this.samplingRLPanel = new SamplingRLPanel(samplingRLContainer, this.apiService);
         this.spatiotemporalPanel = new SpatiotemporalPredictionPanel(spatiotemporalContainer, this.apiService);
+        this.spatiotemporalExplainPanel = new SpatiotemporalExplainPanel(spatiotemporalExplainContainer, this.apiService);
     }
 
     private toggleExpanded(force?: boolean): void {
@@ -150,6 +155,7 @@ export class DeepLearningPanel {
         this.anomalyPanel?.destroy();
         this.samplingRLPanel?.destroy();
         this.spatiotemporalPanel?.destroy();
+        this.spatiotemporalExplainPanel?.destroy();
         this.container.innerHTML = '';
     }
 }
