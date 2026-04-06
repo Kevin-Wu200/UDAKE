@@ -423,6 +423,7 @@ settings = EnvironmentSettings()
 # 确保目录存在
 settings.RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 settings.DATA_DIR.mkdir(parents=True, exist_ok=True)
+settings.ANDROID_APK_DIR.mkdir(parents=True, exist_ok=True)
 
 # 打印当前环境信息
 if settings.DEBUG:

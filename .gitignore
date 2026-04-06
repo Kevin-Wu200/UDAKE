@@ -43,6 +43,7 @@ test-results*.json
 test-results*.xml
 .tsbuildinfo/
 apps/admin-frontend/src/components.d.ts
+deployment/spatiotemporal_kriging/logging/nginx/*.log
 
 # Backend runtime artifacts
 services/backend/app/结果文件/
