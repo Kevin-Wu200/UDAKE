@@ -159,6 +159,7 @@ class SpatioTemporalExplainRequest(BaseModel):
     batch_size: int = Field(default=256, ge=16, le=4096)
     timeout_seconds: Optional[int] = Field(default=None, ge=30, le=7200)
     priority: Optional[int] = Field(default=None, ge=0, le=9)
+    max_retries: int = Field(default=1, ge=0, le=3)
 
 
 class FusionModelInput(BaseModel):
@@ -457,6 +458,28 @@ def delete_spatiotemporal_explain_task(
     except Exception as exc:
         logger.exception("删除 explain 任务失败 task_id=%s: %s", task_id, exc)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"删除任务失败: {exc}") from exc
+
+
+@router.post("/spatiotemporal/explain/{task_id}/cancel")
+def cancel_spatiotemporal_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    try:
+        cancelled = explain_task_service.cancel_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+        if not cancelled:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+        return {"task_id": task_id, "cancelled": True}
+    except ExplainPermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("取消 explain 任务失败 task_id=%s: %s", task_id, exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"取消任务失败: {exc}") from exc
 
 
 @router.post("/fusion/train-profile")

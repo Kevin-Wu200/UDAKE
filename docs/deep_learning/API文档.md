@@ -61,6 +61,31 @@
   - `variance`: 不确定性
   - `source`: `neural_only` 或 `neural+incremental_kriging`
 
+6. `POST /spatiotemporal/explain`
+- 功能：创建时空预测可解释性任务（支持 `lime/shap/hybrid`）。
+- 请求：
+```json
+{
+  "model_type": "st_transformer",
+  "coords": [[120.1, 30.2], [120.2, 30.3]],
+  "series": [[[1.0], [1.1], [1.2], [1.3]], [[0.9], [1.0], [1.1], [1.2]]],
+  "pred_horizon": 2,
+  "method": "lime",
+  "top_k": 3,
+  "max_retries": 1
+}
+```
+
+7. `GET /spatiotemporal/explain/{task_id}`
+- 功能：查询解释任务状态与结果。
+- 状态：`queued/running/retrying/completed/failed/cancelled`
+
+8. `POST /spatiotemporal/explain/{task_id}/cancel`
+- 功能：取消解释任务。
+
+9. `DELETE /spatiotemporal/explain/{task_id}`
+- 功能：删除任务状态与结果缓存。
+
 ## 阶段11：用户验证与模型自评估 API
 
 基础路径：`/api`

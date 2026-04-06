@@ -19,6 +19,7 @@ from deep_learning.models.spatiotemporal import SpatioTemporalSystemIntegrator, 
 from deep_learning.training import LightningTrainer, SpatialTrainingConfig, TrainingConfig, train_spatial_model
 from deep_learning.utils.device import DeviceManager
 from deep_learning.utils.monitoring import AlertManager, AlertRule, MetricMonitor, SystemResourceMonitor
+from .lime_explainer import SpatiotemporalLIMEExplainer
 
 
 @dataclass
@@ -75,6 +76,7 @@ class DeepLearningService:
         self.spatiotemporal_integrator = SpatioTemporalSystemIntegrator(cache_ttl_seconds=180)
         self._spatiotemporal_model_cache: dict[str, dict[str, Any]] = {}
         self.fusion_platform = fusion_platform_service
+        self.lime_explainer = SpatiotemporalLIMEExplainer()
 
     def health(self) -> dict[str, Any]:
         profile = self.device_manager.configure()
@@ -661,19 +663,42 @@ class DeepLearningService:
 
         baseline = np.mean(s, axis=1, keepdims=True)
         node_feature_importance = np.mean(np.abs(s - baseline), axis=1)
-        feature_importance = np.mean(node_feature_importance, axis=0)
+        heuristic_feature_importance = np.mean(node_feature_importance, axis=0)
         temporal_diff = np.abs(np.diff(s[:, :, 0], axis=1))
         temporal_importance = np.mean(temporal_diff, axis=0) if temporal_diff.size else np.array([], dtype=float)
         center = np.mean(c, axis=0, keepdims=True)
         spatial_distance = np.linalg.norm(c - center, axis=1)
         spatial_importance = (spatial_distance / (np.max(spatial_distance) + 1e-6)).astype(float)
 
-        k = max(1, min(int(top_k), int(feature_importance.shape[0])))
-        top_feature_idx = np.argsort(-feature_importance)[:k]
-        top_features = [
-            {"feature_index": int(idx), "importance": float(feature_importance[idx])}
-            for idx in top_feature_idx
-        ]
+        lime_result: dict[str, Any] | None = None
+        if method in {"lime", "hybrid"}:
+            lime_result = self.lime_explainer.explain(
+                model_type=model_type,
+                coords=c,
+                series=s,
+                pred_mean=pred_mean,
+                top_k=top_k,
+            )
+
+        feature_importance = heuristic_feature_importance.copy()
+        top_features: list[dict[str, Any]] = []
+        if method == "lime" and lime_result is not None:
+            lime_importance = np.asarray(lime_result.get("feature_importance", []), dtype=float)
+            if lime_importance.size == feature_importance.size:
+                feature_importance = lime_importance
+            top_features = list(lime_result.get("summary", {}).get("top_features", []))
+        elif method == "hybrid" and lime_result is not None:
+            lime_importance = np.asarray(lime_result.get("feature_importance", []), dtype=float)
+            if lime_importance.size == feature_importance.size:
+                feature_importance = 0.5 * heuristic_feature_importance + 0.5 * lime_importance
+            top_features = list(lime_result.get("summary", {}).get("top_features", []))
+        if not top_features:
+            k = max(1, min(int(top_k), int(feature_importance.shape[0])))
+            top_feature_idx = np.argsort(-feature_importance)[:k]
+            top_features = [
+                {"feature_index": int(idx), "importance": float(feature_importance[idx])}
+                for idx in top_feature_idx
+            ]
 
         summary = {
             "method": method,
@@ -685,6 +710,10 @@ class DeepLearningService:
             "spatial_importance_mean": float(np.mean(spatial_importance)),
             "temporal_importance_mean": float(np.mean(temporal_importance)) if temporal_importance.size else 0.0,
         }
+        if lime_result is not None:
+            summary["lime_average_confidence"] = float(lime_result.get("summary", {}).get("average_confidence", 0.0))
+            summary["lime_num_samples"] = int(lime_result.get("summary", {}).get("num_samples", 0))
+
         result: dict[str, Any] = {
             "model_type": model_type,
             "summary": summary,
@@ -693,6 +722,13 @@ class DeepLearningService:
             "spatial_importance": spatial_importance.tolist(),
             "temporal_importance": temporal_importance.astype(float).tolist(),
         }
+        if lime_result is not None:
+            result["lime"] = {
+                "batch_explanations": lime_result.get("batch_explanations", []),
+                "global_feature_importance": lime_result.get("global_feature_importance", []),
+                "visualization": lime_result.get("visualization", {}),
+                "performance": lime_result.get("performance", {}),
+            }
         if include_prediction:
             result["prediction"] = pred_mean.tolist()
             result["variance"] = pred_var.tolist()

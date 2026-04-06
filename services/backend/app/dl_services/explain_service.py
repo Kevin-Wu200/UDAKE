@@ -41,6 +41,7 @@ class _ExplainTaskEnvelope:
     priority: int
     created_at: float
     timeout_seconds: int
+    max_retries: int
 
 
 class _SlidingWindowLimiter:
@@ -229,6 +230,8 @@ class SpatiotemporalExplainTaskService:
         task_id = envelope.task_id
         try:
             status = self._load_status(task_id) or {}
+            if str(status.get("status")) == "cancelled":
+                return
             status.update(
                 {
                     "status": "running",
@@ -238,7 +241,35 @@ class SpatiotemporalExplainTaskService:
             )
             self._store_status(task_id, status)
 
-            result = self._execute_explanation(envelope.payload)
+            last_error: Exception | None = None
+            result: dict[str, Any] | None = None
+            for attempt in range(envelope.max_retries + 1):
+                status = self._load_status(task_id) or status
+                if str(status.get("status")) == "cancelled":
+                    return
+                try:
+                    status["retry_count"] = attempt
+                    status["updated_at"] = self._utc_now_iso()
+                    self._store_status(task_id, status)
+                    result = self._execute_explanation(envelope.payload)
+                    break
+                except Exception as exc:  # pragma: no cover - 异常路径
+                    last_error = exc
+                    if attempt >= envelope.max_retries:
+                        raise
+                    status.update(
+                        {
+                            "status": "retrying",
+                            "progress": min(0.9, 0.35 + attempt * 0.2),
+                            "updated_at": self._utc_now_iso(),
+                            "error": str(exc),
+                        }
+                    )
+                    self._store_status(task_id, status)
+                    time.sleep(min(1.5, 0.3 * (attempt + 1)))
+            if result is None and last_error is not None:
+                raise last_error
+
             duration_ms = (time.perf_counter() - started) * 1000
             self._store_result(task_id, result)
             status.update(
@@ -322,6 +353,7 @@ class SpatiotemporalExplainTaskService:
         timeout = max(30, int(timeout_seconds or self.task_timeout))
 
         now_iso = self._utc_now_iso()
+        max_retries = max(0, min(3, int(payload.get("max_retries", 1))))
         status_payload = {
             "task_id": task_id,
             "status": "queued",
@@ -332,6 +364,8 @@ class SpatiotemporalExplainTaskService:
             "priority": prio,
             "backend": "celery" if self._celery_available else "local-threadpool",
             "timeout_seconds": timeout,
+            "retry_count": 0,
+            "max_retries": max_retries,
         }
         self._store_status(task_id, status_payload)
 
@@ -342,6 +376,7 @@ class SpatiotemporalExplainTaskService:
             priority=prio,
             created_at=time.time(),
             timeout_seconds=timeout,
+            max_retries=max_retries,
         )
         self._queue.put((prio, envelope.created_at, envelope))
         queued = self._queue.qsize()
@@ -380,6 +415,26 @@ class SpatiotemporalExplainTaskService:
             self._local_result.pop(task_id, None)
         self.cache.delete(self._status_key(task_id))
         self.cache.delete(self._result_key(task_id))
+        return True
+
+    def cancel_task(self, task_id: str, *, owner_id: str, is_admin: bool = False) -> bool:
+        status = self._load_status(task_id)
+        if status is None:
+            return False
+        task_owner = str(status.get("owner_id", "anonymous"))
+        if not is_admin and task_owner != self._validate_owner(owner_id):
+            raise ExplainPermissionError("没有权限取消该任务")
+        if str(status.get("status")) in {"completed", "failed", "cancelled"}:
+            return True
+        status.update(
+            {
+                "status": "cancelled",
+                "progress": 1.0,
+                "updated_at": self._utc_now_iso(),
+                "error": "任务已被用户取消",
+            }
+        )
+        self._store_status(task_id, status)
         return True
 
     def queue_metrics(self) -> dict[str, Any]:

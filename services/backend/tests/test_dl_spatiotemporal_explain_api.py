@@ -24,6 +24,7 @@ def _payload() -> dict:
         "top_k": 1,
         "include_prediction": True,
         "batch_size": 32,
+        "max_retries": 1,
     }
 
 
@@ -106,9 +107,23 @@ def test_delete_explain_task(client: TestClient) -> None:
     assert missing.status_code == 404
 
 
+def test_cancel_explain_task(client: TestClient) -> None:
+    headers = {"x-user-id": "alice"}
+    created = client.post("/api/dl/spatiotemporal/explain", json=_payload(), headers=headers)
+    assert created.status_code == 200, created.text
+    task_id = created.json()["task_id"]
+
+    cancelled = client.post(f"/api/dl/spatiotemporal/explain/{task_id}/cancel", headers=headers)
+    assert cancelled.status_code == 200, cancelled.text
+    assert cancelled.json()["cancelled"] is True
+
+    task = client.get(f"/api/dl/spatiotemporal/explain/{task_id}", headers=headers)
+    assert task.status_code == 200, task.text
+    assert task.json()["status"] in {"cancelled", "completed"}
+
+
 def test_invalid_explain_request_returns_422(client: TestClient) -> None:
     payload = _payload()
     payload["top_k"] = 0
     response = client.post("/api/dl/spatiotemporal/explain", json=payload, headers={"x-user-id": "alice"})
     assert response.status_code == 422
-
