@@ -74,6 +74,8 @@ TODOList/
 
 # 测试数据
 data/
+!tests/deep_learning/data/
+!tests/deep_learning/data/sample_geojson.json
 
 # 阶段7融合系统本地仓库
 deep_learning/fusion/repository/
