@@ -2,7 +2,7 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 COPY package*.json /app/
-RUN npm ci
+RUN npm ci && npm install --no-save esbuild
 
 COPY . /app
 RUN npm run build:prod
