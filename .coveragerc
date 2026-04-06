@@ -1,0 +1,25 @@
+[run]
+source = deep_learning, services/backend/app/dl_services
+omit =
+    # 排除命令行脚本
+    deep_learning/inference/run_*.py
+    deep_learning/training/train_*.py
+    # 排除测试文件
+    tests/*
+    # 排除 __pycache__
+    */__pycache__/*
+    # 排除虚拟环境
+    venv/*
+    */venv/*
+
+[report]
+exclude_lines =
+    # 排除常见的非代码行
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+    @abc.abstractmethod

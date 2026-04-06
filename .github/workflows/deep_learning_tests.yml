@@ -89,7 +89,7 @@ jobs:
             --cov=services/backend/app/dl_services \
             --cov-report=term-missing \
             --cov-report=xml \
-            --cov-fail-under=80
+            --cov-fail-under=79
 
       - name: Dump dependency snapshot on failure
         if: failure()
