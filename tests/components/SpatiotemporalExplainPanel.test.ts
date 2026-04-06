@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SpatiotemporalExplainPanel } from '../../apps/frontend/js/components/SpatiotemporalExplainPanel';
+import { I18n } from '../../apps/frontend/js/utils/I18n';
 
 function createApiMock() {
     return {
@@ -42,6 +43,11 @@ function createApiMock() {
     };
 }
 
+async function flushPromises(): Promise<void> {
+    await Promise.resolve();
+    await Promise.resolve();
+}
+
 describe('SpatiotemporalExplainPanel', () => {
     let host: HTMLDivElement;
 
@@ -49,6 +55,21 @@ describe('SpatiotemporalExplainPanel', () => {
         host = document.createElement('div');
         document.body.innerHTML = '';
         document.body.appendChild(host);
+        I18n.init('zh-CN');
+    });
+
+    it('应完成基础渲染并显示默认空结果态', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        await flushPromises();
+
+        expect(host.querySelector('.explain-panel h4')?.textContent).toContain('模型可解释性增强面板');
+        expect(host.querySelector('#dl-explain-result')?.textContent).toContain('暂无结果');
+        expect(api.getSpatiotemporalExplainMonitor).toHaveBeenCalledTimes(1);
+
+        panel.destroy();
     });
 
     it('应支持方法切换并按选择方法提交任务', async () => {
@@ -77,14 +98,38 @@ describe('SpatiotemporalExplainPanel', () => {
         const shapBtn = host.querySelector('[data-method-switch="shap"]') as HTMLButtonElement;
         shapBtn.click();
         (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
-        await Promise.resolve();
-        await Promise.resolve();
+        await flushPromises();
 
         expect(api.createSpatiotemporalExplainTask).toHaveBeenCalledTimes(1);
         const payload = api.createSpatiotemporalExplainTask.mock.calls[0][0];
         expect(payload.method).toBe('shap');
         expect(payload.top_k).toBe(5);
         expect(payload.pred_horizon).toBe(6);
+        expect(host.querySelector('#dl-explain-status')?.textContent).toContain('任务提交成功');
+
+        panel.destroy();
+    });
+
+    it('应支持键盘快捷键提交与刷新', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        api.createSpatiotemporalExplainTask.mockResolvedValue({ task_id: 'task-kb' });
+        api.getSpatiotemporalExplainTask.mockResolvedValue({
+            task_id: 'task-kb',
+            status: 'running',
+            progress: 0.2,
+            result: { method: 'lime', lime: {} }
+        });
+
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        host.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true }));
+        await flushPromises();
+
+        expect(api.createSpatiotemporalExplainTask).toHaveBeenCalledTimes(1);
+
+        host.dispatchEvent(new KeyboardEvent('keydown', { key: 'r', ctrlKey: true, bubbles: true }));
+        await flushPromises();
+        expect(api.getSpatiotemporalExplainTask).toHaveBeenCalledWith('task-kb');
 
         panel.destroy();
     });
@@ -97,10 +142,26 @@ describe('SpatiotemporalExplainPanel', () => {
         const coordsInput = host.querySelector('#dl-explain-coords') as HTMLTextAreaElement;
         coordsInput.value = '[[120.1,30.2]]';
         (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
-        await Promise.resolve();
+        await flushPromises();
 
         expect(api.createSpatiotemporalExplainTask).not.toHaveBeenCalled();
         expect((host.querySelector('#dl-explain-status') as HTMLElement).textContent).toContain('提交失败');
+
+        panel.destroy();
+    });
+
+    it('JSON 非法时应触发错误处理', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        const seriesInput = host.querySelector('#dl-explain-series') as HTMLTextAreaElement;
+        seriesInput.value = '{bad json}';
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(api.createSpatiotemporalExplainTask).not.toHaveBeenCalled();
+        expect(host.querySelector('#dl-explain-status')?.textContent).toContain('不是合法 JSON');
 
         panel.destroy();
     });
@@ -134,20 +195,63 @@ describe('SpatiotemporalExplainPanel', () => {
 
         const panel = new SpatiotemporalExplainPanel(host, api as any);
         (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
-        await Promise.resolve();
-        await Promise.resolve();
+        await flushPromises();
 
         (host.querySelector('#dl-explain-verify') as HTMLButtonElement).click();
-        await Promise.resolve();
+        await flushPromises();
         expect((host.querySelector('#dl-explain-status') as HTMLElement).textContent).toContain('校验通过');
 
         (host.querySelector('[data-task-action="cancel"]') as HTMLButtonElement).click();
-        await Promise.resolve();
+        await flushPromises();
         expect(api.cancelSpatiotemporalExplainTask).toHaveBeenCalledWith('task-2');
 
         (host.querySelector('[data-task-action="delete"]') as HTMLButtonElement).click();
-        await Promise.resolve();
+        await flushPromises();
         expect(api.deleteSpatiotemporalExplainTask).toHaveBeenCalledWith('task-2');
+
+        panel.destroy();
+    });
+
+    it('提交接口报错时应显示错误消息', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        api.createSpatiotemporalExplainTask.mockRejectedValue(new Error('backend down'));
+
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(host.querySelector('#dl-explain-status')?.textContent).toContain('backend down');
+        panel.destroy();
+    });
+
+    it('应支持任务列表增量渲染和手动加载更多', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        const tasks = Array.from({ length: 45 }).map((_, idx) => ({
+            task_id: `task-${idx}`,
+            status: 'running',
+            progress: 0.1,
+            retry_count: 0,
+            max_retries: 1,
+            created_at: '2026-04-06T10:00:00Z',
+            updated_at: '2026-04-06T10:00:00Z',
+            result: { method: 'lime' }
+        }));
+
+        (panel as any).tasks = tasks;
+        (panel as any).renderedTaskCount = 20;
+        (panel as any).renderTaskList();
+
+        const taskItemsBefore = host.querySelectorAll('.explain-task-item');
+        expect(taskItemsBefore.length).toBe(20);
+        expect(host.textContent).toContain('加载更多');
+
+        (host.querySelector('[data-task-action="load-more"]') as HTMLButtonElement).click();
+        const taskItemsAfter = host.querySelectorAll('.explain-task-item');
+        expect(taskItemsAfter.length).toBe(45);
 
         panel.destroy();
     });

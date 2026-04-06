@@ -1,4 +1,5 @@
 import type { IAPIService } from '../../types/api';
+import { I18n } from '../utils/I18n';
 
 type ExplainMethod = 'lime' | 'shap' | 'hybrid';
 type ExplainStatus = 'queued' | 'running' | 'retrying' | 'completed' | 'failed' | 'cancelled';
@@ -43,6 +44,9 @@ export class SpatiotemporalExplainPanel {
     private autoRefreshTimer: number | null = null;
     private autoRefreshEnabled: boolean = true;
     private filterMethod: 'all' | 'lime' | 'shap' | 'hybrid' = 'all';
+    private renderedTaskCount: number = 40;
+    private readonly taskBatchSize: number = 40;
+    private taskListScrollHandler: (() => void) | null = null;
 
     constructor(container: HTMLElement, apiService: IAPIService) {
         this.container = container;
@@ -58,19 +62,19 @@ export class SpatiotemporalExplainPanel {
         this.container.innerHTML = `
             <div class="dl-module-card explain-panel">
                 <div class="dl-module-header">
-                    <h4>模型可解释性增强面板</h4>
-                    <p>提交时空解释任务，查看 LIME / SHAP 可视化与对比分析</p>
+                    <h4>${this.t('explain.panel.title', '模型可解释性增强面板')}</h4>
+                    <p>${this.t('explain.panel.subtitle', '提交时空解释任务，查看 LIME / SHAP 可视化与对比分析')}</p>
                 </div>
 
-                <div class="explain-method-switch" role="tablist" aria-label="解释方法切换">
-                    <button class="btn btn-secondary active" data-method-switch="lime">LIME</button>
-                    <button class="btn btn-secondary" data-method-switch="shap">SHAP</button>
-                    <button class="btn btn-secondary" data-method-switch="hybrid">Hybrid</button>
+                <div class="explain-method-switch" role="tablist" aria-label="${this.t('explain.method.switchAria', '解释方法切换')}">
+                    <button class="btn btn-secondary active" data-method-switch="lime">${this.t('explain.method.lime', 'LIME')}</button>
+                    <button class="btn btn-secondary" data-method-switch="shap">${this.t('explain.method.shap', 'SHAP')}</button>
+                    <button class="btn btn-secondary" data-method-switch="hybrid">${this.t('explain.method.hybrid', 'Hybrid')}</button>
                 </div>
 
                 <div class="explain-layout-grid">
                     <section class="explain-submit-panel">
-                        <h5>任务提交</h5>
+                        <h5>${this.t('explain.submit.title', '任务提交')}</h5>
                         <div class="dl-form-grid">
                             <label class="dl-field">
                                 <span>模型选择</span>
@@ -114,9 +118,9 @@ export class SpatiotemporalExplainPanel {
                         </label>
 
                         <div class="dl-actions">
-                            <button id="dl-explain-submit" class="btn btn-primary">提交解释任务</button>
-                            <button id="dl-explain-monitor" class="btn btn-secondary">刷新队列状态</button>
-                            <button id="dl-explain-verify" class="btn btn-secondary">校验异步后端</button>
+                            <button id="dl-explain-submit" class="btn btn-primary">${this.t('explain.action.submit', '提交解释任务')}</button>
+                            <button id="dl-explain-monitor" class="btn btn-secondary">${this.t('explain.action.refresh', '刷新队列状态')}</button>
+                            <button id="dl-explain-verify" class="btn btn-secondary">${this.t('explain.action.verify', '校验异步后端')}</button>
                         </div>
                         <div id="dl-explain-status" class="status-message" role="status" aria-live="polite"></div>
                         <div id="dl-explain-guide" class="explain-guide">快捷键：<code>Ctrl/Cmd + Enter</code> 提交任务，<code>Ctrl/Cmd + R</code> 刷新任务。</div>
@@ -124,7 +128,7 @@ export class SpatiotemporalExplainPanel {
 
                     <section class="explain-task-panel">
                         <div class="explain-task-header">
-                            <h5>任务状态</h5>
+                            <h5>${this.t('explain.task.title', '任务状态')}</h5>
                             <div class="explain-task-tools">
                                 <select id="dl-explain-filter" class="select">
                                     <option value="all">全部方法</option>
@@ -145,17 +149,17 @@ export class SpatiotemporalExplainPanel {
 
                 <section class="explain-result-panel">
                     <div class="explain-result-header">
-                        <h5>解释结果展示</h5>
+                        <h5>${this.t('explain.result.title', '解释结果展示')}</h5>
                         <div class="explain-result-tabs">
-                            <button class="btn btn-secondary active" data-result-tab="lime">LIME视图</button>
-                            <button class="btn btn-secondary" data-result-tab="shap">SHAP视图</button>
-                            <button class="btn btn-secondary" data-result-tab="compare">对比分析</button>
-                            <button class="btn btn-secondary" data-result-tab="spatiotemporal">时空视图</button>
+                            <button class="btn btn-secondary active" data-result-tab="lime">${this.t('explain.result.tab.lime', 'LIME视图')}</button>
+                            <button class="btn btn-secondary" data-result-tab="shap">${this.t('explain.result.tab.shap', 'SHAP视图')}</button>
+                            <button class="btn btn-secondary" data-result-tab="compare">${this.t('explain.result.tab.compare', '对比分析')}</button>
+                            <button class="btn btn-secondary" data-result-tab="spatiotemporal">${this.t('explain.result.tab.spatiotemporal', '时空视图')}</button>
                         </div>
                     </div>
 
                     <div id="dl-explain-result" class="explain-result-content">
-                        <div class="status-message">暂无结果，请先提交并完成任务。</div>
+                        <div class="status-message">${this.t('explain.status.emptyResult', '暂无结果，请先提交并完成任务。')}</div>
                     </div>
                 </section>
             </div>
@@ -185,6 +189,7 @@ export class SpatiotemporalExplainPanel {
         this.container.querySelector('#dl-explain-filter')?.addEventListener('change', (event) => {
             const value = (event.target as HTMLSelectElement).value as 'all' | 'lime' | 'shap' | 'hybrid';
             this.filterMethod = value;
+            this.renderedTaskCount = this.taskBatchSize;
             this.renderTaskList();
         });
 
@@ -228,6 +233,12 @@ export class SpatiotemporalExplainPanel {
             }
             if (action === 'delete') {
                 void this.deleteTask(taskId);
+                return;
+            }
+
+            if (action === 'load-more') {
+                this.renderedTaskCount += this.taskBatchSize;
+                this.renderTaskList();
             }
         });
 
@@ -242,6 +253,8 @@ export class SpatiotemporalExplainPanel {
                 void this.refreshAllTasks();
             }
         });
+
+        this.attachTaskListVirtualScroll();
     }
 
     private updateMethodSwitch(): void {
@@ -418,17 +431,17 @@ export class SpatiotemporalExplainPanel {
     private statusLabel(status: ExplainStatus): string {
         switch (status) {
             case 'queued':
-                return '排队中';
+                return this.t('explain.status.queued', '排队中');
             case 'running':
-                return '执行中';
+                return this.t('explain.status.running', '执行中');
             case 'retrying':
-                return '重试中';
+                return this.t('explain.status.retrying', '重试中');
             case 'completed':
-                return '已完成';
+                return this.t('explain.status.completed', '已完成');
             case 'failed':
-                return '失败';
+                return this.t('explain.status.failed', '失败');
             case 'cancelled':
-                return '已取消';
+                return this.t('explain.status.cancelled', '已取消');
             default:
                 return status;
         }
@@ -471,11 +484,12 @@ export class SpatiotemporalExplainPanel {
             : this.tasks.filter(task => this.detectMethodFromTask(task) === this.filterMethod);
 
         if (filtered.length === 0) {
-            list.innerHTML = '<div class="status-message">暂无任务</div>';
+            list.innerHTML = `<div class="status-message">${this.t('explain.status.noTask', '暂无任务')}</div>`;
             return;
         }
 
-        list.innerHTML = filtered.map((task) => {
+        const visibleTasks = filtered.slice(0, this.renderedTaskCount);
+        list.innerHTML = visibleTasks.map((task) => {
             const progress = this.progressPercent(task);
             const method = this.detectMethodFromTask(task).toUpperCase();
             return `
@@ -490,19 +504,33 @@ export class SpatiotemporalExplainPanel {
                         <div class="explain-task-progress-fill" style="width:${progress}%"></div>
                     </div>
                     <div class="explain-task-meta">
-                        <span>进度 ${progress}%</span>
-                        <span>重试 ${task.retry_count || 0}/${task.max_retries || 0}</span>
+                        <span>${this.t('explain.task.progress', '进度')} ${this.formatNumber(progress)}%</span>
+                        <span>${this.t('explain.task.retry', '重试')} ${this.formatNumber(task.retry_count || 0)}/${this.formatNumber(task.max_retries || 0)}</span>
                         <span>${this.formatTime(task.updated_at || task.created_at || '')}</span>
                     </div>
                     ${task.error ? `<div class="status-message error">${task.error}</div>` : ''}
                     <div class="explain-task-actions">
-                        <button class="btn btn-secondary" data-task-action="view" data-task-id="${task.task_id}">查看</button>
-                        <button class="btn btn-secondary" data-task-action="cancel" data-task-id="${task.task_id}" ${['completed', 'failed', 'cancelled'].includes(task.status) ? 'disabled' : ''}>取消</button>
-                        <button class="btn btn-secondary" data-task-action="delete" data-task-id="${task.task_id}">删除</button>
+                        <button class="btn btn-secondary" data-task-action="view" data-task-id="${task.task_id}">${this.t('common.view', '查看')}</button>
+                        <button class="btn btn-secondary" data-task-action="cancel" data-task-id="${task.task_id}" ${['completed', 'failed', 'cancelled'].includes(task.status) ? 'disabled' : ''}>${this.t('common.cancel', '取消')}</button>
+                        <button class="btn btn-secondary" data-task-action="delete" data-task-id="${task.task_id}">${this.t('common.delete', '删除')}</button>
                     </div>
                 </article>
             `;
         }).join('');
+
+        if (filtered.length > visibleTasks.length) {
+            list.insertAdjacentHTML('beforeend', `
+                <div class="status-message">
+                    ${this.t('explain.task.partial', '已渲染 {visible}/{total} 条任务', {
+                        visible: this.formatNumber(visibleTasks.length),
+                        total: this.formatNumber(filtered.length)
+                    })}
+                    <button class="btn btn-secondary" data-task-action="load-more" data-task-id="load-more">
+                        ${this.t('explain.task.loadMore', '加载更多')}
+                    </button>
+                </div>
+            `);
+        }
     }
 
     private async refreshAllTasks(): Promise<void> {
@@ -547,12 +575,12 @@ export class SpatiotemporalExplainPanel {
         const avgDuration = Number(payload.avg_duration_ms || 0).toFixed(1);
 
         monitorEl.innerHTML = `
-            <div class="monitor-chip">队列: ${queueSize}</div>
-            <div class="monitor-chip">执行中: ${activeTasks}</div>
-            <div class="monitor-chip">成功率: ${successRate}%</div>
-            <div class="monitor-chip">错误率: ${errorRate}%</div>
-            <div class="monitor-chip">平均耗时: ${avgDuration}ms</div>
-            <div class="monitor-chip">缓存: ${payload.cache_backend || 'unknown'}</div>
+            <div class="monitor-chip">${this.t('explain.monitor.queue', '队列')}: ${this.formatNumber(queueSize)}</div>
+            <div class="monitor-chip">${this.t('explain.monitor.active', '执行中')}: ${this.formatNumber(activeTasks)}</div>
+            <div class="monitor-chip">${this.t('explain.monitor.successRate', '成功率')}: ${this.formatNumber(successRate)}%</div>
+            <div class="monitor-chip">${this.t('explain.monitor.errorRate', '错误率')}: ${this.formatNumber(errorRate)}%</div>
+            <div class="monitor-chip">${this.t('explain.monitor.avgDuration', '平均耗时')}: ${this.formatNumber(Number(avgDuration))}ms</div>
+            <div class="monitor-chip">${this.t('explain.monitor.cache', '缓存')}: ${payload.cache_backend || 'unknown'}</div>
             <div class="monitor-chip">Celery: ${payload.celery_enabled ? 'on' : 'off'}</div>
         `;
     }
@@ -622,11 +650,13 @@ export class SpatiotemporalExplainPanel {
 
         const task = this.getCurrentTask();
         if (!task) {
-            container.innerHTML = '<div class="status-message">请选择任务查看结果。</div>';
+            container.innerHTML = `<div class="status-message">${this.t('explain.status.selectTask', '请选择任务查看结果。')}</div>`;
             return;
         }
         if (task.status !== 'completed' || !task.result) {
-            container.innerHTML = `<div class="status-message">任务当前状态：${this.statusLabel(task.status)}，结果尚不可用。</div>`;
+            container.innerHTML = `<div class="status-message">${this.t('explain.status.taskUnavailable', '任务当前状态：{status}，结果尚不可用。', {
+                status: this.statusLabel(task.status)
+            })}</div>`;
             return;
         }
 
@@ -889,8 +919,9 @@ export class SpatiotemporalExplainPanel {
             target.style.transformOrigin = 'center center';
         };
 
-        thresholdInput.addEventListener('input', rerender);
-        zoomInput.addEventListener('input', rerender);
+        const debouncedRerender = this.createDebounced(rerender, 80);
+        thresholdInput.addEventListener('input', debouncedRerender);
+        zoomInput.addEventListener('input', debouncedRerender);
     }
 
     private renderDependenceList(rows: Array<Record<string, unknown>>): string {
@@ -1159,6 +1190,52 @@ export class SpatiotemporalExplainPanel {
         }));
     }
 
+    private attachTaskListVirtualScroll(): void {
+        const list = this.container.querySelector('#dl-explain-task-list') as HTMLElement | null;
+        if (!list) {
+            return;
+        }
+        if (this.taskListScrollHandler) {
+            list.removeEventListener('scroll', this.taskListScrollHandler);
+        }
+
+        this.taskListScrollHandler = this.createThrottled(() => {
+            const nearBottom = list.scrollTop + list.clientHeight >= list.scrollHeight - 48;
+            if (!nearBottom) {
+                return;
+            }
+            this.renderedTaskCount += this.taskBatchSize;
+            this.renderTaskList();
+        }, 160);
+
+        list.addEventListener('scroll', this.taskListScrollHandler);
+    }
+
+    private createDebounced(callback: () => void, waitMs: number): () => void {
+        let timer: number | null = null;
+        return () => {
+            if (timer !== null) {
+                window.clearTimeout(timer);
+            }
+            timer = window.setTimeout(() => {
+                timer = null;
+                callback();
+            }, waitMs);
+        };
+    }
+
+    private createThrottled(callback: () => void, waitMs: number): () => void {
+        let lastInvoke = 0;
+        return () => {
+            const now = Date.now();
+            if (now - lastInvoke < waitMs) {
+                return;
+            }
+            lastInvoke = now;
+            callback();
+        };
+    }
+
     private async pollActiveTasks(): Promise<void> {
         const active = this.tasks.filter(task => ['queued', 'running', 'retrying'].includes(task.status));
         if (!active.length) {
@@ -1214,11 +1291,34 @@ export class SpatiotemporalExplainPanel {
             return iso;
         }
 
-        return `${date.toLocaleDateString('zh-CN')} ${date.toLocaleTimeString('zh-CN', { hour12: false })}`;
+        return I18n.formatDateTime(date);
+    }
+
+    private formatNumber(value: number, options: Intl.NumberFormatOptions = {}): string {
+        return I18n.formatNumber(value, options);
+    }
+
+    private t(key: string, fallback: string, params?: Record<string, string | number>): string {
+        const translated = I18n.t(key, params);
+        if (translated === key) {
+            if (!params) {
+                return fallback;
+            }
+            return fallback.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, paramName: string) => {
+                const value = params[paramName];
+                return value === undefined ? match : String(value);
+            });
+        }
+        return translated;
     }
 
     public destroy(): void {
         this.stopAutoRefresh();
+        const list = this.container.querySelector('#dl-explain-task-list') as HTMLElement | null;
+        if (list && this.taskListScrollHandler) {
+            list.removeEventListener('scroll', this.taskListScrollHandler);
+        }
+        this.taskListScrollHandler = null;
         this.container.innerHTML = '';
     }
 }

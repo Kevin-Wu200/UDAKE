@@ -1,0 +1,21 @@
+{
+  "explain.panel.title": "Model Explainability Enhancement Panel",
+  "explain.panel.subtitle": "Submit spatiotemporal explainability tasks and inspect LIME/SHAP visualizations with comparison analysis",
+  "explain.method.switchAria": "Explainability method switch",
+  "explain.method.lime": "LIME",
+  "explain.method.shap": "SHAP",
+  "explain.method.hybrid": "Hybrid",
+  "explain.submit.title": "Task Submission",
+  "explain.task.title": "Task Status",
+  "explain.result.title": "Explainability Results",
+  "explain.action.submit": "Submit Explain Task",
+  "explain.action.refresh": "Refresh Queue Status",
+  "explain.action.verify": "Verify Async Backend",
+  "explain.result.tab.lime": "LIME View",
+  "explain.result.tab.shap": "SHAP View",
+  "explain.result.tab.compare": "Comparison",
+  "explain.result.tab.spatiotemporal": "Spatiotemporal View",
+  "explain.status.emptyResult": "No result yet. Submit and complete a task first.",
+  "explain.status.noTask": "No tasks",
+  "explain.status.selectTask": "Select a task to view results."
+}

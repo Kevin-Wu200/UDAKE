@@ -1,0 +1,21 @@
+{
+  "explain.panel.title": "模型可解释性增强面板",
+  "explain.panel.subtitle": "提交时空解释任务，查看 LIME / SHAP 可视化与对比分析",
+  "explain.method.switchAria": "解释方法切换",
+  "explain.method.lime": "LIME",
+  "explain.method.shap": "SHAP",
+  "explain.method.hybrid": "Hybrid",
+  "explain.submit.title": "任务提交",
+  "explain.task.title": "任务状态",
+  "explain.result.title": "解释结果展示",
+  "explain.action.submit": "提交解释任务",
+  "explain.action.refresh": "刷新队列状态",
+  "explain.action.verify": "校验异步后端",
+  "explain.result.tab.lime": "LIME视图",
+  "explain.result.tab.shap": "SHAP视图",
+  "explain.result.tab.compare": "对比分析",
+  "explain.result.tab.spatiotemporal": "时空视图",
+  "explain.status.emptyResult": "暂无结果，请先提交并完成任务。",
+  "explain.status.noTask": "暂无任务",
+  "explain.status.selectTask": "请选择任务查看结果。"
+}
