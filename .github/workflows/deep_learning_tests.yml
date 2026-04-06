@@ -74,6 +74,7 @@ jobs:
       - name: Install remaining dependencies
         run: |
           pip install -r requirements.txt
+          pip install -r /tmp/requirements-no-gdal.txt
           pip install pytest-cov
           pip check
 
