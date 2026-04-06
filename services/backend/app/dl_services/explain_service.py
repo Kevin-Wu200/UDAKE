@@ -11,7 +11,7 @@ import threading
 import time
 import uuid
 import zlib
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Optional
@@ -269,9 +269,15 @@ class SpatiotemporalExplainTaskService:
     def _execute_with_timeout(self, payload: dict[str, Any], timeout_seconds: int) -> dict[str, Any]:
         if timeout_seconds <= 0:
             return self._execute_explanation(payload)
-        with ThreadPoolExecutor(max_workers=1, thread_name_prefix="dl-explain-timeout") as single:
-            future = single.submit(self._execute_explanation, payload)
+        single = ThreadPoolExecutor(max_workers=1, thread_name_prefix="dl-explain-timeout")
+        future = single.submit(self._execute_explanation, payload)
+        try:
             return future.result(timeout=timeout_seconds)
+        except FuturesTimeoutError as exc:
+            future.cancel()
+            raise TimeoutError(f"解释任务执行超时({timeout_seconds}s)") from exc
+        finally:
+            single.shutdown(wait=False, cancel_futures=True)
 
     def _execute_envelope(self, envelope: _ExplainTaskEnvelope, slot_managed: bool = False) -> dict[str, Any]:
         started = time.perf_counter()

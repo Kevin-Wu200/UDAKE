@@ -127,3 +127,34 @@ def test_invalid_explain_request_returns_422(client: TestClient) -> None:
     payload["top_k"] = 0
     response = client.post("/api/dl/spatiotemporal/explain", json=payload, headers={"x-user-id": "alice"})
     assert response.status_code == 422
+
+
+def test_explain_monitor_and_verify_api(client: TestClient) -> None:
+    headers = {"x-user-id": "alice"}
+    _ = client.post("/api/dl/spatiotemporal/explain", json=_payload(), headers=headers)
+
+    monitor = client.get("/api/dl/spatiotemporal/explain/monitor", headers=headers)
+    assert monitor.status_code == 200, monitor.text
+    monitor_body = monitor.json()
+    assert "queue_size" in monitor_body
+    assert "success_rate" in monitor_body
+    assert "error_rate" in monitor_body
+
+    verify = client.get("/api/dl/spatiotemporal/explain/verify", headers=headers)
+    assert verify.status_code == 200, verify.text
+    verify_body = verify.json()
+    assert "celery_enabled" in verify_body
+    assert "redis_backend_ok" in verify_body
+
+
+def test_explain_cleanup_admin_only(client: TestClient) -> None:
+    headers = {"x-user-id": "alice"}
+    forbidden = client.post("/api/dl/spatiotemporal/explain/cleanup", headers=headers)
+    assert forbidden.status_code == 403
+
+    allowed = client.post(
+        "/api/dl/spatiotemporal/explain/cleanup",
+        headers={"x-user-id": "alice", "x-explain-admin": "true"},
+    )
+    assert allowed.status_code == 200, allowed.text
+    assert "deleted_tasks" in allowed.json()
