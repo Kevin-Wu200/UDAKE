@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
+import logging
+import time
 from typing import Any, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..config import settings
+from .explain_service import (
+    ExplainPermissionError,
+    ExplainRateLimitError,
+    SpatiotemporalExplainTaskService,
+)
 from .service import DeepLearningService
 
 router = APIRouter(prefix="/dl", tags=["深度学习"])
 service = DeepLearningService()
+explain_task_service = SpatiotemporalExplainTaskService(settings=settings, dl_service=service)
+logger = logging.getLogger(__name__)
 
 
 class TrainRequest(BaseModel):
@@ -136,6 +146,21 @@ class SpatioTemporalOnlineRequest(BaseModel):
     strategy: str = Field(default="standard", description="light/standard/aggressive")
 
 
+class SpatioTemporalExplainRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_type: str = Field(default="st_transformer", description="st_transformer/gcn_lstm/convlstm/stgcn")
+    coords: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
+    series: list[list[list[float]]] = Field(default_factory=list, description="[n_nodes, seq_len, n_features]")
+    pred_horizon: int = Field(default=6, ge=1, le=48)
+    method: str = Field(default="hybrid", description="lime/shap/hybrid")
+    top_k: int = Field(default=5, ge=1, le=20)
+    include_prediction: bool = Field(default=True)
+    batch_size: int = Field(default=256, ge=16, le=4096)
+    timeout_seconds: Optional[int] = Field(default=None, ge=30, le=7200)
+    priority: Optional[int] = Field(default=None, ge=0, le=9)
+
+
 class FusionModelInput(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
@@ -202,6 +227,26 @@ class FusionModelSelectRequest(BaseModel):
 class FusionAccessRequest(BaseModel):
     token: Optional[str] = None
     client_id: str = Field(default="anonymous")
+
+
+def _auth_user(
+    x_user_id: Optional[str],
+    x_explain_token: Optional[str],
+) -> str:
+    user_id = (x_user_id or "anonymous").strip() or "anonymous"
+    tokens = list(getattr(settings, "EXPLAIN_API_TOKENS", []) or [])
+    require_auth = bool(getattr(settings, "EXPLAIN_REQUIRE_AUTH", False))
+
+    if require_auth and user_id == "anonymous":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="未认证用户不能访问解释接口")
+    if tokens and (x_explain_token or "") not in tokens:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="解释接口令牌无效")
+    return user_id
+
+
+def _is_admin(x_explain_admin: Optional[str]) -> bool:
+    text = (x_explain_admin or "").strip().lower()
+    return text in {"1", "true", "yes", "admin"}
 
 
 @router.get("/health")
@@ -332,6 +377,86 @@ def update_spatiotemporal_online(payload: SpatioTemporalOnlineRequest) -> dict:
         update_interval=payload.update_interval,
         strategy=payload.strategy,
     )
+
+
+@router.post("/spatiotemporal/explain")
+def create_spatiotemporal_explain_task(
+    payload: SpatioTemporalExplainRequest,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+) -> dict:
+    started = time.perf_counter()
+    user_id = _auth_user(x_user_id, x_explain_token)
+    try:
+        task = explain_task_service.create_task(
+            owner_id=user_id,
+            payload=payload.model_dump(),
+            priority=payload.priority,
+            timeout_seconds=payload.timeout_seconds,
+        )
+        logger.info("创建 explain 任务成功 task_id=%s user=%s", task["task_id"], user_id)
+        return {
+            "task_id": task["task_id"],
+            "status": task["status"],
+            "created_at": task["created_at"],
+            "queue_size": task["queue_size"],
+            "remaining_per_minute": task["remaining_per_minute"],
+            "monitor": explain_task_service.queue_metrics(),
+            "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+        }
+    except ExplainPermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except ExplainRateLimitError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("创建 explain 任务失败 user=%s: %s", user_id, exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"创建任务失败: {exc}") from exc
+
+
+@router.get("/spatiotemporal/explain/{task_id}")
+def get_spatiotemporal_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    try:
+        task = explain_task_service.get_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+        if task is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+        return task
+    except ExplainPermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("查询 explain 任务失败 task_id=%s: %s", task_id, exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"查询任务失败: {exc}") from exc
+
+
+@router.delete("/spatiotemporal/explain/{task_id}")
+def delete_spatiotemporal_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    try:
+        deleted = explain_task_service.delete_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+        if not deleted:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已清理")
+        return {"task_id": task_id, "deleted": True}
+    except ExplainPermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("删除 explain 任务失败 task_id=%s: %s", task_id, exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"删除任务失败: {exc}") from exc
 
 
 @router.post("/fusion/train-profile")

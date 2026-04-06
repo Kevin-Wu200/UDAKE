@@ -161,6 +161,21 @@ class Settings(BaseSettings):
     CACHE_COMPRESSION_THRESHOLD: int = 2048
     CACHE_AUTO_TUNE_ENABLED: bool = True
     CACHE_TUNE_REQUEST_INTERVAL: int = 200
+    EXPLAIN_CELERY_ENABLED: bool = False
+    EXPLAIN_CELERY_TASK_ALWAYS_EAGER: bool = True
+    EXPLAIN_CELERY_BROKER_URL: Optional[str] = None
+    EXPLAIN_CELERY_BACKEND_URL: Optional[str] = None
+    EXPLAIN_TASK_TIMEOUT_SECONDS: int = 900
+    EXPLAIN_TASK_TTL_SECONDS: int = 1800
+    EXPLAIN_RESULT_TTL_SECONDS: int = 3600
+    EXPLAIN_MAX_CONCURRENT_TASKS: int = 4
+    EXPLAIN_MAX_BATCH_SIZE: int = 256
+    EXPLAIN_DEFAULT_PRIORITY: int = 5
+    EXPLAIN_RESULT_COMPRESSION_THRESHOLD: int = 4096
+    EXPLAIN_RATE_LIMIT_PER_MINUTE: int = 30
+    EXPLAIN_REQUIRE_AUTH: bool = False
+    EXPLAIN_API_TOKENS: Union[str, List[str]] = "[]"
+    EXPLAIN_ALLOWED_CREATORS: Union[str, List[str]] = "[]"
 
     # SMTP/邮件通知配置
     SMTP_HOST: str = "smtp.qq.com"
@@ -236,6 +251,8 @@ class Settings(BaseSettings):
         'FEEDBACK_MASK_FIELDS',
         'WORKFLOW_REDIS_CLUSTER_NODES',
         'AUTH_DB_READ_REPLICA_URLS',
+        'EXPLAIN_API_TOKENS',
+        'EXPLAIN_ALLOWED_CREATORS',
         mode='before'
     )
     @classmethod
@@ -262,6 +279,13 @@ class Settings(BaseSettings):
         'CACHE_SHARD_COUNT',
         'CACHE_COMPRESSION_THRESHOLD',
         'CACHE_TUNE_REQUEST_INTERVAL',
+        'EXPLAIN_TASK_TIMEOUT_SECONDS',
+        'EXPLAIN_TASK_TTL_SECONDS',
+        'EXPLAIN_RESULT_TTL_SECONDS',
+        'EXPLAIN_MAX_CONCURRENT_TASKS',
+        'EXPLAIN_MAX_BATCH_SIZE',
+        'EXPLAIN_RESULT_COMPRESSION_THRESHOLD',
+        'EXPLAIN_RATE_LIMIT_PER_MINUTE',
         'AUTH_IP_AUTO_BAN_THRESHOLD',
         'AUTH_IP_AUTO_BAN_WINDOW_SECONDS',
         'AUTH_IP_AUTO_BAN_SECONDS',
@@ -274,6 +298,14 @@ class Settings(BaseSettings):
         if v <= 0:
             raise ValueError(f'{v} must be positive')
         return v
+
+    @field_validator('EXPLAIN_DEFAULT_PRIORITY')
+    @classmethod
+    def validate_explain_priority(cls, v):
+        iv = int(v)
+        if iv < 0 or iv > 9:
+            raise ValueError('EXPLAIN_DEFAULT_PRIORITY must be between 0 and 9')
+        return iv
 
     @field_validator('AUTH_DB_QUERY_CACHE_TTL_SECONDS', mode='before')
     @classmethod

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any
+import time
 
 import numpy as np
 
@@ -72,6 +73,7 @@ class DeepLearningService:
         self.deep_fusion = DeepAnomalyFusionDetector()
         self.sampling_rl_integrators: dict[str, SamplingRLIntegrator] = {}
         self.spatiotemporal_integrator = SpatioTemporalSystemIntegrator(cache_ttl_seconds=180)
+        self._spatiotemporal_model_cache: dict[str, dict[str, Any]] = {}
         self.fusion_platform = fusion_platform_service
 
     def health(self) -> dict[str, Any]:
@@ -559,6 +561,142 @@ class DeepLearningService:
             "online": payload,
             "resource": self.resource_monitor.collect(),
         }
+
+    def warmup_spatiotemporal_model(self, model_type: str = "st_transformer") -> dict[str, Any]:
+        if model_type not in {"st_transformer", "gcn_lstm", "convlstm", "stgcn"}:
+            raise ValueError("model_type must be one of st_transformer/gcn_lstm/convlstm/stgcn")
+
+        cache = self._spatiotemporal_model_cache.get(model_type)
+        now_ts = time.time()
+        if cache:
+            cache["last_access_ts"] = now_ts
+            return {"model_type": model_type, "warmed": True, "from_cache": True}
+
+        # 使用最小规模数据触发一次轻量预测路径，达到模型预热效果。
+        coords = np.array([[0.0, 0.0], [1.0, 0.5], [0.5, 1.0], [1.5, 1.2]], dtype=float)
+        seq_len = 12
+        series = np.tile(np.linspace(0.1, 1.2, seq_len, dtype=float), (coords.shape[0], 1)).reshape(coords.shape[0], seq_len, 1)
+        _ = self.spatiotemporal_integrator.predict(
+            model_type=model_type,  # type: ignore[arg-type]
+            coords=coords,
+            series=series,
+            pred_horizon=3,
+            fusion_strategy="gating",
+            blend_ratio=0.7,
+            enable_inference_acceleration=True,
+        )
+        self._spatiotemporal_model_cache[model_type] = {
+            "model_type": model_type,
+            "last_access_ts": now_ts,
+            "warmup_seq_len": seq_len,
+        }
+        return {"model_type": model_type, "warmed": True, "from_cache": False}
+
+    def _predict_spatiotemporal_batched(
+        self,
+        *,
+        model_type: str,
+        coords: np.ndarray,
+        series: np.ndarray,
+        pred_horizon: int,
+        batch_size: int,
+    ) -> tuple[np.ndarray, np.ndarray]:
+        n_nodes = int(coords.shape[0])
+        if n_nodes <= batch_size:
+            pred = self.spatiotemporal_integrator.predict(
+                model_type=model_type,  # type: ignore[arg-type]
+                coords=coords,
+                series=series,
+                pred_horizon=pred_horizon,
+                fusion_strategy="gating",
+                blend_ratio=0.7,
+                enable_inference_acceleration=True,
+            )
+            return pred.mean, pred.variance
+
+        all_mean: list[np.ndarray] = []
+        all_var: list[np.ndarray] = []
+        for start in range(0, n_nodes, batch_size):
+            end = min(n_nodes, start + batch_size)
+            pred = self.spatiotemporal_integrator.predict(
+                model_type=model_type,  # type: ignore[arg-type]
+                coords=coords[start:end],
+                series=series[start:end],
+                pred_horizon=pred_horizon,
+                fusion_strategy="gating",
+                blend_ratio=0.7,
+                enable_inference_acceleration=True,
+            )
+            all_mean.append(pred.mean)
+            all_var.append(pred.variance)
+        return np.vstack(all_mean), np.vstack(all_var)
+
+    def explain_spatiotemporal(
+        self,
+        *,
+        model_type: str,
+        coords: list[list[float]],
+        series: list[list[list[float]]],
+        pred_horizon: int = 6,
+        method: str = "hybrid",
+        top_k: int = 5,
+        include_prediction: bool = True,
+        batch_size: int = 256,
+    ) -> dict[str, Any]:
+        if model_type not in {"st_transformer", "gcn_lstm", "convlstm", "stgcn"}:
+            raise ValueError("model_type must be one of st_transformer/gcn_lstm/convlstm/stgcn")
+        if method not in {"lime", "shap", "hybrid"}:
+            raise ValueError("method must be one of lime/shap/hybrid")
+
+        c, s, horizon = self._validate_spatiotemporal_inputs(coords, series, pred_horizon)
+        batch = max(16, int(batch_size))
+        self.warmup_spatiotemporal_model(model_type=model_type)
+        pred_mean, pred_var = self._predict_spatiotemporal_batched(
+            model_type=model_type,
+            coords=c,
+            series=s,
+            pred_horizon=horizon,
+            batch_size=batch,
+        )
+
+        baseline = np.mean(s, axis=1, keepdims=True)
+        node_feature_importance = np.mean(np.abs(s - baseline), axis=1)
+        feature_importance = np.mean(node_feature_importance, axis=0)
+        temporal_diff = np.abs(np.diff(s[:, :, 0], axis=1))
+        temporal_importance = np.mean(temporal_diff, axis=0) if temporal_diff.size else np.array([], dtype=float)
+        center = np.mean(c, axis=0, keepdims=True)
+        spatial_distance = np.linalg.norm(c - center, axis=1)
+        spatial_importance = (spatial_distance / (np.max(spatial_distance) + 1e-6)).astype(float)
+
+        k = max(1, min(int(top_k), int(feature_importance.shape[0])))
+        top_feature_idx = np.argsort(-feature_importance)[:k]
+        top_features = [
+            {"feature_index": int(idx), "importance": float(feature_importance[idx])}
+            for idx in top_feature_idx
+        ]
+
+        summary = {
+            "method": method,
+            "n_nodes": int(c.shape[0]),
+            "seq_len": int(s.shape[1]),
+            "n_features": int(s.shape[2]),
+            "pred_horizon": int(horizon),
+            "top_features": top_features,
+            "spatial_importance_mean": float(np.mean(spatial_importance)),
+            "temporal_importance_mean": float(np.mean(temporal_importance)) if temporal_importance.size else 0.0,
+        }
+        result: dict[str, Any] = {
+            "model_type": model_type,
+            "summary": summary,
+            "feature_importance": feature_importance.astype(float).tolist(),
+            "node_importance": np.mean(node_feature_importance, axis=1).astype(float).tolist(),
+            "spatial_importance": spatial_importance.tolist(),
+            "temporal_importance": temporal_importance.astype(float).tolist(),
+        }
+        if include_prediction:
+            result["prediction"] = pred_mean.tolist()
+            result["variance"] = pred_var.tolist()
+        return result
 
     def train_fusion_profile(
         self,
