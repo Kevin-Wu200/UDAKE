@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spatiotemporal Explain Panel E2E</title>
+    <link rel="stylesheet" href="css/deep-learning.css">
+    <link rel="stylesheet" href="css/dark-mode.css">
+    <link rel="stylesheet" href="css/chart-components.css">
+    <link rel="stylesheet" href="css/accessibility.css">
+    <style>
+        body {
+            margin: 0;
+            padding: 16px;
+            background: linear-gradient(145deg, #eef2ff, #f8fafc);
+            font-family: "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+        }
+
+        .test-header {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+
+        .test-header label {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+
+        .test-host {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+    </style>
+</head>
+<body>
+    <main class="test-host">
+        <div class="test-header">
+            <h1 id="e2e-title">Explain Panel Compatibility Page</h1>
+            <label>
+                Locale
+                <select id="e2e-locale">
+                    <option value="zh-CN">zh-CN</option>
+                    <option value="en-US">en-US</option>
+                    <option value="ja-JP">ja-JP</option>
+                </select>
+            </label>
+        </div>
+        <div id="e2e-explain-root"></div>
+    </main>
+
+    <script type="module">
+        import { SpatiotemporalExplainPanel } from './js/components/SpatiotemporalExplainPanel.ts';
+        import { I18n } from './js/utils/I18n.ts';
+
+        const taskStore = new Map();
+        let taskSeq = 0;
+
+        const mockResult = {
+            method: 'hybrid',
+            summary: {
+                n_nodes: 4,
+                seq_len: 6,
+                n_features: 1,
+                top_features: ['temperature', 'humidity']
+            },
+            lime: {
+                visualization: {
+                    feature_importance_list: [
+                        { feature: 'temperature', value: 0.41 },
+                        { feature: 'humidity', value: -0.18 }
+                    ],
+                    local_explanations: [
+                        { node_index: 0, confidence: 0.92, fidelity: 0.88, top_contributions: [{ feature: 'temperature', value: 0.31 }] }
+                    ]
+                },
+                batch_explanations: [
+                    { top_contributions: [{ feature: 'temperature', value: 0.31 }, { feature: 'humidity', value: -0.22 }] }
+                ]
+            },
+            shap: {
+                visualization: {
+                    waterfall_list: [{ feature: 'temperature', value: 0.42 }, { feature: 'humidity', value: -0.23 }],
+                    feature_ranking: [{ feature: 'temperature', value: 0.42 }, { feature: 'humidity', value: 0.23 }],
+                    beeswarm_data: [
+                        { feature: 'temperature', feature_value: 25.2, shap_value: 0.31 },
+                        { feature: 'humidity', feature_value: 61.7, shap_value: -0.2 }
+                    ],
+                    dependence_data: [{ feature: 'temperature', correlation: 0.54 }],
+                    summary_stats: [{ feature: 'temperature', mean: 0.22, variance: 0.04, max_abs: 0.52 }]
+                }
+            }
+        };
+
+        const mockApiService = {
+            createSpatiotemporalExplainTask: async (payload) => {
+                taskSeq += 1;
+                const taskId = `task-e2e-${taskSeq}`;
+                const task = {
+                    task_id: taskId,
+                    status: 'completed',
+                    progress: 1,
+                    retry_count: payload.max_retries ?? 1,
+                    max_retries: payload.max_retries ?? 1,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString(),
+                    result: {
+                        ...mockResult,
+                        method: payload.method ?? 'hybrid'
+                    }
+                };
+                taskStore.set(taskId, task);
+                return { task_id: taskId };
+            },
+            getSpatiotemporalExplainTask: async (taskId) => {
+                return taskStore.get(taskId) || {
+                    task_id: taskId,
+                    status: 'running',
+                    progress: 0.3,
+                    retry_count: 0,
+                    max_retries: 1,
+                    result: null
+                };
+            },
+            cancelSpatiotemporalExplainTask: async (taskId) => ({ cancelled: true, task_id: taskId }),
+            deleteSpatiotemporalExplainTask: async (taskId) => {
+                taskStore.delete(taskId);
+                return { deleted: true, task_id: taskId };
+            },
+            getSpatiotemporalExplainMonitor: async () => ({
+                queue_size: 1,
+                active_tasks: 0,
+                success_rate: 1,
+                error_rate: 0,
+                avg_duration_ms: 28.5,
+                cache_backend: 'memory',
+                celery_enabled: false
+            }),
+            verifySpatiotemporalExplainBackend: async () => ({ broker_ok: true, redis_backend_ok: true })
+        };
+
+        const fallback = () => Promise.resolve({});
+        const proxyApi = new Proxy(mockApiService, {
+            get(target, prop) {
+                if (prop in target) {
+                    return target[prop];
+                }
+                return fallback;
+            }
+        });
+
+        const root = document.getElementById('e2e-explain-root');
+        const localeSelect = document.getElementById('e2e-locale');
+        let panel = null;
+
+        function mount(locale) {
+            I18n.init(locale);
+            if (panel) {
+                panel.destroy();
+            }
+            panel = new SpatiotemporalExplainPanel(root, proxyApi);
+            window.__EXPLAIN_PANEL_READY__ = true;
+        }
+
+        localeSelect.addEventListener('change', (event) => {
+            mount(event.target.value);
+        });
+
+        mount('zh-CN');
+    </script>
+</body>
+</html>

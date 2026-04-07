@@ -338,4 +338,172 @@ describe('SpatiotemporalExplainPanel', () => {
 
         panel.destroy();
     });
+
+    it('应覆盖状态与方法识别相关分支', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        expect((panel as any).statusIcon('completed')).toBe('✓');
+        expect((panel as any).statusIcon('failed')).toBe('!');
+        expect((panel as any).statusIcon('cancelled')).toBe('x');
+        expect((panel as any).statusIcon('running')).toBe('>');
+        expect((panel as any).statusIcon('retrying')).toBe('~');
+        expect((panel as any).statusIcon('queued')).toBe('·');
+
+        expect((panel as any).statusLabel('queued')).toContain('排队');
+        expect((panel as any).statusLabel('running')).toContain('执行');
+        expect((panel as any).progressPercent({ progress: 0.5 })).toBe(50);
+        expect((panel as any).progressPercent({ progress: 150 })).toBe(100);
+        expect((panel as any).progressPercent({ progress: -0.1 })).toBe(0);
+
+        expect((panel as any).detectMethodFromTask({ result: { method: 'shap' } })).toBe('shap');
+        expect((panel as any).detectMethodFromTask({ result: { lime: {}, shap: {} } })).toBe('hybrid');
+        expect((panel as any).detectMethodFromTask({ result: { shap: {} } })).toBe('shap');
+        expect((panel as any).detectMethodFromTask({ result: {} })).toBe('lime');
+
+        panel.destroy();
+    });
+
+    it('应覆盖特征解析与贡献合并逻辑', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        const rows = (panel as any).parseImportanceRows([
+            { feature: 'f1', value: 0.3 },
+            ['f2', -0.2],
+            0.1,
+            { name: 'bad', value: 'abc' }
+        ]);
+        expect(rows.length).toBe(3);
+        expect(rows[0].name).toBe('f1');
+
+        const merged = (panel as any).mergeContribution([
+            { name: 'f1', value: 0.2 },
+            { name: 'f1', value: 0.1 },
+            { name: 'f2', value: -0.4 }
+        ]);
+        expect(merged[0].name).toBe('f2');
+        expect(merged.find((item: any) => item.name === 'f1')?.value).toBeCloseTo(0.3);
+
+        const contribution = (panel as any).parseContributionRows({
+            batch_explanations: [
+                { top_contributions: [{ feature: 'f3', value: 0.4 }, { feature_alias: 'f4', shap_value: -0.2 }] }
+            ]
+        });
+        expect(contribution.length).toBe(2);
+
+        panel.destroy();
+    });
+
+    it('应覆盖蜂群渲染与依赖表格空态分支', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        expect((panel as any).renderFeatureBarList([], 'x')).toContain('暂无特征数据');
+        expect((panel as any).renderLocalExplanationList([])).toContain('暂无局部解释');
+        expect((panel as any).renderDependenceList([])).toContain('暂无依赖图数据');
+        expect((panel as any).renderSummaryTable([])).toContain('暂无统计数据');
+        expect((panel as any).renderBeeswarmPoints([], 0, 1)).toContain('无数据');
+
+        const beeswarmHtml = (panel as any).renderBeeswarmPoints([
+            { feature: 'f1', feature_value: 1, shap_value: 0.12 },
+            { feature: 'f2', feature_value: 2, shap_value: -0.11 }
+        ], 0.1, 1.2);
+        expect(beeswarmHtml).toContain('beeswarm-point');
+        expect(beeswarmHtml).toContain('positive');
+        expect(beeswarmHtml).toContain('negative');
+
+        panel.destroy();
+    });
+
+    it('应覆盖时空视图聚合与安全 JSON 解析分支', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        const coordsInput = host.querySelector('#dl-explain-coords') as HTMLTextAreaElement;
+        coordsInput.value = '{bad';
+        const safeCoords = (panel as any).parseJSONInputSafe('dl-explain-coords', []);
+        expect(safeCoords).toEqual([]);
+
+        const heatmapFallback = (panel as any).buildHeatmapRows([], { summary: {} });
+        expect(heatmapFallback[0].label).toContain('无坐标');
+
+        const heatmap = (panel as any).buildHeatmapRows([[120, 30], [121, 31]], { summary: { top_features: ['a', 'b'] } });
+        expect(heatmap.length).toBe(2);
+        expect(heatmap[0].intensity).toBeGreaterThan(0);
+
+        const timelineEmpty = (panel as any).buildTimelineRows([]);
+        expect(timelineEmpty).toEqual([]);
+
+        const timeline = (panel as any).buildTimelineRows([
+            [[1], [2], [3]],
+            [[2], [3], [4]]
+        ]);
+        expect(timeline.length).toBe(3);
+        expect(timeline[0].width).toBeGreaterThan(0);
+
+        panel.destroy();
+    });
+
+    it('应覆盖刷新空任务与后端校验告警分支', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        api.verifySpatiotemporalExplainBackend.mockResolvedValue({
+            broker_ok: false,
+            redis_backend_ok: false,
+            reason: 'offline'
+        });
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        await (panel as any).refreshAllTasks(true);
+        expect(host.querySelector('#dl-explain-status')?.textContent).toContain('暂无可刷新任务');
+
+        (host.querySelector('#dl-explain-verify') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(host.querySelector('#dl-explain-status')?.textContent).toContain('异步后端不可用');
+
+        panel.destroy();
+    });
+
+    it('应覆盖数值校验失败分支', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        (host.querySelector('#dl-explain-horizon') as HTMLInputElement).value = '100';
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(host.querySelector('#dl-explain-status')?.textContent).toContain('pred_horizon');
+
+        (host.querySelector('#dl-explain-horizon') as HTMLInputElement).value = '6';
+        (host.querySelector('#dl-explain-topk') as HTMLInputElement).value = '30';
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(host.querySelector('#dl-explain-status')?.textContent).toContain('top_k');
+
+        (host.querySelector('#dl-explain-topk') as HTMLInputElement).value = '5';
+        (host.querySelector('#dl-explain-retries') as HTMLInputElement).value = '-1';
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(host.querySelector('#dl-explain-status')?.textContent).toContain('max_retries');
+
+        panel.destroy();
+    });
+
+    it('应覆盖国际化回退与销毁分支', async () => {
+        I18n.init('en-US');
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        const translated = (panel as any).t('unknown.key', '回退文本', { count: 3 });
+        expect(translated).toContain('回退文本');
+
+        panel.destroy();
+        expect(host.innerHTML).toBe('');
+    });
 });
