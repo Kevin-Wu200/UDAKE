@@ -13,21 +13,12 @@ venv/
 .pytest_cache/
 coverage/
 htmlcov/
-dist/
-apps/frontend/dist/
-apps/android/.gradle/
-apps/android/build/
 
 # Python artifacts
 __pycache__/
 *.py[cod]
 *.so
 .Python
-
-# Environment files
-# configs/env/.env
-# configs/env/.env.*
-# !configs/.env.example
 
 # Logs and test outputs
 logs/tests/*.log
