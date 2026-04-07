@@ -91,7 +91,6 @@ jobs:
         run: |
           pytest tests/deep_learning -q -ra -vv --maxfail=1 \
             --cov=deep_learning \
-            --cov=services/backend/app/dl_services \
             --cov-report=term-missing \
             --cov-report=xml \
             --cov-fail-under=79
