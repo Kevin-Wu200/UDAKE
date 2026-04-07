@@ -20,6 +20,7 @@ from deep_learning.training import LightningTrainer, SpatialTrainingConfig, Trai
 from deep_learning.utils.device import DeviceManager
 from deep_learning.utils.monitoring import AlertManager, AlertRule, MetricMonitor, SystemResourceMonitor
 from .anomaly_features import AnomalyFeatureRegistry
+from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
 from .lime_explainer import SpatiotemporalLIMEExplainer
 from .shap_explainer import SpatiotemporalSHAPExplainer
 from .vae_anomaly_explainer import VAEAnomalyLIMEAdapter, VAEAnomalySHAPAdapter
@@ -84,6 +85,8 @@ class DeepLearningService:
         self.anomaly_feature_registry = AnomalyFeatureRegistry()
         self.vae_lime_adapter = VAEAnomalyLIMEAdapter()
         self.vae_shap_adapter = VAEAnomalySHAPAdapter()
+        self.gcae_lime_adapter = GCAELimeAdapter()
+        self.gcae_shap_adapter = GCAEShapAdapter()
 
     def health(self) -> dict[str, Any]:
         profile = self.device_manager.configure()
@@ -357,21 +360,29 @@ class DeepLearningService:
         model = self.anomaly_models[model_name]
         feature_analysis = self.anomaly_feature_registry.analyze(model_name)
 
-        if model_name != "vae":
-            # 当前阶段先完成 VAE 适配器（对应 TODO 第 2 章）。
+        lime_adapter: Any | None = None
+        shap_adapter: Any | None = None
+        if model_name == "vae":
+            lime_adapter = self.vae_lime_adapter
+            shap_adapter = self.vae_shap_adapter
+        elif model_name == "gcae":
+            lime_adapter = self.gcae_lime_adapter
+            shap_adapter = self.gcae_shap_adapter
+
+        if lime_adapter is None or shap_adapter is None:
             return {
                 "model_name": model_name,
                 "summary": {
                     "method": method,
                     "adapter_status": "pending",
-                    "message": "当前仅完成 VAE 的解释适配器，其他异常模型适配器在后续章节实现。",
+                    "message": "当前仅完成 VAE/GCAE 的解释适配器，其他异常模型适配器在后续章节实现。",
                 },
                 "feature_analysis": feature_analysis,
             }
 
         lime_result: dict[str, Any] | None = None
         if method in {"lime", "hybrid"}:
-            lime_result = self.vae_lime_adapter.explain(
+            lime_result = lime_adapter.explain(
                 model=model,
                 coords=c,
                 values=v,
@@ -382,7 +393,7 @@ class DeepLearningService:
 
         shap_result: dict[str, Any] | None = None
         if method in {"shap", "hybrid"}:
-            shap_result = self.vae_shap_adapter.explain(
+            shap_result = shap_adapter.explain(
                 model=model,
                 coords=c,
                 values=v,

@@ -6,14 +6,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .common import (
-    ThresholdMethod,
-    compute_threshold,
-    knn_graph,
-    normalize_adjacency,
-    safe_minmax,
-    standardize,
-)
+from .common import ThresholdMethod, compute_threshold, knn_graph, multiscale_value_features, normalize_adjacency, safe_minmax, standardize
 
 
 @dataclass
@@ -34,7 +27,109 @@ class GCAEAnomalyDetector:
         self.feature_std: np.ndarray | None = None
         self.proj: np.ndarray | None = None
         self.embed_center: np.ndarray | None = None
+        self.adj_template: np.ndarray | None = None
         self.rng = np.random.default_rng(self.config.random_state)
+
+    def is_trained(self) -> bool:
+        return self.proj is not None and self.feature_mean is not None and self.feature_std is not None
+
+    def _validate_inputs(self, coords: np.ndarray, values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        c = np.asarray(coords, dtype=float)
+        v = np.asarray(values, dtype=float).reshape(-1)
+        if c.ndim != 2 or c.shape[1] != 2:
+            raise ValueError("coords must be [[x, y], ...]")
+        if c.shape[0] != v.shape[0]:
+            raise ValueError("coords and values length mismatch")
+        if c.shape[0] < 2:
+            raise ValueError("at least 2 points are required")
+        if not np.isfinite(c).all() or not np.isfinite(v).all():
+            raise ValueError("coords and values must be finite")
+        return c, v
+
+    def preprocess_graph_data(
+        self,
+        coords: np.ndarray,
+        values: np.ndarray,
+        *,
+        batch_size: int | None = None,
+        use_training_stats: bool = True,
+    ) -> dict[str, object]:
+        c, v = self._validate_inputs(coords, values)
+        node_features = self._build_node_features(c, v)
+        if use_training_stats and self.feature_mean is not None and self.feature_std is not None:
+            feat_norm = (node_features - self.feature_mean) / self.feature_std
+            scaler = {
+                "mean": np.asarray(self.feature_mean, dtype=float).reshape(-1).tolist(),
+                "std": np.asarray(self.feature_std, dtype=float).reshape(-1).tolist(),
+                "source": "trained",
+            }
+        else:
+            feat_norm, mean, std = standardize(node_features)
+            scaler = {
+                "mean": mean.reshape(-1).tolist(),
+                "std": std.reshape(-1).tolist(),
+                "source": "runtime",
+            }
+
+        adj = knn_graph(c, k=self.config.knn_k)
+        adj_norm = normalize_adjacency(adj)
+        gcn = self._gcn_layer(feat_norm, adj_norm)
+        gat = self._gat_layer(gcn, adj)
+        edge = self._edgeconv_layer(gat, adj)
+
+        graph_signals = np.column_stack(
+            [
+                np.mean(gcn, axis=1),
+                np.mean(gat, axis=1),
+                np.mean(edge, axis=1),
+            ]
+        )
+        node_degree = adj.sum(axis=1, keepdims=True)
+        density = float(adj.sum() / max(1, adj.size))
+        adj_density = np.full((len(c), 1), density, dtype=float)
+        local = multiscale_value_features(c, v, scales=(5,))
+        processed = np.column_stack(
+            [
+                c[:, 0],
+                c[:, 1],
+                np.linalg.norm(c, axis=1),
+                v,
+                graph_signals[:, 0],
+                graph_signals[:, 1],
+                graph_signals[:, 2],
+                node_degree.reshape(-1),
+                adj_density.reshape(-1),
+                local[:, 0],
+                local[:, 1],
+            ]
+        )
+        names = [
+            "coord_x",
+            "coord_y",
+            "radius",
+            "value",
+            "gcn_response",
+            "gat_response",
+            "edgeconv_response",
+            "node_degree",
+            "adj_density",
+            "local_mean_k5",
+            "local_std_k5",
+        ]
+        size = int(max(1, batch_size or len(c)))
+        slices = [[int(i), int(min(i + size, len(c)))] for i in range(0, len(c), size)]
+        return {
+            "coords": c,
+            "values": v,
+            "node_features": node_features,
+            "normalized_node_features": feat_norm,
+            "adjacency_matrix": adj,
+            "processed_features": processed,
+            "feature_names": names,
+            "batch_slices": slices,
+            "scaler": scaler,
+            "validation": {"is_valid": True, "n_nodes": int(len(c)), "batch_size": size},
+        }
 
     def _build_node_features(self, coords: np.ndarray, values: np.ndarray) -> np.ndarray:
         c = np.asarray(coords, dtype=float)
@@ -88,6 +183,7 @@ class GCAEAnomalyDetector:
         return latent @ proj.T + merged_mean
 
     def fit(self, coords: np.ndarray, values: np.ndarray) -> dict[str, float]:
+        coords, values = self._validate_inputs(coords, values)
         node_features = self._build_node_features(coords, values)
         feat_norm, mean, std = standardize(node_features)
         adj = knn_graph(coords, k=self.config.knn_k)
@@ -125,8 +221,9 @@ class GCAEAnomalyDetector:
         return merged, merged.mean(axis=0, keepdims=True)
 
     def _infer_latent(self, coords: np.ndarray, values: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        if self.proj is None or self.feature_mean is None or self.feature_std is None:
+        if not self.is_trained():
             raise ValueError("模型尚未训练")
+        coords, values = self._validate_inputs(coords, values)
         node_features = self._build_node_features(coords, values)
         feat_norm = (node_features - self.feature_mean) / self.feature_std
         adj = knn_graph(coords, k=self.config.knn_k)
@@ -158,6 +255,7 @@ class GCAEAnomalyDetector:
             "node": node_scores,
             "edge": edge_scores,
             "subgraph": subgraph_scores,
+            "labels": (node_scores >= compute_threshold(node_scores, method="percentile", percentile=95.0).value).astype(int).tolist(),
             "pooling": self._graph_pooling(latent).tolist(),
         }
 
@@ -169,6 +267,7 @@ class GCAEAnomalyDetector:
         percentile: float = 95.0,
         k: float = 2.5,
     ) -> dict[str, object]:
+        coords, values = self._validate_inputs(coords, values)
         score_bundle = self.anomaly_scores(coords, values)
         node_scores = np.asarray(score_bundle["node"], dtype=float)
         edge_scores = np.asarray(score_bundle["edge"], dtype=float)
@@ -188,6 +287,10 @@ class GCAEAnomalyDetector:
             "subgraph_anomalies": sub_idx.tolist(),
             "node_scores": node_scores.tolist(),
             "subgraph_scores": subgraph_scores.tolist(),
+            "anomaly_scores": node_scores.tolist(),
+            "anomaly_labels": (node_scores >= node_thr.value).astype(int).tolist(),
+            "anomaly_count": int(len(node_idx)),
+            "anomaly_indices": node_idx.tolist(),
             "thresholds": {
                 "node": node_thr.value,
                 "edge": edge_thr.value,
@@ -195,4 +298,33 @@ class GCAEAnomalyDetector:
             },
             "threshold_method": threshold_method,
             "pooling_embedding": score_bundle["pooling"],
+        }
+
+    def predict_standard(
+        self,
+        coords: np.ndarray,
+        values: np.ndarray,
+        *,
+        threshold_method: ThresholdMethod = "percentile",
+        percentile: float = 95.0,
+        k: float = 2.5,
+    ) -> dict[str, object]:
+        if not self.is_trained():
+            raise ValueError("模型尚未训练，无法执行标准预测")
+        payload = self.predict(
+            coords=coords,
+            values=values,
+            threshold_method=threshold_method,
+            percentile=percentile,
+            k=k,
+        )
+        scores = np.asarray(payload.get("anomaly_scores", []), dtype=float)
+        labels = np.asarray(payload.get("anomaly_labels", []), dtype=int)
+        return {
+            "scores": scores.astype(float).tolist(),
+            "labels": labels.astype(int).tolist(),
+            "anomaly_count": int(labels.sum()),
+            "anomaly_indices": np.where(labels > 0)[0].astype(int).tolist(),
+            "threshold": float(payload.get("thresholds", {}).get("node", 0.0)),
+            "details": payload,
         }
