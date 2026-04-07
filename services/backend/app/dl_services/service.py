@@ -19,8 +19,10 @@ from deep_learning.models.spatiotemporal import SpatioTemporalSystemIntegrator, 
 from deep_learning.training import LightningTrainer, SpatialTrainingConfig, TrainingConfig, train_spatial_model
 from deep_learning.utils.device import DeviceManager
 from deep_learning.utils.monitoring import AlertManager, AlertRule, MetricMonitor, SystemResourceMonitor
+from .anomaly_features import AnomalyFeatureRegistry
 from .lime_explainer import SpatiotemporalLIMEExplainer
 from .shap_explainer import SpatiotemporalSHAPExplainer
+from .vae_anomaly_explainer import VAEAnomalyLIMEAdapter, VAEAnomalySHAPAdapter
 
 
 @dataclass
@@ -79,6 +81,9 @@ class DeepLearningService:
         self.fusion_platform = fusion_platform_service
         self.lime_explainer = SpatiotemporalLIMEExplainer()
         self.shap_explainer = SpatiotemporalSHAPExplainer()
+        self.anomaly_feature_registry = AnomalyFeatureRegistry()
+        self.vae_lime_adapter = VAEAnomalyLIMEAdapter()
+        self.vae_shap_adapter = VAEAnomalySHAPAdapter()
 
     def health(self) -> dict[str, Any]:
         profile = self.device_manager.configure()
@@ -327,6 +332,94 @@ class DeepLearningService:
             )
             responses.append({"batch_index": i, "result": pred})
         return {"model_name": model_name, "batches": responses}
+
+    def explain_anomaly(
+        self,
+        *,
+        model_name: str,
+        coords: list[list[float]],
+        values: list[float],
+        method: str = "hybrid",
+        top_k: int = 5,
+        include_prediction: bool = True,
+        num_samples: int | None = None,
+        nsamples: int | None = None,
+        max_explain_nodes: int = 8,
+    ) -> dict[str, Any]:
+        if model_name not in {"vae", "gcae", "gan", "contrastive"}:
+            raise ValueError("model_name must be one of vae/gcae/gan/contrastive")
+        if method not in {"lime", "shap", "hybrid"}:
+            raise ValueError("method must be one of lime/shap/hybrid")
+
+        c, v = self._validate_coords_values(coords, values)
+        if model_name not in self.anomaly_models:
+            self.train_anomaly_model(model_name, coords, values, epochs=15)
+        model = self.anomaly_models[model_name]
+        feature_analysis = self.anomaly_feature_registry.analyze(model_name)
+
+        if model_name != "vae":
+            # 当前阶段先完成 VAE 适配器（对应 TODO 第 2 章）。
+            return {
+                "model_name": model_name,
+                "summary": {
+                    "method": method,
+                    "adapter_status": "pending",
+                    "message": "当前仅完成 VAE 的解释适配器，其他异常模型适配器在后续章节实现。",
+                },
+                "feature_analysis": feature_analysis,
+            }
+
+        lime_result: dict[str, Any] | None = None
+        if method in {"lime", "hybrid"}:
+            lime_result = self.vae_lime_adapter.explain(
+                model=model,
+                coords=c,
+                values=v,
+                top_k=top_k,
+                num_samples=num_samples,
+                max_explain_nodes=max_explain_nodes,
+            )
+
+        shap_result: dict[str, Any] | None = None
+        if method in {"shap", "hybrid"}:
+            shap_result = self.vae_shap_adapter.explain(
+                model=model,
+                coords=c,
+                values=v,
+                top_k=top_k,
+                nsamples=nsamples,
+                max_explain_nodes=max_explain_nodes,
+            )
+
+        top_features: list[dict[str, Any]] = []
+        if method == "lime" and lime_result is not None:
+            top_features = list(lime_result.get("summary", {}).get("top_features", []))
+        elif method == "shap" and shap_result is not None:
+            top_features = list(shap_result.get("summary", {}).get("top_features", []))
+        elif method == "hybrid":
+            if shap_result is not None:
+                top_features = list(shap_result.get("summary", {}).get("top_features", []))
+            if not top_features and lime_result is not None:
+                top_features = list(lime_result.get("summary", {}).get("top_features", []))
+
+        result: dict[str, Any] = {
+            "model_name": model_name,
+            "summary": {
+                "method": method,
+                "top_features": top_features,
+                "max_explain_nodes": int(max_explain_nodes),
+                "feature_count": int(feature_analysis["feature_count"]),
+            },
+            "feature_analysis": feature_analysis,
+        }
+        if lime_result is not None:
+            result["lime"] = lime_result
+        if shap_result is not None:
+            result["shap"] = shap_result
+        if include_prediction:
+            pred = model.predict(c, v, threshold_method="percentile", percentile=95.0, k=2.5)
+            result["prediction"] = pred
+        return result
 
     def train_spatial_model(self, model_type: str, samples: list[list[float]], epochs: int = 30) -> dict[str, Any]:
         coords, values = self._to_spatial_arrays(samples)

@@ -84,6 +84,20 @@ class AnomalyRealtimeRequest(BaseModel):
     k: float = Field(default=2.5, ge=1.0, le=6.0)
 
 
+class AnomalyExplainRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_name: str = Field(default="vae", description="vae/gcae/gan/contrastive")
+    coords: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
+    values: list[float] = Field(default_factory=list, description="[value, ...]")
+    method: str = Field(default="hybrid", description="lime/shap/hybrid")
+    top_k: int = Field(default=5, ge=1, le=20)
+    include_prediction: bool = Field(default=True)
+    max_explain_nodes: int = Field(default=8, ge=1, le=128)
+    num_samples: Optional[int] = Field(default=None, ge=80, le=2000)
+    nsamples: Optional[int] = Field(default=None, ge=40, le=2000)
+
+
 class SamplingRLTrainRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
@@ -310,6 +324,21 @@ def anomaly_realtime(payload: AnomalyRealtimeRequest) -> dict:
         threshold_method=payload.threshold_method,
         percentile=payload.percentile,
         k=payload.k,
+    )
+
+
+@router.post("/anomaly/explain")
+def explain_anomaly(payload: AnomalyExplainRequest) -> dict:
+    return service.explain_anomaly(
+        model_name=payload.model_name,
+        coords=payload.coords,
+        values=payload.values,
+        method=payload.method,
+        top_k=payload.top_k,
+        include_prediction=payload.include_prediction,
+        max_explain_nodes=payload.max_explain_nodes,
+        num_samples=payload.num_samples,
+        nsamples=payload.nsamples,
     )
 
 
