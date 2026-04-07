@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
 from dataclasses import dataclass
 import hashlib
@@ -31,6 +32,8 @@ class GCAEExplanationConfig:
     shap_nsamples: int = 140
     max_explain_nodes: int = 8
     cache_size: int = 32
+    parallel_workers: int = 4
+    shap_feature_cap: int = 10
     random_state: int = 42
 
 
@@ -180,6 +183,22 @@ class _BaseGCAEAdapter:
         base = max(80, int(self.config.lime_num_samples))
         return min(1200, base + n_features * 10 + n_points * 2)
 
+    def _dynamic_shap_samples(self, selected_nsamples: int, n_features: int, n_points: int) -> int:
+        """根据图规模和特征维度动态收敛 SHAP 采样预算。"""
+        base = max(40, int(selected_nsamples))
+        penalty = int(max(0, n_features - 8) * 3 + max(0, n_points - 64) * 0.5)
+        return max(40, min(base, base - penalty))
+
+    def _effective_workers(self, n_tasks: int) -> int:
+        return max(1, min(int(self.config.parallel_workers), int(n_tasks)))
+
+    @staticmethod
+    def _to_float32(arr: np.ndarray) -> np.ndarray:
+        x = np.asarray(arr, dtype=float)
+        if x.dtype == np.float32:
+            return x
+        return x.astype(np.float32, copy=False)
+
     def _predict_surrogate(self, context: dict[str, Any]) -> Callable[[np.ndarray], np.ndarray]:
         model: Ridge = context["surrogate"]
         return lambda x: model.predict(np.asarray(x, dtype=float))
@@ -211,19 +230,20 @@ class _BaseGCAEAdapter:
 
         context = {
             "context_key": key,
-            "feature_matrix": matrix,
-            "scaled_x": scaled_x,
+            "feature_matrix": self._to_float32(matrix),
+            "scaled_x": self._to_float32(scaled_x),
             "feature_names": feature_names,
             "scaler_stats": scaler_stats,
             "score_bundle": score_bundle,
             "target": target,
             "surrogate": surrogate,
-            "background": self._select_background(scaled_x, target),
+            "background": self._to_float32(self._select_background(scaled_x, target, size=48)),
             "preprocess": {
                 "batch_slices": pre_info.get("batch_slices", []),
                 "validation": pre_info.get("validation", {}),
                 "adjacency_shape": list(np.asarray(pre_info.get("adjacency_matrix", np.zeros((0, 0), dtype=float))).shape),
             },
+            "adjacency_matrix": self._to_float32(np.asarray(pre_info.get("adjacency_matrix", np.zeros((0, 0), dtype=float)), dtype=float)),
             "surrogate_metrics": {"train_rmse": train_rmse, "fidelity": fidelity},
         }
         self._context_set(key, context)
@@ -242,6 +262,152 @@ class _BaseGCAEAdapter:
                 for i in explained_nodes
                 if 0 <= i < len(s)
             ],
+        }
+
+    def _score_decomposition(
+        self,
+        *,
+        node_scores: np.ndarray,
+        subgraph_scores: np.ndarray,
+        edge_scores: np.ndarray,
+        adjacency: np.ndarray,
+    ) -> dict[str, Any]:
+        node = np.asarray(node_scores, dtype=float).reshape(-1)
+        subgraph = np.asarray(subgraph_scores, dtype=float).reshape(-1)
+        edge = np.asarray(edge_scores, dtype=float)
+        adj = np.asarray(adjacency, dtype=float)
+        n = len(node)
+        rows: list[dict[str, Any]] = []
+        for i in range(n):
+            nbr = np.where(adj[i] > 0)[0]
+            edge_imp = float(np.mean(edge[i, nbr])) if len(nbr) else 0.0
+            neigh = float(max(0.0, subgraph[i] - node[i]))
+            total = float(0.65 * node[i] + 0.25 * neigh + 0.10 * edge_imp)
+            rows.append(
+                {
+                    "node_index": int(i),
+                    "node_component": float(node[i]),
+                    "neighborhood_component": neigh,
+                    "edge_component": edge_imp,
+                    "decomposed_score": total,
+                }
+            )
+        rows.sort(key=lambda item: float(item["decomposed_score"]), reverse=True)
+        return {
+            "decomposition": rows,
+            "top_anomaly_nodes": [int(item["node_index"]) for item in rows[: max(1, min(10, n))]],
+        }
+
+    def _build_propagation_paths(
+        self,
+        *,
+        adjacency: np.ndarray,
+        edge_scores: np.ndarray,
+        top_nodes: list[int],
+    ) -> list[dict[str, Any]]:
+        adj = np.asarray(adjacency, dtype=float)
+        edge = np.asarray(edge_scores, dtype=float)
+        top_set = set(int(x) for x in top_nodes)
+        edges: list[dict[str, Any]] = []
+        for i in range(adj.shape[0]):
+            for j in range(i + 1, adj.shape[1]):
+                if adj[i, j] <= 0:
+                    continue
+                score = float(edge[i, j])
+                if i in top_set or j in top_set:
+                    edges.append({"source": int(i), "target": int(j), "propagation_score": score})
+        edges.sort(key=lambda item: item["propagation_score"], reverse=True)
+        return edges[:20]
+
+    def _graph_structure_analysis(
+        self,
+        *,
+        adjacency: np.ndarray,
+        edge_scores: np.ndarray,
+        node_scores: np.ndarray,
+        explained_nodes: list[int],
+    ) -> dict[str, Any]:
+        adj = np.asarray(adjacency, dtype=float)
+        edge = np.asarray(edge_scores, dtype=float)
+        node = np.asarray(node_scores, dtype=float).reshape(-1)
+        degree = np.sum(adj > 0, axis=1).astype(float)
+        weighted_degree = np.sum(edge, axis=1).astype(float)
+        structure_importance = 0.6 * (degree / (np.max(degree) + 1e-6)) + 0.4 * (weighted_degree / (np.max(weighted_degree) + 1e-6))
+        edge_mask = adj > 0
+        edge_density = float(np.sum(edge_mask) / max(1, edge_mask.size))
+        triad_like = float(np.mean((degree >= np.percentile(degree, 75)).astype(float))) if len(degree) else 0.0
+        subgraph_features = []
+        for idx in explained_nodes:
+            nbr = np.where(adj[idx] > 0)[0]
+            if len(nbr) == 0:
+                subgraph_features.append({"node_index": int(idx), "size": 1, "mean_edge_weight": 0.0, "mean_node_score": float(node[idx])})
+                continue
+            sub_nodes = np.unique(np.concatenate([[idx], nbr]))
+            sub_adj = adj[np.ix_(sub_nodes, sub_nodes)]
+            sub_edge = edge[np.ix_(sub_nodes, sub_nodes)]
+            subgraph_features.append(
+                {
+                    "node_index": int(idx),
+                    "size": int(len(sub_nodes)),
+                    "density": float(np.sum(sub_adj > 0) / max(1, sub_adj.size)),
+                    "mean_edge_weight": float(np.mean(sub_edge[sub_adj > 0])) if np.any(sub_adj > 0) else 0.0,
+                    "mean_node_score": float(np.mean(node[sub_nodes])),
+                }
+            )
+        top_pattern_nodes = np.argsort(-structure_importance)[: max(1, min(8, len(structure_importance)))].astype(int).tolist()
+        return {
+            "structure_importance": structure_importance.astype(float).tolist(),
+            "edge_weight_contribution": weighted_degree.astype(float).tolist(),
+            "key_connection_patterns": {
+                "high_degree_nodes": top_pattern_nodes,
+                "edge_density": edge_density,
+                "cluster_like_ratio": triad_like,
+            },
+            "subgraph_features": subgraph_features,
+            "graph_level_explanation": {
+                "dominant_nodes": top_pattern_nodes[:5],
+                "explained_nodes_overlap": [int(i) for i in explained_nodes if int(i) in set(top_pattern_nodes)],
+                "graph_anomaly_tendency": float(np.mean(node)),
+            },
+        }
+
+    def _explanation_reason(
+        self,
+        *,
+        node_idx: int,
+        decomposition_row: dict[str, Any],
+        top_contributions: list[dict[str, Any]],
+    ) -> str:
+        if not top_contributions:
+            return f"节点{node_idx}异常主要由图结构扰动触发。"
+        top_feat = top_contributions[0]
+        return (
+            f"节点{node_idx}异常由{top_feat['feature_alias']}驱动，"
+            f"节点分量{decomposition_row['node_component']:.3f}、邻域分量{decomposition_row['neighborhood_component']:.3f}、"
+            f"边分量{decomposition_row['edge_component']:.3f}共同放大异常。"
+        )
+
+    def _validate_explanation_consistency(
+        self,
+        *,
+        decomposition: list[dict[str, Any]],
+        node_scores: np.ndarray,
+        explained_nodes: list[int],
+    ) -> dict[str, Any]:
+        if len(decomposition) == 0:
+            return {"is_reasonable": False, "score_corr": 0.0, "coverage": 0.0}
+        dec = np.asarray([item["decomposed_score"] for item in decomposition], dtype=float)
+        node = np.asarray(node_scores, dtype=float)
+        if len(dec) != len(node):
+            aligned = min(len(dec), len(node))
+            dec = dec[:aligned]
+            node = node[:aligned]
+        corr = float(np.corrcoef(dec, node)[0, 1]) if len(dec) >= 2 and np.std(dec) > 1e-9 and np.std(node) > 1e-9 else 0.0
+        coverage = float(len(explained_nodes) / max(1, len(node)))
+        return {
+            "is_reasonable": bool(corr >= 0.5),
+            "score_corr": corr,
+            "coverage": coverage,
         }
 
 
@@ -292,8 +458,15 @@ class GCAELimeAdapter(_BaseGCAEAdapter):
         lime_module = self._load_lime_tabular()
         feature_names: list[str] = context["feature_names"]
         predict_fn = self._predict_surrogate(context)
-        batch_explanations: list[dict[str, Any]] = []
-        for node_idx in explained_nodes:
+        decomposition_payload = self._score_decomposition(
+            node_scores=np.asarray(context["score_bundle"]["node"], dtype=float),
+            subgraph_scores=np.asarray(context["score_bundle"]["subgraph"], dtype=float),
+            edge_scores=np.asarray(context["score_bundle"]["edge"], dtype=float),
+            adjacency=np.asarray(context["adjacency_matrix"], dtype=float),
+        )
+        dec_by_node = {int(item["node_index"]): item for item in decomposition_payload["decomposition"]}
+
+        def _explain_one(node_idx: int) -> dict[str, Any]:
             instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
             local_pairs: list[tuple[int, float]]
             local_pred = float(predict_fn(instance.reshape(1, -1))[0])
@@ -327,7 +500,7 @@ class GCAELimeAdapter(_BaseGCAEAdapter):
             else:
                 local_pairs, local_pred = self._fallback_local_pairs(context, node_idx)
 
-            contributions = [
+            contributions: list[dict[str, Any]] = [
                 {
                     "feature_index": int(i),
                     "feature_name": feature_names[i],
@@ -342,17 +515,25 @@ class GCAELimeAdapter(_BaseGCAEAdapter):
             contributions.sort(key=lambda item: item["abs_weight"], reverse=True)
             contributions = contributions[: max(1, int(top_k))]
             truth = float(target[node_idx])
-            batch_explanations.append(
-                {
-                    "node_index": int(node_idx),
-                    "prediction": local_pred,
-                    "target_prediction": truth,
-                    "fidelity": float(fidelity),
-                    "confidence": float(max(0.0, min(1.0, fidelity * np.exp(-abs(local_pred - truth))))),
-                    "backend": backend,
-                    "top_contributions": contributions,
-                }
-            )
+            dec_row = dec_by_node.get(int(node_idx), {"node_component": 0.0, "neighborhood_component": 0.0, "edge_component": 0.0})
+            return {
+                "node_index": int(node_idx),
+                "prediction": local_pred,
+                "target_prediction": truth,
+                "fidelity": float(fidelity),
+                "confidence": float(max(0.0, min(1.0, fidelity * np.exp(-abs(local_pred - truth))))),
+                "backend": backend,
+                "top_contributions": contributions,
+                "decomposition": dec_row,
+                "reason": self._explanation_reason(node_idx=int(node_idx), decomposition_row=dec_row, top_contributions=contributions),
+            }
+
+        workers = self._effective_workers(len(explained_nodes))
+        if workers == 1:
+            batch_explanations = [_explain_one(idx) for idx in explained_nodes]
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                batch_explanations = list(executor.map(_explain_one, explained_nodes))
 
         raw_importance = np.zeros((len(feature_names),), dtype=float)
         for item in batch_explanations:
@@ -371,6 +552,23 @@ class GCAELimeAdapter(_BaseGCAEAdapter):
         ]
 
         combined = np.asarray(context["score_bundle"]["combined"], dtype=float)
+        structure_analysis = self._graph_structure_analysis(
+            adjacency=np.asarray(context["adjacency_matrix"], dtype=float),
+            edge_scores=np.asarray(context["score_bundle"]["edge"], dtype=float),
+            node_scores=np.asarray(context["score_bundle"]["combined"], dtype=float),
+            explained_nodes=explained_nodes,
+        )
+        top_nodes = decomposition_payload["top_anomaly_nodes"]
+        propagation_paths = self._build_propagation_paths(
+            adjacency=np.asarray(context["adjacency_matrix"], dtype=float),
+            edge_scores=np.asarray(context["score_bundle"]["edge"], dtype=float),
+            top_nodes=top_nodes,
+        )
+        consistency = self._validate_explanation_consistency(
+            decomposition=decomposition_payload["decomposition"],
+            node_scores=np.asarray(context["score_bundle"]["combined"], dtype=float),
+            explained_nodes=explained_nodes,
+        )
         payload = {
             "summary": {
                 "method": "lime",
@@ -384,6 +582,13 @@ class GCAELimeAdapter(_BaseGCAEAdapter):
             "feature_importance": raw_importance.astype(float).tolist(),
             "batch_explanations": batch_explanations,
             "global_feature_importance": top_features,
+            "anomaly_score_explanation": {
+                "decomposition": decomposition_payload["decomposition"],
+                "key_anomaly_nodes": top_nodes,
+                "propagation_paths": propagation_paths,
+                "consistency_validation": consistency,
+            },
+            "graph_structure_analysis": structure_analysis,
             "score_components": {
                 "node": np.asarray(context["score_bundle"]["node"], dtype=float).astype(float).tolist(),
                 "subgraph": np.asarray(context["score_bundle"]["subgraph"], dtype=float).astype(float).tolist(),
@@ -394,6 +599,7 @@ class GCAELimeAdapter(_BaseGCAEAdapter):
             "performance": {
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "cache_hit": False,
+                "parallel_workers": int(workers),
             },
         }
         self._cache_set(cache_key, payload)
@@ -440,9 +646,16 @@ class GCAEShapAdapter(_BaseGCAEAdapter):
         feature_names: list[str] = context["feature_names"]
         background = np.asarray(context["background"], dtype=float)
         baseline = np.mean(background, axis=0)
+        effective_nsamples = self._dynamic_shap_samples(selected_nsamples, len(feature_names), len(v))
+        decomposition_payload = self._score_decomposition(
+            node_scores=np.asarray(context["score_bundle"]["node"], dtype=float),
+            subgraph_scores=np.asarray(context["score_bundle"]["subgraph"], dtype=float),
+            edge_scores=np.asarray(context["score_bundle"]["edge"], dtype=float),
+            adjacency=np.asarray(context["adjacency_matrix"], dtype=float),
+        )
+        dec_by_node = {int(item["node_index"]): item for item in decomposition_payload["decomposition"]}
 
-        batch_explanations: list[dict[str, Any]] = []
-        for node_idx in explained_nodes:
+        def _explain_one(node_idx: int) -> dict[str, Any]:
             instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
             expected_value = float(surrogate.predict(baseline.reshape(1, -1))[0])
             backend = "surrogate_linear"
@@ -454,8 +667,8 @@ class GCAEShapAdapter(_BaseGCAEAdapter):
                     )
                     values_arr = explainer.shap_values(
                         instance.reshape(1, -1),
-                        nsamples=max(40, selected_nsamples),
-                        l1_reg="num_features(10)",
+                        nsamples=max(40, effective_nsamples),
+                        l1_reg=f"num_features({max(4, int(self.config.shap_feature_cap))})",
                     )
                     if isinstance(values_arr, list):
                         values_arr = values_arr[0]
@@ -473,7 +686,7 @@ class GCAEShapAdapter(_BaseGCAEAdapter):
 
             pred = float(surrogate.predict(instance.reshape(1, -1))[0])
             truth = float(target[node_idx])
-            contributions = []
+            contributions: list[dict[str, Any]] = []
             for idx, score in enumerate(shap_values.tolist()):
                 feature = feature_names[idx]
                 contributions.append(
@@ -488,19 +701,27 @@ class GCAEShapAdapter(_BaseGCAEAdapter):
                     }
                 )
             contributions.sort(key=lambda item: item["abs_shap"], reverse=True)
-            contributions = contributions[: max(1, int(top_k))]
-            batch_explanations.append(
-                {
-                    "node_index": int(node_idx),
-                    "prediction": pred,
-                    "target_prediction": truth,
-                    "expected_value": expected_value,
-                    "backend": backend,
-                    "confidence": float(np.exp(-abs(pred - truth) / (abs(truth) + 1e-6))),
-                    "top_contributions": contributions,
-                    "raw_shap_values": [float(x) for x in shap_values.tolist()],
-                }
-            )
+            contributions = contributions[: max(1, int(min(top_k, self.config.shap_feature_cap)))]
+            dec_row = dec_by_node.get(int(node_idx), {"node_component": 0.0, "neighborhood_component": 0.0, "edge_component": 0.0})
+            return {
+                "node_index": int(node_idx),
+                "prediction": pred,
+                "target_prediction": truth,
+                "expected_value": expected_value,
+                "backend": backend,
+                "confidence": float(np.exp(-abs(pred - truth) / (abs(truth) + 1e-6))),
+                "top_contributions": contributions,
+                "raw_shap_values": [float(x) for x in shap_values.tolist()],
+                "decomposition": dec_row,
+                "reason": self._explanation_reason(node_idx=int(node_idx), decomposition_row=dec_row, top_contributions=contributions),
+            }
+
+        workers = self._effective_workers(len(explained_nodes))
+        if workers == 1:
+            batch_explanations = [_explain_one(idx) for idx in explained_nodes]
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                batch_explanations = list(executor.map(_explain_one, explained_nodes))
 
         mean_abs = np.mean(np.abs(np.asarray([item["raw_shap_values"] for item in batch_explanations], dtype=float)), axis=0)
         ranking = np.argsort(-mean_abs).astype(int).tolist()
@@ -516,6 +737,23 @@ class GCAEShapAdapter(_BaseGCAEAdapter):
         ]
 
         combined = np.asarray(context["score_bundle"]["combined"], dtype=float)
+        structure_analysis = self._graph_structure_analysis(
+            adjacency=np.asarray(context["adjacency_matrix"], dtype=float),
+            edge_scores=np.asarray(context["score_bundle"]["edge"], dtype=float),
+            node_scores=np.asarray(context["score_bundle"]["combined"], dtype=float),
+            explained_nodes=explained_nodes,
+        )
+        top_nodes = decomposition_payload["top_anomaly_nodes"]
+        propagation_paths = self._build_propagation_paths(
+            adjacency=np.asarray(context["adjacency_matrix"], dtype=float),
+            edge_scores=np.asarray(context["score_bundle"]["edge"], dtype=float),
+            top_nodes=top_nodes,
+        )
+        consistency = self._validate_explanation_consistency(
+            decomposition=decomposition_payload["decomposition"],
+            node_scores=np.asarray(context["score_bundle"]["combined"], dtype=float),
+            explained_nodes=explained_nodes,
+        )
         payload = {
             "summary": {
                 "method": "shap",
@@ -523,7 +761,7 @@ class GCAEShapAdapter(_BaseGCAEAdapter):
                 "explained_nodes": len(explained_nodes),
                 "num_features": len(feature_names),
                 "background_size": int(background.shape[0]),
-                "nsamples": selected_nsamples,
+                "nsamples": effective_nsamples,
                 "top_features": top_features,
                 "average_confidence": float(np.mean([item["confidence"] for item in batch_explanations])) if batch_explanations else 0.0,
                 "surrogate_fidelity": float(context["surrogate_metrics"]["fidelity"]),
@@ -531,6 +769,13 @@ class GCAEShapAdapter(_BaseGCAEAdapter):
             "feature_importance": mean_abs.astype(float).tolist(),
             "batch_explanations": batch_explanations,
             "global_feature_importance": top_features,
+            "anomaly_score_explanation": {
+                "decomposition": decomposition_payload["decomposition"],
+                "key_anomaly_nodes": top_nodes,
+                "propagation_paths": propagation_paths,
+                "consistency_validation": consistency,
+            },
+            "graph_structure_analysis": structure_analysis,
             "score_components": {
                 "node": np.asarray(context["score_bundle"]["node"], dtype=float).astype(float).tolist(),
                 "subgraph": np.asarray(context["score_bundle"]["subgraph"], dtype=float).astype(float).tolist(),
@@ -542,6 +787,7 @@ class GCAEShapAdapter(_BaseGCAEAdapter):
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "cache_hit": False,
                 "backend": "shap" if shap_module is not None else "surrogate_linear",
+                "parallel_workers": int(workers),
             },
         }
         self._cache_set(cache_key, payload)
