@@ -55,6 +55,7 @@ describe('SpatiotemporalExplainPanel', () => {
         host = document.createElement('div');
         document.body.innerHTML = '';
         document.body.appendChild(host);
+        window.localStorage.clear();
         I18n.init('zh-CN');
     });
 
@@ -252,6 +253,88 @@ describe('SpatiotemporalExplainPanel', () => {
         (host.querySelector('[data-task-action="load-more"]') as HTMLButtonElement).click();
         const taskItemsAfter = host.querySelectorAll('.explain-task-item');
         expect(taskItemsAfter.length).toBe(45);
+
+        panel.destroy();
+    });
+
+    it('应支持暗黑模式切换并持久化用户偏好', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        const toggle = host.querySelector('#dl-explain-theme-toggle') as HTMLButtonElement;
+        toggle.click();
+        await flushPromises();
+
+        expect(host.querySelector('.explain-panel')?.classList.contains('theme-dark')).toBe(true);
+        expect(window.localStorage.getItem('dl-explain-theme')).toBe('dark');
+        expect(toggle.getAttribute('aria-pressed')).toBe('true');
+
+        panel.destroy();
+    });
+
+    it('应支持左右方向键切换方法与结果标签', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        const methodHybrid = host.querySelector('[data-method-switch="hybrid"]') as HTMLButtonElement;
+        methodHybrid.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true }));
+        expect((panel as any).selectedMethod).toBe('shap');
+
+        const tabLime = host.querySelector('[data-result-tab="lime"]') as HTMLButtonElement;
+        tabLime.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+        expect((panel as any).activeTab).toBe('shap');
+
+        panel.destroy();
+    });
+
+    it('监控查询应命中短时缓存', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({ queue_size: 3 });
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        await flushPromises();
+
+        await (panel as any).refreshMonitor();
+        await (panel as any).refreshMonitor();
+
+        expect(api.getSpatiotemporalExplainMonitor).toHaveBeenCalledTimes(1);
+        panel.destroy();
+    });
+
+    it('完成任务在LIME/SHAP视图下应渲染图表容器', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        api.createSpatiotemporalExplainTask.mockResolvedValue({ task_id: 'task-chart' });
+        api.getSpatiotemporalExplainTask.mockResolvedValue({
+            task_id: 'task-chart',
+            status: 'completed',
+            result: {
+                method: 'hybrid',
+                lime: { visualization: { feature_importance_list: [{ feature: 'f1', value: 0.3 }] } },
+                shap: {
+                    visualization: {
+                        waterfall_list: [{ feature: 'f1', value: 0.2 }],
+                        feature_ranking: [{ feature: 'f1', value: 0.2 }],
+                        beeswarm_data: [{ feature: 'f1', feature_value: 1.2, shap_value: 0.1 }]
+                    }
+                },
+                summary: {}
+            }
+        });
+
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(host.querySelector('#chart-lime-feature')).toBeTruthy();
+
+        (host.querySelector('[data-result-tab="shap"]') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(host.querySelector('#chart-shap-waterfall')).toBeTruthy();
+        expect(host.querySelector('#chart-shap-beeswarm')).toBeTruthy();
+        expect(host.querySelector('#chart-shap-ranking')).toBeTruthy();
 
         panel.destroy();
     });

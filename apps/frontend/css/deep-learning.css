@@ -155,6 +155,33 @@
     display: flex;
     flex-direction: column;
     gap: 12px;
+    --explain-bg: #ffffff;
+    --explain-muted-bg: #f8fafc;
+    --explain-card-bg: #fcfcfd;
+    --explain-border: #d1d5db;
+    --explain-text: #0f172a;
+    --explain-subtle: #6b7280;
+    color: var(--explain-text);
+}
+
+.explain-panel.theme-dark {
+    --explain-bg: #0b1220;
+    --explain-muted-bg: #131d32;
+    --explain-card-bg: #0f172a;
+    --explain-border: #334155;
+    --explain-text: #e2e8f0;
+    --explain-subtle: #94a3b8;
+}
+
+.explain-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.explain-theme-toggle {
+    white-space: nowrap;
 }
 
 .explain-method-switch {
@@ -179,10 +206,10 @@
 .explain-submit-panel,
 .explain-task-panel,
 .explain-result-panel {
-    border: 1px solid var(--border-color, #e5e7eb);
+    border: 1px solid var(--explain-border);
     border-radius: 10px;
     padding: 12px;
-    background: var(--panel-bg, #ffffff);
+    background: var(--explain-bg);
 }
 
 .explain-submit-panel h5,
@@ -195,7 +222,7 @@
 .explain-guide {
     margin-top: 8px;
     font-size: 12px;
-    color: var(--text-secondary, #6b7280);
+    color: var(--explain-subtle);
 }
 
 .explain-task-header,
@@ -226,8 +253,8 @@
     font-size: 12px;
     padding: 4px 8px;
     border-radius: 999px;
-    border: 1px solid var(--border-color, #d1d5db);
-    background: #f8fafc;
+    border: 1px solid var(--explain-border);
+    background: var(--explain-muted-bg);
 }
 
 .explain-task-list {
@@ -239,10 +266,10 @@
 }
 
 .explain-task-item {
-    border: 1px solid var(--border-color, #d1d5db);
+    border: 1px solid var(--explain-border);
     border-radius: 10px;
     padding: 10px;
-    background: #fafafa;
+    background: var(--explain-muted-bg);
 }
 
 .explain-task-item.active {
@@ -273,7 +300,7 @@
     font-size: 12px;
     padding: 2px 6px;
     border-radius: 999px;
-    background: #e5e7eb;
+    background: var(--explain-muted-bg);
 }
 
 .explain-task-progress {
@@ -292,7 +319,7 @@
 
 .explain-task-meta {
     font-size: 12px;
-    color: var(--text-secondary, #6b7280);
+    color: var(--explain-subtle);
     justify-content: space-between;
 }
 
@@ -307,10 +334,10 @@
 }
 
 .result-card {
-    border: 1px solid var(--border-color, #e5e7eb);
+    border: 1px solid var(--explain-border);
     border-radius: 10px;
     padding: 10px;
-    background: #fcfcfd;
+    background: var(--explain-card-bg);
 }
 
 .result-card h6 {
@@ -369,7 +396,7 @@
 
 .local-explain-item,
 .summary-card {
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--explain-border);
     border-radius: 8px;
     padding: 8px;
     font-size: 12px;
@@ -381,7 +408,7 @@
 }
 
 .muted {
-    color: #6b7280;
+    color: var(--explain-subtle);
 }
 
 .shap-filter-bar {
@@ -398,6 +425,23 @@
     border-radius: 8px;
     overflow: hidden;
     background: linear-gradient(180deg, #f8fafc, #ffffff);
+}
+
+.explain-chart {
+    width: 100%;
+    height: 260px;
+    border: 1px dashed var(--explain-border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: var(--explain-card-bg);
+}
+
+.explain-chart-lg {
+    height: 320px;
+}
+
+.fallback-bars.chart-enhanced {
+    display: none;
 }
 
 .beeswarm-point {
@@ -437,7 +481,7 @@
 
 .summary-table th,
 .summary-table td {
-    border: 1px solid #e5e7eb;
+    border: 1px solid var(--explain-border);
     padding: 6px;
     text-align: left;
 }
@@ -485,6 +529,11 @@
     cursor: pointer;
 }
 
+.explain-panel :focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 2px;
+}
+
 @media (max-width: 1180px) {
     .explain-layout-grid,
     .explain-result-grid {
@@ -493,6 +542,11 @@
 }
 
 @media (max-width: 768px) {
+    .explain-header-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
     .explain-task-header,
     .explain-result-header {
         flex-direction: column;
@@ -504,5 +558,13 @@
     .explain-method-switch .btn {
         flex: 1;
         min-width: 96px;
+    }
+
+    .explain-chart {
+        height: 220px;
+    }
+
+    .explain-chart-lg {
+        height: 260px;
     }
 }

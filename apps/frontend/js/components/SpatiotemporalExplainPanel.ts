@@ -29,6 +29,19 @@ type MonitorPayload = {
     cache_backend?: string;
 };
 
+type ChartRuntime = {
+    init: (el: HTMLElement, theme?: string) => {
+        setOption: (option: Record<string, unknown>, options?: { notMerge?: boolean; lazyUpdate?: boolean }) => void;
+        dispose: () => void;
+        resize: () => void;
+    };
+};
+
+type CachedEntry<T> = {
+    at: number;
+    data: T;
+};
+
 /**
  * 时空预测可解释性面板
  * 支持 LIME / SHAP / Hybrid 任务提交、状态管理和可视化展示。
@@ -47,29 +60,56 @@ export class SpatiotemporalExplainPanel {
     private renderedTaskCount: number = 40;
     private readonly taskBatchSize: number = 40;
     private taskListScrollHandler: (() => void) | null = null;
+    private selectedResultTabIndex: number = 0;
+    private selectedMethodIndex: number = 2;
+
+    private chartLibPromise: Promise<ChartRuntime | null> | null = null;
+    private chartInstances: Map<string, { dispose: () => void; setOption: (option: Record<string, unknown>, options?: { notMerge?: boolean; lazyUpdate?: boolean }) => void; resize: () => void }> = new Map();
+    private chartObserver: IntersectionObserver | null = null;
+    private chartPendingRender: Map<string, () => Promise<void>> = new Map();
+
+    private monitorCache: CachedEntry<MonitorPayload> | null = null;
+    private taskCache: Map<string, CachedEntry<ExplainTask>> = new Map();
+    private readonly monitorCacheTTL = 2500;
+    private readonly taskCacheTTL = 1500;
+
+    private themeMode: 'light' | 'dark' = 'light';
+    private fpsRafId: number | null = null;
+    private fpsTickerId: number | null = null;
+    private frameCount: number = 0;
+    private lastFpsTs: number = 0;
+    private latestFPS: number = 0;
+    private latestMemoryMB: number | null = null;
 
     constructor(container: HTMLElement, apiService: IAPIService) {
         this.container = container;
         this.apiService = apiService;
 
         this.render();
+        this.initTheme();
         this.bindEvents();
+        this.updateMethodSwitch();
+        this.updateResultTabs();
         this.startAutoRefresh();
-        void this.refreshMonitor();
+        this.startPerformanceMonitor();
+        void this.refreshMonitor(true);
     }
 
     private render(): void {
         this.container.innerHTML = `
             <div class="dl-module-card explain-panel">
                 <div class="dl-module-header">
-                    <h4>${this.t('explain.panel.title', '模型可解释性增强面板')}</h4>
+                    <div class="explain-header-row">
+                        <h4>${this.t('explain.panel.title', '模型可解释性增强面板')}</h4>
+                        <button id="dl-explain-theme-toggle" class="btn btn-secondary explain-theme-toggle" type="button" aria-pressed="false" aria-label="切换暗黑模式">暗黑模式</button>
+                    </div>
                     <p>${this.t('explain.panel.subtitle', '提交时空解释任务，查看 LIME / SHAP 可视化与对比分析')}</p>
                 </div>
 
                 <div class="explain-method-switch" role="tablist" aria-label="${this.t('explain.method.switchAria', '解释方法切换')}">
-                    <button class="btn btn-secondary active" data-method-switch="lime">${this.t('explain.method.lime', 'LIME')}</button>
-                    <button class="btn btn-secondary" data-method-switch="shap">${this.t('explain.method.shap', 'SHAP')}</button>
-                    <button class="btn btn-secondary" data-method-switch="hybrid">${this.t('explain.method.hybrid', 'Hybrid')}</button>
+                    <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-method-switch="lime">${this.t('explain.method.lime', 'LIME')}</button>
+                    <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-method-switch="shap">${this.t('explain.method.shap', 'SHAP')}</button>
+                    <button class="btn btn-secondary active" type="button" role="tab" aria-selected="true" tabindex="0" data-method-switch="hybrid">${this.t('explain.method.hybrid', 'Hybrid')}</button>
                 </div>
 
                 <div class="explain-layout-grid">
@@ -78,7 +118,7 @@ export class SpatiotemporalExplainPanel {
                         <div class="dl-form-grid">
                             <label class="dl-field">
                                 <span>模型选择</span>
-                                <select id="dl-explain-model" class="select">
+                                <select id="dl-explain-model" class="select" aria-label="模型选择">
                                     <option value="st_transformer">ST-Transformer</option>
                                     <option value="gcn_lstm">GCN-LSTM</option>
                                     <option value="convlstm">ConvLSTM</option>
@@ -87,40 +127,40 @@ export class SpatiotemporalExplainPanel {
                             </label>
                             <label class="dl-field">
                                 <span>预测步长</span>
-                                <input id="dl-explain-horizon" class="input" type="number" min="1" max="48" value="6">
+                                <input id="dl-explain-horizon" class="input" type="number" min="1" max="48" value="6" aria-label="预测步长">
                             </label>
                             <label class="dl-field">
                                 <span>Top-K 特征</span>
-                                <input id="dl-explain-topk" class="input" type="number" min="1" max="20" value="5">
+                                <input id="dl-explain-topk" class="input" type="number" min="1" max="20" value="5" aria-label="TopK特征">
                             </label>
                             <label class="dl-field">
                                 <span>重试次数</span>
-                                <input id="dl-explain-retries" class="input" type="number" min="0" max="3" value="1">
+                                <input id="dl-explain-retries" class="input" type="number" min="0" max="3" value="1" aria-label="重试次数">
                             </label>
                             <label class="dl-field">
                                 <span>批大小</span>
-                                <input id="dl-explain-batch" class="input" type="number" min="16" max="4096" value="256">
+                                <input id="dl-explain-batch" class="input" type="number" min="16" max="4096" value="256" aria-label="批大小">
                             </label>
                             <label class="dl-field">
                                 <span>优先级 (0-9)</span>
-                                <input id="dl-explain-priority" class="input" type="number" min="0" max="9" value="5">
+                                <input id="dl-explain-priority" class="input" type="number" min="0" max="9" value="5" aria-label="任务优先级">
                             </label>
                         </div>
 
                         <label class="dl-field dl-field-full">
                             <span>坐标输入 coords（JSON）</span>
-                            <textarea id="dl-explain-coords" class="dl-textarea" rows="3">[[120.1,30.2],[120.2,30.3],[120.3,30.4],[120.4,30.5]]</textarea>
+                            <textarea id="dl-explain-coords" class="dl-textarea" rows="3" aria-label="坐标输入">[[120.1,30.2],[120.2,30.3],[120.3,30.4],[120.4,30.5]]</textarea>
                         </label>
 
                         <label class="dl-field dl-field-full">
                             <span>时间序列输入 series（JSON）</span>
-                            <textarea id="dl-explain-series" class="dl-textarea" rows="5">[[[1.0],[1.1],[1.2],[1.3],[1.4],[1.5]],[[0.9],[1.0],[1.1],[1.2],[1.3],[1.4]],[[1.2],[1.3],[1.4],[1.5],[1.6],[1.7]],[[0.8],[0.9],[1.0],[1.1],[1.2],[1.3]]]</textarea>
+                            <textarea id="dl-explain-series" class="dl-textarea" rows="5" aria-label="时间序列输入">[[[1.0],[1.1],[1.2],[1.3],[1.4],[1.5]],[[0.9],[1.0],[1.1],[1.2],[1.3],[1.4]],[[1.2],[1.3],[1.4],[1.5],[1.6],[1.7]],[[0.8],[0.9],[1.0],[1.1],[1.2],[1.3]]]</textarea>
                         </label>
 
                         <div class="dl-actions">
-                            <button id="dl-explain-submit" class="btn btn-primary">${this.t('explain.action.submit', '提交解释任务')}</button>
-                            <button id="dl-explain-monitor" class="btn btn-secondary">${this.t('explain.action.refresh', '刷新队列状态')}</button>
-                            <button id="dl-explain-verify" class="btn btn-secondary">${this.t('explain.action.verify', '校验异步后端')}</button>
+                            <button id="dl-explain-submit" class="btn btn-primary" type="button">${this.t('explain.action.submit', '提交解释任务')}</button>
+                            <button id="dl-explain-monitor" class="btn btn-secondary" type="button">${this.t('explain.action.refresh', '刷新队列状态')}</button>
+                            <button id="dl-explain-verify" class="btn btn-secondary" type="button">${this.t('explain.action.verify', '校验异步后端')}</button>
                         </div>
                         <div id="dl-explain-status" class="status-message" role="status" aria-live="polite"></div>
                         <div id="dl-explain-guide" class="explain-guide">快捷键：<code>Ctrl/Cmd + Enter</code> 提交任务，<code>Ctrl/Cmd + R</code> 刷新任务。</div>
@@ -130,7 +170,7 @@ export class SpatiotemporalExplainPanel {
                         <div class="explain-task-header">
                             <h5>${this.t('explain.task.title', '任务状态')}</h5>
                             <div class="explain-task-tools">
-                                <select id="dl-explain-filter" class="select">
+                                <select id="dl-explain-filter" class="select" aria-label="任务过滤方法">
                                     <option value="all">全部方法</option>
                                     <option value="lime">LIME</option>
                                     <option value="shap">SHAP</option>
@@ -151,14 +191,14 @@ export class SpatiotemporalExplainPanel {
                     <div class="explain-result-header">
                         <h5>${this.t('explain.result.title', '解释结果展示')}</h5>
                         <div class="explain-result-tabs">
-                            <button class="btn btn-secondary active" data-result-tab="lime">${this.t('explain.result.tab.lime', 'LIME视图')}</button>
-                            <button class="btn btn-secondary" data-result-tab="shap">${this.t('explain.result.tab.shap', 'SHAP视图')}</button>
-                            <button class="btn btn-secondary" data-result-tab="compare">${this.t('explain.result.tab.compare', '对比分析')}</button>
-                            <button class="btn btn-secondary" data-result-tab="spatiotemporal">${this.t('explain.result.tab.spatiotemporal', '时空视图')}</button>
+                            <button class="btn btn-secondary active" type="button" role="tab" aria-selected="true" tabindex="0" data-result-tab="lime">${this.t('explain.result.tab.lime', 'LIME视图')}</button>
+                            <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-result-tab="shap">${this.t('explain.result.tab.shap', 'SHAP视图')}</button>
+                            <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-result-tab="compare">${this.t('explain.result.tab.compare', '对比分析')}</button>
+                            <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-result-tab="spatiotemporal">${this.t('explain.result.tab.spatiotemporal', '时空视图')}</button>
                         </div>
                     </div>
 
-                    <div id="dl-explain-result" class="explain-result-content">
+                    <div id="dl-explain-result" class="explain-result-content" tabindex="-1">
                         <div class="status-message">${this.t('explain.status.emptyResult', '暂无结果，请先提交并完成任务。')}</div>
                     </div>
                 </section>
@@ -167,10 +207,15 @@ export class SpatiotemporalExplainPanel {
     }
 
     private bindEvents(): void {
+        const refreshTasksThrottled = this.createThrottled(() => {
+            void this.refreshAllTasks(true);
+        }, 600);
+
         this.container.querySelectorAll<HTMLButtonElement>('[data-method-switch]').forEach((btn) => {
             btn.addEventListener('click', () => {
                 const method = (btn.dataset.methodSwitch || 'hybrid') as ExplainMethod;
                 this.selectedMethod = method;
+                this.selectedMethodIndex = ['lime', 'shap', 'hybrid'].indexOf(method);
                 this.updateMethodSwitch();
                 this.setStatus(`已切换提交方法：${method.toUpperCase()}`, 'success');
             });
@@ -180,10 +225,13 @@ export class SpatiotemporalExplainPanel {
             void this.submitTask();
         });
         this.container.querySelector('#dl-explain-monitor')?.addEventListener('click', () => {
-            void this.refreshAllTasks();
+            refreshTasksThrottled();
         });
         this.container.querySelector('#dl-explain-verify')?.addEventListener('click', () => {
             void this.verifyBackend();
+        });
+        this.container.querySelector('#dl-explain-theme-toggle')?.addEventListener('click', () => {
+            this.toggleTheme();
         });
 
         this.container.querySelector('#dl-explain-filter')?.addEventListener('change', (event) => {
@@ -205,6 +253,7 @@ export class SpatiotemporalExplainPanel {
         this.container.querySelectorAll<HTMLButtonElement>('[data-result-tab]').forEach((btn) => {
             btn.addEventListener('click', () => {
                 this.activeTab = (btn.dataset.resultTab || 'lime') as typeof this.activeTab;
+                this.selectedResultTabIndex = ['lime', 'shap', 'compare', 'spatiotemporal'].indexOf(this.activeTab);
                 this.updateResultTabs();
                 this.renderCurrentResult();
             });
@@ -250,7 +299,19 @@ export class SpatiotemporalExplainPanel {
 
             if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'r') {
                 event.preventDefault();
-                void this.refreshAllTasks();
+                refreshTasksThrottled();
+            }
+
+            if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+                const target = event.target as HTMLElement;
+                if (target.closest('.explain-result-tabs')) {
+                    event.preventDefault();
+                    this.switchResultTabByKeyboard(event.key === 'ArrowRight' ? 1 : -1);
+                }
+                if (target.closest('.explain-method-switch')) {
+                    event.preventDefault();
+                    this.switchMethodByKeyboard(event.key === 'ArrowRight' ? 1 : -1);
+                }
             }
         });
 
@@ -259,13 +320,19 @@ export class SpatiotemporalExplainPanel {
 
     private updateMethodSwitch(): void {
         this.container.querySelectorAll<HTMLButtonElement>('[data-method-switch]').forEach((btn) => {
-            btn.classList.toggle('active', btn.dataset.methodSwitch === this.selectedMethod);
+            const active = btn.dataset.methodSwitch === this.selectedMethod;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+            btn.tabIndex = active ? 0 : -1;
         });
     }
 
     private updateResultTabs(): void {
         this.container.querySelectorAll<HTMLButtonElement>('[data-result-tab]').forEach((btn) => {
-            btn.classList.toggle('active', btn.dataset.resultTab === this.activeTab);
+            const active = btn.dataset.resultTab === this.activeTab;
+            btn.classList.toggle('active', active);
+            btn.setAttribute('aria-selected', active ? 'true' : 'false');
+            btn.tabIndex = active ? 0 : -1;
         });
     }
 
@@ -360,17 +427,19 @@ export class SpatiotemporalExplainPanel {
 
             this.currentTaskId = String(created.task_id);
             this.setStatus(`任务提交成功：${created.task_id}`, 'success');
-            await this.refreshTaskById(String(created.task_id));
-            await this.refreshMonitor();
+            await this.refreshTaskById(String(created.task_id), true);
+            await this.refreshMonitor(true);
         } catch (error) {
             this.setStatus(`提交失败：${error instanceof Error ? error.message : String(error)}`, 'error');
         }
     }
 
-    private async refreshTaskById(taskId: string): Promise<void> {
+    private async refreshTaskById(taskId: string, force: boolean = false): Promise<void> {
         try {
-            const detail = await this.apiService.getSpatiotemporalExplainTask(taskId);
-            const normalized = this.normalizeTask(detail as Record<string, unknown>);
+            const cached = this.getCachedTask(taskId, force);
+            const detail = cached || this.normalizeTask(await this.apiService.getSpatiotemporalExplainTask(taskId) as Record<string, unknown>);
+            const normalized = detail;
+            this.taskCache.set(taskId, { at: Date.now(), data: normalized });
             const idx = this.tasks.findIndex(item => item.task_id === taskId);
             if (idx >= 0) {
                 this.tasks[idx] = normalized;
@@ -533,7 +602,7 @@ export class SpatiotemporalExplainPanel {
         }
     }
 
-    private async refreshAllTasks(): Promise<void> {
+    private async refreshAllTasks(force: boolean = false): Promise<void> {
         const taskIds = this.tasks.map(item => item.task_id);
         if (this.currentTaskId && !taskIds.includes(this.currentTaskId)) {
             taskIds.unshift(this.currentTaskId);
@@ -541,21 +610,22 @@ export class SpatiotemporalExplainPanel {
 
         if (taskIds.length === 0) {
             this.setStatus('暂无可刷新任务', 'warning');
-            await this.refreshMonitor();
+            await this.refreshMonitor(force);
             return;
         }
 
         await Promise.all(taskIds.slice(0, 20).map(async (id) => {
-            await this.refreshTaskById(id);
+            await this.refreshTaskById(id, force);
         }));
 
-        await this.refreshMonitor();
+        await this.refreshMonitor(force);
         this.setStatus('任务列表已刷新', 'success');
     }
 
-    private async refreshMonitor(): Promise<void> {
+    private async refreshMonitor(force: boolean = false): Promise<void> {
         try {
-            const payload = await this.apiService.getSpatiotemporalExplainMonitor();
+            const payload = this.getCachedMonitor(force) || await this.apiService.getSpatiotemporalExplainMonitor() as MonitorPayload;
+            this.monitorCache = { at: Date.now(), data: payload };
             this.renderMonitor(payload as MonitorPayload);
         } catch (error) {
             this.setStatus(`监控查询失败：${error instanceof Error ? error.message : String(error)}`, 'error');
@@ -582,6 +652,8 @@ export class SpatiotemporalExplainPanel {
             <div class="monitor-chip">${this.t('explain.monitor.avgDuration', '平均耗时')}: ${this.formatNumber(Number(avgDuration))}ms</div>
             <div class="monitor-chip">${this.t('explain.monitor.cache', '缓存')}: ${payload.cache_backend || 'unknown'}</div>
             <div class="monitor-chip">Celery: ${payload.celery_enabled ? 'on' : 'off'}</div>
+            <div class="monitor-chip" id="dl-explain-fps">FPS: ${this.formatNumber(this.latestFPS)}</div>
+            <div class="monitor-chip" id="dl-explain-memory">内存: ${this.latestMemoryMB === null ? '-' : `${this.formatNumber(this.latestMemoryMB)}MB`}</div>
         `;
     }
 
@@ -603,7 +675,7 @@ export class SpatiotemporalExplainPanel {
 
     private async viewTask(taskId: string): Promise<void> {
         this.currentTaskId = taskId;
-        await this.refreshTaskById(taskId);
+        await this.refreshTaskById(taskId, true);
         this.renderTaskList();
         this.renderCurrentResult();
     }
@@ -612,8 +684,8 @@ export class SpatiotemporalExplainPanel {
         try {
             await this.apiService.cancelSpatiotemporalExplainTask(taskId);
             this.setStatus(`任务已取消：${taskId}`, 'success');
-            await this.refreshTaskById(taskId);
-            await this.refreshMonitor();
+            await this.refreshTaskById(taskId, true);
+            await this.refreshMonitor(true);
         } catch (error) {
             this.setStatus(`取消失败：${error instanceof Error ? error.message : String(error)}`, 'error');
         }
@@ -626,9 +698,10 @@ export class SpatiotemporalExplainPanel {
             if (this.currentTaskId === taskId) {
                 this.currentTaskId = this.tasks[0]?.task_id || null;
             }
+            this.taskCache.delete(taskId);
             this.renderTaskList();
             this.renderCurrentResult();
-            await this.refreshMonitor();
+            await this.refreshMonitor(true);
             this.setStatus(`任务已删除：${taskId}`, 'success');
         } catch (error) {
             this.setStatus(`删除失败：${error instanceof Error ? error.message : String(error)}`, 'error');
@@ -650,10 +723,12 @@ export class SpatiotemporalExplainPanel {
 
         const task = this.getCurrentTask();
         if (!task) {
+            this.disposeCharts();
             container.innerHTML = `<div class="status-message">${this.t('explain.status.selectTask', '请选择任务查看结果。')}</div>`;
             return;
         }
         if (task.status !== 'completed' || !task.result) {
+            this.disposeCharts();
             container.innerHTML = `<div class="status-message">${this.t('explain.status.taskUnavailable', '任务当前状态：{status}，结果尚不可用。', {
                 status: this.statusLabel(task.status)
             })}</div>`;
@@ -663,18 +738,22 @@ export class SpatiotemporalExplainPanel {
         const result = task.result as Record<string, unknown>;
         if (this.activeTab === 'lime') {
             container.innerHTML = this.renderLimeResult(result);
+            void this.renderChartsForCurrentTab(result);
             return;
         }
         if (this.activeTab === 'shap') {
             container.innerHTML = this.renderShapResult(result);
             this.bindShapInteractive(container, result);
+            void this.renderChartsForCurrentTab(result);
             return;
         }
         if (this.activeTab === 'compare') {
+            this.disposeCharts();
             container.innerHTML = this.renderCompareResult(result);
             return;
         }
 
+        this.disposeCharts();
         container.innerHTML = this.renderSpatiotemporalResult(result);
     }
 
@@ -744,7 +823,8 @@ export class SpatiotemporalExplainPanel {
             <div class="explain-result-grid">
                 <section class="result-card">
                     <h6>特征重要性条形图</h6>
-                    ${this.renderFeatureBarList(featureImportance.slice(0, 12), 'lime-bars')}
+                    <div id="chart-lime-feature" class="explain-chart js-lazy-chart" role="img" aria-label="LIME 特征重要性条形图"></div>
+                    ${this.renderFeatureBarList(featureImportance.slice(0, 12), 'lime-bars fallback-bars')}
                 </section>
 
                 <section class="result-card">
@@ -834,7 +914,8 @@ export class SpatiotemporalExplainPanel {
             <div class="explain-result-grid">
                 <section class="result-card">
                     <h6>SHAP 瀑布图</h6>
-                    ${this.renderFeatureBarList(waterfall.slice(0, 12), 'shap-waterfall')}
+                    <div id="chart-shap-waterfall" class="explain-chart js-lazy-chart" role="img" aria-label="SHAP 瀑布图"></div>
+                    ${this.renderFeatureBarList(waterfall.slice(0, 12), 'shap-waterfall fallback-bars')}
                 </section>
 
                 <section class="result-card">
@@ -843,7 +924,8 @@ export class SpatiotemporalExplainPanel {
                         <label>贡献阈值 <input id="shap-threshold" class="input" type="number" step="0.01" value="0"></label>
                         <label>缩放 <input id="shap-zoom" type="range" min="0.5" max="2" step="0.1" value="1"></label>
                     </div>
-                    <div id="shap-beeswarm" class="beeswarm-container">
+                    <div id="chart-shap-beeswarm" class="explain-chart explain-chart-lg js-lazy-chart" role="img" aria-label="SHAP 蜂群图"></div>
+                    <div id="shap-beeswarm" class="beeswarm-container fallback-bars">
                         ${this.renderBeeswarmPoints(beeswarm, 0, 1)}
                     </div>
                 </section>
@@ -855,7 +937,8 @@ export class SpatiotemporalExplainPanel {
 
                 <section class="result-card">
                     <h6>特征重要性排序图</h6>
-                    ${this.renderFeatureBarList(ranking.slice(0, 12), 'shap-ranking')}
+                    <div id="chart-shap-ranking" class="explain-chart js-lazy-chart" role="img" aria-label="SHAP 特征重要性排序图"></div>
+                    ${this.renderFeatureBarList(ranking.slice(0, 12), 'shap-ranking fallback-bars')}
                 </section>
 
                 <section class="result-card full-width">
@@ -917,6 +1000,7 @@ export class SpatiotemporalExplainPanel {
             target.innerHTML = this.renderBeeswarmPoints(beeswarm, threshold, zoom);
             target.style.transform = `scale(${zoom})`;
             target.style.transformOrigin = 'center center';
+            void this.renderShapBeeswarmChart(beeswarm, threshold, zoom);
         };
 
         const debouncedRerender = this.createDebounced(rerender, 80);
@@ -1088,7 +1172,7 @@ export class SpatiotemporalExplainPanel {
                         ${heatmap.map((row) => {
                             const opacity = Math.max(0.12, Math.min(1, row.intensity));
                             return `
-                                <button class="heatmap-cell" title="${row.label}" style="background: rgba(56, 189, 248, ${opacity});">
+                                <button class="heatmap-cell" type="button" aria-label="${row.label}" title="${row.label}" style="background: rgba(56, 189, 248, ${opacity});">
                                     ${row.value.toFixed(2)}
                                 </button>
                             `;
@@ -1123,6 +1207,294 @@ export class SpatiotemporalExplainPanel {
                 </section>
             </div>
         `;
+    }
+
+    private initTheme(): void {
+        let nextTheme: 'light' | 'dark' = 'light';
+        try {
+            const stored = window.localStorage.getItem('dl-explain-theme');
+            if (stored === 'light' || stored === 'dark') {
+                nextTheme = stored;
+            } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                nextTheme = 'dark';
+            }
+        } catch {
+            nextTheme = 'light';
+        }
+        this.applyTheme(nextTheme);
+    }
+
+    private applyTheme(mode: 'light' | 'dark'): void {
+        this.themeMode = mode;
+        const panel = this.container.querySelector('.explain-panel');
+        if (!panel) {
+            return;
+        }
+        panel.classList.toggle('theme-dark', mode === 'dark');
+        const toggle = this.container.querySelector('#dl-explain-theme-toggle') as HTMLButtonElement | null;
+        if (toggle) {
+            const isDark = mode === 'dark';
+            toggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+            toggle.textContent = isDark ? '浅色模式' : '暗黑模式';
+        }
+        try {
+            window.localStorage.setItem('dl-explain-theme', mode);
+        } catch {
+            // ignore local storage write error
+        }
+        void this.resizeAllCharts();
+    }
+
+    private toggleTheme(): void {
+        this.applyTheme(this.themeMode === 'dark' ? 'light' : 'dark');
+        this.setStatus(`已切换为${this.themeMode === 'dark' ? '暗黑' : '浅色'}模式`, 'success');
+    }
+
+    private getCachedMonitor(force: boolean): MonitorPayload | null {
+        if (force || !this.monitorCache) {
+            return null;
+        }
+        if (Date.now() - this.monitorCache.at > this.monitorCacheTTL) {
+            return null;
+        }
+        return this.monitorCache.data;
+    }
+
+    private getCachedTask(taskId: string, force: boolean): ExplainTask | null {
+        if (force) {
+            return null;
+        }
+        const entry = this.taskCache.get(taskId);
+        if (!entry) {
+            return null;
+        }
+        if (Date.now() - entry.at > this.taskCacheTTL) {
+            return null;
+        }
+        return entry.data;
+    }
+
+    private switchResultTabByKeyboard(delta: number): void {
+        const tabs: Array<typeof this.activeTab> = ['lime', 'shap', 'compare', 'spatiotemporal'];
+        const total = tabs.length;
+        this.selectedResultTabIndex = (this.selectedResultTabIndex + delta + total) % total;
+        this.activeTab = tabs[this.selectedResultTabIndex];
+        this.updateResultTabs();
+        this.renderCurrentResult();
+        const activeButton = this.container.querySelector<HTMLButtonElement>(`[data-result-tab="${this.activeTab}"]`);
+        activeButton?.focus();
+    }
+
+    private switchMethodByKeyboard(delta: number): void {
+        const methods: ExplainMethod[] = ['lime', 'shap', 'hybrid'];
+        const total = methods.length;
+        this.selectedMethodIndex = (this.selectedMethodIndex + delta + total) % total;
+        this.selectedMethod = methods[this.selectedMethodIndex];
+        this.updateMethodSwitch();
+        this.setStatus(`已切换提交方法：${this.selectedMethod.toUpperCase()}`, 'success');
+        const activeButton = this.container.querySelector<HTMLButtonElement>(`[data-method-switch="${this.selectedMethod}"]`);
+        activeButton?.focus();
+    }
+
+    private async loadChartRuntime(): Promise<ChartRuntime | null> {
+        if (this.chartLibPromise) {
+            return this.chartLibPromise;
+        }
+        this.chartLibPromise = (async () => {
+            try {
+                const runtime = await import('echarts');
+                return runtime as unknown as ChartRuntime;
+            } catch {
+                return null;
+            }
+        })();
+        return this.chartLibPromise;
+    }
+
+    private ensureChartObserver(): IntersectionObserver | null {
+        if (typeof window === 'undefined' || !('IntersectionObserver' in window)) {
+            return null;
+        }
+        if (this.chartObserver) {
+            return this.chartObserver;
+        }
+        this.chartObserver = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (!entry.isIntersecting) {
+                    return;
+                }
+                const element = entry.target as HTMLElement;
+                const chartId = element.id;
+                const task = this.chartPendingRender.get(chartId);
+                if (task) {
+                    void task();
+                    this.chartPendingRender.delete(chartId);
+                }
+                this.chartObserver?.unobserve(element);
+            });
+        }, { threshold: 0.15 });
+        return this.chartObserver;
+    }
+
+    private queueLazyChartRender(chartId: string, renderTask: () => Promise<void>): void {
+        const element = this.container.querySelector(`#${chartId}`) as HTMLElement | null;
+        if (!element) {
+            return;
+        }
+        const observer = this.ensureChartObserver();
+        if (!observer) {
+            void renderTask();
+            return;
+        }
+        this.chartPendingRender.set(chartId, renderTask);
+        observer.observe(element);
+    }
+
+    private async renderChartsForCurrentTab(result: Record<string, unknown>): Promise<void> {
+        if (this.activeTab === 'lime') {
+            const lime = (result.lime || {}) as Record<string, unknown>;
+            const visualization = (lime.visualization || {}) as Record<string, unknown>;
+            const featureImportance = this.parseImportanceRows(
+                visualization.feature_importance_list || lime.global_feature_importance || []
+            ).slice(0, 20);
+            this.queueLazyChartRender('chart-lime-feature', async () => {
+                await this.renderBarChart('chart-lime-feature', 'LIME特征重要性', featureImportance);
+            });
+            return;
+        }
+        if (this.activeTab === 'shap') {
+            const shap = (result.shap || {}) as Record<string, unknown>;
+            const vis = (shap.visualization || {}) as Record<string, unknown>;
+            const waterfall = this.parseImportanceRows(vis.waterfall_list || []).slice(0, 20);
+            const ranking = this.parseImportanceRows(vis.feature_ranking || shap.global_feature_importance || []).slice(0, 20);
+            const beeswarm = Array.isArray(vis.beeswarm_data) ? vis.beeswarm_data as Array<Record<string, unknown>> : [];
+            this.queueLazyChartRender('chart-shap-waterfall', async () => {
+                await this.renderBarChart('chart-shap-waterfall', 'SHAP瀑布图', waterfall);
+            });
+            this.queueLazyChartRender('chart-shap-ranking', async () => {
+                await this.renderBarChart('chart-shap-ranking', 'SHAP特征重要性排序', ranking);
+            });
+            this.queueLazyChartRender('chart-shap-beeswarm', async () => {
+                await this.renderShapBeeswarmChart(beeswarm, 0, 1);
+            });
+            return;
+        }
+        this.disposeCharts();
+    }
+
+    private async renderBarChart(chartId: string, title: string, rows: Array<{ name: string; value: number }>): Promise<void> {
+        const runtime = await this.loadChartRuntime();
+        const element = this.container.querySelector(`#${chartId}`) as HTMLElement | null;
+        if (!runtime || !element || !rows.length) {
+            return;
+        }
+        element.parentElement?.querySelector('.fallback-bars')?.classList.add('chart-enhanced');
+        const colorPositive = this.themeMode === 'dark' ? '#60a5fa' : '#2563eb';
+        const colorNegative = this.themeMode === 'dark' ? '#fca5a5' : '#dc2626';
+        const option: Record<string, unknown> = {
+            animation: false,
+            title: { text: title, left: 'center', textStyle: { fontSize: 12 } },
+            tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+            grid: { left: 140, right: 20, top: 36, bottom: 42 },
+            xAxis: { type: 'value' },
+            yAxis: {
+                type: 'category',
+                data: rows.map(row => row.name),
+                axisLabel: { width: 120, overflow: 'truncate' }
+            },
+            dataZoom: [
+                { type: 'inside', yAxisIndex: 0, zoomOnMouseWheel: true, moveOnMouseMove: true },
+                { type: 'slider', yAxisIndex: 0, height: 14, bottom: 8 }
+            ],
+            series: [
+                {
+                    type: 'bar',
+                    data: rows.map(row => ({
+                        value: row.value,
+                        itemStyle: { color: row.value >= 0 ? colorPositive : colorNegative }
+                    })),
+                    progressive: 2000
+                }
+            ]
+        };
+        this.setChartOption(chartId, runtime, element, option);
+    }
+
+    private async renderShapBeeswarmChart(rows: Array<Record<string, unknown>>, threshold: number, zoom: number): Promise<void> {
+        const runtime = await this.loadChartRuntime();
+        const element = this.container.querySelector('#chart-shap-beeswarm') as HTMLElement | null;
+        if (!runtime || !element) {
+            return;
+        }
+        element.parentElement?.querySelector('.fallback-bars')?.classList.add('chart-enhanced');
+        const filtered = rows
+            .map((item) => ({
+                feature: String(item.feature || item.feature_name || 'feature'),
+                x: Number(item.feature_value ?? item.x ?? 0),
+                y: Number(item.shap_value ?? item.value ?? item.y ?? 0)
+            }))
+            .filter((item) => Number.isFinite(item.x) && Number.isFinite(item.y))
+            .filter((item) => Math.abs(item.y) >= threshold)
+            .slice(0, 2000);
+        const size = Math.max(6, Math.min(16, Math.round(8 * zoom)));
+        const option: Record<string, unknown> = {
+            animation: false,
+            tooltip: {
+                trigger: 'item',
+                formatter: (params: { value: [number, number, string] }) => {
+                    const feature = String(params.value?.[2] || '-');
+                    const featureValue = Number(params.value?.[0] || 0).toFixed(4);
+                    const shapValue = Number(params.value?.[1] || 0).toFixed(4);
+                    return `${feature}<br/>feature=${featureValue}<br/>shap=${shapValue}`;
+                }
+            },
+            grid: { left: 52, right: 24, top: 18, bottom: 48 },
+            xAxis: { type: 'value', name: 'Feature Value' },
+            yAxis: { type: 'value', name: 'SHAP Value' },
+            dataZoom: [
+                { type: 'inside', xAxisIndex: 0, yAxisIndex: 0 },
+                { type: 'slider', xAxisIndex: 0, bottom: 10, height: 14 }
+            ],
+            series: [
+                {
+                    type: 'scatter',
+                    data: filtered.map((item) => [item.x, item.y, item.feature]),
+                    symbolSize: size,
+                    itemStyle: {
+                        color: (param: { value: [number, number, string] }) => (Number(param.value?.[1] || 0) >= 0 ? '#16a34a' : '#dc2626'),
+                        opacity: 0.72
+                    },
+                    large: true,
+                    largeThreshold: 1200,
+                    progressive: 3000
+                }
+            ]
+        };
+        this.setChartOption('chart-shap-beeswarm', runtime, element, option);
+    }
+
+    private setChartOption(
+        chartId: string,
+        runtime: ChartRuntime,
+        element: HTMLElement,
+        option: Record<string, unknown>
+    ): void {
+        const existing = this.chartInstances.get(chartId);
+        const instance = existing || runtime.init(element, this.themeMode);
+        instance.setOption(option, { notMerge: true, lazyUpdate: true });
+        this.chartInstances.set(chartId, instance);
+    }
+
+    private async resizeAllCharts(): Promise<void> {
+        this.chartInstances.forEach((chart) => {
+            chart.resize();
+        });
+    }
+
+    private disposeCharts(): void {
+        this.chartInstances.forEach((chart) => chart.dispose());
+        this.chartInstances.clear();
+        this.chartPendingRender.clear();
     }
 
     private parseJSONInputSafe<T>(id: string, fallback: T): T {
@@ -1236,6 +1608,59 @@ export class SpatiotemporalExplainPanel {
         };
     }
 
+    private startPerformanceMonitor(): void {
+        if (typeof window === 'undefined') {
+            return;
+        }
+        this.lastFpsTs = performance.now();
+        const tickFrame = (now: number): void => {
+            this.frameCount += 1;
+            if (now - this.lastFpsTs >= 1000) {
+                this.latestFPS = Math.round((this.frameCount * 1000) / (now - this.lastFpsTs));
+                this.frameCount = 0;
+                this.lastFpsTs = now;
+                this.latestMemoryMB = this.readMemoryMB();
+                this.updatePerformanceChip();
+            }
+            this.fpsRafId = window.requestAnimationFrame(tickFrame);
+        };
+        this.fpsRafId = window.requestAnimationFrame(tickFrame);
+        this.fpsTickerId = window.setInterval(() => this.updatePerformanceChip(), 1500);
+    }
+
+    private stopPerformanceMonitor(): void {
+        if (this.fpsRafId !== null) {
+            window.cancelAnimationFrame(this.fpsRafId);
+            this.fpsRafId = null;
+        }
+        if (this.fpsTickerId !== null) {
+            window.clearInterval(this.fpsTickerId);
+            this.fpsTickerId = null;
+        }
+    }
+
+    private readMemoryMB(): number | null {
+        const perf = performance as typeof performance & { memory?: { usedJSHeapSize?: number } };
+        const used = perf.memory?.usedJSHeapSize;
+        if (!used || !Number.isFinite(used)) {
+            return null;
+        }
+        return Math.round((used / (1024 * 1024)) * 10) / 10;
+    }
+
+    private updatePerformanceChip(): void {
+        const fpsEl = this.container.querySelector('#dl-explain-fps') as HTMLElement | null;
+        if (fpsEl) {
+            fpsEl.textContent = `FPS: ${this.formatNumber(this.latestFPS)}`;
+        }
+        const memoryEl = this.container.querySelector('#dl-explain-memory') as HTMLElement | null;
+        if (memoryEl) {
+            memoryEl.textContent = this.latestMemoryMB === null
+                ? '内存: -'
+                : `内存: ${this.formatNumber(this.latestMemoryMB)}MB`;
+        }
+    }
+
     private async pollActiveTasks(): Promise<void> {
         const active = this.tasks.filter(task => ['queued', 'running', 'retrying'].includes(task.status));
         if (!active.length) {
@@ -1314,6 +1739,12 @@ export class SpatiotemporalExplainPanel {
 
     public destroy(): void {
         this.stopAutoRefresh();
+        this.stopPerformanceMonitor();
+        this.disposeCharts();
+        if (this.chartObserver) {
+            this.chartObserver.disconnect();
+            this.chartObserver = null;
+        }
         const list = this.container.querySelector('#dl-explain-task-list') as HTMLElement | null;
         if (list && this.taskListScrollHandler) {
             list.removeEventListener('scroll', this.taskListScrollHandler);
