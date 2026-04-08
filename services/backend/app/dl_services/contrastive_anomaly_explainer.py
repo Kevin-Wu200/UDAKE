@@ -162,13 +162,21 @@ class ContrastiveLimeAdapter:
     def _predict_encoder_response(self, *, model: Any, coords: np.ndarray, values: np.ndarray) -> dict[str, np.ndarray]:
         emb = np.asarray(model.encode(np.asarray(coords, dtype=float), np.asarray(values, dtype=float)), dtype=float)
         if emb.ndim != 2 or emb.shape[0] == 0:
-            return {"embedding_norm": np.zeros((0,), dtype=float), "embedding_cos_center": np.zeros((0,), dtype=float)}
+            return {
+                "embedding": np.zeros((0, 0), dtype=float),
+                "embedding_norm": np.zeros((0,), dtype=float),
+                "embedding_cos_center": np.zeros((0,), dtype=float),
+            }
         norm = np.linalg.norm(emb, axis=1)
         center = np.mean(emb, axis=0, keepdims=True)
         center_norm = np.linalg.norm(center, axis=1).reshape(-1)[0] + 1e-9
         emb_norm = np.linalg.norm(emb, axis=1) + 1e-9
         cos_center = np.sum(emb * center, axis=1) / (emb_norm * center_norm)
-        return {"embedding_norm": norm.astype(float), "embedding_cos_center": cos_center.astype(float)}
+        return {
+            "embedding": emb.astype(float),
+            "embedding_norm": norm.astype(float),
+            "embedding_cos_center": cos_center.astype(float),
+        }
 
     def _predict_contrastive_scores(self, *, model: Any, coords: np.ndarray, values: np.ndarray) -> dict[str, np.ndarray]:
         bundle = model.anomaly_scores(np.asarray(coords, dtype=float), np.asarray(values, dtype=float))
@@ -234,6 +242,161 @@ class ContrastiveLimeAdapter:
                 for i in explained_nodes
                 if 0 <= i < len(s)
             ],
+        }
+
+    def _embedding_similarity_analysis(self, embeddings: np.ndarray) -> dict[str, Any]:
+        emb = np.asarray(embeddings, dtype=float)
+        if emb.ndim != 2 or emb.shape[0] == 0:
+            return {
+                "mean_cosine_similarity": 0.0,
+                "std_cosine_similarity": 0.0,
+                "most_similar_pairs": [],
+                "most_dissimilar_pairs": [],
+                "node_mean_similarity": [],
+            }
+        norm = np.linalg.norm(emb, axis=1, keepdims=True) + 1e-9
+        normalized = emb / norm
+        sim = np.asarray(normalized @ normalized.T, dtype=float)
+        n = sim.shape[0]
+        triu = np.triu_indices(n, k=1)
+        pair_scores = sim[triu] if len(triu[0]) else np.zeros((0,), dtype=float)
+        pair_rows = [
+            {"node_i": int(i), "node_j": int(j), "cosine_similarity": float(sim[i, j])}
+            for i, j in zip(triu[0].tolist(), triu[1].tolist())
+        ]
+        pair_rows.sort(key=lambda item: float(item["cosine_similarity"]), reverse=True)
+        top_k = max(1, min(8, len(pair_rows)))
+        np.fill_diagonal(sim, np.nan)
+        node_mean = np.nanmean(sim, axis=1)
+        node_mean = np.where(np.isfinite(node_mean), node_mean, 0.0)
+        return {
+            "mean_cosine_similarity": float(np.mean(pair_scores)) if len(pair_scores) else 1.0,
+            "std_cosine_similarity": float(np.std(pair_scores)) if len(pair_scores) else 0.0,
+            "most_similar_pairs": pair_rows[:top_k],
+            "most_dissimilar_pairs": sorted(pair_rows, key=lambda item: float(item["cosine_similarity"]))[:top_k],
+            "node_mean_similarity": [
+                {"node_index": int(i), "mean_cosine_similarity": float(node_mean[i])}
+                for i in range(len(node_mean))
+            ],
+        }
+
+    def _embedding_distribution_analysis(self, embeddings: np.ndarray, scores: np.ndarray) -> dict[str, Any]:
+        emb = np.asarray(embeddings, dtype=float)
+        s = np.asarray(scores, dtype=float).reshape(-1)
+        if emb.ndim != 2 or emb.shape[0] == 0:
+            return {
+                "embedding_dim": 0,
+                "center": [],
+                "distance_stats": {"mean": 0.0, "std": 0.0, "p90": 0.0, "p95": 0.0},
+                "score_distance_correlation": 0.0,
+                "distance_to_center": [],
+            }
+        center = np.mean(emb, axis=0)
+        dist = np.linalg.norm(emb - center.reshape(1, -1), axis=1)
+        aligned = min(len(dist), len(s))
+        corr = 0.0
+        if aligned >= 2:
+            d = dist[:aligned]
+            y = s[:aligned]
+            if np.std(d) > 1e-9 and np.std(y) > 1e-9:
+                corr = float(np.corrcoef(d, y)[0, 1])
+        return {
+            "embedding_dim": int(emb.shape[1]),
+            "center": [float(x) for x in center.tolist()],
+            "distance_stats": {
+                "mean": float(np.mean(dist)),
+                "std": float(np.std(dist)),
+                "p90": float(np.percentile(dist, 90)),
+                "p95": float(np.percentile(dist, 95)),
+            },
+            "score_distance_correlation": corr,
+            "distance_to_center": [float(x) for x in dist.tolist()],
+        }
+
+    def _embedding_anomaly_patterns(
+        self,
+        *,
+        scores: np.ndarray,
+        explained_nodes: list[int],
+        similarity: dict[str, Any],
+        distribution: dict[str, Any],
+    ) -> dict[str, Any]:
+        s = np.asarray(scores, dtype=float).reshape(-1)
+        dist = np.asarray(distribution.get("distance_to_center", []), dtype=float).reshape(-1)
+        mean_similarity = np.asarray(
+            [float(item.get("mean_cosine_similarity", 0.0)) for item in similarity.get("node_mean_similarity", [])],
+            dtype=float,
+        ).reshape(-1)
+        if len(s) == 0 or len(dist) == 0 or len(mean_similarity) == 0:
+            return {"pattern_name": "none", "matched_nodes": [], "coverage": 0.0}
+        aligned = min(len(s), len(dist), len(mean_similarity))
+        score_thr = float(np.percentile(s[:aligned], 95))
+        dist_thr = float(np.percentile(dist[:aligned], 90))
+        sim_thr = float(np.percentile(mean_similarity[:aligned], 15))
+        matched = [
+            int(i)
+            for i in range(aligned)
+            if s[i] >= score_thr and dist[i] >= dist_thr and mean_similarity[i] <= sim_thr
+        ]
+        explain_set = set(int(i) for i in explained_nodes)
+        matched_explained = [idx for idx in matched if idx in explain_set]
+        return {
+            "pattern_name": "high_score_far_center_low_similarity",
+            "rule_thresholds": {"score_p95": score_thr, "distance_p90": dist_thr, "similarity_p15": sim_thr},
+            "matched_nodes": matched,
+            "matched_explained_nodes": matched_explained,
+            "coverage": float(len(matched) / max(1, aligned)),
+        }
+
+    def _embedding_visualization(self, embeddings: np.ndarray, scores: np.ndarray) -> dict[str, Any]:
+        emb = np.asarray(embeddings, dtype=float)
+        s = np.asarray(scores, dtype=float).reshape(-1)
+        if emb.ndim != 2 or emb.shape[0] == 0:
+            return {"method": "pca_svd", "points": []}
+        if emb.shape[1] >= 2:
+            centered = emb - np.mean(emb, axis=0, keepdims=True)
+            try:
+                _, _, vh = np.linalg.svd(centered, full_matrices=False)
+                components = vh[:2]
+                reduced = centered @ components.T
+            except Exception:
+                reduced = centered[:, :2]
+        else:
+            reduced = np.concatenate([emb, np.zeros((emb.shape[0], 1), dtype=float)], axis=1)
+        threshold = float(np.percentile(s, 95)) if len(s) else 0.0
+        points = []
+        for idx in range(min(len(reduced), len(s))):
+            points.append(
+                {
+                    "node_index": int(idx),
+                    "x": float(reduced[idx, 0]),
+                    "y": float(reduced[idx, 1]),
+                    "score": float(s[idx]),
+                    "is_anomaly": bool(s[idx] >= threshold),
+                }
+            )
+        return {"method": "pca_svd", "anomaly_threshold_p95": threshold, "points": points}
+
+    def _embedding_analysis(self, *, encoder_bundle: dict[str, np.ndarray], scores: np.ndarray, explained_nodes: list[int]) -> dict[str, Any]:
+        embeddings = np.asarray(encoder_bundle.get("embedding", []), dtype=float)
+        similarity = self._embedding_similarity_analysis(embeddings)
+        distribution = self._embedding_distribution_analysis(embeddings, np.asarray(scores, dtype=float))
+        patterns = self._embedding_anomaly_patterns(
+            scores=np.asarray(scores, dtype=float),
+            explained_nodes=explained_nodes,
+            similarity=similarity,
+            distribution=distribution,
+        )
+        visualization = self._embedding_visualization(embeddings, np.asarray(scores, dtype=float))
+        return {
+            "summary": {
+                "embedding_count": int(embeddings.shape[0]) if embeddings.ndim == 2 else 0,
+                "embedding_dim": int(embeddings.shape[1]) if embeddings.ndim == 2 else 0,
+            },
+            "similarity": similarity,
+            "distribution": distribution,
+            "anomaly_patterns": patterns,
+            "visualization": visualization,
         }
 
     def _score_decomposition(
@@ -690,6 +853,11 @@ class ContrastiveLimeAdapter:
                 "embedding_norm": np.asarray(context["encoder_bundle"]["embedding_norm"], dtype=float).astype(float).tolist(),
                 "embedding_cos_center": np.asarray(context["encoder_bundle"]["embedding_cos_center"], dtype=float).astype(float).tolist(),
             },
+            "embedding_analysis": self._embedding_analysis(
+                encoder_bundle=context["encoder_bundle"],
+                scores=target,
+                explained_nodes=explained_nodes,
+            ),
             "surrogate_metrics": context["surrogate_metrics"],
             "preprocess": context["preprocess"],
             "anomaly_analysis": self._anomaly_profile(target, explained_nodes),
@@ -1008,6 +1176,11 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                 "embedding_norm": np.asarray(context["encoder_bundle"]["embedding_norm"], dtype=float).astype(float).tolist(),
                 "embedding_cos_center": np.asarray(context["encoder_bundle"]["embedding_cos_center"], dtype=float).astype(float).tolist(),
             },
+            "embedding_analysis": self._embedding_analysis(
+                encoder_bundle=context["encoder_bundle"],
+                scores=target,
+                explained_nodes=explained_nodes,
+            ),
             "embedding_input": self._embedding_input_summary(context["encoder_bundle"], explained_nodes),
             "encoder_shap_analysis": self._encoder_shap_analysis(
                 feature_names=feature_names,
