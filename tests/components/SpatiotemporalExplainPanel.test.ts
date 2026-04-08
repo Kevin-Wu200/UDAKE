@@ -699,4 +699,91 @@ describe('SpatiotemporalExplainPanel', () => {
 
         panel.destroy();
     });
+
+    it('应渲染重建误差分布并支持阈值交互', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        api.createSpatiotemporalExplainTask.mockResolvedValue({ task_id: 'task-recon' });
+        api.getSpatiotemporalExplainTask.mockResolvedValue({
+            task_id: 'task-recon',
+            status: 'completed',
+            result: {
+                method: 'hybrid',
+                lime: {
+                    score_components: { reconstruction: [0.1, 0.2, 0.35, 0.5, 0.85] },
+                    visualization: { feature_importance_list: [] }
+                },
+                shap: {
+                    score_components: { reconstruction: [0.12, 0.22, 0.4, 0.53, 0.8] },
+                    visualization: { feature_ranking: [] }
+                },
+                summary: {}
+            }
+        });
+
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+
+        (host.querySelector('[data-result-tab="spatiotemporal"]') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(host.querySelector('#recon-histogram-list')).toBeTruthy();
+        expect(host.querySelectorAll('.recon-histogram-row').length).toBeGreaterThan(0);
+        expect(host.querySelector('#recon-heatmap-grid')).toBeTruthy();
+        expect(host.querySelectorAll('#recon-heatmap-grid .recon-error-cell').length).toBeGreaterThan(0);
+        expect(host.querySelector('#recon-timeline-list')).toBeTruthy();
+        expect(host.querySelector('#recon-compare-panel')?.textContent).toContain('整体平均误差');
+
+        const threshold = host.querySelector('#recon-threshold-percentile') as HTMLInputElement;
+        threshold.value = '80';
+        threshold.dispatchEvent(new Event('input', { bubbles: true }));
+        await flushPromises();
+
+        expect(host.querySelector('#recon-threshold-percentile-label')?.textContent).toBe('P80');
+        expect(host.querySelector('#recon-histogram-meta')?.textContent).toContain('P80');
+
+        panel.destroy();
+    });
+
+    it('应覆盖重建误差提取与统计分支', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        const fromScore = (panel as any).extractReconstructionErrorsFromPayload({
+            score_components: { reconstruction: [0.1, '0.2', null, 'bad'] }
+        });
+        expect(fromScore).toEqual([0.1, 0.2, 0]);
+
+        const fromAnalysis = (panel as any).extractReconstructionErrorsFromPayload({
+            reconstruction_analysis: {
+                node_analysis: [{ reconstruction_error: 0.4 }, { reconstruction_score: 0.6 }]
+            }
+        });
+        expect(fromAnalysis).toEqual([0.4, 0.6]);
+
+        const fromGenerator = (panel as any).extractReconstructionErrorsFromPayload({
+            generator_analysis: {
+                node_analysis: [{ reconstruction_score: 0.7 }, { abs_residual: 0.9 }]
+            }
+        });
+        expect(fromGenerator).toEqual([0.7, 0.9]);
+
+        const percentile = (panel as any).computePercentile([1, 2, 3, 4, 5], 80);
+        expect(percentile).toBe(4);
+
+        const histogram = (panel as any).buildReconstructionHistogramRows([0.1, 0.2, 0.2, 0.6], 0.2, 6);
+        expect(histogram.length).toBeGreaterThanOrEqual(4);
+        expect(histogram.some((item: any) => item.isThresholdBin)).toBe(true);
+
+        const comparison = (panel as any).buildReconstructionCompareRows(
+            { lime: [0.2, 0.3], shap: [0.1, 0.4], combined: [0.1, 0.2, 0.8] },
+            0.3
+        );
+        expect(comparison.aboveThresholdCount).toBe(1);
+        expect(comparison.methodGap).toBeGreaterThanOrEqual(0);
+
+        panel.destroy();
+    });
 });

@@ -793,6 +793,7 @@ export class SpatiotemporalExplainPanel {
 
         this.disposeCharts();
         container.innerHTML = this.renderSpatiotemporalResult(result);
+        this.bindReconstructionErrorInteractive(container, result);
     }
 
     private renderFeatureBarList(rows: Array<{ name: string; value: number }>, className: string): string {
@@ -1754,12 +1755,58 @@ export class SpatiotemporalExplainPanel {
 
         const coordinates = this.parseJSONInputSafe<Array<[number, number]>>('dl-explain-coords', []);
         const series = this.parseJSONInputSafe<number[][][]>('dl-explain-series', []);
+        const reconstruction = this.collectReconstructionErrorData(result);
+        const thresholdPercentile = 95;
+        const threshold = this.computePercentile(reconstruction.combined, thresholdPercentile);
+        const histogram = this.buildReconstructionHistogramRows(reconstruction.combined, threshold, 12);
+        const errorHeatmap = this.buildReconstructionHeatmapRows(coordinates, reconstruction.combined, threshold);
+        const errorTimeline = this.buildReconstructionTimelineRows(series, reconstruction.combined, threshold);
+        const comparison = this.buildReconstructionCompareRows(reconstruction, threshold);
 
         const heatmap = this.buildHeatmapRows(coordinates, result);
         const timeline = this.buildTimelineRows(series);
 
         return `
             <div class="explain-result-grid">
+                <section class="result-card">
+                    <h6>重建误差分布直方图</h6>
+                    <div class="recon-threshold-controls">
+                        <label>阈值分位数
+                            <input id="recon-threshold-percentile" class="input" type="range" min="50" max="99" value="${thresholdPercentile}">
+                            <span id="recon-threshold-percentile-label">P${thresholdPercentile}</span>
+                        </label>
+                    </div>
+                    <div id="recon-histogram-meta" class="summary-card recon-meta-card">
+                        <p>阈值：${threshold.toFixed(4)}（P${thresholdPercentile}）</p>
+                        <p>超阈值节点：${comparison.aboveThresholdCount}/${Math.max(1, reconstruction.combined.length)}</p>
+                        <p>平均误差：${comparison.meanError.toFixed(4)}</p>
+                    </div>
+                    <div id="recon-histogram-list" class="recon-histogram-list">
+                        ${this.renderReconstructionHistogramRows(histogram)}
+                    </div>
+                </section>
+
+                <section class="result-card">
+                    <h6>重建误差热图</h6>
+                    <div id="recon-heatmap-grid" class="heatmap-grid recon-heatmap-grid">
+                        ${this.renderReconstructionHeatmapRows(errorHeatmap)}
+                    </div>
+                </section>
+
+                <section class="result-card">
+                    <h6>重建误差时间轴</h6>
+                    <div id="recon-timeline-list" class="timeline-list recon-timeline-list">
+                        ${this.renderReconstructionTimelineRows(errorTimeline)}
+                    </div>
+                </section>
+
+                <section class="result-card">
+                    <h6>重建误差对比</h6>
+                    <div id="recon-compare-panel" class="summary-card recon-compare-panel">
+                        ${this.renderReconstructionCompareRows(comparison)}
+                    </div>
+                </section>
+
                 <section class="result-card">
                     <h6>空间热力图（近似）</h6>
                     <div class="heatmap-grid">
@@ -1801,6 +1848,45 @@ export class SpatiotemporalExplainPanel {
                 </section>
             </div>
         `;
+    }
+
+    private bindReconstructionErrorInteractive(container: HTMLElement, result: Record<string, unknown>): void {
+        const percentileInput = container.querySelector('#recon-threshold-percentile') as HTMLInputElement | null;
+        const percentileLabel = container.querySelector('#recon-threshold-percentile-label') as HTMLElement | null;
+        const histogramTarget = container.querySelector('#recon-histogram-list') as HTMLElement | null;
+        const heatmapTarget = container.querySelector('#recon-heatmap-grid') as HTMLElement | null;
+        const timelineTarget = container.querySelector('#recon-timeline-list') as HTMLElement | null;
+        const compareTarget = container.querySelector('#recon-compare-panel') as HTMLElement | null;
+        const histogramMeta = container.querySelector('#recon-histogram-meta') as HTMLElement | null;
+        if (!percentileInput || !percentileLabel || !histogramTarget || !heatmapTarget || !timelineTarget || !compareTarget || !histogramMeta) {
+            return;
+        }
+        const coordinates = this.parseJSONInputSafe<Array<[number, number]>>('dl-explain-coords', []);
+        const series = this.parseJSONInputSafe<number[][][]>('dl-explain-series', []);
+        const reconstruction = this.collectReconstructionErrorData(result);
+        const rerender = (): void => {
+            const percentile = Math.max(50, Math.min(99, Number(percentileInput.value || 95)));
+            percentileLabel.textContent = `P${percentile}`;
+            const threshold = this.computePercentile(reconstruction.combined, percentile);
+            histogramMeta.innerHTML = `
+                <p>阈值：${threshold.toFixed(4)}（P${percentile}）</p>
+                <p>超阈值节点：${reconstruction.combined.filter((value) => value >= threshold).length}/${Math.max(1, reconstruction.combined.length)}</p>
+                <p>平均误差：${(reconstruction.combined.reduce((acc, item) => acc + item, 0) / Math.max(1, reconstruction.combined.length)).toFixed(4)}</p>
+            `;
+            histogramTarget.innerHTML = this.renderReconstructionHistogramRows(
+                this.buildReconstructionHistogramRows(reconstruction.combined, threshold, 12)
+            );
+            heatmapTarget.innerHTML = this.renderReconstructionHeatmapRows(
+                this.buildReconstructionHeatmapRows(coordinates, reconstruction.combined, threshold)
+            );
+            timelineTarget.innerHTML = this.renderReconstructionTimelineRows(
+                this.buildReconstructionTimelineRows(series, reconstruction.combined, threshold)
+            );
+            compareTarget.innerHTML = this.renderReconstructionCompareRows(
+                this.buildReconstructionCompareRows(reconstruction, threshold)
+            );
+        };
+        percentileInput.addEventListener('input', rerender);
     }
 
     private exportCurrentResult(): void {
@@ -2281,6 +2367,291 @@ export class SpatiotemporalExplainPanel {
             value,
             width: Math.round((Math.abs(value) / maxVal) * 100)
         }));
+    }
+
+    private collectReconstructionErrorData(result: Record<string, unknown>): { lime: number[]; shap: number[]; combined: number[] } {
+        const lime = this.extractReconstructionErrorsFromPayload((result.lime || {}) as Record<string, unknown>);
+        const shap = this.extractReconstructionErrorsFromPayload((result.shap || {}) as Record<string, unknown>);
+        const fallback = this.extractReconstructionErrorsFromPayload(result);
+        const maxLen = Math.max(lime.length, shap.length, fallback.length);
+        const combined: number[] = [];
+        for (let i = 0; i < maxLen; i += 1) {
+            const values = [lime[i], shap[i], fallback[i]].filter((item) => Number.isFinite(item)) as number[];
+            if (!values.length) {
+                continue;
+            }
+            combined.push(values.reduce((acc, item) => acc + item, 0) / values.length);
+        }
+        if (!combined.length) {
+            return {
+                lime,
+                shap,
+                combined: fallback.length ? fallback : [0]
+            };
+        }
+        return { lime, shap, combined };
+    }
+
+    private extractReconstructionErrorsFromPayload(payload: Record<string, unknown>): number[] {
+        const rows: number[] = [];
+        const scoreComponents = (payload.score_components || {}) as Record<string, unknown>;
+        const reconRaw = scoreComponents.reconstruction;
+        if (Array.isArray(reconRaw)) {
+            reconRaw.forEach((value) => {
+                const num = Number(value);
+                if (Number.isFinite(num)) {
+                    rows.push(num);
+                }
+            });
+        }
+
+        if (!rows.length) {
+            const reconAnalysis = (payload.reconstruction_analysis || {}) as Record<string, unknown>;
+            const nodeAnalysis = Array.isArray(reconAnalysis.node_analysis) ? reconAnalysis.node_analysis as Array<Record<string, unknown>> : [];
+            nodeAnalysis.forEach((item) => {
+                const num = Number(item.reconstruction_error ?? item.reconstruction_score ?? item.error ?? 0);
+                if (Number.isFinite(num)) {
+                    rows.push(num);
+                }
+            });
+        }
+
+        if (!rows.length) {
+            const generator = (payload.generator_analysis || {}) as Record<string, unknown>;
+            const nodeRows = Array.isArray(generator.node_analysis) ? generator.node_analysis as Array<Record<string, unknown>> : [];
+            nodeRows.forEach((item) => {
+                const num = Number(item.reconstruction_score ?? item.abs_residual ?? 0);
+                if (Number.isFinite(num)) {
+                    rows.push(num);
+                }
+            });
+        }
+        return rows;
+    }
+
+    private computePercentile(values: number[], percentile: number): number {
+        const filtered = values.filter((item) => Number.isFinite(item));
+        if (!filtered.length) {
+            return 0;
+        }
+        const sorted = [...filtered].sort((a, b) => a - b);
+        const p = Math.max(0, Math.min(100, percentile));
+        const idx = Math.min(sorted.length - 1, Math.max(0, Math.floor(((sorted.length - 1) * p) / 100)));
+        return sorted[idx];
+    }
+
+    private buildReconstructionHistogramRows(
+        values: number[],
+        threshold: number,
+        binCount: number
+    ): Array<{ left: number; right: number; count: number; ratio: number; isThresholdBin: boolean }> {
+        const filtered = values.filter((item) => Number.isFinite(item));
+        if (!filtered.length) {
+            return [{ left: 0, right: 0, count: 0, ratio: 0, isThresholdBin: true }];
+        }
+        const minVal = Math.min(...filtered);
+        const maxVal = Math.max(...filtered);
+        const bins = Math.max(4, Math.min(30, binCount));
+        const span = Math.max(1e-6, maxVal - minVal);
+        const step = span / bins;
+        const bucket = Array.from({ length: bins }).map((_, idx) => ({
+            left: minVal + idx * step,
+            right: idx === bins - 1 ? maxVal : minVal + (idx + 1) * step,
+            count: 0,
+            ratio: 0,
+            isThresholdBin: false
+        }));
+        filtered.forEach((value) => {
+            const rawIndex = Math.floor((value - minVal) / step);
+            const idx = Math.max(0, Math.min(bins - 1, rawIndex));
+            bucket[idx].count += 1;
+        });
+        const total = filtered.length;
+        bucket.forEach((item, idx) => {
+            item.ratio = item.count / Math.max(1, total);
+            const startHit = threshold >= item.left;
+            const endHit = idx === bins - 1 ? threshold <= item.right : threshold < item.right;
+            item.isThresholdBin = startHit && endHit;
+        });
+        return bucket;
+    }
+
+    private renderReconstructionHistogramRows(
+        rows: Array<{ left: number; right: number; count: number; ratio: number; isThresholdBin: boolean }>
+    ): string {
+        if (!rows.length) {
+            return '<div class="status-message">暂无重建误差数据</div>';
+        }
+        const maxCount = Math.max(...rows.map((item) => item.count), 1);
+        return rows.map((item) => {
+            const width = Math.max(2, Math.round((item.count / maxCount) * 100));
+            return `
+                <div class="recon-histogram-row ${item.isThresholdBin ? 'threshold-hit' : ''}">
+                    <span class="recon-histogram-bin">${item.left.toFixed(3)} ~ ${item.right.toFixed(3)}</span>
+                    <div class="recon-histogram-track">
+                        <div class="recon-histogram-fill" style="width:${width}%"></div>
+                    </div>
+                    <span class="recon-histogram-count">${item.count}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    private buildReconstructionHeatmapRows(
+        coords: Array<[number, number]>,
+        errors: number[],
+        threshold: number
+    ): Array<{ label: string; value: number; intensity: number; exceeded: boolean }> {
+        const values = errors.filter((item) => Number.isFinite(item));
+        if (!values.length) {
+            return [{ label: '无重建误差', value: 0, intensity: 0.1, exceeded: false }];
+        }
+        const maxError = Math.max(...values, 1e-6);
+        return values.slice(0, 64).map((value, idx) => {
+            const coord = coords[idx];
+            const label = coord
+                ? `节点${idx} (${coord[0]}, ${coord[1]})`
+                : `节点${idx} (无坐标)`;
+            return {
+                label,
+                value,
+                intensity: Math.max(0.1, Math.min(1, value / maxError)),
+                exceeded: value >= threshold
+            };
+        });
+    }
+
+    private renderReconstructionHeatmapRows(
+        rows: Array<{ label: string; value: number; intensity: number; exceeded: boolean }>
+    ): string {
+        if (!rows.length) {
+            return '<div class="status-message">暂无重建误差热图</div>';
+        }
+        return rows.map((row) => {
+            const opacity = row.intensity;
+            const className = row.exceeded ? 'heatmap-cell recon-error-cell threshold-hit' : 'heatmap-cell recon-error-cell';
+            return `
+                <button class="${className}" type="button" aria-label="${row.label}" title="${row.label} / 误差 ${row.value.toFixed(4)}" style="background: rgba(249, 115, 22, ${opacity});">
+                    ${row.value.toFixed(3)}
+                </button>
+            `;
+        }).join('');
+    }
+
+    private buildReconstructionTimelineRows(
+        series: number[][][],
+        reconstructionErrors: number[],
+        threshold: number
+    ): Array<{ index: number; value: number; width: number; exceeded: boolean }> {
+        const recon = reconstructionErrors.filter((item) => Number.isFinite(item));
+        if (!series.length || !series[0]?.length) {
+            if (!recon.length) {
+                return [];
+            }
+            const maxVal = Math.max(...recon, 1e-6);
+            return recon.slice(0, 40).map((value, index) => ({
+                index,
+                value,
+                width: Math.round((value / maxVal) * 100),
+                exceeded: value >= threshold
+            }));
+        }
+        const steps = series[0].length;
+        const factor = recon.length ? recon.reduce((acc, item) => acc + item, 0) / recon.length : 1;
+        const timelineValues: number[] = [];
+        for (let t = 1; t < steps; t += 1) {
+            let sumDiff = 0;
+            let count = 0;
+            for (const node of series) {
+                const current = Array.isArray(node[t]) ? node[t] : [];
+                const prev = Array.isArray(node[t - 1]) ? node[t - 1] : [];
+                const dim = Math.max(current.length, prev.length);
+                for (let i = 0; i < dim; i += 1) {
+                    const c = Number(current[i] ?? 0);
+                    const p = Number(prev[i] ?? 0);
+                    if (!Number.isFinite(c) || !Number.isFinite(p)) {
+                        continue;
+                    }
+                    sumDiff += Math.abs(c - p);
+                    count += 1;
+                }
+            }
+            const drift = count ? sumDiff / count : 0;
+            timelineValues.push(drift * factor);
+        }
+        const maxVal = Math.max(...timelineValues.map((item) => Math.abs(item)), 1e-6);
+        return timelineValues.slice(0, 60).map((value, index) => ({
+            index,
+            value,
+            width: Math.round((Math.abs(value) / maxVal) * 100),
+            exceeded: value >= threshold
+        }));
+    }
+
+    private renderReconstructionTimelineRows(
+        rows: Array<{ index: number; value: number; width: number; exceeded: boolean }>
+    ): string {
+        if (!rows.length) {
+            return '<div class="status-message">暂无重建误差时间轴数据</div>';
+        }
+        return rows.map((row) => `
+            <div class="timeline-item recon-timeline-item ${row.exceeded ? 'threshold-hit' : ''}">
+                <span>T${row.index + 1}</span>
+                <div class="timeline-track">
+                    <div class="timeline-fill recon-timeline-fill" style="width:${Math.max(2, row.width)}%"></div>
+                </div>
+                <span>${row.value.toFixed(4)}</span>
+            </div>
+        `).join('');
+    }
+
+    private buildReconstructionCompareRows(
+        reconstruction: { lime: number[]; shap: number[]; combined: number[] },
+        threshold: number
+    ): {
+        aboveThresholdCount: number;
+        belowThresholdCount: number;
+        meanError: number;
+        aboveMean: number;
+        belowMean: number;
+        limeMean: number;
+        shapMean: number;
+        methodGap: number;
+    } {
+        const combined = reconstruction.combined.filter((item) => Number.isFinite(item));
+        const above = combined.filter((item) => item >= threshold);
+        const below = combined.filter((item) => item < threshold);
+        const mean = (values: number[]): number => values.length ? values.reduce((acc, item) => acc + item, 0) / values.length : 0;
+        const limeMean = mean(reconstruction.lime.filter((item) => Number.isFinite(item)));
+        const shapMean = mean(reconstruction.shap.filter((item) => Number.isFinite(item)));
+        return {
+            aboveThresholdCount: above.length,
+            belowThresholdCount: below.length,
+            meanError: mean(combined),
+            aboveMean: mean(above),
+            belowMean: mean(below),
+            limeMean,
+            shapMean,
+            methodGap: Math.abs(limeMean - shapMean)
+        };
+    }
+
+    private renderReconstructionCompareRows(rows: {
+        aboveThresholdCount: number;
+        belowThresholdCount: number;
+        meanError: number;
+        aboveMean: number;
+        belowMean: number;
+        limeMean: number;
+        shapMean: number;
+        methodGap: number;
+    }): string {
+        return `
+            <p>阈值外/内节点：${rows.aboveThresholdCount} / ${rows.belowThresholdCount}</p>
+            <p>整体平均误差：${rows.meanError.toFixed(4)}</p>
+            <p>阈值外平均误差：${rows.aboveMean.toFixed(4)}；阈值内平均误差：${rows.belowMean.toFixed(4)}</p>
+            <p>LIME平均误差：${rows.limeMean.toFixed(4)}；SHAP平均误差：${rows.shapMean.toFixed(4)}；方法差异：${rows.methodGap.toFixed(4)}</p>
+        `;
     }
 
     private attachTaskListVirtualScroll(): void {
