@@ -595,4 +595,108 @@ describe('SpatiotemporalExplainPanel', () => {
 
         panel.destroy();
     });
+
+    it('应渲染异常原因分析并支持分类筛选与详情弹窗', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        api.createSpatiotemporalExplainTask.mockResolvedValue({ task_id: 'task-reason' });
+        api.getSpatiotemporalExplainTask.mockResolvedValue({
+            task_id: 'task-reason',
+            status: 'completed',
+            result: {
+                method: 'hybrid',
+                lime: {
+                    anomaly_score_explanation: {
+                        anomaly_reasons: [
+                            { node_index: 1, reason: '节点1异常由温度突增驱动，重建分量上升。', confidence: 0.91, category: '重建偏差' },
+                            { node_index: 2, reason: '节点2异常由判别器输出偏高触发。', confidence: 0.66, category: '判别偏移' }
+                        ]
+                    },
+                    visualization: { feature_importance_list: [] }
+                },
+                shap: {
+                    anomaly_score_explanation: {
+                        anomaly_reasons: [
+                            { node_index: 3, reason: '节点3异常由嵌入分布漂移触发。', confidence: 0.78, category: '分布漂移' }
+                        ]
+                    },
+                    visualization: { feature_ranking: [] }
+                },
+                summary: {}
+            }
+        });
+
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(host.querySelector('#lime-reason-panel')).toBeTruthy();
+        expect(host.querySelectorAll('.reason-item').length).toBeGreaterThan(0);
+
+        const category = host.querySelector('#lime-reason-category') as HTMLSelectElement;
+        category.value = '判别偏移';
+        category.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushPromises();
+        expect(host.querySelectorAll('#lime-reason-list .reason-item').length).toBe(1);
+
+        (host.querySelector('#lime-reason-list .reason-detail-btn') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(host.querySelector('#dl-explain-detail-modal')?.classList.contains('open')).toBe(true);
+        expect(host.querySelector('#dl-reason-detail-body')?.textContent).toContain('原因分类');
+
+        (host.querySelector('#dl-reason-detail-close') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(host.querySelector('#dl-explain-detail-modal')?.classList.contains('open')).toBe(false);
+
+        panel.destroy();
+    });
+
+    it('应在对比视图展示异常原因多模型对比并支持TopN调节', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        api.createSpatiotemporalExplainTask.mockResolvedValue({ task_id: 'task-reason-compare' });
+        api.getSpatiotemporalExplainTask.mockResolvedValue({
+            task_id: 'task-reason-compare',
+            status: 'completed',
+            result: {
+                method: 'hybrid',
+                lime: {
+                    anomaly_score_explanation: {
+                        anomaly_reasons: [
+                            { node_index: 1, reason: '重建误差偏高', confidence: 0.9, category: '重建偏差' },
+                            { node_index: 2, reason: '判别器分量偏高', confidence: 0.8, category: '判别偏移' }
+                        ]
+                    },
+                    visualization: { feature_importance_list: [{ feature: 'f1', value: 0.2 }] }
+                },
+                shap: {
+                    anomaly_score_explanation: {
+                        anomaly_reasons: [
+                            { node_index: 1, reason: '重建误差偏高', confidence: 0.86, category: '重建偏差' },
+                            { node_index: 3, reason: '嵌入漂移', confidence: 0.7, category: '表征漂移' }
+                        ]
+                    },
+                    visualization: { feature_ranking: [{ feature: 'f1', value: 0.2 }] }
+                },
+                summary: {}
+            }
+        });
+
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+        (host.querySelector('[data-result-tab="compare"]') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(host.querySelector('#reason-compare-table')).toBeTruthy();
+        expect(host.querySelector('#reason-compare-table')?.textContent).toContain('重建偏差');
+
+        const topn = host.querySelector('#reason-compare-topn') as HTMLInputElement;
+        topn.value = '1';
+        topn.dispatchEvent(new Event('input', { bubbles: true }));
+        await flushPromises();
+        expect(host.querySelector('#reason-compare-topn-label')?.textContent).toBe('1');
+
+        panel.destroy();
+    });
 });

@@ -80,6 +80,7 @@ export class SpatiotemporalExplainPanel {
     private lastFpsTs: number = 0;
     private latestFPS: number = 0;
     private latestMemoryMB: number | null = null;
+    private detailModalVisible: boolean = false;
 
     constructor(container: HTMLElement, apiService: IAPIService) {
         this.container = container;
@@ -211,6 +212,14 @@ export class SpatiotemporalExplainPanel {
                         <div class="status-message">${this.t('explain.status.emptyResult', '暂无结果，请先提交并完成任务。')}</div>
                     </div>
                 </section>
+
+                <div id="dl-explain-detail-modal" class="reason-detail-modal" aria-hidden="true">
+                    <div class="reason-detail-dialog" role="dialog" aria-modal="true" aria-labelledby="dl-reason-detail-title">
+                        <button id="dl-reason-detail-close" class="btn btn-secondary reason-detail-close" type="button">关闭</button>
+                        <h6 id="dl-reason-detail-title">异常原因详细说明</h6>
+                        <div id="dl-reason-detail-body" class="reason-detail-body"></div>
+                    </div>
+                </div>
             </div>
         `;
     }
@@ -273,6 +282,18 @@ export class SpatiotemporalExplainPanel {
 
         this.container.addEventListener('click', (event) => {
             const target = event.target as HTMLElement;
+            const detailTrigger = target.closest<HTMLButtonElement>('[data-reason-detail]');
+            if (detailTrigger) {
+                const payload = detailTrigger.dataset.reasonDetail || '';
+                this.showReasonDetail(payload);
+                return;
+            }
+
+            if (target.id === 'dl-reason-detail-close' || target.id === 'dl-explain-detail-modal') {
+                this.hideReasonDetail();
+                return;
+            }
+
             const actionButton = target.closest<HTMLButtonElement>('[data-task-action]');
             if (!actionButton) {
                 return;
@@ -751,6 +772,7 @@ export class SpatiotemporalExplainPanel {
         if (this.activeTab === 'lime') {
             container.innerHTML = this.renderLimeResult(result);
             this.bindAnomalyInteractive(container, this.extractAnomalyRows((result.lime || {}) as Record<string, unknown>), 'lime');
+            this.bindReasonInteractive(container, this.parseAnomalyReasonRows((result.lime || {}) as Record<string, unknown>, 'LIME'), 'lime');
             void this.renderChartsForCurrentTab(result);
             return;
         }
@@ -758,12 +780,14 @@ export class SpatiotemporalExplainPanel {
             container.innerHTML = this.renderShapResult(result);
             this.bindShapInteractive(container, result);
             this.bindAnomalyInteractive(container, this.extractAnomalyRows((result.shap || {}) as Record<string, unknown>), 'shap');
+            this.bindReasonInteractive(container, this.parseAnomalyReasonRows((result.shap || {}) as Record<string, unknown>, 'SHAP'), 'shap');
             void this.renderChartsForCurrentTab(result);
             return;
         }
         if (this.activeTab === 'compare') {
             this.disposeCharts();
             container.innerHTML = this.renderCompareResult(result);
+            this.bindReasonCompareInteractive(container, result);
             return;
         }
 
@@ -833,6 +857,7 @@ export class SpatiotemporalExplainPanel {
             : [];
 
         const contributionRows = this.parseContributionRows(lime);
+        const reasonRows = this.parseAnomalyReasonRows(lime, 'LIME');
 
         return `
             <div class="explain-result-grid">
@@ -855,6 +880,11 @@ export class SpatiotemporalExplainPanel {
                 <section class="result-card">
                     <h6>异常分数解释</h6>
                     ${this.renderAnomalyScoreExplorer(anomalyRows, 'lime')}
+                </section>
+
+                <section class="result-card">
+                    <h6>异常原因分析</h6>
+                    ${this.renderReasonAnalysisPanel(reasonRows, 'lime')}
                 </section>
 
                 <section class="result-card">
@@ -930,6 +960,7 @@ export class SpatiotemporalExplainPanel {
         const beeswarm = Array.isArray(vis.beeswarm_data) ? vis.beeswarm_data as Array<Record<string, unknown>> : [];
         const dependence = Array.isArray(vis.dependence_data) ? vis.dependence_data as Array<Record<string, unknown>> : [];
         const summaryStats = Array.isArray(vis.summary_stats) ? vis.summary_stats as Array<Record<string, unknown>> : [];
+        const reasonRows = this.parseAnomalyReasonRows(shap, 'SHAP');
 
         return `
             <div class="explain-result-grid">
@@ -970,6 +1001,11 @@ export class SpatiotemporalExplainPanel {
                 <section class="result-card full-width">
                     <h6>异常分数解释</h6>
                     ${this.renderAnomalyScoreExplorer(anomalyRows, 'shap')}
+                </section>
+
+                <section class="result-card full-width">
+                    <h6>异常原因分析</h6>
+                    ${this.renderReasonAnalysisPanel(reasonRows, 'shap')}
                 </section>
             </div>
         `;
@@ -1110,6 +1146,396 @@ export class SpatiotemporalExplainPanel {
         topNInput.addEventListener('input', rerender);
     }
 
+    private parseAnomalyReasonRows(payload: Record<string, unknown>, method: 'LIME' | 'SHAP'): Array<{
+        node: number;
+        reason: string;
+        confidence: number;
+        category: string;
+        method: 'LIME' | 'SHAP';
+    }> {
+        const scoreExplanation = (payload.anomaly_score_explanation || {}) as Record<string, unknown>;
+        const reasonRowsRaw = Array.isArray(scoreExplanation.anomaly_reasons) ? scoreExplanation.anomaly_reasons as Array<Record<string, unknown>> : [];
+        const batchRows = Array.isArray(payload.batch_explanations) ? payload.batch_explanations as Array<Record<string, unknown>> : [];
+        const sourceRows = reasonRowsRaw.length ? reasonRowsRaw : batchRows;
+        const seen = new Set<string>();
+        const rows: Array<{ node: number; reason: string; confidence: number; category: string; method: 'LIME' | 'SHAP' }> = [];
+        sourceRows.forEach((item, idx) => {
+            const node = Number(item.node_index ?? item.node ?? idx);
+            if (!Number.isFinite(node)) {
+                return;
+            }
+            const reason = String(item.reason || '').trim() || `节点${node}存在异常行为。`;
+            const confidence = Math.max(0, Math.min(1, Number(item.confidence ?? 0)));
+            const explicitCategory = String(item.category || '').trim();
+            const category = this.normalizeReasonCategory(explicitCategory || this.inferReasonCategory(reason));
+            const key = `${node}-${reason}`;
+            if (seen.has(key)) {
+                return;
+            }
+            seen.add(key);
+            rows.push({ node, reason, confidence, category, method });
+        });
+        rows.sort((a, b) => b.confidence - a.confidence);
+        return rows;
+    }
+
+    private inferReasonCategory(reason: string): string {
+        const text = reason.toLowerCase();
+        if (text.includes('重建') || text.includes('reconstruction')) {
+            return '重建偏差';
+        }
+        if (text.includes('判别') || text.includes('discriminator')) {
+            return '判别偏移';
+        }
+        if (text.includes('梯度') || text.includes('gradient')) {
+            return '梯度扰动';
+        }
+        if (text.includes('密度') || text.includes('nearest') || text.includes('特征库') || text.includes('bank')) {
+            return '分布漂移';
+        }
+        if (text.includes('嵌入') || text.includes('embedding')) {
+            return '表征漂移';
+        }
+        return '综合异常';
+    }
+
+    private normalizeReasonCategory(category: string): string {
+        const text = category.trim();
+        return text || '综合异常';
+    }
+
+    private buildReasonCategoryRows(rows: Array<{ node: number; reason: string; confidence: number; category: string; method: 'LIME' | 'SHAP' }>): Array<{ category: string; count: number; avgConfidence: number }> {
+        const map = new Map<string, { count: number; confidenceSum: number }>();
+        rows.forEach((row) => {
+            const val = map.get(row.category) || { count: 0, confidenceSum: 0 };
+            val.count += 1;
+            val.confidenceSum += row.confidence;
+            map.set(row.category, val);
+        });
+        return Array.from(map.entries())
+            .map(([category, value]) => ({
+                category,
+                count: value.count,
+                avgConfidence: value.count ? value.confidenceSum / value.count : 0
+            }))
+            .sort((a, b) => b.count - a.count);
+    }
+
+    private renderReasonAnalysisPanel(
+        rows: Array<{ node: number; reason: string; confidence: number; category: string; method: 'LIME' | 'SHAP' }>,
+        prefix: 'lime' | 'shap'
+    ): string {
+        if (!rows.length) {
+            return '<div class="status-message">暂无异常原因分析数据</div>';
+        }
+        const categories = this.buildReasonCategoryRows(rows);
+        const maxCount = Math.max(1, Math.min(20, rows.length));
+        const initialCount = Math.min(maxCount, 6);
+        const initialCategory = 'all';
+        const meanConfidence = rows.reduce((acc, item) => acc + item.confidence, 0) / rows.length;
+        return `
+            <div id="${prefix}-reason-panel" class="reason-analysis-panel">
+                <div class="reason-analysis-controls">
+                    <label>分类
+                        <select id="${prefix}-reason-category" class="select">
+                            <option value="all">全部</option>
+                            ${categories.map((item) => `<option value="${item.category}">${item.category}</option>`).join('')}
+                        </select>
+                    </label>
+                    <label>排序
+                        <select id="${prefix}-reason-sort" class="select">
+                            <option value="confidence_desc">置信度高到低</option>
+                            <option value="confidence_asc">置信度低到高</option>
+                            <option value="node_asc">节点编号升序</option>
+                        </select>
+                    </label>
+                    <label>Top
+                        <input id="${prefix}-reason-topn" class="input" type="range" min="1" max="${maxCount}" value="${initialCount}">
+                        <span id="${prefix}-reason-topn-label">${initialCount}</span>
+                    </label>
+                </div>
+                <div class="reason-confidence-overview">
+                    <span>均值置信度 ${meanConfidence.toFixed(3)}</span>
+                    <span>高置信(≥0.75) ${rows.filter(item => item.confidence >= 0.75).length}/${rows.length}</span>
+                </div>
+                <div id="${prefix}-reason-categories" class="reason-category-list">
+                    ${this.renderReasonCategoryChips(categories)}
+                </div>
+                <div id="${prefix}-reason-history" class="reason-history-list">
+                    ${this.renderReasonHistoryRows(rows, initialCategory, initialCount, 'confidence_desc')}
+                </div>
+                <div id="${prefix}-reason-list" class="reason-item-list">
+                    ${this.renderReasonRows(rows, initialCount, initialCategory, 'confidence_desc')}
+                </div>
+            </div>
+        `;
+    }
+
+    private renderReasonCategoryChips(rows: Array<{ category: string; count: number; avgConfidence: number }>): string {
+        if (!rows.length) {
+            return '<div class="status-message">暂无原因分类</div>';
+        }
+        return rows.map((row) => `
+            <div class="reason-category-chip">
+                <span>${row.category}</span>
+                <span>${row.count}</span>
+                <span>均值${row.avgConfidence.toFixed(2)}</span>
+            </div>
+        `).join('');
+    }
+
+    private renderReasonRows(
+        rows: Array<{ node: number; reason: string; confidence: number; category: string; method: 'LIME' | 'SHAP' }>,
+        topN: number,
+        category: string,
+        sortBy: 'confidence_desc' | 'confidence_asc' | 'node_asc'
+    ): string {
+        const filtered = category === 'all' ? rows : rows.filter(item => item.category === category);
+        if (!filtered.length) {
+            return '<div class="status-message">当前分类下暂无数据</div>';
+        }
+        const sorted = [...filtered];
+        if (sortBy === 'node_asc') {
+            sorted.sort((a, b) => a.node - b.node);
+        } else if (sortBy === 'confidence_asc') {
+            sorted.sort((a, b) => a.confidence - b.confidence);
+        } else {
+            sorted.sort((a, b) => b.confidence - a.confidence);
+        }
+        const sliced = sorted.slice(0, Math.max(1, topN));
+        return sliced.map((item) => {
+            const confidencePct = Math.round(item.confidence * 100);
+            const detailPayload = encodeURIComponent(JSON.stringify(item));
+            return `
+                <article class="reason-item">
+                    <div class="reason-item-header">
+                        <span class="reason-node">节点 #${item.node}</span>
+                        <span class="reason-category">${item.category}</span>
+                        <span class="reason-confidence">${confidencePct}%</span>
+                    </div>
+                    <div class="reason-confidence-track">
+                        <div class="reason-confidence-fill" style="width:${confidencePct}%"></div>
+                    </div>
+                    <p class="reason-text">${item.reason}</p>
+                    <button class="btn btn-secondary reason-detail-btn" type="button" data-reason-detail="${detailPayload}">详细说明</button>
+                </article>
+            `;
+        }).join('');
+    }
+
+    private renderReasonHistoryRows(
+        rows: Array<{ node: number; reason: string; confidence: number; category: string; method: 'LIME' | 'SHAP' }>,
+        category: string,
+        topN: number,
+        sortBy: 'confidence_desc' | 'confidence_asc' | 'node_asc'
+    ): string {
+        const filtered = category === 'all' ? rows : rows.filter(item => item.category === category);
+        if (!filtered.length) {
+            return '<div class="status-message">暂无趋势数据</div>';
+        }
+        const sorted = [...filtered];
+        if (sortBy === 'confidence_asc') {
+            sorted.sort((a, b) => a.confidence - b.confidence);
+        } else if (sortBy === 'node_asc') {
+            sorted.sort((a, b) => a.node - b.node);
+        } else {
+            sorted.sort((a, b) => b.confidence - a.confidence);
+        }
+        const sliced = sorted.slice(0, Math.max(1, topN));
+        const maxConf = Math.max(...sliced.map(item => item.confidence), 1e-6);
+        return `
+            <div class="reason-history-track">
+                ${sliced.map((item) => `
+                    <div class="reason-history-col" title="节点#${item.node} ${item.confidence.toFixed(3)}">
+                        <div class="reason-history-bar" style="height:${Math.round((item.confidence / maxConf) * 100)}%"></div>
+                        <span class="reason-history-label">${item.node}</span>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    }
+
+    private bindReasonInteractive(
+        container: HTMLElement,
+        rows: Array<{ node: number; reason: string; confidence: number; category: string; method: 'LIME' | 'SHAP' }>,
+        prefix: 'lime' | 'shap'
+    ): void {
+        if (!rows.length) {
+            return;
+        }
+        const categoryInput = container.querySelector(`#${prefix}-reason-category`) as HTMLSelectElement | null;
+        const sortInput = container.querySelector(`#${prefix}-reason-sort`) as HTMLSelectElement | null;
+        const topNInput = container.querySelector(`#${prefix}-reason-topn`) as HTMLInputElement | null;
+        const topNLabel = container.querySelector(`#${prefix}-reason-topn-label`) as HTMLElement | null;
+        const listTarget = container.querySelector(`#${prefix}-reason-list`) as HTMLElement | null;
+        const trendTarget = container.querySelector(`#${prefix}-reason-history`) as HTMLElement | null;
+        if (!categoryInput || !sortInput || !topNInput || !topNLabel || !listTarget || !trendTarget) {
+            return;
+        }
+        const rerender = (): void => {
+            const topN = Math.max(1, Number(topNInput.value || 1));
+            const category = categoryInput.value || 'all';
+            const sortBy = (sortInput.value || 'confidence_desc') as 'confidence_desc' | 'confidence_asc' | 'node_asc';
+            topNLabel.textContent = String(topN);
+            listTarget.innerHTML = this.renderReasonRows(rows, topN, category, sortBy);
+            trendTarget.innerHTML = this.renderReasonHistoryRows(rows, category, topN, sortBy);
+        };
+        categoryInput.addEventListener('change', rerender);
+        sortInput.addEventListener('change', rerender);
+        topNInput.addEventListener('input', rerender);
+    }
+
+    private renderReasonComparePanel(
+        limeRows: Array<{ node: number; reason: string; confidence: number; category: string; method: 'LIME' | 'SHAP' }>,
+        shapRows: Array<{ node: number; reason: string; confidence: number; category: string; method: 'LIME' | 'SHAP' }>
+    ): string {
+        if (!limeRows.length && !shapRows.length) {
+            return '<div class="status-message">暂无可对比的原因分析结果</div>';
+        }
+        const merged = new Map<string, { lime: number; shap: number }>();
+        this.buildReasonCategoryRows(limeRows).forEach((item) => {
+            const value = merged.get(item.category) || { lime: 0, shap: 0 };
+            value.lime = item.count;
+            merged.set(item.category, value);
+        });
+        this.buildReasonCategoryRows(shapRows).forEach((item) => {
+            const value = merged.get(item.category) || { lime: 0, shap: 0 };
+            value.shap = item.count;
+            merged.set(item.category, value);
+        });
+        const rows = Array.from(merged.entries())
+            .map(([category, value]) => ({
+                category,
+                lime: value.lime,
+                shap: value.shap,
+                diff: Math.abs(value.lime - value.shap)
+            }))
+            .sort((a, b) => b.diff - a.diff);
+
+        return `
+            <div class="reason-compare-wrap">
+                <div class="reason-compare-controls">
+                    <label>展示数量
+                        <input id="reason-compare-topn" class="input" type="range" min="1" max="${Math.max(1, rows.length)}" value="${Math.min(8, Math.max(1, rows.length))}">
+                        <span id="reason-compare-topn-label">${Math.min(8, Math.max(1, rows.length))}</span>
+                    </label>
+                </div>
+                <div id="reason-compare-table">
+                    ${this.renderReasonCompareRows(rows, Math.min(8, Math.max(1, rows.length)))}
+                </div>
+            </div>
+        `;
+    }
+
+    private renderReasonCompareRows(rows: Array<{ category: string; lime: number; shap: number; diff: number }>, topN: number): string {
+        const sliced = rows.slice(0, Math.max(1, topN));
+        return `
+            <div class="summary-table-wrap">
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>原因分类</th>
+                            <th>LIME</th>
+                            <th>SHAP</th>
+                            <th>差异</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${sliced.map((row) => `
+                            <tr class="${row.diff > 1 ? 'highlight' : ''}">
+                                <td>${row.category}</td>
+                                <td>${row.lime}</td>
+                                <td>${row.shap}</td>
+                                <td>${row.diff}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    private bindReasonCompareInteractive(container: HTMLElement, result: Record<string, unknown>): void {
+        const limeRows = this.parseAnomalyReasonRows((result.lime || {}) as Record<string, unknown>, 'LIME');
+        const shapRows = this.parseAnomalyReasonRows((result.shap || {}) as Record<string, unknown>, 'SHAP');
+        const merged = new Map<string, { lime: number; shap: number }>();
+        this.buildReasonCategoryRows(limeRows).forEach((item) => {
+            const value = merged.get(item.category) || { lime: 0, shap: 0 };
+            value.lime = item.count;
+            merged.set(item.category, value);
+        });
+        this.buildReasonCategoryRows(shapRows).forEach((item) => {
+            const value = merged.get(item.category) || { lime: 0, shap: 0 };
+            value.shap = item.count;
+            merged.set(item.category, value);
+        });
+        const rows = Array.from(merged.entries())
+            .map(([category, value]) => ({
+                category,
+                lime: value.lime,
+                shap: value.shap,
+                diff: Math.abs(value.lime - value.shap)
+            }))
+            .sort((a, b) => b.diff - a.diff);
+        const slider = container.querySelector('#reason-compare-topn') as HTMLInputElement | null;
+        const label = container.querySelector('#reason-compare-topn-label') as HTMLElement | null;
+        const table = container.querySelector('#reason-compare-table') as HTMLElement | null;
+        if (!slider || !label || !table || !rows.length) {
+            return;
+        }
+        const rerender = (): void => {
+            const topN = Math.max(1, Number(slider.value || 1));
+            label.textContent = String(topN);
+            table.innerHTML = this.renderReasonCompareRows(rows, topN);
+        };
+        slider.addEventListener('input', rerender);
+    }
+
+    private showReasonDetail(payload: string): void {
+        if (!payload) {
+            return;
+        }
+        let parsed: { node: number; reason: string; confidence: number; category: string; method: 'LIME' | 'SHAP' } | null = null;
+        try {
+            parsed = JSON.parse(decodeURIComponent(payload)) as { node: number; reason: string; confidence: number; category: string; method: 'LIME' | 'SHAP' };
+        } catch {
+            parsed = null;
+        }
+        if (!parsed) {
+            return;
+        }
+        const modal = this.container.querySelector('#dl-explain-detail-modal') as HTMLElement | null;
+        const body = this.container.querySelector('#dl-reason-detail-body') as HTMLElement | null;
+        if (!modal || !body) {
+            return;
+        }
+        body.innerHTML = `
+            <article class="reason-detail-content">
+                <p><strong>模型：</strong>${parsed.method}</p>
+                <p><strong>节点：</strong>#${parsed.node}</p>
+                <p><strong>原因分类：</strong>${parsed.category}</p>
+                <p><strong>置信度：</strong>${Math.round(parsed.confidence * 100)}%</p>
+                <p><strong>详细说明：</strong>${parsed.reason}</p>
+            </article>
+        `;
+        modal.classList.add('open');
+        modal.setAttribute('aria-hidden', 'false');
+        this.detailModalVisible = true;
+    }
+
+    private hideReasonDetail(): void {
+        if (!this.detailModalVisible) {
+            return;
+        }
+        const modal = this.container.querySelector('#dl-explain-detail-modal') as HTMLElement | null;
+        if (!modal) {
+            return;
+        }
+        modal.classList.remove('open');
+        modal.setAttribute('aria-hidden', 'true');
+        this.detailModalVisible = false;
+    }
+
     private renderBeeswarmPoints(rows: Array<Record<string, unknown>>, threshold: number, zoom: number): string {
         const filtered = rows
             .map((item) => ({
@@ -1232,6 +1658,8 @@ export class SpatiotemporalExplainPanel {
     private renderCompareResult(result: Record<string, unknown>): string {
         const lime = (result.lime || {}) as Record<string, unknown>;
         const shap = (result.shap || {}) as Record<string, unknown>;
+        const limeReasonRows = this.parseAnomalyReasonRows(lime, 'LIME');
+        const shapReasonRows = this.parseAnomalyReasonRows(shap, 'SHAP');
 
         const limeRows = this.parseImportanceRows(lime.global_feature_importance || ((lime.visualization || {}) as Record<string, unknown>).feature_importance_list || []);
         const shapRows = this.parseImportanceRows(shap.global_feature_importance || ((shap.visualization || {}) as Record<string, unknown>).feature_ranking || []);
@@ -1309,6 +1737,11 @@ export class SpatiotemporalExplainPanel {
                             </tbody>
                         </table>
                     </div>
+                </section>
+
+                <section class="result-card full-width">
+                    <h6>异常原因多模型对比</h6>
+                    ${this.renderReasonComparePanel(limeReasonRows, shapReasonRows)}
                 </section>
             </div>
         `;
