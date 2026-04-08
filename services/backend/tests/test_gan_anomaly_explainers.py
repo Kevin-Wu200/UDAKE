@@ -46,6 +46,27 @@ def test_gan_lime_adapter_generates_explanations() -> None:
     assert len(result["batch_explanations"]) == 3
     assert "generator_analysis" in result
     assert len(result["score_components"]["combined"]) == len(values)
+    assert "anomaly_score_explanation" in result
+    assert len(result["anomaly_score_explanation"]["decomposition"]) == len(values)
+    assert len(result["anomaly_score_explanation"]["key_anomaly_nodes"]) >= 1
+    assert len(result["anomaly_score_explanation"]["key_anomaly_features"]) >= 1
+    assert len(result["anomaly_score_explanation"]["anomaly_reasons"]) == 3
+
+    component = result["anomaly_score_explanation"]["component_contribution"]
+    assert component["discriminator_total"] >= 0.0
+    assert component["generator_total"] >= 0.0
+    assert 0.0 <= component["discriminator_ratio"] <= 1.0
+    assert 0.0 <= component["generator_ratio"] <= 1.0
+    assert len(component["explained_node_breakdown"]) == 3
+
+    first = result["batch_explanations"][0]
+    assert "decomposition" in first
+    assert "reason" in first
+    assert first["reason"].startswith("节点")
+
+    consistency = result["anomaly_score_explanation"]["consistency_validation"]
+    assert "is_reasonable" in consistency
+    assert "score_corr" in consistency
 
 
 def test_gan_shap_adapter_generates_explanations_and_cache() -> None:
@@ -58,4 +79,6 @@ def test_gan_shap_adapter_generates_explanations_and_cache() -> None:
     assert first["summary"]["method"] == "shap"
     assert first["summary"]["explained_nodes"] == 2
     assert len(first["batch_explanations"]) == 2
+    assert "component_contribution" in first["anomaly_score_explanation"]
+    assert len(first["anomaly_score_explanation"]["anomaly_reasons"]) == 2
     assert second["performance"]["cache_hit"] is True

@@ -274,13 +274,21 @@ class _BaseGANAdapter:
         n = len(disc)
         rows: list[dict[str, Any]] = []
         for i in range(n):
-            total = float(0.50 * disc[i] + 0.35 * recon[i] + 0.15 * grad[i])
+            disc_weighted = float(0.50 * disc[i])
+            recon_weighted = float(0.35 * recon[i])
+            grad_weighted = float(0.15 * grad[i])
+            generator_weighted = float(recon_weighted + grad_weighted)
+            total = float(disc_weighted + generator_weighted)
             rows.append(
                 {
                     "node_index": int(i),
                     "discriminator_component": float(disc[i]),
                     "reconstruction_component": float(recon[i]),
                     "gradient_component": float(grad[i]),
+                    "discriminator_weighted_component": disc_weighted,
+                    "generator_reconstruction_component": recon_weighted,
+                    "generator_gradient_component": grad_weighted,
+                    "generator_weighted_component": generator_weighted,
                     "decomposed_score": total,
                 }
             )
@@ -289,6 +297,103 @@ class _BaseGANAdapter:
             "decomposition": rows,
             "top_anomaly_nodes": [int(item["node_index"]) for item in rows[: max(1, min(10, n))]],
         }
+
+    def _component_contribution_analysis(
+        self,
+        *,
+        decomposition: list[dict[str, Any]],
+        explained_nodes: list[int],
+    ) -> dict[str, Any]:
+        if len(decomposition) == 0:
+            return {
+                "discriminator_total": 0.0,
+                "generator_total": 0.0,
+                "discriminator_ratio": 0.0,
+                "generator_ratio": 0.0,
+                "explained_node_breakdown": [],
+            }
+
+        disc_total = float(np.sum([float(item.get("discriminator_weighted_component", 0.0)) for item in decomposition]))
+        gen_total = float(np.sum([float(item.get("generator_weighted_component", 0.0)) for item in decomposition]))
+        total = disc_total + gen_total + 1e-9
+        node_set = set(int(i) for i in explained_nodes)
+        node_rows = [item for item in decomposition if int(item.get("node_index", -1)) in node_set]
+        node_rows.sort(key=lambda item: float(item.get("decomposed_score", 0.0)), reverse=True)
+        breakdown = [
+            {
+                "node_index": int(item["node_index"]),
+                "discriminator_weighted_component": float(item.get("discriminator_weighted_component", 0.0)),
+                "generator_weighted_component": float(item.get("generator_weighted_component", 0.0)),
+                "generator_reconstruction_component": float(item.get("generator_reconstruction_component", 0.0)),
+                "generator_gradient_component": float(item.get("generator_gradient_component", 0.0)),
+                "decomposed_score": float(item.get("decomposed_score", 0.0)),
+            }
+            for item in node_rows
+        ]
+        return {
+            "discriminator_total": disc_total,
+            "generator_total": gen_total,
+            "discriminator_ratio": float(disc_total / total),
+            "generator_ratio": float(gen_total / total),
+            "explained_node_breakdown": breakdown,
+        }
+
+    def _extract_key_anomaly_features(self, *, batch_explanations: list[dict[str, Any]], top_k: int) -> list[dict[str, Any]]:
+        if len(batch_explanations) == 0:
+            return []
+        feature_agg: dict[str, dict[str, Any]] = {}
+        for item in batch_explanations:
+            node_idx = int(item.get("node_index", -1))
+            for contrib in item.get("top_contributions", []):
+                name = str(contrib.get("feature_name", ""))
+                alias = str(contrib.get("feature_alias", name))
+                category = str(contrib.get("category", "unknown"))
+                score = float(
+                    contrib.get(
+                        "abs_weight",
+                        contrib.get("abs_shap", abs(float(contrib.get("weight", contrib.get("shap_value", 0.0))))),
+                    )
+                )
+                if name not in feature_agg:
+                    feature_agg[name] = {
+                        "feature_name": name,
+                        "feature_alias": alias,
+                        "category": category,
+                        "importance_sum": 0.0,
+                        "mention_count": 0,
+                        "nodes": set(),
+                    }
+                feature_agg[name]["importance_sum"] = float(feature_agg[name]["importance_sum"] + score)
+                feature_agg[name]["mention_count"] = int(feature_agg[name]["mention_count"] + 1)
+                feature_agg[name]["nodes"].add(node_idx)
+
+        size = float(max(1, len(batch_explanations)))
+        rows = []
+        for item in feature_agg.values():
+            rows.append(
+                {
+                    "feature_name": str(item["feature_name"]),
+                    "feature_alias": str(item["feature_alias"]),
+                    "category": str(item["category"]),
+                    "importance": float(item["importance_sum"] / size),
+                    "mention_count": int(item["mention_count"]),
+                    "covered_nodes": sorted(int(i) for i in item["nodes"]),
+                }
+            )
+        rows.sort(key=lambda x: float(x["importance"]), reverse=True)
+        return rows[: max(1, int(top_k))]
+
+    def _collect_anomaly_reasons(self, *, batch_explanations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        rows = [
+            {
+                "node_index": int(item.get("node_index", -1)),
+                "reason": str(item.get("reason", "")),
+                "confidence": float(item.get("confidence", 0.0)),
+            }
+            for item in batch_explanations
+        ]
+        rows.sort(key=lambda x: float(x.get("confidence", 0.0)), reverse=True)
+        return rows
 
     def _explanation_reason(
         self,
@@ -500,7 +605,16 @@ class GANAnomalyLimeAdapter(_BaseGANAdapter):
             combined_scores=combined,
             explained_nodes=explained_nodes,
         )
+        component_summary = self._component_contribution_analysis(
+            decomposition=decomposition_payload["decomposition"],
+            explained_nodes=explained_nodes,
+        )
+        key_anomaly_features = self._extract_key_anomaly_features(batch_explanations=batch_explanations, top_k=int(top_k))
+        anomaly_reasons = self._collect_anomaly_reasons(batch_explanations=batch_explanations)
         generator_info = self._generator_analysis(model=model, coords=c, values=v)
+        discriminator = np.asarray(context["score_bundle"]["discriminator"], dtype=float)
+        reconstruction = np.asarray(context["score_bundle"]["reconstruction"], dtype=float)
+        gradient = np.asarray(context["score_bundle"]["gradient"], dtype=float)
         payload = {
             "summary": {
                 "method": "lime",
@@ -517,12 +631,17 @@ class GANAnomalyLimeAdapter(_BaseGANAdapter):
             "anomaly_score_explanation": {
                 "decomposition": decomposition_payload["decomposition"],
                 "key_anomaly_nodes": decomposition_payload["top_anomaly_nodes"],
+                "component_contribution": component_summary,
+                "key_anomaly_features": key_anomaly_features,
+                "anomaly_reasons": anomaly_reasons,
                 "consistency_validation": consistency,
             },
             "score_components": {
-                "discriminator": np.asarray(context["score_bundle"]["discriminator"], dtype=float).astype(float).tolist(),
-                "reconstruction": np.asarray(context["score_bundle"]["reconstruction"], dtype=float).astype(float).tolist(),
-                "gradient": np.asarray(context["score_bundle"]["gradient"], dtype=float).astype(float).tolist(),
+                "discriminator": discriminator.astype(float).tolist(),
+                "discriminator_weighted": (0.50 * discriminator).astype(float).tolist(),
+                "reconstruction": reconstruction.astype(float).tolist(),
+                "gradient": gradient.astype(float).tolist(),
+                "generator_weighted": (0.35 * reconstruction + 0.15 * gradient).astype(float).tolist(),
                 "combined": combined.astype(float).tolist(),
             },
             "generator_analysis": generator_info,
@@ -673,7 +792,16 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
             combined_scores=combined,
             explained_nodes=explained_nodes,
         )
+        component_summary = self._component_contribution_analysis(
+            decomposition=decomposition_payload["decomposition"],
+            explained_nodes=explained_nodes,
+        )
+        key_anomaly_features = self._extract_key_anomaly_features(batch_explanations=batch_explanations, top_k=int(top_k))
+        anomaly_reasons = self._collect_anomaly_reasons(batch_explanations=batch_explanations)
         generator_info = self._generator_analysis(model=model, coords=c, values=v)
+        discriminator = np.asarray(context["score_bundle"]["discriminator"], dtype=float)
+        reconstruction = np.asarray(context["score_bundle"]["reconstruction"], dtype=float)
+        gradient = np.asarray(context["score_bundle"]["gradient"], dtype=float)
         payload = {
             "summary": {
                 "method": "shap",
@@ -692,12 +820,17 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
             "anomaly_score_explanation": {
                 "decomposition": decomposition_payload["decomposition"],
                 "key_anomaly_nodes": decomposition_payload["top_anomaly_nodes"],
+                "component_contribution": component_summary,
+                "key_anomaly_features": key_anomaly_features,
+                "anomaly_reasons": anomaly_reasons,
                 "consistency_validation": consistency,
             },
             "score_components": {
-                "discriminator": np.asarray(context["score_bundle"]["discriminator"], dtype=float).astype(float).tolist(),
-                "reconstruction": np.asarray(context["score_bundle"]["reconstruction"], dtype=float).astype(float).tolist(),
-                "gradient": np.asarray(context["score_bundle"]["gradient"], dtype=float).astype(float).tolist(),
+                "discriminator": discriminator.astype(float).tolist(),
+                "discriminator_weighted": (0.50 * discriminator).astype(float).tolist(),
+                "reconstruction": reconstruction.astype(float).tolist(),
+                "gradient": gradient.astype(float).tolist(),
+                "generator_weighted": (0.35 * reconstruction + 0.15 * gradient).astype(float).tolist(),
                 "combined": combined.astype(float).tolist(),
             },
             "generator_analysis": generator_info,
