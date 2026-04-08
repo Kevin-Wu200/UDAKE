@@ -506,4 +506,93 @@ describe('SpatiotemporalExplainPanel', () => {
         panel.destroy();
         expect(host.innerHTML).toBe('');
     });
+
+    it('应支持导出当前解释结果（JSON/CSV）', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        api.createSpatiotemporalExplainTask.mockResolvedValue({ task_id: 'task-export' });
+        api.getSpatiotemporalExplainTask.mockResolvedValue({
+            task_id: 'task-export',
+            status: 'completed',
+            result: {
+                method: 'hybrid',
+                lime: { visualization: { feature_importance_list: [{ feature: 'f1', value: 0.32 }] } },
+                shap: { visualization: { feature_ranking: [{ feature: 'f2', value: 0.18 }] } },
+                summary: { n_nodes: 4, seq_len: 6, n_features: 1 }
+            }
+        });
+
+        const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+
+        (host.querySelector('#dl-explain-export') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(clickSpy).toHaveBeenCalledTimes(1);
+        expect(host.querySelector('#dl-explain-status')?.textContent).toContain('导出成功');
+
+        (host.querySelector('#dl-explain-export-format') as HTMLSelectElement).value = 'csv';
+        (host.querySelector('[data-result-tab="shap"]') as HTMLButtonElement).click();
+        await flushPromises();
+        (host.querySelector('#dl-explain-export') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(clickSpy).toHaveBeenCalledTimes(2);
+        expect(host.querySelector('#dl-explain-status')?.textContent).toContain('.csv');
+
+        panel.destroy();
+        clickSpy.mockRestore();
+    });
+
+    it('应渲染异常分数解释并支持交互筛选', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        api.createSpatiotemporalExplainTask.mockResolvedValue({ task_id: 'task-anomaly' });
+        api.getSpatiotemporalExplainTask.mockResolvedValue({
+            task_id: 'task-anomaly',
+            status: 'completed',
+            result: {
+                method: 'hybrid',
+                lime: {
+                    visualization: { feature_importance_list: [{ feature: 'f1', value: 0.3 }] },
+                    anomaly_score_explanation: {
+                        key_anomaly_nodes: [0, 1, 2],
+                        node_scores: { '0': 0.91, '1': 0.56, '2': 0.41 }
+                    },
+                    anomaly_analysis: {
+                        score_summary: [
+                            { node_index: 0, deviation: 2.4, percentile: 0.99 },
+                            { node_index: 1, deviation: 1.6, percentile: 0.85 },
+                            { node_index: 2, deviation: 1.2, percentile: 0.71 }
+                        ]
+                    }
+                },
+                shap: {
+                    visualization: { feature_ranking: [{ feature: 'f1', value: 0.21 }] },
+                    anomaly_score_explanation: { key_anomaly_nodes: [3], node_scores: { '3': 0.66 } },
+                    anomaly_analysis: { score_summary: [{ node_index: 3, deviation: 1.3, percentile: 0.78 }] }
+                },
+                summary: {}
+            }
+        });
+
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(host.querySelector('#lime-anomaly-sort')).toBeTruthy();
+        expect(host.querySelectorAll('#lime-anomaly-list .anomaly-node-item').length).toBeGreaterThan(0);
+
+        const topN = host.querySelector('#lime-anomaly-topn') as HTMLInputElement;
+        topN.value = '1';
+        topN.dispatchEvent(new Event('input', { bubbles: true }));
+        await flushPromises();
+        expect(host.querySelectorAll('#lime-anomaly-list .anomaly-node-item').length).toBe(1);
+
+        (host.querySelector('[data-result-tab="shap"]') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(host.querySelector('#shap-anomaly-sort')).toBeTruthy();
+
+        panel.destroy();
+    });
 });

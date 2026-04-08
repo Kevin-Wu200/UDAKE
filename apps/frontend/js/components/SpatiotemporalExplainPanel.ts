@@ -190,11 +190,20 @@ export class SpatiotemporalExplainPanel {
                 <section class="explain-result-panel">
                     <div class="explain-result-header">
                         <h5>${this.t('explain.result.title', '解释结果展示')}</h5>
-                        <div class="explain-result-tabs">
-                            <button class="btn btn-secondary active" type="button" role="tab" aria-selected="true" tabindex="0" data-result-tab="lime">${this.t('explain.result.tab.lime', 'LIME视图')}</button>
-                            <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-result-tab="shap">${this.t('explain.result.tab.shap', 'SHAP视图')}</button>
-                            <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-result-tab="compare">${this.t('explain.result.tab.compare', '对比分析')}</button>
-                            <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-result-tab="spatiotemporal">${this.t('explain.result.tab.spatiotemporal', '时空视图')}</button>
+                        <div class="explain-result-tools">
+                            <div class="explain-result-tabs">
+                                <button class="btn btn-secondary active" type="button" role="tab" aria-selected="true" tabindex="0" data-result-tab="lime">${this.t('explain.result.tab.lime', 'LIME视图')}</button>
+                                <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-result-tab="shap">${this.t('explain.result.tab.shap', 'SHAP视图')}</button>
+                                <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-result-tab="compare">${this.t('explain.result.tab.compare', '对比分析')}</button>
+                                <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-result-tab="spatiotemporal">${this.t('explain.result.tab.spatiotemporal', '时空视图')}</button>
+                            </div>
+                            <div class="explain-export-tools">
+                                <select id="dl-explain-export-format" class="select" aria-label="导出格式">
+                                    <option value="json">JSON</option>
+                                    <option value="csv">CSV</option>
+                                </select>
+                                <button id="dl-explain-export" class="btn btn-secondary" type="button">${this.t('explain.action.export', '导出结果')}</button>
+                            </div>
                         </div>
                     </div>
 
@@ -229,6 +238,9 @@ export class SpatiotemporalExplainPanel {
         });
         this.container.querySelector('#dl-explain-verify')?.addEventListener('click', () => {
             void this.verifyBackend();
+        });
+        this.container.querySelector('#dl-explain-export')?.addEventListener('click', () => {
+            this.exportCurrentResult();
         });
         this.container.querySelector('#dl-explain-theme-toggle')?.addEventListener('click', () => {
             this.toggleTheme();
@@ -738,12 +750,14 @@ export class SpatiotemporalExplainPanel {
         const result = task.result as Record<string, unknown>;
         if (this.activeTab === 'lime') {
             container.innerHTML = this.renderLimeResult(result);
+            this.bindAnomalyInteractive(container, this.extractAnomalyRows((result.lime || {}) as Record<string, unknown>), 'lime');
             void this.renderChartsForCurrentTab(result);
             return;
         }
         if (this.activeTab === 'shap') {
             container.innerHTML = this.renderShapResult(result);
             this.bindShapInteractive(container, result);
+            this.bindAnomalyInteractive(container, this.extractAnomalyRows((result.shap || {}) as Record<string, unknown>), 'shap');
             void this.renderChartsForCurrentTab(result);
             return;
         }
@@ -808,6 +822,7 @@ export class SpatiotemporalExplainPanel {
         const lime = (result.lime || {}) as Record<string, unknown>;
         const visualization = (lime.visualization || {}) as Record<string, unknown>;
         const summary = (result.summary || {}) as Record<string, unknown>;
+        const anomalyRows = this.extractAnomalyRows(lime);
 
         const featureImportance = this.parseImportanceRows(
             visualization.feature_importance_list || lime.global_feature_importance || []
@@ -835,6 +850,11 @@ export class SpatiotemporalExplainPanel {
                 <section class="result-card">
                     <h6>特征贡献度列表</h6>
                     ${this.renderFeatureBarList(contributionRows.slice(0, 12), 'contribution-bars')}
+                </section>
+
+                <section class="result-card">
+                    <h6>异常分数解释</h6>
+                    ${this.renderAnomalyScoreExplorer(anomalyRows, 'lime')}
                 </section>
 
                 <section class="result-card">
@@ -903,6 +923,7 @@ export class SpatiotemporalExplainPanel {
     private renderShapResult(result: Record<string, unknown>): string {
         const shap = (result.shap || {}) as Record<string, unknown>;
         const vis = (shap.visualization || {}) as Record<string, unknown>;
+        const anomalyRows = this.extractAnomalyRows(shap);
 
         const waterfall = this.parseImportanceRows(vis.waterfall_list || []);
         const ranking = this.parseImportanceRows(vis.feature_ranking || shap.global_feature_importance || []);
@@ -945,8 +966,148 @@ export class SpatiotemporalExplainPanel {
                     <h6>SHAP 摘要统计表</h6>
                     ${this.renderSummaryTable(summaryStats)}
                 </section>
+
+                <section class="result-card full-width">
+                    <h6>异常分数解释</h6>
+                    ${this.renderAnomalyScoreExplorer(anomalyRows, 'shap')}
+                </section>
             </div>
         `;
+    }
+
+    private extractAnomalyRows(payload: Record<string, unknown>): Array<{ node: number; score: number; deviation: number; percentile: number }> {
+        const exp = (payload.anomaly_score_explanation || {}) as Record<string, unknown>;
+        const rawNodes = Array.isArray(exp.key_anomaly_nodes) ? exp.key_anomaly_nodes : [];
+        const scoreMapRaw = (exp.node_scores || {}) as Record<string, unknown>;
+        const profile = (payload.anomaly_analysis || {}) as Record<string, unknown>;
+        const profileRowsRaw = Array.isArray(profile.score_summary) ? profile.score_summary as Array<Record<string, unknown>> : [];
+        const profileRows = new Map<number, { deviation: number; percentile: number }>();
+
+        profileRowsRaw.forEach((item) => {
+            const node = Number(item.node_index);
+            if (!Number.isFinite(node)) {
+                return;
+            }
+            profileRows.set(node, {
+                deviation: Number(item.deviation || 0),
+                percentile: Number(item.percentile || 0)
+            });
+        });
+
+        const scoreMap = new Map<number, number>();
+        Object.entries(scoreMapRaw).forEach(([key, value]) => {
+            const node = Number(key);
+            const score = Number(value);
+            if (Number.isFinite(node) && Number.isFinite(score)) {
+                scoreMap.set(node, score);
+            }
+        });
+
+        rawNodes.forEach((node) => {
+            const idx = Number(node);
+            if (Number.isFinite(idx) && !scoreMap.has(idx)) {
+                scoreMap.set(idx, 0);
+            }
+        });
+
+        if (!scoreMap.size) {
+            return [];
+        }
+
+        return Array.from(scoreMap.entries()).map(([node, score]) => {
+            const row = profileRows.get(node);
+            return {
+                node,
+                score,
+                deviation: Number(row?.deviation || 0),
+                percentile: Number(row?.percentile || 0)
+            };
+        });
+    }
+
+    private renderAnomalyScoreExplorer(rows: Array<{ node: number; score: number; deviation: number; percentile: number }>, prefix: string): string {
+        if (!rows.length) {
+            return '<div class="status-message">暂无异常分数解释数据</div>';
+        }
+        const maxCount = Math.max(1, Math.min(20, rows.length));
+        const initialCount = Math.min(8, maxCount);
+        return `
+            <div class="anomaly-explorer">
+                <div class="anomaly-explorer-controls">
+                    <label>排序
+                        <select id="${prefix}-anomaly-sort" class="select">
+                            <option value="score_desc">分数高到低</option>
+                            <option value="score_asc">分数低到高</option>
+                            <option value="deviation_desc">偏差高到低</option>
+                        </select>
+                    </label>
+                    <label>Top 节点
+                        <input id="${prefix}-anomaly-topn" class="input" type="range" min="1" max="${maxCount}" value="${initialCount}">
+                        <span id="${prefix}-anomaly-topn-label">${initialCount}</span>
+                    </label>
+                </div>
+                <div id="${prefix}-anomaly-list" class="anomaly-node-list">
+                    ${this.renderAnomalyNodeRows(rows, initialCount, 'score_desc')}
+                </div>
+            </div>
+        `;
+    }
+
+    private renderAnomalyNodeRows(
+        rows: Array<{ node: number; score: number; deviation: number; percentile: number }>,
+        topN: number,
+        sortBy: 'score_desc' | 'score_asc' | 'deviation_desc'
+    ): string {
+        const sorted = [...rows];
+        if (sortBy === 'score_asc') {
+            sorted.sort((a, b) => a.score - b.score);
+        } else if (sortBy === 'deviation_desc') {
+            sorted.sort((a, b) => b.deviation - a.deviation);
+        } else {
+            sorted.sort((a, b) => b.score - a.score);
+        }
+        const sliced = sorted.slice(0, Math.max(1, topN));
+        const maxScore = Math.max(1e-6, ...sliced.map((item) => Math.abs(item.score)));
+        return sliced.map((item) => {
+            const width = Math.round((Math.abs(item.score) / maxScore) * 100);
+            return `
+                <div class="anomaly-node-item">
+                    <span class="node-name">节点 #${item.node}</span>
+                    <div class="anomaly-node-track">
+                        <div class="anomaly-node-fill" style="width:${width}%"></div>
+                    </div>
+                    <span class="node-score">${item.score.toFixed(4)}</span>
+                    <span class="node-meta">偏差 ${item.deviation.toFixed(3)} / P${Math.round(item.percentile * 100)}</span>
+                </div>
+            `;
+        }).join('');
+    }
+
+    private bindAnomalyInteractive(
+        container: HTMLElement,
+        rows: Array<{ node: number; score: number; deviation: number; percentile: number }>,
+        prefix: string
+    ): void {
+        if (!rows.length) {
+            return;
+        }
+        const sortInput = container.querySelector(`#${prefix}-anomaly-sort`) as HTMLSelectElement | null;
+        const topNInput = container.querySelector(`#${prefix}-anomaly-topn`) as HTMLInputElement | null;
+        const topNLabel = container.querySelector(`#${prefix}-anomaly-topn-label`) as HTMLElement | null;
+        const target = container.querySelector(`#${prefix}-anomaly-list`) as HTMLElement | null;
+        if (!sortInput || !topNInput || !topNLabel || !target) {
+            return;
+        }
+
+        const rerender = (): void => {
+            const topN = Math.max(1, Number(topNInput.value || 1));
+            const sortBy = (sortInput.value || 'score_desc') as 'score_desc' | 'score_asc' | 'deviation_desc';
+            topNLabel.textContent = String(topN);
+            target.innerHTML = this.renderAnomalyNodeRows(rows, topN, sortBy);
+        };
+
+        sortInput.addEventListener('change', rerender);
+        topNInput.addEventListener('input', rerender);
     }
 
     private renderBeeswarmPoints(rows: Array<Record<string, unknown>>, threshold: number, zoom: number): string {
@@ -1207,6 +1368,133 @@ export class SpatiotemporalExplainPanel {
                 </section>
             </div>
         `;
+    }
+
+    private exportCurrentResult(): void {
+        const task = this.getCurrentTask();
+        if (!task || task.status !== 'completed' || !task.result) {
+            this.setStatus('当前无可导出的完成任务结果', 'warning');
+            return;
+        }
+
+        const format = ((this.container.querySelector('#dl-explain-export-format') as HTMLSelectElement | null)?.value || 'json').toLowerCase();
+        const taskId = task.task_id || 'task';
+        const tab = this.activeTab;
+
+        if (format === 'csv') {
+            const csv = this.buildCsvForActiveTab(task.result as Record<string, unknown>);
+            if (!csv) {
+                this.setStatus('当前视图暂无可导出的表格数据', 'warning');
+                return;
+            }
+            this.downloadTextFile(`${taskId}_${tab}.csv`, csv, 'text/csv;charset=utf-8');
+            this.setStatus(`导出成功：${taskId}_${tab}.csv`, 'success');
+            return;
+        }
+
+        const payload = {
+            task_id: task.task_id,
+            method: this.detectMethodFromTask(task),
+            tab: this.activeTab,
+            exported_at: new Date().toISOString(),
+            result: task.result
+        };
+        this.downloadTextFile(`${taskId}_${tab}.json`, JSON.stringify(payload, null, 2), 'application/json;charset=utf-8');
+        this.setStatus(`导出成功：${taskId}_${tab}.json`, 'success');
+    }
+
+    private buildCsvForActiveTab(result: Record<string, unknown>): string {
+        if (this.activeTab === 'lime') {
+            const lime = (result.lime || {}) as Record<string, unknown>;
+            const vis = (lime.visualization || {}) as Record<string, unknown>;
+            const rows = this.parseImportanceRows(vis.feature_importance_list || lime.global_feature_importance || [])
+                .slice(0, 120);
+            if (!rows.length) {
+                return '';
+            }
+            return this.rowsToCsv(['feature', 'importance'], rows.map((row) => [row.name, row.value]));
+        }
+
+        if (this.activeTab === 'shap') {
+            const shap = (result.shap || {}) as Record<string, unknown>;
+            const vis = (shap.visualization || {}) as Record<string, unknown>;
+            const rows = this.parseImportanceRows(vis.feature_ranking || shap.global_feature_importance || [])
+                .slice(0, 120);
+            if (!rows.length) {
+                return '';
+            }
+            return this.rowsToCsv(['feature', 'importance'], rows.map((row) => [row.name, row.value]));
+        }
+
+        if (this.activeTab === 'compare') {
+            const compareHtml = this.renderCompareResult(result);
+            if (compareHtml.includes('需要 Hybrid')) {
+                return '';
+            }
+            const lime = (result.lime || {}) as Record<string, unknown>;
+            const shap = (result.shap || {}) as Record<string, unknown>;
+            const limeRows = this.parseImportanceRows(lime.global_feature_importance || ((lime.visualization || {}) as Record<string, unknown>).feature_importance_list || []);
+            const shapRows = this.parseImportanceRows(shap.global_feature_importance || ((shap.visualization || {}) as Record<string, unknown>).feature_ranking || []);
+            const merged = new Map<string, { lime: number; shap: number }>();
+            limeRows.forEach((item) => {
+                merged.set(item.name, { lime: item.value, shap: merged.get(item.name)?.shap || 0 });
+            });
+            shapRows.forEach((item) => {
+                merged.set(item.name, { lime: merged.get(item.name)?.lime || 0, shap: item.value });
+            });
+            const rows = Array.from(merged.entries())
+                .map(([feature, value]) => ({ feature, lime: value.lime, shap: value.shap, diff: Math.abs(value.lime - value.shap) }))
+                .sort((a, b) => b.diff - a.diff)
+                .slice(0, 120);
+            if (!rows.length) {
+                return '';
+            }
+            return this.rowsToCsv(['feature', 'lime', 'shap', 'abs_diff'], rows.map((row) => [row.feature, row.lime, row.shap, row.diff]));
+        }
+
+        const summary = (result.summary || {}) as Record<string, unknown>;
+        const topFeatures = Array.isArray(summary.top_features) ? summary.top_features.join('|') : '';
+        return this.rowsToCsv(
+            ['metric', 'value'],
+            [
+                ['n_nodes', Number(summary.n_nodes || 0)],
+                ['seq_len', Number(summary.seq_len || 0)],
+                ['n_features', Number(summary.n_features || 0)],
+                ['top_features', topFeatures]
+            ]
+        );
+    }
+
+    private rowsToCsv(headers: string[], rows: Array<Array<string | number>>): string {
+        const esc = (value: string | number): string => {
+            const text = String(value ?? '');
+            return `"${text.replace(/"/g, '""')}"`;
+        };
+        const lines = [headers.map(esc).join(',')];
+        rows.forEach((row) => {
+            lines.push(row.map(esc).join(','));
+        });
+        return lines.join('\n');
+    }
+
+    private downloadTextFile(filename: string, content: string, mimeType: string): void {
+        const blob = new Blob([content], { type: mimeType });
+        const urlFactory = window.URL || (window as typeof window & { webkitURL?: typeof URL }).webkitURL;
+        const objectUrl = typeof urlFactory?.createObjectURL === 'function'
+            ? urlFactory.createObjectURL(blob)
+            : '';
+
+        const link = document.createElement('a');
+        link.href = objectUrl || `data:${mimeType},${encodeURIComponent(content)}`;
+        link.download = filename;
+        link.rel = 'noopener';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        if (objectUrl && typeof urlFactory?.revokeObjectURL === 'function') {
+            urlFactory.revokeObjectURL(objectUrl);
+        }
     }
 
     private initTheme(): void {
