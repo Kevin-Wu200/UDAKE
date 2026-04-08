@@ -43,6 +43,7 @@ class _BaseGANAdapter:
         self._lock = threading.Lock()
         self._result_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
         self._context_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._score_cache: "OrderedDict[str, dict[str, np.ndarray]]" = OrderedDict()
         self._feature_registry = AnomalyFeatureRegistry()
 
     @staticmethod
@@ -95,6 +96,21 @@ class _BaseGANAdapter:
             while len(self._context_cache) > self.config.cache_size:
                 self._context_cache.popitem(last=False)
 
+    def _score_cache_get(self, key: str) -> Optional[dict[str, np.ndarray]]:
+        with self._lock:
+            item = self._score_cache.get(key)
+            if item is None:
+                return None
+            self._score_cache.move_to_end(key)
+            return {name: np.asarray(arr, dtype=float).copy() for name, arr in item.items()}
+
+    def _score_cache_set(self, key: str, value: dict[str, np.ndarray]) -> None:
+        with self._lock:
+            self._score_cache[key] = {name: np.asarray(arr, dtype=float).copy() for name, arr in value.items()}
+            self._score_cache.move_to_end(key)
+            while len(self._score_cache) > self.config.cache_size:
+                self._score_cache.popitem(last=False)
+
     def _standardize_column(self, values: np.ndarray, strategy: str) -> tuple[np.ndarray, dict[str, float]]:
         v = np.asarray(values, dtype=float).reshape(-1)
         if strategy == "minmax":
@@ -144,17 +160,33 @@ class _BaseGANAdapter:
         return matrix, names, pre
 
     def _predict_scores(self, *, model: Any, coords: np.ndarray, values: np.ndarray) -> dict[str, np.ndarray]:
+        model_coef = np.asarray(getattr(model, "generator_coef", np.array([], dtype=float)), dtype=float).reshape(-1)
+        model_sig = self._stable_hash(
+            {
+                "model_type": model.__class__.__name__,
+                "coef_hash": hashlib.md5(model_coef.tobytes()).hexdigest(),
+                "bias": _safe_float(getattr(model, "generator_bias", 0.0)),
+                "coords_hash": hashlib.md5(np.asarray(coords, dtype=float).tobytes()).hexdigest(),
+                "values_hash": hashlib.md5(np.asarray(values, dtype=float).tobytes()).hexdigest(),
+            }
+        )
+        cached = self._score_cache_get(model_sig)
+        if cached is not None:
+            return cached
+
         bundle = model.anomaly_scores(np.asarray(coords, dtype=float), np.asarray(values, dtype=float))
         discriminator = np.asarray(bundle.get("discriminator", []), dtype=float)
         reconstruction = np.asarray(bundle.get("reconstruction", []), dtype=float)
         gradient = np.asarray(bundle.get("gradient", []), dtype=float)
         combined = np.asarray(bundle.get("combined", []), dtype=float)
-        return {
+        payload = {
             "discriminator": discriminator,
             "reconstruction": reconstruction,
             "gradient": gradient,
             "combined": combined,
         }
+        self._score_cache_set(model_sig, payload)
+        return payload
 
     def _top_node_indices(self, scores: np.ndarray, max_explain_nodes: int) -> list[int]:
         n = len(scores)
@@ -181,11 +213,13 @@ class _BaseGANAdapter:
 
     def _dynamic_lime_samples(self, n_features: int, n_points: int) -> int:
         base = max(80, int(self.config.lime_num_samples))
-        return min(1200, base + n_features * 10 + n_points * 2)
+        complexity = int(np.sqrt(max(1, n_features) * max(1, n_points)))
+        reduction = int(max(0, n_points - 80) * 0.8)
+        return max(80, min(900, base + complexity * 6 - reduction))
 
     def _dynamic_shap_samples(self, selected_nsamples: int, n_features: int, n_points: int) -> int:
         base = max(40, int(selected_nsamples))
-        penalty = int(max(0, n_features - 8) * 3 + max(0, n_points - 64) * 0.5)
+        penalty = int(max(0, n_features - 8) * 4 + max(0, n_points - 64) * 0.7)
         return max(40, min(base, base - penalty))
 
     def _effective_workers(self, n_tasks: int) -> int:
@@ -201,6 +235,47 @@ class _BaseGANAdapter:
     def _predict_surrogate(self, context: dict[str, Any]) -> Callable[[np.ndarray], np.ndarray]:
         model: Ridge = context["surrogate"]
         return lambda x: model.predict(np.asarray(x, dtype=float))
+
+    @staticmethod
+    def _memory_bytes(context: dict[str, Any], extra_arrays: Optional[list[np.ndarray]] = None) -> int:
+        keys = ["feature_matrix", "scaled_x", "background", "target"]
+        total = 0
+        for key in keys:
+            arr = context.get(key)
+            if isinstance(arr, np.ndarray):
+                total += int(arr.nbytes)
+        artifacts = context.get("generator_artifacts", {})
+        if isinstance(artifacts, dict):
+            for arr in artifacts.values():
+                if isinstance(arr, np.ndarray):
+                    total += int(arr.nbytes)
+        for arr in extra_arrays or []:
+            total += int(np.asarray(arr).nbytes)
+        return int(total)
+
+    def _compressed_lime_training_data(self, context: dict[str, Any], explained_nodes: list[int]) -> np.ndarray:
+        x = np.asarray(context["scaled_x"], dtype=float)
+        if x.shape[0] <= 64:
+            return x
+        scores = np.asarray(context["target"], dtype=float).reshape(-1)
+        keep = min(96, x.shape[0])
+        top_k = max(8, min(len(explained_nodes) * 4, keep // 2))
+        top_idx = np.argsort(-scores)[:top_k].astype(int)
+        low_idx = np.argsort(scores)[:top_k].astype(int)
+        mixed = np.concatenate([top_idx, low_idx], axis=0)
+        if mixed.size < keep:
+            stride = max(1, x.shape[0] // max(1, keep - mixed.size))
+            sampled = np.arange(0, x.shape[0], stride, dtype=int)[: max(1, keep - mixed.size)]
+            mixed = np.concatenate([mixed, sampled], axis=0)
+        unique_idx = np.unique(mixed)[:keep]
+        return x[unique_idx]
+
+    def _select_shap_feature_indices(self, context: dict[str, Any], top_k: int) -> list[int]:
+        coef = np.abs(np.asarray(context["surrogate"].coef_, dtype=float).reshape(-1))
+        variance = np.var(np.asarray(context["scaled_x"], dtype=float), axis=0)
+        signal = coef * (variance + 1e-6)
+        cap = max(4, min(int(self.config.shap_feature_cap), len(signal), int(top_k) * 2))
+        return np.argsort(-signal)[:cap].astype(int).tolist()
 
     def _build_context(self, *, model: Any, coords: np.ndarray, values: np.ndarray) -> dict[str, Any]:
         key = self._stable_hash(
@@ -926,12 +1001,30 @@ class GANAnomalyLimeAdapter(_BaseGANAdapter):
         )
         cached = self._cache_get(cache_key)
         if cached is not None:
-            cached["performance"] = {**cached.get("performance", {}), "cache_hit": True}
+            cached["performance"] = {
+                **cached.get("performance", {}),
+                "cache_hit": True,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+            }
             return cached
 
         lime_module = self._load_lime_tabular()
         feature_names: list[str] = context["feature_names"]
         predict_fn = self._predict_surrogate(context)
+        lime_training_data = self._compressed_lime_training_data(context, explained_nodes)
+        lime_explainer = None
+        lime_lock = threading.Lock()
+        if lime_module is not None:
+            try:
+                lime_explainer = lime_module.LimeTabularExplainer(
+                    training_data=lime_training_data,
+                    feature_names=feature_names,
+                    mode="regression",
+                    discretize_continuous=False,
+                    random_state=self.config.random_state,
+                )
+            except Exception:
+                lime_explainer = None
         decomposition_payload = self._score_decomposition(
             discriminator_scores=np.asarray(context["score_bundle"]["discriminator"], dtype=float),
             reconstruction_scores=np.asarray(context["score_bundle"]["reconstruction"], dtype=float),
@@ -946,21 +1039,15 @@ class GANAnomalyLimeAdapter(_BaseGANAdapter):
             fidelity = float(context["surrogate_metrics"]["fidelity"])
             backend = "surrogate_linear"
 
-            if lime_module is not None:
+            if lime_explainer is not None:
                 try:
-                    explainer = lime_module.LimeTabularExplainer(
-                        training_data=np.asarray(context["scaled_x"], dtype=float),
-                        feature_names=feature_names,
-                        mode="regression",
-                        discretize_continuous=False,
-                        random_state=self.config.random_state,
-                    )
-                    exp = explainer.explain_instance(
-                        data_row=instance,
-                        predict_fn=predict_fn,
-                        num_features=max(1, min(int(top_k), len(feature_names))),
-                        num_samples=max(80, selected_samples),
-                    )
+                    with lime_lock:
+                        exp = lime_explainer.explain_instance(
+                            data_row=instance,
+                            predict_fn=predict_fn,
+                            num_features=max(1, min(int(top_k), len(feature_names))),
+                            num_samples=max(80, selected_samples),
+                        )
                     local_map = exp.local_exp.get(1) or exp.local_exp.get(0) or []
                     local_pairs = [(int(i), float(w)) for i, w in local_map]
                     fidelity = _safe_float(getattr(exp, "score", fidelity), fidelity)
@@ -1036,13 +1123,48 @@ class GANAnomalyLimeAdapter(_BaseGANAdapter):
         )
         key_anomaly_features = self._extract_key_anomaly_features(batch_explanations=batch_explanations, top_k=int(top_k))
         anomaly_reasons = self._collect_anomaly_reasons(batch_explanations=batch_explanations)
-        generator_info = self._generator_analysis(
-            model=model,
-            coords=c,
-            values=v,
-            score_bundle=context["score_bundle"],
-            generator_artifacts=context.get("generator_artifacts"),
-        )
+        post_workers = self._effective_workers(2)
+        if post_workers > 1:
+            with ThreadPoolExecutor(max_workers=post_workers) as executor:
+                gen_future = executor.submit(
+                    self._generator_analysis,
+                    model=model,
+                    coords=c,
+                    values=v,
+                    score_bundle=context["score_bundle"],
+                    generator_artifacts=context.get("generator_artifacts"),
+                )
+                disc_future = executor.submit(
+                    self._discriminator_analysis,
+                    model=model,
+                    coords=c,
+                    values=v,
+                    feature_names=feature_names,
+                    feature_matrix=np.asarray(context["feature_matrix"], dtype=float),
+                    score_bundle=context["score_bundle"],
+                    batch_explanations=batch_explanations,
+                    top_k=int(top_k),
+                )
+                generator_info = gen_future.result()
+                discriminator_info = disc_future.result()
+        else:
+            generator_info = self._generator_analysis(
+                model=model,
+                coords=c,
+                values=v,
+                score_bundle=context["score_bundle"],
+                generator_artifacts=context.get("generator_artifacts"),
+            )
+            discriminator_info = self._discriminator_analysis(
+                model=model,
+                coords=c,
+                values=v,
+                feature_names=feature_names,
+                feature_matrix=np.asarray(context["feature_matrix"], dtype=float),
+                score_bundle=context["score_bundle"],
+                batch_explanations=batch_explanations,
+                top_k=int(top_k),
+            )
         discriminator = np.asarray(context["score_bundle"]["discriminator"], dtype=float)
         reconstruction = np.asarray(context["score_bundle"]["reconstruction"], dtype=float)
         gradient = np.asarray(context["score_bundle"]["gradient"], dtype=float)
@@ -1076,22 +1198,17 @@ class GANAnomalyLimeAdapter(_BaseGANAdapter):
                 "combined": combined.astype(float).tolist(),
             },
             "generator_analysis": generator_info,
-            "discriminator_analysis": self._discriminator_analysis(
-                model=model,
-                coords=c,
-                values=v,
-                feature_names=feature_names,
-                feature_matrix=np.asarray(context["feature_matrix"], dtype=float),
-                score_bundle=context["score_bundle"],
-                batch_explanations=batch_explanations,
-                top_k=int(top_k),
-            ),
+            "discriminator_analysis": discriminator_info,
             "anomaly_analysis": self._anomaly_profile(combined, explained_nodes),
             "preprocess": dict(context["preprocess"]),
             "performance": {
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "cache_hit": False,
                 "parallel_workers": int(workers),
+                "post_parallel_workers": int(post_workers),
+                "lime_training_size": int(lime_training_data.shape[0]),
+                "lime_sampling_budget": int(selected_samples),
+                "memory_bytes": self._memory_bytes(context),
             },
         }
         self._cache_set(cache_key, payload)
@@ -1130,7 +1247,11 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
         )
         cached = self._cache_get(cache_key)
         if cached is not None:
-            cached["performance"] = {**cached.get("performance", {}), "cache_hit": True}
+            cached["performance"] = {
+                **cached.get("performance", {}),
+                "cache_hit": True,
+                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+            }
             return cached
 
         shap_module = self._load_shap()
@@ -1138,6 +1259,13 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
         feature_names: list[str] = context["feature_names"]
         background = np.asarray(context["background"], dtype=float)
         baseline = np.mean(background, axis=0)
+        feature_indices = self._select_shap_feature_indices(context, int(top_k))
+        other_indices = [i for i in range(len(feature_names)) if i not in set(feature_indices)]
+        coef = np.asarray(surrogate.coef_, dtype=float).reshape(-1)
+        reduced_coef = coef[np.asarray(feature_indices, dtype=int)]
+        fixed_offset = float(surrogate.intercept_ + np.dot(coef[np.asarray(other_indices, dtype=int)], baseline[np.asarray(other_indices, dtype=int)]))
+        reduced_background = background[:, feature_indices]
+        reduced_baseline = baseline[feature_indices]
         effective_nsamples = self._dynamic_shap_samples(selected_nsamples, len(feature_names), len(v))
         decomposition_payload = self._score_decomposition(
             discriminator_scores=np.asarray(context["score_bundle"]["discriminator"], dtype=float),
@@ -1148,22 +1276,23 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
 
         def _explain_one(node_idx: int) -> dict[str, Any]:
             instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
-            expected_value = float(surrogate.predict(baseline.reshape(1, -1))[0])
+            reduced_instance = instance[feature_indices]
+            expected_value = float(np.dot(reduced_coef, reduced_baseline) + fixed_offset)
             backend = "surrogate_linear"
             if shap_module is not None:
                 try:
                     explainer = shap_module.KernelExplainer(
-                        lambda x: surrogate.predict(np.asarray(x, dtype=float)),
-                        background,
+                        lambda x: np.asarray(x, dtype=float) @ reduced_coef + fixed_offset,
+                        reduced_background,
                     )
                     values_arr = explainer.shap_values(
-                        instance.reshape(1, -1),
+                        reduced_instance.reshape(1, -1),
                         nsamples=max(40, effective_nsamples),
                         l1_reg=f"num_features({max(4, int(self.config.shap_feature_cap))})",
                     )
                     if isinstance(values_arr, list):
                         values_arr = values_arr[0]
-                    shap_values = np.asarray(values_arr, dtype=float).reshape(-1)
+                    reduced_shap_values = np.asarray(values_arr, dtype=float).reshape(-1)
                     ev = getattr(explainer, "expected_value", expected_value)
                     if isinstance(ev, (list, tuple, np.ndarray)):
                         expected_value = _safe_float(np.asarray(ev).reshape(-1)[0], expected_value)
@@ -1171,14 +1300,18 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
                         expected_value = _safe_float(ev, expected_value)
                     backend = "shap_kernel"
                 except Exception:
-                    shap_values = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
+                    reduced_shap_values = reduced_coef * (reduced_instance - reduced_baseline)
             else:
-                shap_values = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
+                reduced_shap_values = reduced_coef * (reduced_instance - reduced_baseline)
+
+            shap_values = np.zeros((len(feature_names),), dtype=float)
+            shap_values[np.asarray(feature_indices, dtype=int)] = np.asarray(reduced_shap_values, dtype=float)
 
             pred = float(surrogate.predict(instance.reshape(1, -1))[0])
             truth = float(target[node_idx])
             contributions: list[dict[str, Any]] = []
-            for idx, score in enumerate(shap_values.tolist()):
+            for idx in feature_indices:
+                score = float(shap_values[idx])
                 feature = feature_names[idx]
                 contributions.append(
                     {
@@ -1239,13 +1372,48 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
         )
         key_anomaly_features = self._extract_key_anomaly_features(batch_explanations=batch_explanations, top_k=int(top_k))
         anomaly_reasons = self._collect_anomaly_reasons(batch_explanations=batch_explanations)
-        generator_info = self._generator_analysis(
-            model=model,
-            coords=c,
-            values=v,
-            score_bundle=context["score_bundle"],
-            generator_artifacts=context.get("generator_artifacts"),
-        )
+        post_workers = self._effective_workers(2)
+        if post_workers > 1:
+            with ThreadPoolExecutor(max_workers=post_workers) as executor:
+                gen_future = executor.submit(
+                    self._generator_analysis,
+                    model=model,
+                    coords=c,
+                    values=v,
+                    score_bundle=context["score_bundle"],
+                    generator_artifacts=context.get("generator_artifacts"),
+                )
+                disc_future = executor.submit(
+                    self._discriminator_analysis,
+                    model=model,
+                    coords=c,
+                    values=v,
+                    feature_names=feature_names,
+                    feature_matrix=np.asarray(context["feature_matrix"], dtype=float),
+                    score_bundle=context["score_bundle"],
+                    batch_explanations=batch_explanations,
+                    top_k=int(top_k),
+                )
+                generator_info = gen_future.result()
+                discriminator_info = disc_future.result()
+        else:
+            generator_info = self._generator_analysis(
+                model=model,
+                coords=c,
+                values=v,
+                score_bundle=context["score_bundle"],
+                generator_artifacts=context.get("generator_artifacts"),
+            )
+            discriminator_info = self._discriminator_analysis(
+                model=model,
+                coords=c,
+                values=v,
+                feature_names=feature_names,
+                feature_matrix=np.asarray(context["feature_matrix"], dtype=float),
+                score_bundle=context["score_bundle"],
+                batch_explanations=batch_explanations,
+                top_k=int(top_k),
+            )
         discriminator = np.asarray(context["score_bundle"]["discriminator"], dtype=float)
         reconstruction = np.asarray(context["score_bundle"]["reconstruction"], dtype=float)
         gradient = np.asarray(context["score_bundle"]["gradient"], dtype=float)
@@ -1255,7 +1423,7 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
                 "explainer": "KernelExplainer",
                 "explained_nodes": len(explained_nodes),
                 "num_features": len(feature_names),
-                "background_size": int(background.shape[0]),
+                "background_size": int(reduced_background.shape[0]),
                 "nsamples": effective_nsamples,
                 "top_features": top_features,
                 "average_confidence": float(np.mean([item["confidence"] for item in batch_explanations])) if batch_explanations else 0.0,
@@ -1281,16 +1449,7 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
                 "combined": combined.astype(float).tolist(),
             },
             "generator_analysis": generator_info,
-            "discriminator_analysis": self._discriminator_analysis(
-                model=model,
-                coords=c,
-                values=v,
-                feature_names=feature_names,
-                feature_matrix=np.asarray(context["feature_matrix"], dtype=float),
-                score_bundle=context["score_bundle"],
-                batch_explanations=batch_explanations,
-                top_k=int(top_k),
-            ),
+            "discriminator_analysis": discriminator_info,
             "anomaly_analysis": self._anomaly_profile(combined, explained_nodes),
             "preprocess": dict(context["preprocess"]),
             "performance": {
@@ -1298,6 +1457,10 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
                 "cache_hit": False,
                 "backend": "shap" if shap_module is not None else "surrogate_linear",
                 "parallel_workers": int(workers),
+                "post_parallel_workers": int(post_workers),
+                "effective_feature_count": int(len(feature_indices)),
+                "feature_reduction_ratio": float(len(feature_indices) / max(1, len(feature_names))),
+                "memory_bytes": self._memory_bytes(context, extra_arrays=[reduced_background]),
             },
         }
         self._cache_set(cache_key, payload)
