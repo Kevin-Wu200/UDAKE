@@ -72,3 +72,22 @@ def test_explain_anomaly_contrastive_returns_pending_adapter() -> None:
 
     assert result["summary"]["adapter_status"] == "pending"
     assert result["feature_analysis"]["model_name"] == "contrastive"
+
+
+def test_explain_anomaly_contrastive_lime() -> None:
+    service = DeepLearningService()
+    coords, values = _build_payload()
+
+    result = service.explain_anomaly(
+        model_name="contrastive",
+        coords=coords,
+        values=values,
+        method="lime",
+        top_k=3,
+        max_explain_nodes=3,
+    )
+
+    assert result["model_name"] == "contrastive"
+    assert result["summary"]["method"] == "lime"
+    assert "lime" in result
+    assert "prediction" in result

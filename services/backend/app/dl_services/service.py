@@ -20,6 +20,7 @@ from deep_learning.training import LightningTrainer, SpatialTrainingConfig, Trai
 from deep_learning.utils.device import DeviceManager
 from deep_learning.utils.monitoring import AlertManager, AlertRule, MetricMonitor, SystemResourceMonitor
 from .anomaly_features import AnomalyFeatureRegistry
+from .contrastive_anomaly_explainer import ContrastiveLimeAdapter
 from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
 from .gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter
 from .lime_explainer import SpatiotemporalLIMEExplainer
@@ -90,6 +91,7 @@ class DeepLearningService:
         self.gcae_shap_adapter = GCAEShapAdapter()
         self.gan_lime_adapter = GANAnomalyLimeAdapter()
         self.gan_shap_adapter = GANAnomalySHAPAdapter()
+        self.contrastive_lime_adapter = ContrastiveLimeAdapter()
 
     def health(self) -> dict[str, Any]:
         profile = self.device_manager.configure()
@@ -374,14 +376,26 @@ class DeepLearningService:
         elif model_name == "gan":
             lime_adapter = self.gan_lime_adapter
             shap_adapter = self.gan_shap_adapter
+        elif model_name == "contrastive":
+            lime_adapter = self.contrastive_lime_adapter
 
-        if lime_adapter is None or shap_adapter is None:
+        if method in {"lime", "hybrid"} and lime_adapter is None:
             return {
                 "model_name": model_name,
                 "summary": {
                     "method": method,
                     "adapter_status": "pending",
-                    "message": "当前仅完成 VAE/GCAE/GAN 的解释适配器，其他异常模型适配器在后续章节实现。",
+                    "message": "当前模型尚未实现 LIME 解释适配器。",
+                },
+                "feature_analysis": feature_analysis,
+            }
+        if method in {"shap", "hybrid"} and shap_adapter is None:
+            return {
+                "model_name": model_name,
+                "summary": {
+                    "method": method,
+                    "adapter_status": "pending",
+                    "message": "当前模型尚未实现 SHAP 解释适配器。",
                 },
                 "feature_analysis": feature_analysis,
             }
