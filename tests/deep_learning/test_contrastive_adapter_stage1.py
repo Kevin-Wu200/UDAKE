@@ -52,6 +52,11 @@ def test_contrastive_shap_cache_and_validation_fields() -> None:
 
     assert "validation" in out1
     assert "surrogate_fidelity" in out1["validation"]
+    assert "additivity_mean_abs_error" in out1["validation"]
+    assert "additivity_max_abs_error" in out1["validation"]
+    assert "embedding_input" in out1
+    assert "explainer_config" in out1["summary"]
+    assert out1["summary"]["explainer_config"]["effective_nsamples"] >= out1["summary"]["nsamples"]
     assert out2["performance"]["cache_hit"] is True
 
 

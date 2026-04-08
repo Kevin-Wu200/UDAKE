@@ -423,6 +423,28 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
 
     _CONTRASTIVE_FEATURE_NAMES = {"feature_distance", "density_score", "nearest_score", "bank_similarity"}
 
+    def _embedding_input_summary(self, encoder_bundle: dict[str, np.ndarray], explained_nodes: list[int]) -> dict[str, Any]:
+        embedding_norm = np.asarray(encoder_bundle.get("embedding_norm", []), dtype=float).reshape(-1)
+        embedding_cos_center = np.asarray(encoder_bundle.get("embedding_cos_center", []), dtype=float).reshape(-1)
+        idx = np.asarray(explained_nodes, dtype=int)
+        if len(idx) and len(embedding_norm) >= int(np.max(idx)) + 1:
+            explained_norm = embedding_norm[idx]
+        else:
+            explained_norm = np.zeros((0,), dtype=float)
+        if len(idx) and len(embedding_cos_center) >= int(np.max(idx)) + 1:
+            explained_cos = embedding_cos_center[idx]
+        else:
+            explained_cos = np.zeros((0,), dtype=float)
+
+        return {
+            "embedding_dim_proxy": int(len(embedding_norm)),
+            "explained_nodes": int(len(explained_nodes)),
+            "explained_embedding_norm_mean": float(np.mean(explained_norm)) if len(explained_norm) else 0.0,
+            "explained_embedding_norm_std": float(np.std(explained_norm)) if len(explained_norm) else 0.0,
+            "explained_embedding_cos_center_mean": float(np.mean(explained_cos)) if len(explained_cos) else 0.0,
+            "explained_embedding_cos_center_std": float(np.std(explained_cos)) if len(explained_cos) else 0.0,
+        }
+
     def _encoder_shap_analysis(
         self,
         *,
@@ -537,6 +559,7 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
         baseline = np.mean(background, axis=0)
 
         batch_explanations: list[dict[str, Any]] = []
+        additivity_errors: list[float] = []
         for node_idx in explained_nodes:
             instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
             expected_value = float(surrogate.predict(baseline.reshape(1, -1))[0])
@@ -567,6 +590,7 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                 shap_values = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
 
             pred = float(surrogate.predict(instance.reshape(1, -1))[0])
+            additivity_errors.append(float(abs((expected_value + float(np.sum(shap_values))) - pred)))
             contributions: list[dict[str, Any]] = []
             for idx, score in enumerate(shap_values.tolist()):
                 feature = feature_names[idx]
@@ -628,6 +652,11 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                 "num_features": len(feature_names),
                 "background_size": int(background.shape[0]),
                 "nsamples": int(selected_nsamples),
+                "explainer_config": {
+                    "background_size": int(background.shape[0]),
+                    "effective_nsamples": int(effective_nsamples),
+                    "l1_reg_num_features": int(max(4, int(self.config.shap_l1_reg_num_features))),
+                },
                 "anomaly_threshold_p95": anomaly_threshold,
                 "top_features": top_features,
                 "average_confidence": float(np.mean([item["confidence"] for item in batch_explanations])) if batch_explanations else 0.0,
@@ -646,6 +675,7 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                 "embedding_norm": np.asarray(context["encoder_bundle"]["embedding_norm"], dtype=float).astype(float).tolist(),
                 "embedding_cos_center": np.asarray(context["encoder_bundle"]["embedding_cos_center"], dtype=float).astype(float).tolist(),
             },
+            "embedding_input": self._embedding_input_summary(context["encoder_bundle"], explained_nodes),
             "encoder_shap_analysis": self._encoder_shap_analysis(
                 feature_names=feature_names,
                 mean_abs=mean_abs,
@@ -664,6 +694,8 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
             "validation": {
                 "mean_abs_error": mean_abs_error,
                 "surrogate_fidelity": _safe_float(context.get("surrogate_metrics", {}).get("fidelity", 0.0), 0.0),
+                "additivity_mean_abs_error": float(np.mean(additivity_errors)) if additivity_errors else 0.0,
+                "additivity_max_abs_error": float(np.max(additivity_errors)) if additivity_errors else 0.0,
             },
             "performance": {
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
