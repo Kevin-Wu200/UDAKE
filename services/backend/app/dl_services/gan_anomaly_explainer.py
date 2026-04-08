@@ -647,4 +647,68 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
                 "reason": self._explanation_reason(node_idx=int(node_idx), decomposition_row=dec_row, top_contributions=contributions),
             }
 
-<!-- PLACEHOLDER_SHAP_AGGREGATE -->
+        workers = self._effective_workers(len(explained_nodes))
+        if workers == 1:
+            batch_explanations = [_explain_one(idx) for idx in explained_nodes]
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                batch_explanations = list(executor.map(_explain_one, explained_nodes))
+
+        mean_abs = np.mean(np.abs(np.asarray([item["raw_shap_values"] for item in batch_explanations], dtype=float)), axis=0)
+        ranking = np.argsort(-mean_abs).astype(int).tolist()
+        top_features = [
+            {
+                "feature_index": int(idx),
+                "feature_name": feature_names[idx],
+                "feature_alias": self._feature_display(feature_names[idx]),
+                "importance": float(mean_abs[idx]),
+                "category": self._feature_category(feature_names[idx]),
+            }
+            for idx in ranking[: max(1, int(top_k))]
+        ]
+
+        combined = np.asarray(context["score_bundle"]["combined"], dtype=float)
+        consistency = self._validate_explanation_consistency(
+            decomposition=decomposition_payload["decomposition"],
+            combined_scores=combined,
+            explained_nodes=explained_nodes,
+        )
+        generator_info = self._generator_analysis(model=model, coords=c, values=v)
+        payload = {
+            "summary": {
+                "method": "shap",
+                "explainer": "KernelExplainer",
+                "explained_nodes": len(explained_nodes),
+                "num_features": len(feature_names),
+                "background_size": int(background.shape[0]),
+                "nsamples": effective_nsamples,
+                "top_features": top_features,
+                "average_confidence": float(np.mean([item["confidence"] for item in batch_explanations])) if batch_explanations else 0.0,
+                "surrogate_fidelity": float(context["surrogate_metrics"]["fidelity"]),
+            },
+            "feature_importance": mean_abs.astype(float).tolist(),
+            "batch_explanations": batch_explanations,
+            "global_feature_importance": top_features,
+            "anomaly_score_explanation": {
+                "decomposition": decomposition_payload["decomposition"],
+                "key_anomaly_nodes": decomposition_payload["top_anomaly_nodes"],
+                "consistency_validation": consistency,
+            },
+            "score_components": {
+                "discriminator": np.asarray(context["score_bundle"]["discriminator"], dtype=float).astype(float).tolist(),
+                "reconstruction": np.asarray(context["score_bundle"]["reconstruction"], dtype=float).astype(float).tolist(),
+                "gradient": np.asarray(context["score_bundle"]["gradient"], dtype=float).astype(float).tolist(),
+                "combined": combined.astype(float).tolist(),
+            },
+            "generator_analysis": generator_info,
+            "anomaly_analysis": self._anomaly_profile(combined, explained_nodes),
+            "preprocess": dict(context["preprocess"]),
+            "performance": {
+                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                "cache_hit": False,
+                "backend": "shap" if shap_module is not None else "surrogate_linear",
+                "parallel_workers": int(workers),
+            },
+        }
+        self._cache_set(cache_key, payload)
+        return payload
