@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import numpy as np
+import pytest
 
 from deep_learning.models.anomaly_detection import ContrastiveAnomalyDetector
 from services.backend.app.dl_services.contrastive_anomaly_explainer import (
@@ -39,6 +40,52 @@ def test_contrastive_lime_and_shap_adapters() -> None:
     assert len(shap["global_feature_importance"]) >= 1
     assert "encoder_shap_analysis" in shap
     assert "contrastive_loss_shap_analysis" in shap
+
+
+def test_contrastive_preprocess_validation_and_batch_support() -> None:
+    coords, values = _make_data(n=50, seed=39)
+    model = ContrastiveAnomalyDetector()
+
+    pre = model.preprocess_contrastive_data(coords, values, batch_size=16, use_training_stats=False, augmentation=False)
+    processed = np.asarray(pre["processed_features"], dtype=float)
+
+    assert processed.shape == (len(values), 10)
+    assert len(pre["feature_names"]) == 10
+    assert len(pre["batch_slices"]) == 4
+    assert pre["batch_slices"][-1] == [48, 50]
+    assert len(pre["positive_pairs"]) == len(values)
+    assert len(pre["negative_pairs"]) == len(values)
+
+    validation = pre["validation"]
+    assert validation["is_valid"] is True
+    assert validation["n_points"] == len(values)
+    assert validation["pair_count"] == len(values)
+    assert validation["batch_size"] == 16
+    assert validation["num_batches"] == 4
+    assert validation["last_batch_size"] == 2
+    assert validation["feature_dim"] == 10
+    assert isinstance(validation["zero_variance_feature_indices"], list)
+
+    assert abs(float(np.mean(processed))) < 0.5
+    assert np.isfinite(processed).all()
+    assert pre["scaler"]["source"] == "runtime"
+
+
+def test_contrastive_preprocess_training_stats_and_fallback() -> None:
+    coords, values = _make_data(n=64, seed=67)
+    model = ContrastiveAnomalyDetector()
+    model.fit(coords, values, epochs=10)
+
+    trained = model.preprocess_contrastive_data(coords, values, batch_size=32, use_training_stats=True, augmentation=False)
+    assert trained["scaler"]["source"] == "trained"
+
+    model.feature_mean = np.zeros((1, 3), dtype=float)
+    model.feature_std = np.ones((1, 3), dtype=float)
+    fallback = model.preprocess_contrastive_data(coords, values, batch_size=32, use_training_stats=True, augmentation=False)
+    assert fallback["scaler"]["source"] == "runtime_fallback"
+
+    with pytest.raises(ValueError):
+        model.preprocess_contrastive_data(coords, values, batch_size=0)
 
 
 def test_contrastive_shap_cache_and_validation_fields() -> None:

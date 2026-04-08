@@ -64,6 +64,24 @@ class ContrastiveAnomalyDetector:
             neg = np.roll(pos, 1)
         return pos, neg
 
+    def _validate_batch_size(self, batch_size: int | None, n_points: int) -> int:
+        if batch_size is None:
+            return int(max(1, n_points))
+        if not isinstance(batch_size, (int, np.integer)):
+            raise ValueError("batch_size must be an integer")
+        size = int(batch_size)
+        if size <= 0:
+            raise ValueError("batch_size must be > 0")
+        return int(min(size, n_points))
+
+    def _build_batch_slices(self, n_points: int, batch_size: int) -> list[list[int]]:
+        return [[int(i), int(min(i + batch_size, n_points))] for i in range(0, n_points, batch_size)]
+
+    def _apply_runtime_standardization(self, matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        mean = matrix.mean(axis=0, keepdims=True)
+        std = matrix.std(axis=0, keepdims=True) + 1e-6
+        return (matrix - mean) / std, mean, std
+
     def preprocess_contrastive_data(
         self,
         coords: np.ndarray,
@@ -75,6 +93,7 @@ class ContrastiveAnomalyDetector:
     ) -> dict[str, object]:
         c, v = self._validate_inputs(coords, values)
         base = self._build_features(c, v)
+        n_points = int(len(v))
         names = [
             "coord_x",
             "coord_y",
@@ -103,27 +122,37 @@ class ContrastiveAnomalyDetector:
         matrix = np.concatenate([base, feature_distance, density_score, nearest_score, bank_similarity], axis=1)
         names.extend(["feature_distance", "density_score", "nearest_score", "bank_similarity"])
 
-        if use_training_stats and self.feature_mean is not None and self.feature_std is not None:
-            processed = (matrix - self.feature_mean) / self.feature_std
+        scaler_source = "runtime"
+        if (
+            use_training_stats
+            and self.feature_mean is not None
+            and self.feature_std is not None
+            and np.asarray(self.feature_mean).shape == (1, matrix.shape[1])
+            and np.asarray(self.feature_std).shape == (1, matrix.shape[1])
+        ):
+            processed = (matrix - self.feature_mean) / (self.feature_std + 1e-6)
+            scaler_source = "trained"
             scaler = {
                 "mean": np.asarray(self.feature_mean, dtype=float).reshape(-1).tolist(),
                 "std": np.asarray(self.feature_std, dtype=float).reshape(-1).tolist(),
-                "source": "trained",
+                "source": scaler_source,
             }
         else:
-            mean = matrix.mean(axis=0, keepdims=True)
-            std = matrix.std(axis=0, keepdims=True) + 1e-6
-            processed = (matrix - mean) / std
+            processed, mean, std = self._apply_runtime_standardization(matrix)
+            if use_training_stats and (self.feature_mean is not None or self.feature_std is not None):
+                scaler_source = "runtime_fallback"
             scaler = {
                 "mean": mean.reshape(-1).tolist(),
                 "std": std.reshape(-1).tolist(),
-                "source": "runtime",
+                "source": scaler_source,
             }
 
-        pos_idx, neg_idx = self._pair_indices(len(v))
+        pos_idx, neg_idx = self._pair_indices(n_points)
         pair_size = int(len(pos_idx))
-        size = int(max(1, batch_size or len(v)))
-        slices = [[int(i), int(min(i + size, len(v)))] for i in range(0, len(v), size)]
+        size = self._validate_batch_size(batch_size, n_points)
+        slices = self._build_batch_slices(n_points, size)
+        coord_duplicate_ratio = 1.0 - (len(np.unique(c, axis=0)) / float(max(1, n_points)))
+        zero_variance_cols = np.where(np.std(matrix, axis=0) < 1e-12)[0].astype(int).tolist()
         return {
             "coords": c,
             "values": v,
@@ -139,10 +168,15 @@ class ContrastiveAnomalyDetector:
             },
             "scaler": scaler,
             "validation": {
-                "is_valid": bool(np.isfinite(matrix).all() and len(v) > 0 and pair_size > 0),
-                "n_points": int(len(v)),
+                "is_valid": bool(np.isfinite(matrix).all() and n_points > 0 and pair_size > 0),
+                "n_points": n_points,
                 "pair_count": int(pair_size),
                 "batch_size": size,
+                "num_batches": int(len(slices)),
+                "last_batch_size": int(slices[-1][1] - slices[-1][0]) if slices else 0,
+                "coord_duplicate_ratio": float(coord_duplicate_ratio),
+                "zero_variance_feature_indices": zero_variance_cols,
+                "feature_dim": int(matrix.shape[1]),
             },
         }
 
