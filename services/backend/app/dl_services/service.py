@@ -20,7 +20,7 @@ from deep_learning.training import LightningTrainer, SpatialTrainingConfig, Trai
 from deep_learning.utils.device import DeviceManager
 from deep_learning.utils.monitoring import AlertManager, AlertRule, MetricMonitor, SystemResourceMonitor
 from .anomaly_features import AnomalyFeatureRegistry
-from .contrastive_anomaly_explainer import ContrastiveLimeAdapter
+from .contrastive_anomaly_explainer import ContrastiveLimeAdapter, ContrastiveShapAdapter
 from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
 from .gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter
 from .lime_explainer import SpatiotemporalLIMEExplainer
@@ -92,6 +92,7 @@ class DeepLearningService:
         self.gan_lime_adapter = GANAnomalyLimeAdapter()
         self.gan_shap_adapter = GANAnomalySHAPAdapter()
         self.contrastive_lime_adapter = ContrastiveLimeAdapter()
+        self.contrastive_shap_adapter = ContrastiveShapAdapter()
 
     def health(self) -> dict[str, Any]:
         profile = self.device_manager.configure()
@@ -378,6 +379,7 @@ class DeepLearningService:
             shap_adapter = self.gan_shap_adapter
         elif model_name == "contrastive":
             lime_adapter = self.contrastive_lime_adapter
+            shap_adapter = self.contrastive_shap_adapter
 
         if method in {"lime", "hybrid"} and lime_adapter is None:
             return {

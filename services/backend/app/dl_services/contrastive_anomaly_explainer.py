@@ -26,6 +26,9 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 @dataclass
 class ContrastiveExplanationConfig:
     lime_num_samples: int = 240
+    shap_nsamples: int = 140
+    shap_background_size: int = 64
+    shap_l1_reg_num_features: int = 10
     max_explain_nodes: int = 8
     cache_size: int = 32
     random_state: int = 42
@@ -48,6 +51,14 @@ class ContrastiveLimeAdapter:
         except Exception:
             return None
         return lime_tabular
+
+    @staticmethod
+    def _load_shap() -> Any:
+        try:
+            import shap  # type: ignore
+        except Exception:
+            return None
+        return shap
 
     def _stable_hash(self, payload: dict[str, Any]) -> str:
         normalized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
@@ -164,6 +175,19 @@ class ContrastiveLimeAdapter:
     def _dynamic_lime_samples(self, n_features: int, n_points: int) -> int:
         base = max(80, int(self.config.lime_num_samples))
         return min(1200, base + n_features * 8 + n_points * 2)
+
+    def _dynamic_shap_samples(self, selected_nsamples: int, n_features: int, n_points: int) -> int:
+        base = max(40, int(selected_nsamples))
+        return min(1000, base + n_features * 3 + n_points)
+
+    def _select_background(self, x_scaled: np.ndarray, scores: np.ndarray, size: int | None = None) -> np.ndarray:
+        n = x_scaled.shape[0]
+        k = max(8, min(int(size or self.config.shap_background_size), n))
+        if n <= k:
+            return np.asarray(x_scaled, dtype=float).copy()
+        order = np.argsort(np.asarray(scores, dtype=float).reshape(-1))
+        evenly = np.linspace(0, n - 1, k, dtype=int)
+        return np.asarray(x_scaled[np.unique(order[evenly])], dtype=float)
 
     def _top_node_indices(self, scores: np.ndarray, max_explain_nodes: int) -> list[int]:
         n = len(scores)
@@ -388,6 +412,264 @@ class ContrastiveLimeAdapter:
             "performance": {
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "cache_hit": False,
+            },
+        }
+        self._cache_set(cache_key, payload)
+        return payload
+
+
+class ContrastiveShapAdapter(ContrastiveLimeAdapter):
+    """对比学习模型的 SHAP 解释适配器。"""
+
+    _CONTRASTIVE_FEATURE_NAMES = {"feature_distance", "density_score", "nearest_score", "bank_similarity"}
+
+    def _encoder_shap_analysis(
+        self,
+        *,
+        feature_names: list[str],
+        mean_abs: np.ndarray,
+        encoder_bundle: dict[str, np.ndarray],
+        batch_explanations: list[dict[str, Any]],
+        top_k: int,
+    ) -> dict[str, Any]:
+        encoder_pairs: list[tuple[int, float]] = []
+        for idx, name in enumerate(feature_names):
+            if name in self._CONTRASTIVE_FEATURE_NAMES:
+                continue
+            encoder_pairs.append((idx, float(mean_abs[idx])))
+        encoder_pairs.sort(key=lambda item: item[1], reverse=True)
+
+        top_encoder_features = [
+            {
+                "feature_index": int(idx),
+                "feature_name": feature_names[idx],
+                "feature_alias": self._feature_display(feature_names[idx]),
+                "importance": float(score),
+                "category": self._feature_category(feature_names[idx]),
+            }
+            for idx, score in encoder_pairs[: max(1, int(top_k))]
+        ]
+
+        embedding_norm = np.asarray(encoder_bundle.get("embedding_norm", []), dtype=float).reshape(-1)
+        embedding_cos_center = np.asarray(encoder_bundle.get("embedding_cos_center", []), dtype=float).reshape(-1)
+        local_abs = np.asarray([np.sum(np.abs(np.asarray(item["raw_shap_values"], dtype=float))) for item in batch_explanations], dtype=float)
+        explain_idx = np.asarray([int(item["node_index"]) for item in batch_explanations], dtype=int)
+        emb_slice = embedding_norm[explain_idx] if len(embedding_norm) > 0 and len(explain_idx) > 0 else np.zeros((0,), dtype=float)
+        corr = 0.0
+        if len(local_abs) > 1 and len(emb_slice) == len(local_abs) and np.std(local_abs) > 1e-9 and np.std(emb_slice) > 1e-9:
+            corr = float(np.corrcoef(local_abs, emb_slice)[0, 1])
+
+        return {
+            "top_encoder_features": top_encoder_features,
+            "embedding_norm_stats": {
+                "mean": float(np.mean(embedding_norm)) if len(embedding_norm) else 0.0,
+                "std": float(np.std(embedding_norm)) if len(embedding_norm) else 0.0,
+            },
+            "embedding_cos_center_stats": {
+                "mean": float(np.mean(embedding_cos_center)) if len(embedding_cos_center) else 0.0,
+                "std": float(np.std(embedding_cos_center)) if len(embedding_cos_center) else 0.0,
+            },
+            "embedding_shap_alignment": corr,
+        }
+
+    def _contrastive_shap_analysis(self, *, feature_names: list[str], mean_abs: np.ndarray, score_bundle: dict[str, np.ndarray], top_k: int) -> dict[str, Any]:
+        pairs: list[tuple[str, float]] = []
+        for idx, name in enumerate(feature_names):
+            if name in self._CONTRASTIVE_FEATURE_NAMES:
+                pairs.append((name, float(mean_abs[idx])))
+        pairs.sort(key=lambda item: item[1], reverse=True)
+        top_contrastive_features = [
+            {
+                "feature_name": name,
+                "feature_alias": self._feature_display(name),
+                "importance": float(score),
+                "category": self._feature_category(name),
+            }
+            for name, score in pairs[: max(1, int(top_k))]
+        ]
+        return {
+            "top_contrastive_features": top_contrastive_features,
+            "score_component_stats": {
+                "feature_distance_mean": float(np.mean(np.asarray(score_bundle.get("feature_distance", []), dtype=float))) if len(np.asarray(score_bundle.get("feature_distance", []), dtype=float)) else 0.0,
+                "density_mean": float(np.mean(np.asarray(score_bundle.get("density", []), dtype=float))) if len(np.asarray(score_bundle.get("density", []), dtype=float)) else 0.0,
+                "nearest_neighbor_mean": float(np.mean(np.asarray(score_bundle.get("nearest_neighbor", []), dtype=float))) if len(np.asarray(score_bundle.get("nearest_neighbor", []), dtype=float)) else 0.0,
+                "bank_similarity_mean": float(np.mean(np.asarray(score_bundle.get("bank_similarity", []), dtype=float))) if len(np.asarray(score_bundle.get("bank_similarity", []), dtype=float)) else 0.0,
+            },
+        }
+
+    def explain(
+        self,
+        *,
+        model: Any,
+        coords: np.ndarray,
+        values: np.ndarray,
+        top_k: int = 5,
+        nsamples: Optional[int] = None,
+        max_explain_nodes: Optional[int] = None,
+    ) -> dict[str, Any]:
+        started = time.perf_counter()
+        c = np.asarray(coords, dtype=float)
+        v = np.asarray(values, dtype=float).reshape(-1)
+        context = self._build_context(model=model, coords=c, values=v)
+        target = np.asarray(context["target"], dtype=float)
+        explained_nodes, anomaly_threshold = self._select_explained_nodes(target, int(max_explain_nodes or self.config.max_explain_nodes))
+        selected_nsamples = int(nsamples or self.config.shap_nsamples)
+        effective_nsamples = self._dynamic_shap_samples(selected_nsamples, context["scaled_x"].shape[1], len(v))
+
+        cache_key = self._stable_hash(
+            {
+                "method": "shap",
+                "context_key": context["context_key"],
+                "top_k": int(top_k),
+                "nodes": explained_nodes,
+                "nsamples": selected_nsamples,
+            }
+        )
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            cached["performance"] = {**cached.get("performance", {}), "cache_hit": True}
+            return cached
+
+        shap_module = self._load_shap()
+        surrogate: Ridge = context["surrogate"]
+        feature_names: list[str] = context["feature_names"]
+        background = self._select_background(np.asarray(context["scaled_x"], dtype=float), target)
+        baseline = np.mean(background, axis=0)
+
+        batch_explanations: list[dict[str, Any]] = []
+        for node_idx in explained_nodes:
+            instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
+            expected_value = float(surrogate.predict(baseline.reshape(1, -1))[0])
+            backend = "surrogate_linear"
+            if shap_module is not None:
+                try:
+                    explainer = shap_module.KernelExplainer(
+                        lambda x: surrogate.predict(np.asarray(x, dtype=float)),
+                        background,
+                    )
+                    values_arr = explainer.shap_values(
+                        instance.reshape(1, -1),
+                        nsamples=max(40, effective_nsamples),
+                        l1_reg=f"num_features({max(4, int(self.config.shap_l1_reg_num_features))})",
+                    )
+                    if isinstance(values_arr, list):
+                        values_arr = values_arr[0]
+                    shap_values = np.asarray(values_arr, dtype=float).reshape(-1)
+                    ev = getattr(explainer, "expected_value", expected_value)
+                    if isinstance(ev, (list, tuple, np.ndarray)):
+                        expected_value = _safe_float(np.asarray(ev).reshape(-1)[0], expected_value)
+                    else:
+                        expected_value = _safe_float(ev, expected_value)
+                    backend = "shap_kernel"
+                except Exception:
+                    shap_values = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
+            else:
+                shap_values = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
+
+            pred = float(surrogate.predict(instance.reshape(1, -1))[0])
+            contributions: list[dict[str, Any]] = []
+            for idx, score in enumerate(shap_values.tolist()):
+                feature = feature_names[idx]
+                contributions.append(
+                    {
+                        "feature_index": int(idx),
+                        "feature_name": feature,
+                        "feature_alias": self._feature_display(feature),
+                        "category": self._feature_category(feature),
+                        "shap_value": float(score),
+                        "abs_shap": float(abs(score)),
+                        "feature_value": float(context["feature_matrix"][node_idx, idx]),
+                    }
+                )
+            contributions.sort(key=lambda item: item["abs_shap"], reverse=True)
+            contributions = contributions[: max(1, int(top_k))]
+            batch_explanations.append(
+                {
+                    "node_index": int(node_idx),
+                    "prediction": pred,
+                    "target_prediction": float(target[node_idx]),
+                    "is_anomaly": bool(target[node_idx] >= anomaly_threshold),
+                    "expected_value": expected_value,
+                    "backend": backend,
+                    "confidence": float(np.exp(-abs(pred - target[node_idx]) / (abs(target[node_idx]) + 1e-6))),
+                    "top_contributions": contributions,
+                    "raw_shap_values": [float(x) for x in shap_values.tolist()],
+                }
+            )
+
+        mean_abs = np.mean(np.abs(np.asarray([item["raw_shap_values"] for item in batch_explanations], dtype=float)), axis=0)
+        ranking = np.argsort(-mean_abs).astype(int).tolist()
+        top_features = [
+            {
+                "feature_index": int(idx),
+                "feature_name": feature_names[idx],
+                "feature_alias": self._feature_display(feature_names[idx]),
+                "importance": float(mean_abs[idx]),
+                "category": self._feature_category(feature_names[idx]),
+            }
+            for idx in ranking[: max(1, int(top_k))]
+        ]
+
+        mean_abs_error = float(
+            np.mean(
+                [
+                    abs(float(item["prediction"]) - float(item["target_prediction"]))
+                    for item in batch_explanations
+                ]
+            )
+        ) if batch_explanations else 0.0
+        score_bundle = context["score_bundle"]
+
+        payload = {
+            "summary": {
+                "method": "shap",
+                "explainer": "KernelExplainer",
+                "explained_nodes": len(explained_nodes),
+                "num_features": len(feature_names),
+                "background_size": int(background.shape[0]),
+                "nsamples": int(selected_nsamples),
+                "anomaly_threshold_p95": anomaly_threshold,
+                "top_features": top_features,
+                "average_confidence": float(np.mean([item["confidence"] for item in batch_explanations])) if batch_explanations else 0.0,
+            },
+            "feature_importance": mean_abs.astype(float).tolist(),
+            "batch_explanations": batch_explanations,
+            "global_feature_importance": top_features,
+            "score_components": {
+                "feature_distance": np.asarray(score_bundle["feature_distance"], dtype=float).astype(float).tolist(),
+                "density": np.asarray(score_bundle["density"], dtype=float).astype(float).tolist(),
+                "nearest_neighbor": np.asarray(score_bundle["nearest_neighbor"], dtype=float).astype(float).tolist(),
+                "bank_similarity": np.asarray(score_bundle["bank_similarity"], dtype=float).astype(float).tolist(),
+                "combined": target.astype(float).tolist(),
+            },
+            "encoder_components": {
+                "embedding_norm": np.asarray(context["encoder_bundle"]["embedding_norm"], dtype=float).astype(float).tolist(),
+                "embedding_cos_center": np.asarray(context["encoder_bundle"]["embedding_cos_center"], dtype=float).astype(float).tolist(),
+            },
+            "encoder_shap_analysis": self._encoder_shap_analysis(
+                feature_names=feature_names,
+                mean_abs=mean_abs,
+                encoder_bundle=context["encoder_bundle"],
+                batch_explanations=batch_explanations,
+                top_k=top_k,
+            ),
+            "contrastive_loss_shap_analysis": self._contrastive_shap_analysis(
+                feature_names=feature_names,
+                mean_abs=mean_abs,
+                score_bundle=score_bundle,
+                top_k=top_k,
+            ),
+            "surrogate_metrics": context["surrogate_metrics"],
+            "preprocess": context["preprocess"],
+            "validation": {
+                "mean_abs_error": mean_abs_error,
+                "surrogate_fidelity": _safe_float(context.get("surrogate_metrics", {}).get("fidelity", 0.0), 0.0),
+            },
+            "performance": {
+                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                "cache_hit": False,
+                "backend": "shap" if shap_module is not None else "surrogate_linear",
+                "effective_nsamples": int(effective_nsamples),
             },
         }
         self._cache_set(cache_key, payload)
