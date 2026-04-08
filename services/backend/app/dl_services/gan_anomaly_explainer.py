@@ -241,6 +241,10 @@ class _BaseGANAdapter:
                 "batch_slices": pre_info.get("batch_slices", []),
                 "validation": pre_info.get("validation", {}),
             },
+            "generator_artifacts": {
+                "generated_values": self._to_float32(np.asarray(pre_info.get("generated_values", []), dtype=float)),
+                "latent_projection": self._to_float32(np.asarray(pre_info.get("latent_projection", []), dtype=float)),
+            },
             "surrogate_metrics": {"train_rmse": train_rmse, "fidelity": fidelity},
         }
         self._context_set(key, context)
@@ -435,17 +439,224 @@ class _BaseGANAdapter:
             "coverage": coverage,
         }
 
-    def _generator_analysis(self, *, model: Any, coords: np.ndarray, values: np.ndarray) -> dict[str, Any]:
+    def _generator_analysis(
+        self,
+        *,
+        model: Any,
+        coords: np.ndarray,
+        values: np.ndarray,
+        score_bundle: Optional[dict[str, np.ndarray]] = None,
+        generator_artifacts: Optional[dict[str, np.ndarray]] = None,
+    ) -> dict[str, Any]:
         c = np.asarray(coords, dtype=float)
         v = np.asarray(values, dtype=float).reshape(-1)
-        noise = np.zeros_like(v)
-        generated = model.generator(noise, c)
+        if generator_artifacts is not None and "generated_values" in generator_artifacts:
+            generated = np.asarray(generator_artifacts.get("generated_values", []), dtype=float).reshape(-1)
+            if len(generated) != len(v):
+                generated = np.asarray(model.generator(np.zeros_like(v), c), dtype=float).reshape(-1)
+        else:
+            generated = np.asarray(model.generator(np.zeros_like(v), c), dtype=float).reshape(-1)
+
+        if generator_artifacts is not None and "latent_projection" in generator_artifacts:
+            latent = np.asarray(generator_artifacts.get("latent_projection", []), dtype=float).reshape(-1)
+            if len(latent) != len(v):
+                pre = model.preprocess_gan_data(c, v, batch_size=32, use_training_stats=True)
+                latent = np.asarray(pre.get("latent_projection", []), dtype=float).reshape(-1)
+        else:
+            pre = model.preprocess_gan_data(c, v, batch_size=32, use_training_stats=True)
+            latent = np.asarray(pre.get("latent_projection", []), dtype=float).reshape(-1)
+
+        bundle = score_bundle or self._predict_scores(model=model, coords=c, values=v)
+        disc = np.asarray(bundle.get("discriminator", []), dtype=float).reshape(-1)
+        recon = np.asarray(bundle.get("reconstruction", []), dtype=float).reshape(-1)
+        grad = np.asarray(bundle.get("gradient", []), dtype=float).reshape(-1)
+        combined = np.asarray(bundle.get("combined", []), dtype=float).reshape(-1)
         residual = v - generated
+        abs_residual = np.abs(residual)
+        residual_z = robust_zscore(residual) if len(residual) else np.array([], dtype=float)
+
+        real_mean = float(np.mean(v)) if len(v) else 0.0
+        real_std = float(np.std(v)) if len(v) else 0.0
+        gen_mean = float(np.mean(generated)) if len(generated) else 0.0
+        gen_std = float(np.std(generated)) if len(generated) else 0.0
+        corr = 0.0
+        if len(v) >= 2 and real_std > 1e-9 and gen_std > 1e-9:
+            corr = float(np.corrcoef(v, generated)[0, 1])
+        mae = float(np.mean(abs_residual)) if len(abs_residual) else 0.0
+        rmse = float(np.sqrt(np.mean(residual**2))) if len(residual) else 0.0
+        mape = float(np.mean(abs_residual / (np.abs(v) + 1e-6))) if len(v) else 0.0
+        value_span = float(np.max(v) - np.min(v)) if len(v) else 0.0
+        nrmse = float(rmse / (value_span + 1e-6))
+        ss_res = float(np.sum(residual**2)) if len(residual) else 0.0
+        ss_tot = float(np.sum((v - np.mean(v)) ** 2)) if len(v) else 0.0
+        r2 = float(1.0 - ss_res / (ss_tot + 1e-9)) if len(v) else 0.0
+
+        latent_mean = float(np.mean(latent)) if len(latent) else 0.0
+        latent_std = float(np.std(latent)) if len(latent) else 0.0
+        latent_centered = latent - latent_mean if len(latent) else np.array([], dtype=float)
+        latent_skew = float(np.mean((latent_centered / (latent_std + 1e-6)) ** 3)) if len(latent) else 0.0
+        latent_kurt = float(np.mean((latent_centered / (latent_std + 1e-6)) ** 4) - 3.0) if len(latent) else 0.0
+        latent_q = np.percentile(latent, [5, 25, 50, 75, 95]).astype(float).tolist() if len(latent) else [0.0] * 5
+        hist_values: list[float]
+        if len(latent):
+            hist, _ = np.histogram(latent, bins=min(10, max(4, len(latent) // 4)), density=False)
+            hist_values = hist.astype(float).tolist()
+        else:
+            hist_values = []
+        hist_sum = float(np.sum(hist_values)) if hist_values else 0.0
+        prob = np.asarray(hist_values, dtype=float) / (hist_sum + 1e-9) if hist_values else np.array([], dtype=float)
+        entropy = float(-np.sum(prob * np.log(prob + 1e-9))) if len(prob) else 0.0
+        active_bin_ratio = float(np.mean(prob > 0.05)) if len(prob) else 0.0
+        latent_outlier_ratio = float(np.mean(np.abs(robust_zscore(latent)) >= 2.5)) if len(latent) else 0.0
+
+        mode_collapse_from_history = bool(any(float(item.get("mode_collapse", 0.0)) > 0.0 for item in getattr(model, "history", [])))
+        mode_collapse_risk = bool(mode_collapse_from_history or latent_std <= 0.03 or entropy < 0.8 or active_bin_ratio < 0.3)
+
+        residual_thr = float(np.percentile(abs_residual, 90)) if len(abs_residual) else 0.0
+        recon_thr = float(np.percentile(recon, 85)) if len(recon) else 0.0
+        grad_thr = float(np.percentile(grad, 85)) if len(grad) else 0.0
+        candidates = []
+        for i in range(len(v)):
+            recon_hit = bool(i < len(recon) and recon[i] >= recon_thr)
+            grad_hit = bool(i < len(grad) and grad[i] >= grad_thr)
+            resid_hit = bool(abs_residual[i] >= residual_thr)
+            if not (recon_hit or grad_hit or resid_hit):
+                continue
+            pattern_type = "under_generation" if residual[i] > 0 else "over_generation"
+            if recon_hit and grad_hit:
+                pattern_type = "structural_shift"
+            severity = float(
+                abs_residual[i] / (residual_thr + 1e-6)
+                + (float(recon[i]) if i < len(recon) else 0.0)
+                + (float(grad[i]) if i < len(grad) else 0.0)
+            )
+            candidates.append(
+                {
+                    "node_index": int(i),
+                    "pattern_type": pattern_type,
+                    "real_value": float(v[i]),
+                    "generated_value": float(generated[i]),
+                    "residual": float(residual[i]),
+                    "abs_residual": float(abs_residual[i]),
+                    "residual_zscore": float(residual_z[i]) if i < len(residual_z) else 0.0,
+                    "reconstruction_score": float(recon[i]) if i < len(recon) else 0.0,
+                    "gradient_score": float(grad[i]) if i < len(grad) else 0.0,
+                    "discriminator_score": float(disc[i]) if i < len(disc) else 0.0,
+                    "combined_score": float(combined[i]) if i < len(combined) else 0.0,
+                    "severity": severity,
+                }
+            )
+        candidates.sort(key=lambda x: float(x["severity"]), reverse=True)
+        top_patterns = candidates[: max(1, min(8, len(candidates)))] if candidates else []
+
+        high_residual_idx = np.argsort(-abs_residual).astype(int).tolist()[: max(1, min(6, len(v)))] if len(v) else []
+        low_residual_idx = np.argsort(abs_residual).astype(int).tolist()[: max(1, min(6, len(v)))] if len(v) else []
+        comparison_anomalous = [
+            {
+                "node_index": int(i),
+                "real_value": float(v[i]),
+                "generated_value": float(generated[i]),
+                "residual": float(residual[i]),
+                "abs_residual": float(abs_residual[i]),
+                "residual_ratio": float(abs_residual[i] / (abs(v[i]) + 1e-6)),
+                "pattern_type": next((str(item["pattern_type"]) for item in top_patterns if int(item["node_index"]) == int(i)), "under_generation" if residual[i] > 0 else "over_generation"),
+                "combined_score": float(combined[i]) if i < len(combined) else 0.0,
+            }
+            for i in high_residual_idx
+        ]
+        comparison_reference = [
+            {
+                "node_index": int(i),
+                "real_value": float(v[i]),
+                "generated_value": float(generated[i]),
+                "residual": float(residual[i]),
+                "abs_residual": float(abs_residual[i]),
+                "residual_ratio": float(abs_residual[i] / (abs(v[i]) + 1e-6)),
+                "combined_score": float(combined[i]) if i < len(combined) else 0.0,
+            }
+            for i in low_residual_idx
+        ]
+
+        pattern_counts = {"under_generation": 0, "over_generation": 0, "structural_shift": 0}
+        for item in top_patterns:
+            key = str(item["pattern_type"])
+            if key in pattern_counts:
+                pattern_counts[key] += 1
+
         return {
+            "output_analysis": {
+                "real_stats": {
+                    "mean": real_mean,
+                    "std": real_std,
+                    "min": float(np.min(v)) if len(v) else 0.0,
+                    "max": float(np.max(v)) if len(v) else 0.0,
+                },
+                "generated_stats": {
+                    "mean": gen_mean,
+                    "std": gen_std,
+                    "min": float(np.min(generated)) if len(generated) else 0.0,
+                    "max": float(np.max(generated)) if len(generated) else 0.0,
+                },
+                "residual_stats": {
+                    "mean": float(np.mean(residual)) if len(residual) else 0.0,
+                    "std": float(np.std(residual)) if len(residual) else 0.0,
+                    "mae": mae,
+                    "max_abs": float(np.max(abs_residual)) if len(abs_residual) else 0.0,
+                    "p95_abs": float(np.percentile(abs_residual, 95)) if len(abs_residual) else 0.0,
+                },
+                "distribution_match": {
+                    "pearson_corr": corr,
+                    "mean_gap": float(abs(real_mean - gen_mean)),
+                    "std_ratio": float(gen_std / (real_std + 1e-6)),
+                },
+            },
+            "quality_metrics": {
+                "mae": mae,
+                "rmse": rmse,
+                "nrmse": nrmse,
+                "mape": mape,
+                "r2_score": r2,
+                "residual_energy": ss_res,
+            },
+            "latent_space_distribution": {
+                "stats": {
+                    "mean": latent_mean,
+                    "std": latent_std,
+                    "min": float(np.min(latent)) if len(latent) else 0.0,
+                    "max": float(np.max(latent)) if len(latent) else 0.0,
+                    "skewness": latent_skew,
+                    "kurtosis": latent_kurt,
+                },
+                "quantiles": {"p05": latent_q[0], "p25": latent_q[1], "p50": latent_q[2], "p75": latent_q[3], "p95": latent_q[4]},
+                "histogram": hist_values,
+                "distribution_health": {
+                    "entropy": entropy,
+                    "active_bin_ratio": active_bin_ratio,
+                    "outlier_ratio": latent_outlier_ratio,
+                    "mode_collapse_risk": mode_collapse_risk,
+                    "mode_collapse_from_training": mode_collapse_from_history,
+                },
+            },
+            "anomaly_patterns": {
+                "residual_threshold": residual_thr,
+                "reconstruction_threshold": recon_thr,
+                "gradient_threshold": grad_thr,
+                "pattern_counts": pattern_counts,
+                "detected_patterns": top_patterns,
+            },
+            "sample_comparison": {
+                "anomalous_samples": comparison_anomalous,
+                "reference_samples": comparison_reference,
+                "mean_abs_residual_gap": float(
+                    np.mean([item["abs_residual"] for item in comparison_anomalous]) - np.mean([item["abs_residual"] for item in comparison_reference])
+                )
+                if comparison_anomalous and comparison_reference
+                else 0.0,
+            },
             "stats": {
-                "mean_residual": float(np.mean(residual)),
-                "std_residual": float(np.std(residual)),
-                "max_abs_residual": float(np.max(np.abs(residual))),
+                "mean_residual": float(np.mean(residual)) if len(residual) else 0.0,
+                "std_residual": float(np.std(residual)) if len(residual) else 0.0,
+                "max_abs_residual": float(np.max(abs_residual)) if len(abs_residual) else 0.0,
             },
             "node_analysis": [
                 {
@@ -453,9 +664,15 @@ class _BaseGANAdapter:
                     "real_value": float(v[i]),
                     "generated_value": float(generated[i]),
                     "residual": float(residual[i]),
-                    "residual_zscore": float(z_i),
+                    "abs_residual": float(abs_residual[i]),
+                    "residual_ratio": float(abs_residual[i] / (abs(v[i]) + 1e-6)),
+                    "residual_zscore": float(z_i) if i < len(residual_z) else 0.0,
+                    "discriminator_score": float(disc[i]) if i < len(disc) else 0.0,
+                    "reconstruction_score": float(recon[i]) if i < len(recon) else 0.0,
+                    "gradient_score": float(grad[i]) if i < len(grad) else 0.0,
+                    "combined_score": float(combined[i]) if i < len(combined) else 0.0,
                 }
-                for i, z_i in enumerate(robust_zscore(residual).tolist())
+                for i, z_i in enumerate(residual_z.tolist() if len(residual_z) else np.zeros_like(v).tolist())
             ],
         }
 
@@ -611,7 +828,13 @@ class GANAnomalyLimeAdapter(_BaseGANAdapter):
         )
         key_anomaly_features = self._extract_key_anomaly_features(batch_explanations=batch_explanations, top_k=int(top_k))
         anomaly_reasons = self._collect_anomaly_reasons(batch_explanations=batch_explanations)
-        generator_info = self._generator_analysis(model=model, coords=c, values=v)
+        generator_info = self._generator_analysis(
+            model=model,
+            coords=c,
+            values=v,
+            score_bundle=context["score_bundle"],
+            generator_artifacts=context.get("generator_artifacts"),
+        )
         discriminator = np.asarray(context["score_bundle"]["discriminator"], dtype=float)
         reconstruction = np.asarray(context["score_bundle"]["reconstruction"], dtype=float)
         gradient = np.asarray(context["score_bundle"]["gradient"], dtype=float)
@@ -798,7 +1021,13 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
         )
         key_anomaly_features = self._extract_key_anomaly_features(batch_explanations=batch_explanations, top_k=int(top_k))
         anomaly_reasons = self._collect_anomaly_reasons(batch_explanations=batch_explanations)
-        generator_info = self._generator_analysis(model=model, coords=c, values=v)
+        generator_info = self._generator_analysis(
+            model=model,
+            coords=c,
+            values=v,
+            score_bundle=context["score_bundle"],
+            generator_artifacts=context.get("generator_artifacts"),
+        )
         discriminator = np.asarray(context["score_bundle"]["discriminator"], dtype=float)
         reconstruction = np.asarray(context["score_bundle"]["reconstruction"], dtype=float)
         gradient = np.asarray(context["score_bundle"]["gradient"], dtype=float)

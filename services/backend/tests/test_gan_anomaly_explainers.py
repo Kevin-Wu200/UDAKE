@@ -47,6 +47,11 @@ def test_gan_lime_adapter_generates_explanations() -> None:
     assert "generator_analysis" in result
     assert len(result["score_components"]["combined"]) == len(values)
     assert "anomaly_score_explanation" in result
+    assert "output_analysis" in result["generator_analysis"]
+    assert "quality_metrics" in result["generator_analysis"]
+    assert "latent_space_distribution" in result["generator_analysis"]
+    assert "anomaly_patterns" in result["generator_analysis"]
+    assert "sample_comparison" in result["generator_analysis"]
     assert len(result["anomaly_score_explanation"]["decomposition"]) == len(values)
     assert len(result["anomaly_score_explanation"]["key_anomaly_nodes"]) >= 1
     assert len(result["anomaly_score_explanation"]["key_anomaly_features"]) >= 1
@@ -82,3 +87,40 @@ def test_gan_shap_adapter_generates_explanations_and_cache() -> None:
     assert "component_contribution" in first["anomaly_score_explanation"]
     assert len(first["anomaly_score_explanation"]["anomaly_reasons"]) == 2
     assert second["performance"]["cache_hit"] is True
+
+
+def test_gan_generator_analysis_contains_stage2_sections() -> None:
+    model, coords, values = _build_trained_model()
+    adapter = GANAnomalyLimeAdapter()
+
+    result = adapter.explain(model=model, coords=coords, values=values, top_k=4, max_explain_nodes=4)
+    generator = result["generator_analysis"]
+
+    output = generator["output_analysis"]
+    quality = generator["quality_metrics"]
+    latent = generator["latent_space_distribution"]
+    patterns = generator["anomaly_patterns"]
+    comparison = generator["sample_comparison"]
+
+    assert output["distribution_match"]["pearson_corr"] <= 1.0
+    assert output["distribution_match"]["pearson_corr"] >= -1.0
+    assert quality["mae"] >= 0.0
+    assert quality["rmse"] >= 0.0
+    assert quality["mape"] >= 0.0
+
+    assert "stats" in latent
+    assert "quantiles" in latent
+    assert "distribution_health" in latent
+    assert isinstance(latent["histogram"], list)
+    assert "mode_collapse_risk" in latent["distribution_health"]
+
+    assert "pattern_counts" in patterns
+    assert "detected_patterns" in patterns
+    assert isinstance(patterns["detected_patterns"], list)
+    assert sum(patterns["pattern_counts"].values()) == len(patterns["detected_patterns"])
+
+    assert "anomalous_samples" in comparison
+    assert "reference_samples" in comparison
+    assert isinstance(comparison["anomalous_samples"], list)
+    assert isinstance(comparison["reference_samples"], list)
+    assert len(generator["node_analysis"]) == len(values)
