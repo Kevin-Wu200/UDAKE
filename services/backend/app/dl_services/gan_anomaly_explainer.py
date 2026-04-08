@@ -676,6 +676,214 @@ class _BaseGANAdapter:
             ],
         }
 
+    def _discriminator_analysis(
+        self,
+        *,
+        model: Any,
+        coords: np.ndarray,
+        values: np.ndarray,
+        feature_names: list[str],
+        feature_matrix: np.ndarray,
+        score_bundle: Optional[dict[str, np.ndarray]] = None,
+        batch_explanations: Optional[list[dict[str, Any]]] = None,
+        top_k: int = 5,
+    ) -> dict[str, Any]:
+        c = np.asarray(coords, dtype=float)
+        v = np.asarray(values, dtype=float).reshape(-1)
+        bundle = score_bundle or self._predict_scores(model=model, coords=c, values=v)
+        disc = np.asarray(bundle.get("discriminator", []), dtype=float).reshape(-1)
+        recon = np.asarray(bundle.get("reconstruction", []), dtype=float).reshape(-1)
+        grad = np.asarray(bundle.get("gradient", []), dtype=float).reshape(-1)
+        combined = np.asarray(bundle.get("combined", []), dtype=float).reshape(-1)
+        x = np.asarray(feature_matrix, dtype=float)
+        n = int(min(len(v), len(disc), x.shape[0] if x.ndim == 2 else 0))
+        if n <= 0:
+            return {
+                "decision_analysis": {"threshold": 0.0, "stats": {}, "node_decisions": [], "decision_counts": {}},
+                "confidence_scores": {"mean_confidence": 0.0, "high_confidence_ratio": 0.0, "node_confidence": []},
+                "decision_boundary": {
+                    "lower_margin_threshold": 0.0,
+                    "upper_margin_threshold": 0.0,
+                    "boundary_sample_ratio": 0.0,
+                    "separation_gap": 0.0,
+                    "boundary_sharpness": 0.0,
+                    "samples": [],
+                },
+                "key_discriminator_features": [],
+                "adversarial_detection": {"risk_ratio": 0.0, "risk_threshold": 0.0, "candidates": []},
+            }
+
+        disc = disc[:n]
+        recon = recon[:n] if len(recon) >= n else np.pad(recon, (0, n - len(recon)))
+        grad = grad[:n] if len(grad) >= n else np.pad(grad, (0, n - len(grad)))
+        combined = combined[:n] if len(combined) >= n else np.pad(combined, (0, n - len(combined)))
+        x = x[:n]
+
+        disc_thr = float(np.percentile(disc, 85))
+        disc_z = robust_zscore(disc) if n > 1 else np.zeros_like(disc)
+        margin = disc - disc_thr
+        margin_norm = margin / (float(np.std(disc)) + 1e-6)
+        confidence = 1.0 / (1.0 + np.exp(-3.0 * margin_norm))
+        decision_labels: list[str] = []
+        for i in range(n):
+            if disc[i] >= disc_thr and confidence[i] >= 0.75:
+                decision_labels.append("high_confidence_anomaly")
+            elif disc[i] >= disc_thr:
+                decision_labels.append("boundary_anomaly")
+            elif confidence[i] <= 0.25:
+                decision_labels.append("high_confidence_normal")
+            else:
+                decision_labels.append("boundary_normal")
+        decision_counts: dict[str, int] = {}
+        for lb in decision_labels:
+            decision_counts[lb] = decision_counts.get(lb, 0) + 1
+        node_decisions = [
+            {
+                "node_index": int(i),
+                "discriminator_score": float(disc[i]),
+                "discriminator_zscore": float(disc_z[i]) if i < len(disc_z) else 0.0,
+                "margin_to_threshold": float(margin[i]),
+                "confidence": float(confidence[i]),
+                "label": decision_labels[i],
+            }
+            for i in range(n)
+        ]
+
+        low_thr = float(np.percentile(disc, 45))
+        high_thr = float(np.percentile(disc, 55))
+        boundary_mask = (disc >= low_thr) & (disc <= high_thr)
+        boundary_indices = np.where(boundary_mask)[0]
+        anom_scores = disc[disc >= disc_thr]
+        norm_scores = disc[disc < disc_thr]
+        anom_mean = float(np.mean(anom_scores)) if len(anom_scores) else disc_thr
+        norm_mean = float(np.mean(norm_scores)) if len(norm_scores) else disc_thr
+        separation_gap = float(anom_mean - norm_mean)
+        boundary_sharpness = float(separation_gap / (float(np.std(disc)) + 1e-6))
+        boundary_samples = [
+            {
+                "node_index": int(i),
+                "discriminator_score": float(disc[i]),
+                "margin_to_threshold": float(margin[i]),
+                "confidence": float(confidence[i]),
+            }
+            for i in boundary_indices[: max(1, min(8, len(boundary_indices)))]
+        ]
+
+        feature_rows: list[dict[str, Any]] = []
+        for idx, name in enumerate(feature_names[: x.shape[1]]):
+            col = np.asarray(x[:, idx], dtype=float)
+            corr = 0.0
+            if n >= 2 and np.std(col) > 1e-9 and np.std(disc) > 1e-9:
+                corr = float(np.corrcoef(col, disc)[0, 1])
+            feature_rows.append(
+                {
+                    "feature_index": int(idx),
+                    "feature_name": str(name),
+                    "feature_alias": self._feature_display(str(name)),
+                    "category": self._feature_category(str(name)),
+                    "corr_with_discriminator": corr,
+                    "importance": float(abs(corr)),
+                }
+            )
+
+        expl_weight: dict[str, float] = {}
+        for item in batch_explanations or []:
+            for contrib in item.get("top_contributions", []):
+                fname = str(contrib.get("feature_name", ""))
+                w = float(
+                    abs(
+                        contrib.get(
+                            "abs_weight",
+                            contrib.get("abs_shap", contrib.get("weight", contrib.get("shap_value", 0.0))),
+                        )
+                    )
+                )
+                expl_weight[fname] = expl_weight.get(fname, 0.0) + w
+        explained_nodes = float(max(1, len(batch_explanations or [])))
+        for row in feature_rows:
+            name = str(row["feature_name"])
+            explain_boost = float(expl_weight.get(name, 0.0) / explained_nodes)
+            row["explain_importance"] = explain_boost
+            row["importance"] = float(0.65 * float(row["importance"]) + 0.35 * explain_boost)
+        feature_rows.sort(key=lambda item: float(item["importance"]), reverse=True)
+        key_features = feature_rows[: max(1, int(top_k))]
+
+        scale = max(1e-6, float(np.std(v)))
+        delta = 0.05 * scale
+        perturbed_v = v.copy()
+        if len(perturbed_v):
+            perturbed_v = perturbed_v + delta * np.sign(v - float(np.mean(v)))
+        perturbed_disc = np.asarray(model.discriminator(c, perturbed_v), dtype=float).reshape(-1)
+        if len(perturbed_disc) < n:
+            perturbed_disc = np.pad(perturbed_disc, (0, n - len(perturbed_disc)))
+        perturbed_disc = perturbed_disc[:n]
+        sensitivity = np.abs(perturbed_disc - disc) / (abs(delta) + 1e-6)
+        sensitivity_thr = float(np.percentile(sensitivity, 90)) if len(sensitivity) else 0.0
+        low_recon = recon <= float(np.percentile(recon, 50))
+        low_grad = grad <= float(np.percentile(grad, 50))
+        high_disc = disc >= disc_thr
+        suspicious_mask = (sensitivity >= sensitivity_thr) | (high_disc & low_recon & low_grad)
+        adv_candidates = [
+            {
+                "node_index": int(i),
+                "discriminator_score": float(disc[i]),
+                "perturbed_discriminator_score": float(perturbed_disc[i]),
+                "sensitivity": float(sensitivity[i]),
+                "reconstruction_score": float(recon[i]),
+                "gradient_score": float(grad[i]),
+                "combined_score": float(combined[i]),
+                "risk_score": float(
+                    (sensitivity[i] / (sensitivity_thr + 1e-6))
+                    + (1.0 if high_disc[i] else 0.0)
+                    + (1.0 if low_recon[i] else 0.0)
+                    + (1.0 if low_grad[i] else 0.0)
+                ),
+            }
+            for i in np.where(suspicious_mask)[0].tolist()
+        ]
+        adv_candidates.sort(key=lambda item: float(item["risk_score"]), reverse=True)
+        adv_candidates = adv_candidates[: max(1, min(8, len(adv_candidates)))] if adv_candidates else []
+
+        return {
+            "decision_analysis": {
+                "threshold": disc_thr,
+                "stats": {
+                    "mean": float(np.mean(disc)),
+                    "std": float(np.std(disc)),
+                    "p95": float(np.percentile(disc, 95)),
+                },
+                "node_decisions": node_decisions,
+                "decision_counts": decision_counts,
+            },
+            "confidence_scores": {
+                "mean_confidence": float(np.mean(confidence)),
+                "high_confidence_ratio": float(np.mean(confidence >= 0.75)),
+                "node_confidence": [
+                    {
+                        "node_index": int(i),
+                        "confidence": float(confidence[i]),
+                        "margin_to_threshold": float(margin[i]),
+                        "discriminator_zscore": float(disc_z[i]) if i < len(disc_z) else 0.0,
+                    }
+                    for i in range(n)
+                ],
+            },
+            "decision_boundary": {
+                "lower_margin_threshold": low_thr,
+                "upper_margin_threshold": high_thr,
+                "boundary_sample_ratio": float(np.mean(boundary_mask)),
+                "separation_gap": separation_gap,
+                "boundary_sharpness": boundary_sharpness,
+                "samples": boundary_samples,
+            },
+            "key_discriminator_features": key_features,
+            "adversarial_detection": {
+                "risk_ratio": float(len(adv_candidates) / max(1, n)),
+                "risk_threshold": sensitivity_thr,
+                "candidates": adv_candidates,
+            },
+        }
+
 
 class GANAnomalyLimeAdapter(_BaseGANAdapter):
     """GAN 的 LIME 解释适配器。"""
@@ -868,6 +1076,16 @@ class GANAnomalyLimeAdapter(_BaseGANAdapter):
                 "combined": combined.astype(float).tolist(),
             },
             "generator_analysis": generator_info,
+            "discriminator_analysis": self._discriminator_analysis(
+                model=model,
+                coords=c,
+                values=v,
+                feature_names=feature_names,
+                feature_matrix=np.asarray(context["feature_matrix"], dtype=float),
+                score_bundle=context["score_bundle"],
+                batch_explanations=batch_explanations,
+                top_k=int(top_k),
+            ),
             "anomaly_analysis": self._anomaly_profile(combined, explained_nodes),
             "preprocess": dict(context["preprocess"]),
             "performance": {
@@ -1063,6 +1281,16 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
                 "combined": combined.astype(float).tolist(),
             },
             "generator_analysis": generator_info,
+            "discriminator_analysis": self._discriminator_analysis(
+                model=model,
+                coords=c,
+                values=v,
+                feature_names=feature_names,
+                feature_matrix=np.asarray(context["feature_matrix"], dtype=float),
+                score_bundle=context["score_bundle"],
+                batch_explanations=batch_explanations,
+                top_k=int(top_k),
+            ),
             "anomaly_analysis": self._anomaly_profile(combined, explained_nodes),
             "preprocess": dict(context["preprocess"]),
             "performance": {
