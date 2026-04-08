@@ -41,7 +41,7 @@ def test_explain_anomaly_vae_hybrid() -> None:
     assert result["feature_analysis"]["feature_count"] >= 12
 
 
-def test_explain_anomaly_non_vae_returns_pending_adapter() -> None:
+def test_explain_anomaly_gan_hybrid() -> None:
     service = DeepLearningService()
     coords, values = _build_payload()
 
@@ -52,5 +52,23 @@ def test_explain_anomaly_non_vae_returns_pending_adapter() -> None:
         method="hybrid",
     )
 
-    assert result["summary"]["adapter_status"] == "pending"
+    assert result["model_name"] == "gan"
+    assert result["summary"]["method"] == "hybrid"
+    assert "lime" in result
+    assert "shap" in result
     assert result["feature_analysis"]["model_name"] == "gan"
+
+
+def test_explain_anomaly_contrastive_returns_pending_adapter() -> None:
+    service = DeepLearningService()
+    coords, values = _build_payload()
+
+    result = service.explain_anomaly(
+        model_name="contrastive",
+        coords=coords,
+        values=values,
+        method="hybrid",
+    )
+
+    assert result["summary"]["adapter_status"] == "pending"
+    assert result["feature_analysis"]["model_name"] == "contrastive"

@@ -21,6 +21,7 @@ from deep_learning.utils.device import DeviceManager
 from deep_learning.utils.monitoring import AlertManager, AlertRule, MetricMonitor, SystemResourceMonitor
 from .anomaly_features import AnomalyFeatureRegistry
 from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
+from .gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter
 from .lime_explainer import SpatiotemporalLIMEExplainer
 from .shap_explainer import SpatiotemporalSHAPExplainer
 from .vae_anomaly_explainer import VAEAnomalyLIMEAdapter, VAEAnomalySHAPAdapter
@@ -87,6 +88,8 @@ class DeepLearningService:
         self.vae_shap_adapter = VAEAnomalySHAPAdapter()
         self.gcae_lime_adapter = GCAELimeAdapter()
         self.gcae_shap_adapter = GCAEShapAdapter()
+        self.gan_lime_adapter = GANAnomalyLimeAdapter()
+        self.gan_shap_adapter = GANAnomalySHAPAdapter()
 
     def health(self) -> dict[str, Any]:
         profile = self.device_manager.configure()
@@ -368,6 +371,9 @@ class DeepLearningService:
         elif model_name == "gcae":
             lime_adapter = self.gcae_lime_adapter
             shap_adapter = self.gcae_shap_adapter
+        elif model_name == "gan":
+            lime_adapter = self.gan_lime_adapter
+            shap_adapter = self.gan_shap_adapter
 
         if lime_adapter is None or shap_adapter is None:
             return {
@@ -375,7 +381,7 @@ class DeepLearningService:
                 "summary": {
                     "method": method,
                     "adapter_status": "pending",
-                    "message": "当前仅完成 VAE/GCAE 的解释适配器，其他异常模型适配器在后续章节实现。",
+                    "message": "当前仅完成 VAE/GCAE/GAN 的解释适配器，其他异常模型适配器在后续章节实现。",
                 },
                 "feature_analysis": feature_analysis,
             }
