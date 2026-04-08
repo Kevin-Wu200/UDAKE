@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from collections import OrderedDict
 from dataclasses import dataclass
 import hashlib
@@ -33,6 +34,8 @@ class ContrastiveExplanationConfig:
     shap_l1_reg_num_features: int = 10
     max_explain_nodes: int = 8
     cache_size: int = 32
+    parallel_workers: int = 4
+    shap_feature_cap: int = 10
     random_state: int = 42
 
 
@@ -190,11 +193,64 @@ class ContrastiveLimeAdapter:
 
     def _dynamic_lime_samples(self, n_features: int, n_points: int) -> int:
         base = max(80, int(self.config.lime_num_samples))
-        return min(1200, base + n_features * 8 + n_points * 2)
+        complexity = int(np.sqrt(max(1, n_features) * max(1, n_points)))
+        reduction = int(max(0, n_points - 80) * 0.7)
+        return max(80, min(900, base + complexity * 6 - reduction))
 
     def _dynamic_shap_samples(self, selected_nsamples: int, n_features: int, n_points: int) -> int:
         base = max(40, int(selected_nsamples))
         return min(1000, base + n_features * 3 + n_points)
+
+    def _effective_workers(self, n_tasks: int) -> int:
+        return max(1, min(int(self.config.parallel_workers), int(n_tasks)))
+
+    @staticmethod
+    def _to_float32(arr: np.ndarray) -> np.ndarray:
+        x = np.asarray(arr, dtype=float)
+        if x.dtype == np.float32:
+            return x
+        return x.astype(np.float32, copy=False)
+
+    @staticmethod
+    def _memory_bytes(context: dict[str, Any], extra_arrays: Optional[list[np.ndarray]] = None) -> int:
+        keys = ["feature_matrix", "scaled_x", "background", "target"]
+        total = 0
+        for key in keys:
+            arr = context.get(key)
+            if isinstance(arr, np.ndarray):
+                total += int(arr.nbytes)
+        encoder_bundle = context.get("encoder_bundle", {})
+        if isinstance(encoder_bundle, dict):
+            for arr in encoder_bundle.values():
+                if isinstance(arr, np.ndarray):
+                    total += int(arr.nbytes)
+        for arr in extra_arrays or []:
+            total += int(np.asarray(arr).nbytes)
+        return int(total)
+
+    def _compressed_lime_training_data(self, context: dict[str, Any], explained_nodes: list[int]) -> np.ndarray:
+        x = np.asarray(context["scaled_x"], dtype=float)
+        if x.shape[0] <= 64:
+            return x
+        scores = np.asarray(context["target"], dtype=float).reshape(-1)
+        keep = min(96, x.shape[0])
+        top_k = max(8, min(len(explained_nodes) * 4, keep // 2))
+        top_idx = np.argsort(-scores)[:top_k].astype(int)
+        low_idx = np.argsort(scores)[:top_k].astype(int)
+        mixed = np.concatenate([top_idx, low_idx], axis=0)
+        if mixed.size < keep:
+            stride = max(1, x.shape[0] // max(1, keep - mixed.size))
+            sampled = np.arange(0, x.shape[0], stride, dtype=int)[: max(1, keep - mixed.size)]
+            mixed = np.concatenate([mixed, sampled], axis=0)
+        unique_idx = np.unique(mixed)[:keep]
+        return x[unique_idx]
+
+    def _select_shap_feature_indices(self, context: dict[str, Any], top_k: int) -> list[int]:
+        coef = np.abs(np.asarray(context["surrogate"].coef_, dtype=float).reshape(-1))
+        variance = np.var(np.asarray(context["scaled_x"], dtype=float), axis=0)
+        signal = coef * (variance + 1e-6)
+        cap = max(4, min(int(self.config.shap_feature_cap), len(signal), int(top_k) * 2))
+        return np.argsort(-signal)[:cap].astype(int).tolist()
 
     def _select_background(self, x_scaled: np.ndarray, scores: np.ndarray, size: int | None = None) -> np.ndarray:
         n = x_scaled.shape[0]
@@ -807,15 +863,22 @@ class ContrastiveLimeAdapter:
 
         context = {
             "context_key": key,
-            "feature_matrix": matrix,
-            "scaled_x": scaled_x,
+            "feature_matrix": self._to_float32(matrix),
+            "scaled_x": self._to_float32(scaled_x),
             "feature_names": feature_names,
             "scaler_stats": scaler_stats,
             "score_bundle": score_bundle,
-            "encoder_bundle": encoder_bundle,
-            "target": target,
+            "encoder_bundle": {
+                "embedding": self._to_float32(np.asarray(encoder_bundle.get("embedding", np.zeros((0, 0), dtype=float)), dtype=float)),
+                "embedding_norm": self._to_float32(np.asarray(encoder_bundle.get("embedding_norm", np.zeros((0,), dtype=float)), dtype=float)),
+                "embedding_cos_center": self._to_float32(
+                    np.asarray(encoder_bundle.get("embedding_cos_center", np.zeros((0,), dtype=float)), dtype=float)
+                ),
+            },
+            "target": self._to_float32(target),
             "surrogate": surrogate,
             "surrogate_metrics": {"train_rmse": train_rmse, "fidelity": fidelity},
+            "background": self._to_float32(self._select_background(scaled_x, target, size=48)),
             "preprocess": {
                 "batch_slices": pre_info.get("batch_slices", []),
                 "validation": pre_info.get("validation", {}),
@@ -868,34 +931,44 @@ class ContrastiveLimeAdapter:
         lime_module = self._load_lime_tabular()
         feature_names: list[str] = context["feature_names"]
         predict_fn = self._predict_surrogate(context)
-        batch_explanations: list[dict[str, Any]] = []
-        for node_idx in explained_nodes:
+        lime_training_data = self._compressed_lime_training_data(context, explained_nodes)
+        lime_explainer = None
+        lime_lock = threading.Lock()
+        if lime_module is not None:
+            try:
+                lime_explainer = lime_module.LimeTabularExplainer(
+                    training_data=lime_training_data,
+                    feature_names=feature_names,
+                    mode="regression",
+                    discretize_continuous=False,
+                    random_state=self.config.random_state,
+                )
+            except Exception:
+                lime_explainer = None
+
+        def _explain_one(node_idx: int) -> dict[str, Any]:
             instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
             local_pairs: list[tuple[int, float]]
             local_pred = float(predict_fn(instance.reshape(1, -1))[0])
             fidelity = _safe_float(context["surrogate_metrics"].get("fidelity", 0.5), 0.5)
+            backend = "surrogate_linear"
 
-            if lime_module is not None:
+            if lime_explainer is not None:
                 try:
-                    explainer = lime_module.LimeTabularExplainer(
-                        training_data=np.asarray(context["scaled_x"], dtype=float),
-                        feature_names=feature_names,
-                        mode="regression",
-                        discretize_continuous=False,
-                        random_state=self.config.random_state,
-                    )
-                    exp = explainer.explain_instance(
-                        data_row=instance,
-                        predict_fn=predict_fn,
-                        num_features=max(1, min(int(top_k), len(feature_names))),
-                        num_samples=max(80, selected_samples),
-                    )
+                    with lime_lock:
+                        exp = lime_explainer.explain_instance(
+                            data_row=instance,
+                            predict_fn=predict_fn,
+                            num_features=max(1, min(int(top_k), len(feature_names))),
+                            num_samples=max(80, selected_samples),
+                        )
                     local_map = exp.local_exp.get(1) or exp.local_exp.get(0) or []
                     local_pairs = [(int(i), float(w)) for i, w in local_map]
                     fidelity = _safe_float(getattr(exp, "score", fidelity), fidelity)
                     local_pred_arr = getattr(exp, "local_pred", None)
                     if isinstance(local_pred_arr, (list, tuple, np.ndarray)) and len(local_pred_arr) > 0:
                         local_pred = _safe_float(local_pred_arr[0], local_pred)
+                    backend = "lime_tabular"
                 except Exception:
                     local_pairs, local_pred = self._fallback_local_pairs(context, node_idx)
             else:
@@ -915,16 +988,27 @@ class ContrastiveLimeAdapter:
             ]
             contributions.sort(key=lambda item: item["abs_weight"], reverse=True)
             contributions = contributions[: max(1, int(top_k))]
-            batch_explanations.append(
-                {
-                    "node_index": int(node_idx),
-                    "prediction": local_pred,
-                    "target_prediction": float(target[node_idx]),
-                    "is_anomaly": bool(target[node_idx] >= anomaly_threshold),
-                    "fidelity": float(fidelity),
-                    "confidence": float(max(0.0, min(1.0, fidelity * np.exp(-abs(local_pred - target[node_idx]))))),
-                    "top_contributions": contributions,
-                    "decomposition": dec_by_node.get(
+            return {
+                "node_index": int(node_idx),
+                "prediction": local_pred,
+                "target_prediction": float(target[node_idx]),
+                "is_anomaly": bool(target[node_idx] >= anomaly_threshold),
+                "fidelity": float(fidelity),
+                "confidence": float(max(0.0, min(1.0, fidelity * np.exp(-abs(local_pred - target[node_idx]))))),
+                "backend": backend,
+                "top_contributions": contributions,
+                "decomposition": dec_by_node.get(
+                    int(node_idx),
+                    {
+                        "feature_distance_component": 0.0,
+                        "density_component": 0.0,
+                        "nearest_neighbor_component": 0.0,
+                        "bank_similarity_component": 0.0,
+                    },
+                ),
+                "reason": self._explanation_reason(
+                    node_idx=int(node_idx),
+                    decomposition_row=dec_by_node.get(
                         int(node_idx),
                         {
                             "feature_distance_component": 0.0,
@@ -933,21 +1017,16 @@ class ContrastiveLimeAdapter:
                             "bank_similarity_component": 0.0,
                         },
                     ),
-                    "reason": self._explanation_reason(
-                        node_idx=int(node_idx),
-                        decomposition_row=dec_by_node.get(
-                            int(node_idx),
-                            {
-                                "feature_distance_component": 0.0,
-                                "density_component": 0.0,
-                                "nearest_neighbor_component": 0.0,
-                                "bank_similarity_component": 0.0,
-                            },
-                        ),
-                        top_contributions=contributions,
-                    ),
-                }
-            )
+                    top_contributions=contributions,
+                ),
+            }
+
+        workers = self._effective_workers(len(explained_nodes))
+        if workers == 1:
+            batch_explanations = [_explain_one(idx) for idx in explained_nodes]
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                batch_explanations = list(executor.map(_explain_one, explained_nodes))
 
         global_importance: dict[str, float] = {}
         raw_importance = np.zeros((len(feature_names),), dtype=float)
@@ -967,11 +1046,34 @@ class ContrastiveLimeAdapter:
             }
             for name, weight in global_items[: max(1, int(top_k))]
         ]
-        consistency = self._validate_explanation_consistency(
-            decomposition=decomposition_payload["decomposition"],
-            combined_scores=target,
-            explained_nodes=explained_nodes,
-        )
+        post_workers = self._effective_workers(2)
+        if post_workers > 1:
+            with ThreadPoolExecutor(max_workers=post_workers) as executor:
+                embedding_future = executor.submit(
+                    self._embedding_analysis,
+                    encoder_bundle=context["encoder_bundle"],
+                    scores=target,
+                    explained_nodes=explained_nodes,
+                )
+                consistency_future = executor.submit(
+                    self._validate_explanation_consistency,
+                    decomposition=decomposition_payload["decomposition"],
+                    combined_scores=target,
+                    explained_nodes=explained_nodes,
+                )
+                embedding_analysis = embedding_future.result()
+                consistency = consistency_future.result()
+        else:
+            embedding_analysis = self._embedding_analysis(
+                encoder_bundle=context["encoder_bundle"],
+                scores=target,
+                explained_nodes=explained_nodes,
+            )
+            consistency = self._validate_explanation_consistency(
+                decomposition=decomposition_payload["decomposition"],
+                combined_scores=target,
+                explained_nodes=explained_nodes,
+            )
         component_summary = self._component_contribution_analysis(
             decomposition=decomposition_payload["decomposition"],
             explained_nodes=explained_nodes,
@@ -1014,17 +1116,18 @@ class ContrastiveLimeAdapter:
                 "embedding_norm": np.asarray(context["encoder_bundle"]["embedding_norm"], dtype=float).astype(float).tolist(),
                 "embedding_cos_center": np.asarray(context["encoder_bundle"]["embedding_cos_center"], dtype=float).astype(float).tolist(),
             },
-            "embedding_analysis": self._embedding_analysis(
-                encoder_bundle=context["encoder_bundle"],
-                scores=target,
-                explained_nodes=explained_nodes,
-            ),
+            "embedding_analysis": embedding_analysis,
             "surrogate_metrics": context["surrogate_metrics"],
             "preprocess": context["preprocess"],
             "anomaly_analysis": self._anomaly_profile(target, explained_nodes),
             "performance": {
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "cache_hit": False,
+                "parallel_workers": int(workers),
+                "post_parallel_workers": int(post_workers),
+                "lime_training_size": int(lime_training_data.shape[0]),
+                "lime_sampling_budget": int(selected_samples),
+                "memory_bytes": self._memory_bytes(context),
             },
         }
         self._cache_set(cache_key, payload)
@@ -1176,29 +1279,36 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
         shap_module = self._load_shap()
         surrogate: Ridge = context["surrogate"]
         feature_names: list[str] = context["feature_names"]
-        background = self._select_background(np.asarray(context["scaled_x"], dtype=float), target)
+        background = np.asarray(context.get("background", self._select_background(np.asarray(context["scaled_x"], dtype=float), target)), dtype=float)
         baseline = np.mean(background, axis=0)
+        feature_indices = self._select_shap_feature_indices(context, int(top_k))
+        feature_index_set = set(feature_indices)
+        other_indices = [i for i in range(len(feature_names)) if i not in feature_index_set]
+        coef = np.asarray(surrogate.coef_, dtype=float).reshape(-1)
+        reduced_coef = coef[np.asarray(feature_indices, dtype=int)]
+        fixed_offset = float(surrogate.intercept_ + np.dot(coef[np.asarray(other_indices, dtype=int)], baseline[np.asarray(other_indices, dtype=int)]))
+        reduced_background = background[:, feature_indices]
+        reduced_baseline = baseline[feature_indices]
 
-        batch_explanations: list[dict[str, Any]] = []
-        additivity_errors: list[float] = []
-        for node_idx in explained_nodes:
+        def _explain_one(node_idx: int) -> tuple[dict[str, Any], float]:
             instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
-            expected_value = float(surrogate.predict(baseline.reshape(1, -1))[0])
+            reduced_instance = instance[feature_indices]
+            expected_value = float(np.dot(reduced_coef, reduced_baseline) + fixed_offset)
             backend = "surrogate_linear"
             if shap_module is not None:
                 try:
                     explainer = shap_module.KernelExplainer(
-                        lambda x: surrogate.predict(np.asarray(x, dtype=float)),
-                        background,
+                        lambda x: np.asarray(x, dtype=float) @ reduced_coef + fixed_offset,
+                        reduced_background,
                     )
                     values_arr = explainer.shap_values(
-                        instance.reshape(1, -1),
+                        reduced_instance.reshape(1, -1),
                         nsamples=max(40, effective_nsamples),
-                        l1_reg=f"num_features({max(4, int(self.config.shap_l1_reg_num_features))})",
+                        l1_reg=f"num_features({max(4, int(self.config.shap_feature_cap))})",
                     )
                     if isinstance(values_arr, list):
                         values_arr = values_arr[0]
-                    shap_values = np.asarray(values_arr, dtype=float).reshape(-1)
+                    reduced_shap_values = np.asarray(values_arr, dtype=float).reshape(-1)
                     ev = getattr(explainer, "expected_value", expected_value)
                     if isinstance(ev, (list, tuple, np.ndarray)):
                         expected_value = _safe_float(np.asarray(ev).reshape(-1)[0], expected_value)
@@ -1206,14 +1316,18 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                         expected_value = _safe_float(ev, expected_value)
                     backend = "shap_kernel"
                 except Exception:
-                    shap_values = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
+                    reduced_shap_values = reduced_coef * (reduced_instance - reduced_baseline)
             else:
-                shap_values = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
+                reduced_shap_values = reduced_coef * (reduced_instance - reduced_baseline)
+
+            shap_values = np.zeros((len(feature_names),), dtype=float)
+            shap_values[np.asarray(feature_indices, dtype=int)] = np.asarray(reduced_shap_values, dtype=float)
 
             pred = float(surrogate.predict(instance.reshape(1, -1))[0])
-            additivity_errors.append(float(abs((expected_value + float(np.sum(shap_values))) - pred)))
+            additivity_error = float(abs((expected_value + float(np.sum(shap_values))) - pred))
             contributions: list[dict[str, Any]] = []
-            for idx, score in enumerate(shap_values.tolist()):
+            for idx in feature_indices:
+                score = float(shap_values[idx])
                 feature = feature_names[idx]
                 contributions.append(
                     {
@@ -1227,8 +1341,8 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                     }
                 )
             contributions.sort(key=lambda item: item["abs_shap"], reverse=True)
-            contributions = contributions[: max(1, int(top_k))]
-            batch_explanations.append(
+            contributions = contributions[: max(1, int(min(top_k, self.config.shap_feature_cap)))]
+            return (
                 {
                     "node_index": int(node_idx),
                     "prediction": pred,
@@ -1261,8 +1375,18 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                         ),
                         top_contributions=contributions,
                     ),
-                }
+                },
+                additivity_error,
             )
+
+        workers = self._effective_workers(len(explained_nodes))
+        if workers == 1:
+            explain_rows = [_explain_one(idx) for idx in explained_nodes]
+        else:
+            with ThreadPoolExecutor(max_workers=workers) as executor:
+                explain_rows = list(executor.map(_explain_one, explained_nodes))
+        batch_explanations = [item for item, _ in explain_rows]
+        additivity_errors = [err for _, err in explain_rows]
 
         mean_abs = np.mean(np.abs(np.asarray([item["raw_shap_values"] for item in batch_explanations], dtype=float)), axis=0)
         ranking = np.argsort(-mean_abs).astype(int).tolist()
@@ -1286,11 +1410,34 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
             )
         ) if batch_explanations else 0.0
         score_bundle = context["score_bundle"]
-        consistency = self._validate_explanation_consistency(
-            decomposition=decomposition_payload["decomposition"],
-            combined_scores=target,
-            explained_nodes=explained_nodes,
-        )
+        post_workers = self._effective_workers(2)
+        if post_workers > 1:
+            with ThreadPoolExecutor(max_workers=post_workers) as executor:
+                embedding_future = executor.submit(
+                    self._embedding_analysis,
+                    encoder_bundle=context["encoder_bundle"],
+                    scores=target,
+                    explained_nodes=explained_nodes,
+                )
+                consistency_future = executor.submit(
+                    self._validate_explanation_consistency,
+                    decomposition=decomposition_payload["decomposition"],
+                    combined_scores=target,
+                    explained_nodes=explained_nodes,
+                )
+                embedding_analysis = embedding_future.result()
+                consistency = consistency_future.result()
+        else:
+            embedding_analysis = self._embedding_analysis(
+                encoder_bundle=context["encoder_bundle"],
+                scores=target,
+                explained_nodes=explained_nodes,
+            )
+            consistency = self._validate_explanation_consistency(
+                decomposition=decomposition_payload["decomposition"],
+                combined_scores=target,
+                explained_nodes=explained_nodes,
+            )
         component_summary = self._component_contribution_analysis(
             decomposition=decomposition_payload["decomposition"],
             explained_nodes=explained_nodes,
@@ -1304,12 +1451,12 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                 "explainer": "KernelExplainer",
                 "explained_nodes": len(explained_nodes),
                 "num_features": len(feature_names),
-                "background_size": int(background.shape[0]),
+                "background_size": int(reduced_background.shape[0]),
                 "nsamples": int(selected_nsamples),
                 "explainer_config": {
-                    "background_size": int(background.shape[0]),
+                    "background_size": int(reduced_background.shape[0]),
                     "effective_nsamples": int(effective_nsamples),
-                    "l1_reg_num_features": int(max(4, int(self.config.shap_l1_reg_num_features))),
+                    "l1_reg_num_features": int(max(4, int(self.config.shap_feature_cap))),
                 },
                 "anomaly_threshold_p95": anomaly_threshold,
                 "top_features": top_features,
@@ -1337,11 +1484,7 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                 "embedding_norm": np.asarray(context["encoder_bundle"]["embedding_norm"], dtype=float).astype(float).tolist(),
                 "embedding_cos_center": np.asarray(context["encoder_bundle"]["embedding_cos_center"], dtype=float).astype(float).tolist(),
             },
-            "embedding_analysis": self._embedding_analysis(
-                encoder_bundle=context["encoder_bundle"],
-                scores=target,
-                explained_nodes=explained_nodes,
-            ),
+            "embedding_analysis": embedding_analysis,
             "embedding_input": self._embedding_input_summary(context["encoder_bundle"], explained_nodes),
             "encoder_shap_analysis": self._encoder_shap_analysis(
                 feature_names=feature_names,
@@ -1370,6 +1513,11 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                 "cache_hit": False,
                 "backend": "shap" if shap_module is not None else "surrogate_linear",
                 "effective_nsamples": int(effective_nsamples),
+                "parallel_workers": int(workers),
+                "post_parallel_workers": int(post_workers),
+                "effective_feature_count": int(len(feature_indices)),
+                "feature_reduction_ratio": float(len(feature_indices) / max(1, len(feature_names))),
+                "memory_bytes": self._memory_bytes(context, extra_arrays=[reduced_background]),
             },
         }
         self._cache_set(cache_key, payload)
