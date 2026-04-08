@@ -118,6 +118,47 @@ def test_contrastive_shap_cache_and_validation_fields() -> None:
     assert out2["performance"]["cache_hit"] is True
 
 
+def test_contrastive_similarity_distribution_analysis() -> None:
+    coords, values = _make_data(n=72, seed=91)
+    model = ContrastiveAnomalyDetector()
+    model.fit(coords, values, epochs=12)
+
+    lime_adapter = ContrastiveLimeAdapter(config=ContrastiveExplanationConfig(lime_num_samples=160))
+    lime = lime_adapter.explain(model=model, coords=coords, values=values, top_k=4, max_explain_nodes=5, num_samples=100)
+    analysis = lime["embedding_analysis"]["similarity_distribution_analysis"]
+
+    assert "sample_similarity" in analysis
+    assert "distribution" in analysis
+    assert "anomaly_patterns" in analysis
+    assert "threshold_boundaries" in analysis
+    assert "heatmap" in analysis
+
+    sim = analysis["sample_similarity"]
+    assert sim["matrix_shape"][0] == sim["matrix_shape"][1]
+    assert len(sim["similarity_matrix"]) == sim["matrix_shape"][0]
+    assert len(sim["node_mean_similarity"]) == sim["matrix_shape"][0]
+
+    dist = analysis["distribution"]
+    assert "stats" in dist and "histogram" in dist
+    assert len(dist["histogram"]["bin_edges"]) == 11
+    assert len(dist["histogram"]["counts"]) == 10
+
+    boundaries = analysis["threshold_boundaries"]
+    assert boundaries["node_low_similarity_threshold_p10"] <= boundaries["node_high_similarity_threshold_p90"]
+    assert boundaries["pair_low_similarity_threshold_p05"] <= boundaries["pair_high_similarity_threshold_p95"]
+
+    heatmap = analysis["heatmap"]
+    assert len(heatmap["labels"]) == sim["matrix_shape"][0]
+    assert len(heatmap["matrix"]) == sim["matrix_shape"][0]
+    assert len(heatmap["score_order_desc"]) == sim["matrix_shape"][0]
+
+    shap_adapter = ContrastiveShapAdapter(config=ContrastiveExplanationConfig(shap_nsamples=100))
+    shap = shap_adapter.explain(model=model, coords=coords, values=values, top_k=4, max_explain_nodes=5, nsamples=80)
+    shap_analysis = shap["embedding_analysis"]["similarity_distribution_analysis"]
+    assert "anomaly_patterns" in shap_analysis
+    assert "high_score_low_similarity_nodes" in shap_analysis["anomaly_patterns"]
+
+
 def test_service_supports_contrastive_hybrid_explain() -> None:
     coords, values = _make_data(n=64, seed=53)
     service = DeepLearningService()

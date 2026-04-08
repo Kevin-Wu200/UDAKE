@@ -280,6 +280,161 @@ class ContrastiveLimeAdapter:
             ],
         }
 
+    def _sample_similarity_calculation(self, embeddings: np.ndarray) -> dict[str, Any]:
+        emb = np.asarray(embeddings, dtype=float)
+        if emb.ndim != 2 or emb.shape[0] == 0:
+            return {
+                "similarity_matrix": [],
+                "pair_similarity_scores": [],
+                "node_mean_similarity": [],
+                "matrix_shape": [0, 0],
+            }
+        norm = np.linalg.norm(emb, axis=1, keepdims=True) + 1e-9
+        normalized = emb / norm
+        sim = np.asarray(normalized @ normalized.T, dtype=float)
+        n = int(sim.shape[0])
+        triu = np.triu_indices(n, k=1)
+        pair_scores = sim[triu] if len(triu[0]) else np.zeros((0,), dtype=float)
+        np.fill_diagonal(sim, np.nan)
+        node_mean = np.nanmean(sim, axis=1)
+        node_mean = np.where(np.isfinite(node_mean), node_mean, 0.0)
+        np.fill_diagonal(sim, 1.0)
+        return {
+            "similarity_matrix": [[float(x) for x in row] for row in sim.tolist()],
+            "pair_similarity_scores": [float(x) for x in pair_scores.tolist()],
+            "node_mean_similarity": [float(x) for x in node_mean.tolist()],
+            "matrix_shape": [n, n],
+        }
+
+    def _similarity_distribution_analysis(self, similarity_bundle: dict[str, Any]) -> dict[str, Any]:
+        pair = np.asarray(similarity_bundle.get("pair_similarity_scores", []), dtype=float).reshape(-1)
+        if len(pair) == 0:
+            return {
+                "stats": {"mean": 0.0, "std": 0.0, "p05": 0.0, "p25": 0.0, "p50": 0.0, "p75": 0.0, "p95": 0.0},
+                "histogram": {"bin_edges": [], "counts": []},
+            }
+        counts, edges = np.histogram(pair, bins=10, range=(-1.0, 1.0))
+        return {
+            "stats": {
+                "mean": float(np.mean(pair)),
+                "std": float(np.std(pair)),
+                "p05": float(np.percentile(pair, 5)),
+                "p25": float(np.percentile(pair, 25)),
+                "p50": float(np.percentile(pair, 50)),
+                "p75": float(np.percentile(pair, 75)),
+                "p95": float(np.percentile(pair, 95)),
+            },
+            "histogram": {
+                "bin_edges": [float(x) for x in edges.tolist()],
+                "counts": [int(x) for x in counts.tolist()],
+            },
+        }
+
+    def _similarity_threshold_boundaries(self, similarity_bundle: dict[str, Any], scores: np.ndarray) -> dict[str, Any]:
+        pair = np.asarray(similarity_bundle.get("pair_similarity_scores", []), dtype=float).reshape(-1)
+        node_mean = np.asarray(similarity_bundle.get("node_mean_similarity", []), dtype=float).reshape(-1)
+        s = np.asarray(scores, dtype=float).reshape(-1)
+        if len(node_mean) == 0 or len(s) == 0:
+            return {
+                "node_low_similarity_threshold_p10": 0.0,
+                "node_high_similarity_threshold_p90": 0.0,
+                "score_high_threshold_p95": 0.0,
+                "pair_low_similarity_threshold_p05": 0.0,
+                "pair_high_similarity_threshold_p95": 0.0,
+            }
+        return {
+            "node_low_similarity_threshold_p10": float(np.percentile(node_mean, 10)),
+            "node_high_similarity_threshold_p90": float(np.percentile(node_mean, 90)),
+            "score_high_threshold_p95": float(np.percentile(s[: len(node_mean)], 95)) if len(s) else 0.0,
+            "pair_low_similarity_threshold_p05": float(np.percentile(pair, 5)) if len(pair) else 0.0,
+            "pair_high_similarity_threshold_p95": float(np.percentile(pair, 95)) if len(pair) else 0.0,
+        }
+
+    def _similarity_anomaly_patterns(
+        self,
+        *,
+        similarity_bundle: dict[str, Any],
+        scores: np.ndarray,
+        explained_nodes: list[int],
+        boundaries: dict[str, Any],
+    ) -> dict[str, Any]:
+        node_mean = np.asarray(similarity_bundle.get("node_mean_similarity", []), dtype=float).reshape(-1)
+        s = np.asarray(scores, dtype=float).reshape(-1)
+        if len(node_mean) == 0 or len(s) == 0:
+            return {
+                "high_score_low_similarity_nodes": [],
+                "low_score_high_similarity_nodes": [],
+                "isolated_nodes": [],
+                "explained_pattern_overlap": [],
+            }
+        aligned = min(len(node_mean), len(s))
+        s = s[:aligned]
+        node_mean = node_mean[:aligned]
+        low_sim_thr = float(boundaries.get("node_low_similarity_threshold_p10", 0.0))
+        high_sim_thr = float(boundaries.get("node_high_similarity_threshold_p90", 0.0))
+        high_score_thr = float(boundaries.get("score_high_threshold_p95", 0.0))
+        low_score_thr = float(np.percentile(s, 25)) if aligned else 0.0
+
+        high_score_low_similarity = [
+            int(i) for i in range(aligned) if s[i] >= high_score_thr and node_mean[i] <= low_sim_thr
+        ]
+        low_score_high_similarity = [
+            int(i) for i in range(aligned) if s[i] <= low_score_thr and node_mean[i] >= high_sim_thr
+        ]
+        isolated_nodes = [int(i) for i in range(aligned) if node_mean[i] <= low_sim_thr]
+        explain_set = set(int(i) for i in explained_nodes)
+        overlap = [int(i) for i in high_score_low_similarity if i in explain_set]
+        return {
+            "high_score_low_similarity_nodes": high_score_low_similarity,
+            "low_score_high_similarity_nodes": low_score_high_similarity,
+            "isolated_nodes": isolated_nodes,
+            "explained_pattern_overlap": overlap,
+        }
+
+    def _similarity_heatmap(self, similarity_bundle: dict[str, Any], scores: np.ndarray) -> dict[str, Any]:
+        matrix = np.asarray(similarity_bundle.get("similarity_matrix", []), dtype=float)
+        s = np.asarray(scores, dtype=float).reshape(-1)
+        if matrix.ndim != 2 or matrix.shape[0] == 0:
+            return {"labels": [], "matrix": [], "score_order_desc": []}
+        n = int(matrix.shape[0])
+        aligned = min(n, len(s))
+        order = np.argsort(-s[:aligned]).astype(int).tolist() if aligned else list(range(n))
+        if aligned < n:
+            rest = [i for i in range(n) if i >= aligned]
+            order.extend(rest)
+        reordered = matrix[np.ix_(order, order)]
+        labels = [f"node_{int(i)}" for i in order]
+        return {
+            "labels": labels,
+            "matrix": [[float(x) for x in row] for row in reordered.tolist()],
+            "score_order_desc": [int(i) for i in order],
+        }
+
+    def _similarity_distribution_bundle(
+        self,
+        *,
+        embeddings: np.ndarray,
+        scores: np.ndarray,
+        explained_nodes: list[int],
+    ) -> dict[str, Any]:
+        similarity = self._sample_similarity_calculation(embeddings)
+        distribution = self._similarity_distribution_analysis(similarity)
+        boundaries = self._similarity_threshold_boundaries(similarity, np.asarray(scores, dtype=float))
+        patterns = self._similarity_anomaly_patterns(
+            similarity_bundle=similarity,
+            scores=np.asarray(scores, dtype=float),
+            explained_nodes=explained_nodes,
+            boundaries=boundaries,
+        )
+        heatmap = self._similarity_heatmap(similarity, np.asarray(scores, dtype=float))
+        return {
+            "sample_similarity": similarity,
+            "distribution": distribution,
+            "anomaly_patterns": patterns,
+            "threshold_boundaries": boundaries,
+            "heatmap": heatmap,
+        }
+
     def _embedding_distribution_analysis(self, embeddings: np.ndarray, scores: np.ndarray) -> dict[str, Any]:
         emb = np.asarray(embeddings, dtype=float)
         s = np.asarray(scores, dtype=float).reshape(-1)
@@ -381,6 +536,11 @@ class ContrastiveLimeAdapter:
         embeddings = np.asarray(encoder_bundle.get("embedding", []), dtype=float)
         similarity = self._embedding_similarity_analysis(embeddings)
         distribution = self._embedding_distribution_analysis(embeddings, np.asarray(scores, dtype=float))
+        similarity_distribution = self._similarity_distribution_bundle(
+            embeddings=embeddings,
+            scores=np.asarray(scores, dtype=float),
+            explained_nodes=explained_nodes,
+        )
         patterns = self._embedding_anomaly_patterns(
             scores=np.asarray(scores, dtype=float),
             explained_nodes=explained_nodes,
@@ -395,6 +555,7 @@ class ContrastiveLimeAdapter:
             },
             "similarity": similarity,
             "distribution": distribution,
+            "similarity_distribution_analysis": similarity_distribution,
             "anomaly_patterns": patterns,
             "visualization": visualization,
         }
