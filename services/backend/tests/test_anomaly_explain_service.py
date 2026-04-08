@@ -59,7 +59,7 @@ def test_explain_anomaly_gan_hybrid() -> None:
     assert result["feature_analysis"]["model_name"] == "gan"
 
 
-def test_explain_anomaly_contrastive_returns_pending_adapter() -> None:
+def test_explain_anomaly_contrastive_hybrid() -> None:
     service = DeepLearningService()
     coords, values = _build_payload()
 
@@ -70,7 +70,12 @@ def test_explain_anomaly_contrastive_returns_pending_adapter() -> None:
         method="hybrid",
     )
 
-    assert result["summary"]["adapter_status"] == "pending"
+    assert result["model_name"] == "contrastive"
+    assert result["summary"]["method"] == "hybrid"
+    assert "lime" in result
+    assert "shap" in result
+    assert "anomaly_score_explanation" in result["lime"]
+    assert "anomaly_score_explanation" in result["shap"]
     assert result["feature_analysis"]["model_name"] == "contrastive"
 
 

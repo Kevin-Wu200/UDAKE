@@ -31,6 +31,12 @@ def test_contrastive_lime_and_shap_adapters() -> None:
     assert lime["summary"]["method"] == "lime"
     assert lime["summary"]["explained_nodes"] == 5
     assert len(lime["global_feature_importance"]) >= 1
+    assert "anomaly_score_explanation" in lime
+    assert "consistency_validation" in lime["anomaly_score_explanation"]
+    assert len(lime["anomaly_score_explanation"]["key_anomaly_features"]) >= 1
+    assert len(lime["anomaly_score_explanation"]["anomaly_reasons"]) == 5
+    assert "reason" in lime["batch_explanations"][0]
+    assert "decomposition" in lime["batch_explanations"][0]
 
     shap_adapter = ContrastiveShapAdapter(config=ContrastiveExplanationConfig(shap_nsamples=120))
     shap = shap_adapter.explain(model=model, coords=coords, values=values, top_k=4, max_explain_nodes=5, nsamples=100)
@@ -40,6 +46,11 @@ def test_contrastive_lime_and_shap_adapters() -> None:
     assert len(shap["global_feature_importance"]) >= 1
     assert "encoder_shap_analysis" in shap
     assert "contrastive_loss_shap_analysis" in shap
+    assert "anomaly_score_explanation" in shap
+    assert "component_contribution" in shap["anomaly_score_explanation"]
+    assert len(shap["anomaly_score_explanation"]["anomaly_reasons"]) == 5
+    assert "reason" in shap["batch_explanations"][0]
+    assert "decomposition" in shap["batch_explanations"][0]
 
 
 def test_contrastive_preprocess_validation_and_batch_support() -> None:

@@ -44,4 +44,7 @@ def test_contrastive_lime_adapter_generates_explanations_and_cache() -> None:
     assert len(first["batch_explanations"]) == 3
     assert len(first["score_components"]["combined"]) == len(values)
     assert "encoder_components" in first
+    assert "anomaly_score_explanation" in first
+    assert len(first["anomaly_score_explanation"]["decomposition"]) == len(values)
+    assert len(first["anomaly_score_explanation"]["anomaly_reasons"]) == 3
     assert second["performance"]["cache_hit"] is True

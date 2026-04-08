@@ -13,6 +13,8 @@ from typing import Any, Callable, Optional
 import numpy as np
 from sklearn.linear_model import Ridge
 
+from deep_learning.models.anomaly_detection.common import safe_minmax
+
 from .anomaly_features import AnomalyFeatureRegistry
 
 
@@ -43,6 +45,12 @@ class ContrastiveLimeAdapter:
         self._result_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
         self._context_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
         self._feature_registry = AnomalyFeatureRegistry()
+        self._score_weights = {
+            "feature_distance": 0.40,
+            "density": 0.30,
+            "nearest_neighbor": 0.20,
+            "bank_similarity_inverse": 0.10,
+        }
 
     @staticmethod
     def _load_lime_tabular() -> Any:
@@ -213,6 +221,232 @@ class ContrastiveLimeAdapter:
         surrogate: Ridge = context["surrogate"]
         return lambda x: surrogate.predict(np.asarray(x, dtype=float))
 
+    def _anomaly_profile(self, scores: np.ndarray, explained_nodes: list[int]) -> dict[str, Any]:
+        s = np.asarray(scores, dtype=float).reshape(-1)
+        if s.size == 0:
+            return {"stats": {"mean": 0.0, "std": 0.0, "p95": 0.0}, "node_labels": []}
+        thr = float(np.percentile(s, 95))
+        labels = (s >= thr).astype(int)
+        return {
+            "stats": {"mean": float(np.mean(s)), "std": float(np.std(s)), "p95": thr},
+            "node_labels": [
+                {"node_index": int(i), "score": float(s[i]), "label": int(labels[i])}
+                for i in explained_nodes
+                if 0 <= i < len(s)
+            ],
+        }
+
+    def _score_decomposition(
+        self,
+        *,
+        feature_distance: np.ndarray,
+        density: np.ndarray,
+        nearest_neighbor: np.ndarray,
+        bank_similarity: np.ndarray,
+        combined: np.ndarray,
+    ) -> dict[str, Any]:
+        fd = np.asarray(feature_distance, dtype=float).reshape(-1)
+        den = np.asarray(density, dtype=float).reshape(-1)
+        near = np.asarray(nearest_neighbor, dtype=float).reshape(-1)
+        bank = np.asarray(bank_similarity, dtype=float).reshape(-1)
+        combo = np.asarray(combined, dtype=float).reshape(-1)
+        aligned = min(len(fd), len(den), len(near), len(bank), len(combo))
+        if aligned <= 0:
+            return {"decomposition": [], "top_anomaly_nodes": []}
+
+        fd = fd[:aligned]
+        den = den[:aligned]
+        near = near[:aligned]
+        bank = bank[:aligned]
+        combo = combo[:aligned]
+        fd_norm = safe_minmax(fd)
+        den_norm = safe_minmax(den)
+        near_norm = safe_minmax(near)
+        bank_inv_norm = 1.0 - safe_minmax(bank)
+
+        rows: list[dict[str, Any]] = []
+        for idx in range(aligned):
+            fd_weighted = float(self._score_weights["feature_distance"] * fd_norm[idx])
+            den_weighted = float(self._score_weights["density"] * den_norm[idx])
+            near_weighted = float(self._score_weights["nearest_neighbor"] * near_norm[idx])
+            bank_weighted = float(self._score_weights["bank_similarity_inverse"] * bank_inv_norm[idx])
+            total = float(fd_weighted + den_weighted + near_weighted + bank_weighted)
+            rows.append(
+                {
+                    "node_index": int(idx),
+                    "feature_distance_component": float(fd[idx]),
+                    "density_component": float(den[idx]),
+                    "nearest_neighbor_component": float(near[idx]),
+                    "bank_similarity_component": float(bank[idx]),
+                    "feature_distance_weighted_component": fd_weighted,
+                    "density_weighted_component": den_weighted,
+                    "nearest_neighbor_weighted_component": near_weighted,
+                    "bank_similarity_inverse_weighted_component": bank_weighted,
+                    "decomposed_score": total,
+                    "combined_score": float(combo[idx]),
+                }
+            )
+        rows.sort(key=lambda item: float(item["decomposed_score"]), reverse=True)
+        return {
+            "decomposition": rows,
+            "top_anomaly_nodes": [int(item["node_index"]) for item in rows[: max(1, min(10, aligned))]],
+        }
+
+    def _component_contribution_analysis(
+        self,
+        *,
+        decomposition: list[dict[str, Any]],
+        explained_nodes: list[int],
+    ) -> dict[str, Any]:
+        if len(decomposition) == 0:
+            return {
+                "encoder_total": 0.0,
+                "contrastive_loss_total": 0.0,
+                "encoder_ratio": 0.0,
+                "contrastive_loss_ratio": 0.0,
+                "explained_node_breakdown": [],
+            }
+
+        # 近似拆分：编码器主导 embedding 距离与最近邻项；对比损失主导密度与特征库一致性项。
+        encoder_total = float(
+            np.sum(
+                [
+                    float(item.get("feature_distance_weighted_component", 0.0))
+                    + float(item.get("nearest_neighbor_weighted_component", 0.0))
+                    for item in decomposition
+                ]
+            )
+        )
+        contrastive_total = float(
+            np.sum(
+                [
+                    float(item.get("density_weighted_component", 0.0))
+                    + float(item.get("bank_similarity_inverse_weighted_component", 0.0))
+                    for item in decomposition
+                ]
+            )
+        )
+        total = encoder_total + contrastive_total + 1e-9
+        node_set = set(int(i) for i in explained_nodes)
+        node_rows = [item for item in decomposition if int(item.get("node_index", -1)) in node_set]
+        node_rows.sort(key=lambda item: float(item.get("decomposed_score", 0.0)), reverse=True)
+        breakdown = [
+            {
+                "node_index": int(item["node_index"]),
+                "encoder_weighted_component": float(item.get("feature_distance_weighted_component", 0.0))
+                + float(item.get("nearest_neighbor_weighted_component", 0.0)),
+                "contrastive_loss_weighted_component": float(item.get("density_weighted_component", 0.0))
+                + float(item.get("bank_similarity_inverse_weighted_component", 0.0)),
+                "decomposed_score": float(item.get("decomposed_score", 0.0)),
+            }
+            for item in node_rows
+        ]
+        return {
+            "encoder_total": encoder_total,
+            "contrastive_loss_total": contrastive_total,
+            "encoder_ratio": float(encoder_total / total),
+            "contrastive_loss_ratio": float(contrastive_total / total),
+            "explained_node_breakdown": breakdown,
+        }
+
+    def _extract_key_anomaly_features(self, *, batch_explanations: list[dict[str, Any]], top_k: int) -> list[dict[str, Any]]:
+        if len(batch_explanations) == 0:
+            return []
+        feature_agg: dict[str, dict[str, Any]] = {}
+        for item in batch_explanations:
+            node_idx = int(item.get("node_index", -1))
+            for contrib in item.get("top_contributions", []):
+                name = str(contrib.get("feature_name", ""))
+                alias = str(contrib.get("feature_alias", name))
+                category = str(contrib.get("category", "unknown"))
+                score = float(
+                    contrib.get(
+                        "abs_weight",
+                        contrib.get("abs_shap", abs(float(contrib.get("weight", contrib.get("shap_value", 0.0))))),
+                    )
+                )
+                if name not in feature_agg:
+                    feature_agg[name] = {
+                        "feature_name": name,
+                        "feature_alias": alias,
+                        "category": category,
+                        "importance_sum": 0.0,
+                        "mention_count": 0,
+                        "nodes": set(),
+                    }
+                feature_agg[name]["importance_sum"] = float(feature_agg[name]["importance_sum"] + score)
+                feature_agg[name]["mention_count"] = int(feature_agg[name]["mention_count"] + 1)
+                feature_agg[name]["nodes"].add(node_idx)
+
+        size = float(max(1, len(batch_explanations)))
+        rows = []
+        for item in feature_agg.values():
+            rows.append(
+                {
+                    "feature_name": str(item["feature_name"]),
+                    "feature_alias": str(item["feature_alias"]),
+                    "category": str(item["category"]),
+                    "importance": float(item["importance_sum"] / size),
+                    "mention_count": int(item["mention_count"]),
+                    "covered_nodes": sorted(int(i) for i in item["nodes"]),
+                }
+            )
+        rows.sort(key=lambda x: float(x["importance"]), reverse=True)
+        return rows[: max(1, int(top_k))]
+
+    def _collect_anomaly_reasons(self, *, batch_explanations: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        rows = [
+            {
+                "node_index": int(item.get("node_index", -1)),
+                "reason": str(item.get("reason", "")),
+                "confidence": float(item.get("confidence", 0.0)),
+            }
+            for item in batch_explanations
+        ]
+        rows.sort(key=lambda x: float(x.get("confidence", 0.0)), reverse=True)
+        return rows
+
+    def _explanation_reason(
+        self,
+        *,
+        node_idx: int,
+        decomposition_row: dict[str, Any],
+        top_contributions: list[dict[str, Any]],
+    ) -> str:
+        if not top_contributions:
+            return f"节点{node_idx}异常主要由嵌入偏移与特征库不一致共同触发。"
+        top_feat = top_contributions[0]
+        return (
+            f"节点{node_idx}异常由{top_feat['feature_alias']}驱动，"
+            f"特征距离分量{decomposition_row['feature_distance_component']:.3f}、"
+            f"密度分量{decomposition_row['density_component']:.3f}、"
+            f"最近邻分量{decomposition_row['nearest_neighbor_component']:.3f}、"
+            f"特征库相似度分量{decomposition_row['bank_similarity_component']:.3f}共同放大异常。"
+        )
+
+    def _validate_explanation_consistency(
+        self,
+        *,
+        decomposition: list[dict[str, Any]],
+        combined_scores: np.ndarray,
+        explained_nodes: list[int],
+    ) -> dict[str, Any]:
+        if len(decomposition) == 0:
+            return {"is_reasonable": False, "score_corr": 0.0, "coverage": 0.0}
+        dec = np.asarray([item["decomposed_score"] for item in decomposition], dtype=float)
+        node = np.asarray(combined_scores, dtype=float)
+        if len(dec) != len(node):
+            aligned = min(len(dec), len(node))
+            dec = dec[:aligned]
+            node = node[:aligned]
+        corr = float(np.corrcoef(dec, node)[0, 1]) if len(dec) >= 2 and np.std(dec) > 1e-9 and np.std(node) > 1e-9 else 0.0
+        coverage = float(len(explained_nodes) / max(1, len(node)))
+        return {
+            "is_reasonable": bool(corr >= 0.5),
+            "score_corr": corr,
+            "coverage": coverage,
+        }
+
     def _fallback_local_pairs(self, context: dict[str, Any], node_index: int) -> tuple[list[tuple[int, float]], float]:
         surrogate: Ridge = context["surrogate"]
         instance = np.asarray(context["scaled_x"][node_index], dtype=float)
@@ -283,6 +517,14 @@ class ContrastiveLimeAdapter:
         context = self._build_context(model=model, coords=c, values=v)
         target = np.asarray(context["target"], dtype=float)
         explained_nodes, anomaly_threshold = self._select_explained_nodes(target, int(max_explain_nodes or self.config.max_explain_nodes))
+        decomposition_payload = self._score_decomposition(
+            feature_distance=np.asarray(context["score_bundle"]["feature_distance"], dtype=float),
+            density=np.asarray(context["score_bundle"]["density"], dtype=float),
+            nearest_neighbor=np.asarray(context["score_bundle"]["nearest_neighbor"], dtype=float),
+            bank_similarity=np.asarray(context["score_bundle"]["bank_similarity"], dtype=float),
+            combined=target,
+        )
+        dec_by_node = {int(item["node_index"]): item for item in decomposition_payload["decomposition"]}
         selected_samples = int(num_samples or self._dynamic_lime_samples(context["scaled_x"].shape[1], len(v)))
 
         cache_key = self._stable_hash(
@@ -358,6 +600,28 @@ class ContrastiveLimeAdapter:
                     "fidelity": float(fidelity),
                     "confidence": float(max(0.0, min(1.0, fidelity * np.exp(-abs(local_pred - target[node_idx]))))),
                     "top_contributions": contributions,
+                    "decomposition": dec_by_node.get(
+                        int(node_idx),
+                        {
+                            "feature_distance_component": 0.0,
+                            "density_component": 0.0,
+                            "nearest_neighbor_component": 0.0,
+                            "bank_similarity_component": 0.0,
+                        },
+                    ),
+                    "reason": self._explanation_reason(
+                        node_idx=int(node_idx),
+                        decomposition_row=dec_by_node.get(
+                            int(node_idx),
+                            {
+                                "feature_distance_component": 0.0,
+                                "density_component": 0.0,
+                                "nearest_neighbor_component": 0.0,
+                                "bank_similarity_component": 0.0,
+                            },
+                        ),
+                        top_contributions=contributions,
+                    ),
                 }
             )
 
@@ -379,6 +643,17 @@ class ContrastiveLimeAdapter:
             }
             for name, weight in global_items[: max(1, int(top_k))]
         ]
+        consistency = self._validate_explanation_consistency(
+            decomposition=decomposition_payload["decomposition"],
+            combined_scores=target,
+            explained_nodes=explained_nodes,
+        )
+        component_summary = self._component_contribution_analysis(
+            decomposition=decomposition_payload["decomposition"],
+            explained_nodes=explained_nodes,
+        )
+        key_anomaly_features = self._extract_key_anomaly_features(batch_explanations=batch_explanations, top_k=int(top_k))
+        anomaly_reasons = self._collect_anomaly_reasons(batch_explanations=batch_explanations)
 
         payload = {
             "summary": {
@@ -396,6 +671,14 @@ class ContrastiveLimeAdapter:
             "feature_importance": raw_importance.astype(float).tolist(),
             "batch_explanations": batch_explanations,
             "global_feature_importance": global_feature_importance,
+            "anomaly_score_explanation": {
+                "decomposition": decomposition_payload["decomposition"],
+                "key_anomaly_nodes": decomposition_payload["top_anomaly_nodes"],
+                "component_contribution": component_summary,
+                "key_anomaly_features": key_anomaly_features,
+                "anomaly_reasons": anomaly_reasons,
+                "consistency_validation": consistency,
+            },
             "score_components": {
                 "feature_distance": np.asarray(context["score_bundle"]["feature_distance"], dtype=float).astype(float).tolist(),
                 "density": np.asarray(context["score_bundle"]["density"], dtype=float).astype(float).tolist(),
@@ -409,6 +692,7 @@ class ContrastiveLimeAdapter:
             },
             "surrogate_metrics": context["surrogate_metrics"],
             "preprocess": context["preprocess"],
+            "anomaly_analysis": self._anomaly_profile(target, explained_nodes),
             "performance": {
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "cache_hit": False,
@@ -535,6 +819,14 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
         context = self._build_context(model=model, coords=c, values=v)
         target = np.asarray(context["target"], dtype=float)
         explained_nodes, anomaly_threshold = self._select_explained_nodes(target, int(max_explain_nodes or self.config.max_explain_nodes))
+        decomposition_payload = self._score_decomposition(
+            feature_distance=np.asarray(context["score_bundle"]["feature_distance"], dtype=float),
+            density=np.asarray(context["score_bundle"]["density"], dtype=float),
+            nearest_neighbor=np.asarray(context["score_bundle"]["nearest_neighbor"], dtype=float),
+            bank_similarity=np.asarray(context["score_bundle"]["bank_similarity"], dtype=float),
+            combined=target,
+        )
+        dec_by_node = {int(item["node_index"]): item for item in decomposition_payload["decomposition"]}
         selected_nsamples = int(nsamples or self.config.shap_nsamples)
         effective_nsamples = self._dynamic_shap_samples(selected_nsamples, context["scaled_x"].shape[1], len(v))
 
@@ -618,6 +910,28 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                     "confidence": float(np.exp(-abs(pred - target[node_idx]) / (abs(target[node_idx]) + 1e-6))),
                     "top_contributions": contributions,
                     "raw_shap_values": [float(x) for x in shap_values.tolist()],
+                    "decomposition": dec_by_node.get(
+                        int(node_idx),
+                        {
+                            "feature_distance_component": 0.0,
+                            "density_component": 0.0,
+                            "nearest_neighbor_component": 0.0,
+                            "bank_similarity_component": 0.0,
+                        },
+                    ),
+                    "reason": self._explanation_reason(
+                        node_idx=int(node_idx),
+                        decomposition_row=dec_by_node.get(
+                            int(node_idx),
+                            {
+                                "feature_distance_component": 0.0,
+                                "density_component": 0.0,
+                                "nearest_neighbor_component": 0.0,
+                                "bank_similarity_component": 0.0,
+                            },
+                        ),
+                        top_contributions=contributions,
+                    ),
                 }
             )
 
@@ -643,6 +957,17 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
             )
         ) if batch_explanations else 0.0
         score_bundle = context["score_bundle"]
+        consistency = self._validate_explanation_consistency(
+            decomposition=decomposition_payload["decomposition"],
+            combined_scores=target,
+            explained_nodes=explained_nodes,
+        )
+        component_summary = self._component_contribution_analysis(
+            decomposition=decomposition_payload["decomposition"],
+            explained_nodes=explained_nodes,
+        )
+        key_anomaly_features = self._extract_key_anomaly_features(batch_explanations=batch_explanations, top_k=int(top_k))
+        anomaly_reasons = self._collect_anomaly_reasons(batch_explanations=batch_explanations)
 
         payload = {
             "summary": {
@@ -664,6 +989,14 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
             "feature_importance": mean_abs.astype(float).tolist(),
             "batch_explanations": batch_explanations,
             "global_feature_importance": top_features,
+            "anomaly_score_explanation": {
+                "decomposition": decomposition_payload["decomposition"],
+                "key_anomaly_nodes": decomposition_payload["top_anomaly_nodes"],
+                "component_contribution": component_summary,
+                "key_anomaly_features": key_anomaly_features,
+                "anomaly_reasons": anomaly_reasons,
+                "consistency_validation": consistency,
+            },
             "score_components": {
                 "feature_distance": np.asarray(score_bundle["feature_distance"], dtype=float).astype(float).tolist(),
                 "density": np.asarray(score_bundle["density"], dtype=float).astype(float).tolist(),
@@ -697,6 +1030,7 @@ class ContrastiveShapAdapter(ContrastiveLimeAdapter):
                 "additivity_mean_abs_error": float(np.mean(additivity_errors)) if additivity_errors else 0.0,
                 "additivity_max_abs_error": float(np.max(additivity_errors)) if additivity_errors else 0.0,
             },
+            "anomaly_analysis": self._anomaly_profile(target, explained_nodes),
             "performance": {
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "cache_hit": False,
