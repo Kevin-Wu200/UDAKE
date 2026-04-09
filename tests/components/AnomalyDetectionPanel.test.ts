@@ -193,4 +193,101 @@ describe('AnomalyDetectionPanel 时间序列异常标记', () => {
 
         panel.destroy();
     });
+
+    it('应支持训练模型、Fusion 训练拦截与错误提示', async () => {
+        const api = createApiMock();
+        api.trainAnomaly.mockResolvedValue({ model: 'vae', status: 'ok' });
+
+        const panel = new AnomalyDetectionPanel(host, api as any);
+        (host.querySelector('#dl-anomaly-train') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(api.trainAnomaly).toHaveBeenCalledTimes(1);
+        expect(api.trainAnomaly).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model_name: 'vae',
+                epochs: 30
+            })
+        );
+        expect(host.querySelector('#dl-anomaly-status')?.textContent).toContain('训练完成');
+
+        (host.querySelector('#dl-anomaly-model') as HTMLSelectElement).value = 'fusion';
+        (host.querySelector('#dl-anomaly-train') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(api.trainAnomaly).toHaveBeenCalledTimes(1);
+        expect(host.querySelector('#dl-anomaly-status')?.textContent).toContain('仅支持预测');
+
+        panel.destroy();
+    });
+
+    it('导出结果前后应展示不同状态并触发下载', async () => {
+        const api = createApiMock();
+        api.predictAnomaly.mockResolvedValue({
+            anomaly_indices: [1, 3],
+            anomaly_scores: [0.1, 0.9, 0.2, 0.88, 0.05, 0.12]
+        });
+
+        const createUrlSpy = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:mock');
+        const revokeSpy = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+        const clickSpy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {});
+
+        const panel = new AnomalyDetectionPanel(host, api as any);
+        (host.querySelector('#dl-anomaly-export') as HTMLButtonElement).click();
+        expect(host.querySelector('#dl-anomaly-status')?.textContent).toContain('没有可导出的结果');
+
+        (host.querySelector('#dl-anomaly-predict') as HTMLButtonElement).click();
+        await flushPromises();
+        (host.querySelector('#dl-anomaly-export') as HTMLButtonElement).click();
+
+        expect(createUrlSpy).toHaveBeenCalledTimes(1);
+        expect(clickSpy).toHaveBeenCalledTimes(1);
+        expect(revokeSpy).toHaveBeenCalledTimes(1);
+        expect(host.querySelector('#dl-anomaly-status')?.textContent).toContain('导出成功');
+
+        panel.destroy();
+        createUrlSpy.mockRestore();
+        revokeSpy.mockRestore();
+        clickSpy.mockRestore();
+    });
+
+    it('应支持模型选择全选/清空，且少于两个模型时拒绝对比', async () => {
+        const api = createApiMock();
+        const panel = new AnomalyDetectionPanel(host, api as any);
+
+        (host.querySelector('#dl-anomaly-compare-clear') as HTMLButtonElement).click();
+        const allBoxes = Array.from(host.querySelectorAll('.compare-model-checkbox')) as HTMLInputElement[];
+        expect(allBoxes.every((item) => !item.checked)).toBe(true);
+
+        (host.querySelector('#dl-anomaly-run-compare') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(host.querySelector('#dl-anomaly-compare-summary')?.textContent).toContain('至少选择两个模型');
+        expect(api.predictAnomaly).not.toHaveBeenCalled();
+
+        (host.querySelector('#dl-anomaly-compare-select-all') as HTMLButtonElement).click();
+        expect(allBoxes.every((item) => item.checked)).toBe(true);
+
+        panel.destroy();
+    });
+
+    it('检测与对比失败时应输出错误状态', async () => {
+        const api = createApiMock();
+        api.predictAnomaly.mockRejectedValueOnce(new Error('predict failed')).mockRejectedValueOnce(new Error('compare failed'));
+
+        const panel = new AnomalyDetectionPanel(host, api as any);
+        (host.querySelector('#dl-anomaly-predict') as HTMLButtonElement).click();
+        await flushPromises();
+        expect(host.querySelector('#dl-anomaly-status')?.textContent).toContain('predict failed');
+
+        const boxes = Array.from(host.querySelectorAll('.compare-model-checkbox')) as HTMLInputElement[];
+        boxes.forEach((item, idx) => {
+            item.checked = idx < 2;
+        });
+        (host.querySelector('#dl-anomaly-run-compare') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(host.querySelector('#dl-anomaly-status')?.textContent).toContain('compare failed');
+        expect(host.querySelector('#dl-anomaly-compare-summary')?.textContent).toContain('模型对比失败');
+
+        panel.destroy();
+    });
 });
