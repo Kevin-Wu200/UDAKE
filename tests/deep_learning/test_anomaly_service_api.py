@@ -72,3 +72,50 @@ def test_anomaly_train_predict_and_realtime_endpoints() -> None:
     )
     assert realtime_resp.status_code == 200
     assert len(realtime_resp.json()["batches"]) == 2
+
+
+def test_anomaly_cache_management_endpoints() -> None:
+    app = FastAPI()
+    app.include_router(router, prefix="/api")
+    client = TestClient(app)
+
+    coords, values = build_payload(48)
+    first = client.post(
+        "/api/dl/anomaly/predict",
+        json={
+            "model_name": "vae",
+            "coords": coords,
+            "values": values,
+            "threshold_method": "adaptive",
+            "k": 2.1,
+        },
+    )
+    assert first.status_code == 200
+    assert first.json()["cache"]["cache_hit"] is False
+
+    second = client.post(
+        "/api/dl/anomaly/predict",
+        json={
+            "model_name": "vae",
+            "coords": coords,
+            "values": values,
+            "threshold_method": "adaptive",
+            "k": 2.1,
+        },
+    )
+    assert second.status_code == 200
+    assert second.json()["cache"]["cache_hit"] is True
+
+    metrics_resp = client.get("/api/dl/anomaly/cache/metrics")
+    assert metrics_resp.status_code == 200
+    metrics = metrics_resp.json()
+    assert metrics["enabled"] is True
+    assert "prediction" in metrics["namespaces"]
+
+    cleanup_resp = client.post("/api/dl/anomaly/cache/cleanup", json={"namespace": "prediction"})
+    assert cleanup_resp.status_code == 200
+    assert "stats" in cleanup_resp.json()
+
+    clear_resp = client.post("/api/dl/anomaly/cache/clear", json={"namespace": "prediction"})
+    assert clear_resp.status_code == 200
+    assert "removed" in clear_resp.json()

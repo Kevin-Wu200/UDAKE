@@ -98,6 +98,10 @@ class AnomalyExplainRequest(BaseModel):
     nsamples: Optional[int] = Field(default=None, ge=40, le=2000)
 
 
+class AnomalyCacheManageRequest(BaseModel):
+    namespace: Optional[str] = Field(default=None, description="prediction/explanation，可选")
+
+
 class SamplingRLTrainRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
@@ -340,6 +344,21 @@ def explain_anomaly(payload: AnomalyExplainRequest) -> dict:
         num_samples=payload.num_samples,
         nsamples=payload.nsamples,
     )
+
+
+@router.get("/anomaly/cache/metrics")
+def anomaly_cache_metrics() -> dict:
+    return service.anomaly_cache_metrics()
+
+
+@router.post("/anomaly/cache/cleanup")
+def cleanup_anomaly_cache(payload: AnomalyCacheManageRequest) -> dict:
+    return service.cleanup_anomaly_cache(namespace=payload.namespace)
+
+
+@router.post("/anomaly/cache/clear")
+def clear_anomaly_cache(payload: AnomalyCacheManageRequest) -> dict:
+    return service.clear_anomaly_cache(namespace=payload.namespace)
 
 
 @router.post("/sampling-rl/train")

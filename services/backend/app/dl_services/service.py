@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
+import hashlib
+import json
 from typing import Any
 import time
 
@@ -19,6 +22,7 @@ from deep_learning.models.spatiotemporal import SpatioTemporalSystemIntegrator, 
 from deep_learning.training import LightningTrainer, SpatialTrainingConfig, TrainingConfig, train_spatial_model
 from deep_learning.utils.device import DeviceManager
 from deep_learning.utils.monitoring import AlertManager, AlertRule, MetricMonitor, SystemResourceMonitor
+from .anomaly_cache import AnomalyModelCache
 from .anomaly_features import AnomalyFeatureRegistry
 from .contrastive_anomaly_explainer import ContrastiveLimeAdapter, ContrastiveShapAdapter
 from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
@@ -93,6 +97,34 @@ class DeepLearningService:
         self.gan_shap_adapter = GANAnomalySHAPAdapter()
         self.contrastive_lime_adapter = ContrastiveLimeAdapter()
         self.contrastive_shap_adapter = ContrastiveShapAdapter()
+        self.anomaly_cache = AnomalyModelCache(cache_size=256, ttl_seconds=600)
+        self._anomaly_model_versions: dict[str, int] = {}
+
+    @staticmethod
+    def _hash_array(value: np.ndarray) -> str:
+        arr = np.ascontiguousarray(np.asarray(value))
+        return hashlib.sha256(arr.tobytes()).hexdigest()
+
+    @staticmethod
+    def _stable_hash(payload: dict[str, Any]) -> str:
+        normalized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _bump_anomaly_model_version(self, model_name: str) -> None:
+        current = int(self._anomaly_model_versions.get(model_name, 0))
+        self._anomaly_model_versions[model_name] = current + 1
+
+    def _model_version(self, model_name: str) -> int:
+        return int(self._anomaly_model_versions.get(model_name, 0))
+
+    def _with_cache_meta(self, payload: dict[str, Any], *, namespace: str, cache_hit: bool) -> dict[str, Any]:
+        result = copy.deepcopy(payload)
+        result["cache"] = {
+            "namespace": namespace,
+            "cache_hit": bool(cache_hit),
+            "stats": self.anomaly_cache.stats(),
+        }
+        return result
 
     def health(self) -> dict[str, Any]:
         profile = self.device_manager.configure()
@@ -288,6 +320,7 @@ class DeepLearningService:
             v,
         )
         self.anomaly_models[model_name] = payload["model"]
+        self._bump_anomaly_model_version(model_name)
         self.metric_monitor.log(f"{model_name}_train", float(payload["training"].get("best_total_loss", payload["training"].get("final_loss", 0.0))))
         return {
             "model_name": model_name,
@@ -307,13 +340,35 @@ class DeepLearningService:
         c, v = self._validate_coords_values(coords, values)
         if model_name not in {"vae", "gcae", "gan", "contrastive", "fusion"}:
             raise ValueError("model_name must be one of vae/gcae/gan/contrastive/fusion")
+        if model_name != "fusion":
+            _ = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
+
+        predict_cache_key = self._stable_hash(
+            {
+                "namespace": "prediction",
+                "model_name": model_name,
+                "model_version": self._model_version(model_name),
+                "coords_shape": [int(c.shape[0]), int(c.shape[1])],
+                "coords_hash": self._hash_array(c),
+                "values_hash": self._hash_array(v),
+                "threshold_method": threshold_method,
+                "percentile": float(percentile),
+                "k": float(k),
+            }
+        )
+        cached_prediction = self.anomaly_cache.get("prediction", predict_cache_key)
+        if cached_prediction is not None:
+            self.metric_monitor.log(f"{model_name}_prediction_cache_hit", 1.0)
+            return self._with_cache_meta(cached_prediction, namespace="prediction", cache_hit=True)
 
         if model_name == "fusion":
             x = c[:, 0]
             y = c[:, 1]
             result = self.deep_fusion.detect(x, y, v, threshold_method=threshold_method, percentile=percentile)
             self.metric_monitor.log("fusion_anomaly_count", float(result["anomaly_count"]))
-            return result
+            self.anomaly_cache.set("prediction", predict_cache_key, result)
+            self.metric_monitor.log("fusion_prediction_cache_hit", 0.0)
+            return self._with_cache_meta(result, namespace="prediction", cache_hit=False)
 
         model = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
         try:
@@ -345,12 +400,15 @@ class DeepLearningService:
         self.metric_monitor.log(f"{model_name}_anomaly_count", count)
 
         scores = pred.get("scores", pred.get("node_scores", []))
-        return {
+        result = {
             "model_name": model_name,
             "prediction": normalized_pred,
             "resource": self.resource_monitor.collect(),
             "score_preview": list(scores[:10]),
         }
+        self.anomaly_cache.set("prediction", predict_cache_key, result)
+        self.metric_monitor.log(f"{model_name}_prediction_cache_hit", 0.0)
+        return self._with_cache_meta(result, namespace="prediction", cache_hit=False)
 
     def detect_realtime_anomaly(
         self,
@@ -395,6 +453,27 @@ class DeepLearningService:
 
         c, v = self._validate_coords_values(coords, values)
         model = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
+        explain_cache_key = self._stable_hash(
+            {
+                "namespace": "explanation",
+                "model_name": model_name,
+                "model_version": self._model_version(model_name),
+                "coords_shape": [int(c.shape[0]), int(c.shape[1])],
+                "coords_hash": self._hash_array(c),
+                "values_hash": self._hash_array(v),
+                "method": method,
+                "top_k": int(top_k),
+                "include_prediction": bool(include_prediction),
+                "num_samples": num_samples,
+                "nsamples": nsamples,
+                "max_explain_nodes": int(max_explain_nodes),
+            }
+        )
+        cached_explanation = self.anomaly_cache.get("explanation", explain_cache_key)
+        if cached_explanation is not None:
+            self.metric_monitor.log(f"{model_name}_explain_cache_hit", 1.0)
+            return self._with_cache_meta(cached_explanation, namespace="explanation", cache_hit=True)
+
         feature_analysis = self.anomaly_feature_registry.analyze(model_name)
 
         lime_adapter: Any | None = None
@@ -413,7 +492,7 @@ class DeepLearningService:
             shap_adapter = self.contrastive_shap_adapter
 
         if method in {"lime", "hybrid"} and lime_adapter is None:
-            return {
+            pending_payload = {
                 "model_name": model_name,
                 "summary": {
                     "method": method,
@@ -422,8 +501,11 @@ class DeepLearningService:
                 },
                 "feature_analysis": feature_analysis,
             }
+            self.anomaly_cache.set("explanation", explain_cache_key, pending_payload)
+            self.metric_monitor.log(f"{model_name}_explain_cache_hit", 0.0)
+            return self._with_cache_meta(pending_payload, namespace="explanation", cache_hit=False)
         if method in {"shap", "hybrid"} and shap_adapter is None:
-            return {
+            pending_payload = {
                 "model_name": model_name,
                 "summary": {
                     "method": method,
@@ -432,6 +514,9 @@ class DeepLearningService:
                 },
                 "feature_analysis": feature_analysis,
             }
+            self.anomaly_cache.set("explanation", explain_cache_key, pending_payload)
+            self.metric_monitor.log(f"{model_name}_explain_cache_hit", 0.0)
+            return self._with_cache_meta(pending_payload, namespace="explanation", cache_hit=False)
 
         lime_result: dict[str, Any] | None = None
         if method in {"lime", "hybrid"}:
@@ -488,7 +573,20 @@ class DeepLearningService:
                 model = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
                 pred = model.predict(c, v, threshold_method="percentile", percentile=95.0, k=2.5)
             result["prediction"] = pred
-        return result
+        self.anomaly_cache.set("explanation", explain_cache_key, result)
+        self.metric_monitor.log(f"{model_name}_explain_cache_hit", 0.0)
+        return self._with_cache_meta(result, namespace="explanation", cache_hit=False)
+
+    def anomaly_cache_metrics(self) -> dict[str, Any]:
+        return self.anomaly_cache.stats()
+
+    def cleanup_anomaly_cache(self, namespace: str | None = None) -> dict[str, Any]:
+        removed = self.anomaly_cache.cleanup(namespace=namespace)
+        return {"removed": removed, "stats": self.anomaly_cache.stats()}
+
+    def clear_anomaly_cache(self, namespace: str | None = None) -> dict[str, Any]:
+        removed = self.anomaly_cache.clear(namespace=namespace)
+        return {"removed": removed, "stats": self.anomaly_cache.stats()}
 
     def train_spatial_model(self, model_type: str, samples: list[list[float]], epochs: int = 30) -> dict[str, Any]:
         coords, values = self._to_spatial_arrays(samples)
