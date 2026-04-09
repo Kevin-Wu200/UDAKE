@@ -96,6 +96,40 @@ describe('AnomalyDetectionPanel 时间序列异常标记', () => {
         panel.destroy();
     });
 
+    it('应兼容 GCAE prediction 包裹结构并正确提取异常分数', async () => {
+        const api = createApiMock();
+        api.predictAnomaly.mockResolvedValue({
+            model_name: 'gcae',
+            prediction: {
+                anomaly_indices: [0, 5],
+                anomaly_scores: [0.91, 0.11, 0.16, 0.21, 0.35, 0.88],
+                node_scores: [0.91, 0.11, 0.16, 0.21, 0.35, 0.88],
+                value_anomalies: {
+                    anomalies: [
+                        { index: 0, value: 9.1, type: 'high' },
+                        { index: 5, value: 8.8, type: 'high' }
+                    ]
+                }
+            },
+            score_preview: [0.91, 0.11, 0.16, 0.21, 0.35, 0.88]
+        });
+
+        const panel = new AnomalyDetectionPanel(host, api as any);
+        (host.querySelector('#dl-anomaly-model') as HTMLSelectElement).value = 'gcae';
+        (host.querySelector('#dl-anomaly-predict') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(api.predictAnomaly).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model_name: 'gcae'
+            })
+        );
+        expect(host.querySelectorAll('.series-anomaly-point').length).toBeGreaterThan(0);
+        expect(host.querySelector('#dl-anomaly-timeseries-summary')?.textContent).toContain('异常点');
+
+        panel.destroy();
+    });
+
     it('应支持严重级别筛选和异常分数数据源切换', async () => {
         const api = createApiMock();
         api.predictAnomaly.mockResolvedValue({
