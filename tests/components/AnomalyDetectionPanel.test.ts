@@ -168,6 +168,45 @@ describe('AnomalyDetectionPanel 时间序列异常标记', () => {
         panel.destroy();
     });
 
+    it('应兼容 Contrastive prediction 包裹结构并渲染异常结果', async () => {
+        const api = createApiMock();
+        api.predictAnomaly.mockResolvedValue({
+            model_name: 'contrastive',
+            prediction: {
+                anomaly_indices: [1, 3],
+                anomaly_scores: [0.09, 0.84, 0.18, 0.87, 0.22, 0.13],
+                score_components: {
+                    feature_distance: [0.18, 0.86, 0.21, 0.83, 0.29, 0.17],
+                    density: [0.11, 0.78, 0.16, 0.74, 0.23, 0.12],
+                    nearest_neighbor: [0.08, 0.71, 0.15, 0.69, 0.2, 0.1],
+                    bank_similarity: [0.82, 0.13, 0.79, 0.11, 0.76, 0.81]
+                },
+                value_anomalies: {
+                    anomalies: [
+                        { index: 1, value: 8.7, type: 'high' },
+                        { index: 3, value: 8.9, type: 'high' }
+                    ]
+                }
+            },
+            score_preview: [0.09, 0.84, 0.18, 0.87, 0.22, 0.13]
+        });
+
+        const panel = new AnomalyDetectionPanel(host, api as any);
+        (host.querySelector('#dl-anomaly-model') as HTMLSelectElement).value = 'contrastive';
+        (host.querySelector('#dl-anomaly-predict') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(api.predictAnomaly).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model_name: 'contrastive'
+            })
+        );
+        expect(host.querySelectorAll('.series-anomaly-point').length).toBeGreaterThan(0);
+        expect(host.querySelector('#dl-anomaly-timeseries-summary')?.textContent).toContain('异常点');
+
+        panel.destroy();
+    });
+
     it('应支持严重级别筛选和异常分数数据源切换', async () => {
         const api = createApiMock();
         api.predictAnomaly.mockResolvedValue({
