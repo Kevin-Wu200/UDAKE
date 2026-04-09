@@ -1,5 +1,28 @@
 import type { IAPIService } from '../../types/api';
 
+type SeverityLevel = 'high' | 'medium' | 'low';
+type SeverityFilter = SeverityLevel | 'all';
+
+interface TimeSeriesPoint {
+    index: number;
+    value: number;
+}
+
+interface AnomalyPoint {
+    index: number;
+    value: number;
+    severity: SeverityLevel;
+    zScore: number;
+}
+
+interface SlidingWindowSummary {
+    start: number;
+    end: number;
+    mean: number;
+    anomalyCount: number;
+    anomalyRate: number;
+}
+
 /**
  * 异常检测子面板
  */
@@ -7,6 +30,9 @@ export class AnomalyDetectionPanel {
     private container: HTMLElement;
     private apiService: IAPIService;
     private lastResult: unknown = null;
+    private seriesCache: TimeSeriesPoint[] = [];
+    private anomalyCache: AnomalyPoint[] = [];
+    private selectedSeverityFilter: SeverityFilter = 'all';
 
     constructor(container: HTMLElement, apiService: IAPIService) {
         this.container = container;
@@ -74,6 +100,53 @@ export class AnomalyDetectionPanel {
 
                 <div id="dl-anomaly-status" class="status-message"></div>
                 <pre id="dl-anomaly-result" class="dl-result">暂无结果</pre>
+
+                <section class="dl-timeseries-card">
+                    <div class="dl-timeseries-header">
+                        <h5>时间序列异常标记</h5>
+                        <p>支持异常点标记、异常区域高亮、滑动窗口分析、趋势线与异常预测展示</p>
+                    </div>
+                    <div class="dl-timeseries-controls">
+                        <label class="dl-field">
+                            <span>分析数据源</span>
+                            <select id="dl-anomaly-series-source" class="select">
+                                <option value="values">原始值</option>
+                                <option value="scores">异常分数</option>
+                            </select>
+                        </label>
+                        <label class="dl-field">
+                            <span>滑动窗口</span>
+                            <input id="dl-anomaly-window-size" class="input" type="number" min="2" max="32" value="4">
+                        </label>
+                        <label class="dl-field">
+                            <span>趋势线模式</span>
+                            <select id="dl-anomaly-trend-mode" class="select">
+                                <option value="linear">线性回归</option>
+                                <option value="moving_avg">移动平均</option>
+                            </select>
+                        </label>
+                        <label class="dl-field">
+                            <span>预测步长</span>
+                            <input id="dl-anomaly-forecast-horizon" class="input" type="number" min="1" max="24" value="6">
+                        </label>
+                        <label class="dl-field">
+                            <span>严重级别筛选</span>
+                            <select id="dl-anomaly-severity-filter" class="select">
+                                <option value="all">全部</option>
+                                <option value="high">高风险</option>
+                                <option value="medium">中风险</option>
+                                <option value="low">低风险</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="dl-actions">
+                        <button id="dl-anomaly-refresh-timeseries" class="btn btn-secondary">刷新时间序列可视化</button>
+                    </div>
+                    <div id="dl-anomaly-timeseries-summary" class="dl-timeseries-summary">请先执行检测后查看时间序列异常标记。</div>
+                    <div id="dl-anomaly-timeseries-legend" class="dl-timeseries-legend" aria-label="时间序列图例"></div>
+                    <div id="dl-anomaly-timeseries" class="dl-timeseries-chart" aria-label="时间序列异常可视化"></div>
+                    <div id="dl-anomaly-window-analysis" class="dl-window-analysis"></div>
+                </section>
             </div>
         `;
     }
@@ -89,6 +162,21 @@ export class AnomalyDetectionPanel {
 
         this.container.querySelector('#dl-anomaly-export')?.addEventListener('click', () => {
             this.exportResult();
+        });
+
+        this.container.querySelector('#dl-anomaly-refresh-timeseries')?.addEventListener('click', () => {
+            this.renderTimeSeriesVisualization();
+        });
+
+        this.container.querySelector('#dl-anomaly-severity-filter')?.addEventListener('change', (event: Event) => {
+            const target = event.target as HTMLSelectElement | null;
+            const value = target?.value || 'all';
+            if (value === 'high' || value === 'medium' || value === 'low') {
+                this.selectedSeverityFilter = value;
+            } else {
+                this.selectedSeverityFilter = 'all';
+            }
+            this.renderTimeSeriesVisualization();
         });
     }
 
@@ -155,6 +243,7 @@ export class AnomalyDetectionPanel {
             this.lastResult = response;
             this.setResult(response);
             this.setStatus('异常检测模型训练完成', 'success');
+            this.renderTimeSeriesVisualization();
         } catch (error) {
             this.setStatus(`训练失败：${error instanceof Error ? error.message : String(error)}`, 'error');
         }
@@ -182,9 +271,407 @@ export class AnomalyDetectionPanel {
             this.lastResult = response;
             this.setResult(response);
             this.setStatus('异常检测完成', 'success');
+            this.renderTimeSeriesVisualization();
         } catch (error) {
             this.setStatus(`检测失败：${error instanceof Error ? error.message : String(error)}`, 'error');
         }
+    }
+
+    private renderTimeSeriesVisualization(): void {
+        const host = this.container.querySelector('#dl-anomaly-timeseries') as HTMLElement | null;
+        const legend = this.container.querySelector('#dl-anomaly-timeseries-legend') as HTMLElement | null;
+        const summary = this.container.querySelector('#dl-anomaly-timeseries-summary') as HTMLElement | null;
+        const windowHost = this.container.querySelector('#dl-anomaly-window-analysis') as HTMLElement | null;
+        if (!host || !legend || !summary || !windowHost) {
+            return;
+        }
+
+        const dataSource = (this.container.querySelector('#dl-anomaly-series-source') as HTMLSelectElement | null)?.value || 'values';
+        const windowSize = this.getNumberInputValue('dl-anomaly-window-size', 4, 2, 32);
+        const trendMode = (this.container.querySelector('#dl-anomaly-trend-mode') as HTMLSelectElement | null)?.value || 'linear';
+        const horizon = this.getNumberInputValue('dl-anomaly-forecast-horizon', 6, 1, 24);
+
+        const series = this.extractSeriesData(dataSource);
+        this.seriesCache = series;
+        if (series.length < 2) {
+            host.innerHTML = '<div class="status-message">暂无可用于时间序列可视化的数据</div>';
+            legend.innerHTML = '';
+            summary.textContent = '请先执行检测，或检查输入 values 是否为有效数值数组。';
+            windowHost.innerHTML = '';
+            return;
+        }
+
+        const anomalies = this.extractAnomalyPoints(series);
+        this.anomalyCache = anomalies;
+        const filteredAnomalies = this.filterAnomaliesBySeverity(anomalies, this.selectedSeverityFilter);
+        const anomalySet = new Set<number>(filteredAnomalies.map((item) => item.index));
+        const regions = this.buildAnomalyRegions(filteredAnomalies);
+        const trendLine = trendMode === 'moving_avg' ? this.computeMovingAverage(series, windowSize) : this.computeLinearTrend(series);
+        const forecast = this.computeForecast(series, horizon);
+        const windows = this.computeSlidingWindows(series, anomalySet, windowSize);
+
+        host.innerHTML = this.renderSeriesSvg(series, trendLine, forecast, filteredAnomalies, regions);
+        legend.innerHTML = this.renderLegend(filteredAnomalies, trendMode, dataSource);
+        summary.textContent = this.buildSummaryText(series, filteredAnomalies, windowSize, horizon, dataSource, trendMode);
+        windowHost.innerHTML = this.renderWindowAnalysis(windows, windowSize);
+    }
+
+    private getNumberInputValue(inputId: string, fallback: number, min: number, max: number): number {
+        const raw = Number((this.container.querySelector(`#${inputId}`) as HTMLInputElement | null)?.value || fallback);
+        if (!Number.isFinite(raw)) {
+            return fallback;
+        }
+        return Math.min(max, Math.max(min, Math.round(raw)));
+    }
+
+    private extractSeriesData(source: string): TimeSeriesPoint[] {
+        let values: number[] = [];
+        if (source === 'scores') {
+            const result = this.lastResult as Record<string, unknown> | null;
+            const maybeScores = result ? result.anomaly_scores : null;
+            if (Array.isArray(maybeScores)) {
+                values = maybeScores
+                    .map((item) => Number(item))
+                    .filter((item) => Number.isFinite(item));
+            }
+        }
+
+        if (values.length === 0) {
+            try {
+                const inputValues = this.parseJson<unknown[]>('dl-anomaly-values', 'values');
+                values = inputValues
+                    .map((item) => Number(item))
+                    .filter((item) => Number.isFinite(item));
+            } catch {
+                values = [];
+            }
+        }
+
+        return values.map((value, index) => ({ index, value }));
+    }
+
+    private extractAnomalyPoints(series: TimeSeriesPoint[]): AnomalyPoint[] {
+        const result = this.lastResult as Record<string, unknown> | null;
+        const stdInfo = this.computeStats(series.map((item) => item.value));
+        const indexSet = new Set<number>();
+
+        if (result) {
+            if (Array.isArray(result.anomaly_indices)) {
+                result.anomaly_indices.forEach((value) => {
+                    const index = Number(value);
+                    if (Number.isInteger(index) && index >= 0 && index < series.length) {
+                        indexSet.add(index);
+                    }
+                });
+            }
+
+            const valueAnomalies = (result.value_anomalies || {}) as Record<string, unknown>;
+            const anomalyList = valueAnomalies.anomalies;
+            if (Array.isArray(anomalyList)) {
+                anomalyList.forEach((item) => {
+                    if (!item || typeof item !== 'object') {
+                        return;
+                    }
+                    const index = Number((item as Record<string, unknown>).index);
+                    if (Number.isInteger(index) && index >= 0 && index < series.length) {
+                        indexSet.add(index);
+                    }
+                });
+            }
+        }
+
+        if (indexSet.size === 0) {
+            const threshold = stdInfo.mean + stdInfo.std * 1.8;
+            series.forEach((point) => {
+                if (Math.abs(point.value - stdInfo.mean) >= Math.abs(threshold - stdInfo.mean)) {
+                    indexSet.add(point.index);
+                }
+            });
+        }
+
+        return Array.from(indexSet)
+            .sort((a, b) => a - b)
+            .map((index) => {
+                const point = series[index];
+                const zScore = stdInfo.std > 0 ? (point.value - stdInfo.mean) / stdInfo.std : 0;
+                return {
+                    index,
+                    value: point.value,
+                    zScore,
+                    severity: this.classifySeverity(Math.abs(zScore))
+                };
+            });
+    }
+
+    private classifySeverity(absZScore: number): SeverityLevel {
+        if (absZScore >= 2.5) {
+            return 'high';
+        }
+        if (absZScore >= 1.5) {
+            return 'medium';
+        }
+        return 'low';
+    }
+
+    private filterAnomaliesBySeverity(anomalies: AnomalyPoint[], filter: SeverityFilter): AnomalyPoint[] {
+        if (filter === 'all') {
+            return anomalies;
+        }
+        return anomalies.filter((item) => item.severity === filter);
+    }
+
+    private buildAnomalyRegions(anomalies: AnomalyPoint[]): Array<{ start: number; end: number }> {
+        if (anomalies.length === 0) {
+            return [];
+        }
+        const sorted = anomalies.map((item) => item.index).sort((a, b) => a - b);
+        const regions: Array<{ start: number; end: number }> = [];
+        let start = sorted[0];
+        let prev = sorted[0];
+
+        for (let i = 1; i < sorted.length; i++) {
+            const current = sorted[i];
+            if (current - prev <= 1) {
+                prev = current;
+                continue;
+            }
+            regions.push({ start, end: prev });
+            start = current;
+            prev = current;
+        }
+        regions.push({ start, end: prev });
+        return regions;
+    }
+
+    private computeMovingAverage(series: TimeSeriesPoint[], windowSize: number): Array<number | null> {
+        const trend: Array<number | null> = [];
+        for (let i = 0; i < series.length; i++) {
+            const start = Math.max(0, i - windowSize + 1);
+            const segment = series.slice(start, i + 1).map((item) => item.value);
+            trend.push(segment.reduce((sum, value) => sum + value, 0) / segment.length);
+        }
+        return trend;
+    }
+
+    private computeLinearTrend(series: TimeSeriesPoint[]): Array<number | null> {
+        const n = series.length;
+        const sumX = series.reduce((sum, item) => sum + item.index, 0);
+        const sumY = series.reduce((sum, item) => sum + item.value, 0);
+        const sumXY = series.reduce((sum, item) => sum + item.index * item.value, 0);
+        const sumXX = series.reduce((sum, item) => sum + item.index * item.index, 0);
+        const denominator = n * sumXX - sumX * sumX;
+        const slope = denominator === 0 ? 0 : (n * sumXY - sumX * sumY) / denominator;
+        const intercept = (sumY - slope * sumX) / Math.max(1, n);
+        return series.map((item) => intercept + slope * item.index);
+    }
+
+    private computeForecast(series: TimeSeriesPoint[], horizon: number): TimeSeriesPoint[] {
+        const trend = this.computeLinearTrend(series);
+        const tailValues = trend.filter((item): item is number => typeof item === 'number');
+        if (tailValues.length < 2) {
+            return [];
+        }
+        const last = tailValues[tailValues.length - 1];
+        const prev = tailValues[tailValues.length - 2];
+        const step = last - prev;
+        const startIndex = series.length;
+        const points: TimeSeriesPoint[] = [];
+        for (let i = 0; i < horizon; i++) {
+            points.push({
+                index: startIndex + i,
+                value: last + step * (i + 1)
+            });
+        }
+        return points;
+    }
+
+    private computeSlidingWindows(series: TimeSeriesPoint[], anomalySet: Set<number>, windowSize: number): SlidingWindowSummary[] {
+        const summaries: SlidingWindowSummary[] = [];
+        if (series.length === 0) {
+            return summaries;
+        }
+        for (let start = 0; start < series.length; start += 1) {
+            const end = Math.min(series.length - 1, start + windowSize - 1);
+            if (end - start + 1 < windowSize && start > 0) {
+                break;
+            }
+            const segment = series.slice(start, end + 1);
+            const anomalyCount = segment.reduce((count, item) => count + (anomalySet.has(item.index) ? 1 : 0), 0);
+            summaries.push({
+                start,
+                end,
+                mean: segment.reduce((sum, item) => sum + item.value, 0) / Math.max(1, segment.length),
+                anomalyCount,
+                anomalyRate: anomalyCount / Math.max(1, segment.length)
+            });
+        }
+        return summaries.slice(0, 8);
+    }
+
+    private renderSeriesSvg(
+        series: TimeSeriesPoint[],
+        trend: Array<number | null>,
+        forecast: TimeSeriesPoint[],
+        anomalies: AnomalyPoint[],
+        regions: Array<{ start: number; end: number }>
+    ): string {
+        const width = 920;
+        const height = 260;
+        const padding = { top: 12, right: 20, bottom: 26, left: 36 };
+        const allSeriesValues = series.map((item) => item.value);
+        const allForecastValues = forecast.map((item) => item.value);
+        const allValues = [...allSeriesValues, ...allForecastValues];
+        const minValue = Math.min(...allValues);
+        const maxValue = Math.max(...allValues);
+        const valueRange = maxValue - minValue || 1;
+        const maxIndex = Math.max(series.length - 1, forecast.length > 0 ? forecast[forecast.length - 1].index : series.length - 1, 1);
+        const plotWidth = width - padding.left - padding.right;
+        const plotHeight = height - padding.top - padding.bottom;
+        const scaleX = (index: number): number => padding.left + (index / maxIndex) * plotWidth;
+        const scaleY = (value: number): number => padding.top + (1 - (value - minValue) / valueRange) * plotHeight;
+
+        const linePath = this.buildSvgPath(series, scaleX, scaleY);
+        const trendPath = this.buildSvgPathFromValues(trend, scaleX, scaleY);
+        const forecastPath = this.buildSvgPath(forecast, scaleX, scaleY);
+        const regionRects = regions
+            .map((region) => {
+                const x1 = scaleX(region.start);
+                const x2 = scaleX(region.end + 0.85);
+                return `<rect x="${x1.toFixed(2)}" y="${padding.top}" width="${Math.max(4, x2 - x1).toFixed(2)}" height="${plotHeight}" class="series-anomaly-region"></rect>`;
+            })
+            .join('');
+
+        const anomalyMarks = anomalies
+            .map((item) => {
+                const cx = scaleX(item.index).toFixed(2);
+                const cy = scaleY(item.value).toFixed(2);
+                return `<circle cx="${cx}" cy="${cy}" r="4.4" class="series-anomaly-point ${this.getSeverityClass(item.severity)}"><title>t${item.index}: ${item.value.toFixed(4)} (${item.severity})</title></circle>`;
+            })
+            .join('');
+
+        const forecastMarks = forecast
+            .map((item) => `<circle cx="${scaleX(item.index).toFixed(2)}" cy="${scaleY(item.value).toFixed(2)}" r="3.2" class="series-forecast-point"></circle>`)
+            .join('');
+
+        return `
+            <svg class="series-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="时间序列异常图">
+                ${regionRects}
+                <line x1="${padding.left}" y1="${height - padding.bottom}" x2="${width - padding.right}" y2="${height - padding.bottom}" class="series-axis"></line>
+                <line x1="${padding.left}" y1="${padding.top}" x2="${padding.left}" y2="${height - padding.bottom}" class="series-axis"></line>
+                <path d="${linePath}" class="series-line"></path>
+                <path d="${trendPath}" class="series-trend-line"></path>
+                <path d="${forecastPath}" class="series-forecast-line"></path>
+                ${forecastMarks}
+                ${anomalyMarks}
+                <text x="${padding.left}" y="${padding.top - 2}" class="series-label">max ${maxValue.toFixed(3)}</text>
+                <text x="${padding.left}" y="${height - 6}" class="series-label">min ${minValue.toFixed(3)}</text>
+            </svg>
+        `;
+    }
+
+    private buildSvgPath(points: TimeSeriesPoint[], scaleX: (index: number) => number, scaleY: (value: number) => number): string {
+        if (points.length === 0) {
+            return '';
+        }
+        return points
+            .map((point, index) => `${index === 0 ? 'M' : 'L'}${scaleX(point.index).toFixed(2)},${scaleY(point.value).toFixed(2)}`)
+            .join(' ');
+    }
+
+    private buildSvgPathFromValues(values: Array<number | null>, scaleX: (index: number) => number, scaleY: (value: number) => number): string {
+        let path = '';
+        let open = false;
+        values.forEach((value, index) => {
+            if (typeof value !== 'number') {
+                open = false;
+                return;
+            }
+            const cmd = open ? 'L' : 'M';
+            path += `${cmd}${scaleX(index).toFixed(2)},${scaleY(value).toFixed(2)} `;
+            open = true;
+        });
+        return path.trim();
+    }
+
+    private renderLegend(anomalies: AnomalyPoint[], trendMode: string, source: string): string {
+        const high = anomalies.filter((item) => item.severity === 'high').length;
+        const medium = anomalies.filter((item) => item.severity === 'medium').length;
+        const low = anomalies.filter((item) => item.severity === 'low').length;
+        const sourceLabel = source === 'scores' ? '异常分数序列' : '原始值序列';
+        const trendLabel = trendMode === 'moving_avg' ? '移动平均趋势线' : '线性回归趋势线';
+
+        return `
+            <span class="legend-item"><i class="legend-swatch series-base"></i>${sourceLabel}</span>
+            <span class="legend-item"><i class="legend-swatch series-trend"></i>${trendLabel}</span>
+            <span class="legend-item"><i class="legend-swatch series-forecast"></i>异常预测</span>
+            <span class="legend-item"><i class="legend-swatch severity-high"></i>高风险 ${high}</span>
+            <span class="legend-item"><i class="legend-swatch severity-medium"></i>中风险 ${medium}</span>
+            <span class="legend-item"><i class="legend-swatch severity-low"></i>低风险 ${low}</span>
+        `;
+    }
+
+    private buildSummaryText(
+        series: TimeSeriesPoint[],
+        anomalies: AnomalyPoint[],
+        windowSize: number,
+        horizon: number,
+        source: string,
+        trendMode: string
+    ): string {
+        const ratio = (anomalies.length / Math.max(1, series.length)) * 100;
+        const trendLabel = trendMode === 'moving_avg' ? '移动平均趋势' : '线性回归趋势';
+        const sourceLabel = source === 'scores' ? '异常分数序列' : '原始值序列';
+        return `共 ${series.length} 个时序点，筛选后异常点 ${anomalies.length} 个（${ratio.toFixed(2)}%）。当前模式：${sourceLabel} + ${trendLabel}，滑动窗口 ${windowSize}，预测未来 ${horizon} 步。`;
+    }
+
+    private renderWindowAnalysis(windows: SlidingWindowSummary[], windowSize: number): string {
+        if (windows.length === 0) {
+            return '<div class="status-message">暂无滑动窗口统计</div>';
+        }
+        const rows = windows
+            .map((item) => {
+                const tone = item.anomalyRate >= 0.5 ? 'high' : item.anomalyRate >= 0.25 ? 'medium' : 'low';
+                return `
+                    <tr>
+                        <td>[${item.start}-${item.end}]</td>
+                        <td>${item.mean.toFixed(4)}</td>
+                        <td>${item.anomalyCount}</td>
+                        <td><span class="window-rate ${tone}">${(item.anomalyRate * 100).toFixed(1)}%</span></td>
+                    </tr>
+                `;
+            })
+            .join('');
+
+        return `
+            <div class="dl-window-analysis-title">滑动窗口分析（窗口长度 ${windowSize}）</div>
+            <table class="dl-window-analysis-table">
+                <thead>
+                    <tr>
+                        <th>窗口</th>
+                        <th>均值</th>
+                        <th>异常数</th>
+                        <th>异常占比</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+    }
+
+    private computeStats(values: number[]): { mean: number; std: number } {
+        const mean = values.reduce((sum, value) => sum + value, 0) / Math.max(1, values.length);
+        const variance = values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) / Math.max(1, values.length);
+        return { mean, std: Math.sqrt(variance) };
+    }
+
+    private getSeverityClass(level: SeverityLevel): string {
+        if (level === 'high') {
+            return 'severity-high';
+        }
+        if (level === 'medium') {
+            return 'severity-medium';
+        }
+        return 'severity-low';
     }
 
     private exportResult(): void {
