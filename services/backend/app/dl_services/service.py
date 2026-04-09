@@ -183,6 +183,24 @@ class DeepLearningService:
             raise ValueError("series length is too short")
         return c, s, horizon
 
+    def _is_usable_anomaly_model(self, model: Any) -> bool:
+        return model is not None and callable(getattr(model, "predict", None))
+
+    def _get_or_train_anomaly_model(
+        self,
+        model_name: str,
+        coords: list[list[float]],
+        values: list[float],
+        epochs: int = 15,
+    ) -> Any:
+        model = self.anomaly_models.get(model_name)
+        if not self._is_usable_anomaly_model(model):
+            self.train_anomaly_model(model_name, coords, values, epochs=epochs)
+            model = self.anomaly_models.get(model_name)
+        if not self._is_usable_anomaly_model(model):
+            raise RuntimeError(f"anomaly model unavailable: {model_name}")
+        return model
+
     def _get_sampling_rl_integrator(self, model_name: str) -> SamplingRLIntegrator:
         if model_name not in {"ppo", "dqn", "a2c", "a3c"}:
             raise ValueError("model_name must be one of ppo/dqn/a2c/a3c")
@@ -297,17 +315,26 @@ class DeepLearningService:
             self.metric_monitor.log("fusion_anomaly_count", float(result["anomaly_count"]))
             return result
 
-        if model_name not in self.anomaly_models:
+        model = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
+        try:
+            pred = model.predict(
+                c,
+                v,
+                threshold_method=threshold_method,  # type: ignore[arg-type]
+                percentile=percentile,
+                k=k,
+            )
+        except Exception:
+            # 模型状态异常时自动回退重训练一次，避免缓存污染导致接口不可用。
             self.train_anomaly_model(model_name, coords, values, epochs=15)
-        model = self.anomaly_models[model_name]
-
-        pred = model.predict(
-            c,
-            v,
-            threshold_method=threshold_method,  # type: ignore[arg-type]
-            percentile=percentile,
-            k=k,
-        )
+            model = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
+            pred = model.predict(
+                c,
+                v,
+                threshold_method=threshold_method,  # type: ignore[arg-type]
+                percentile=percentile,
+                k=k,
+            )
         normalized_pred = dict(pred)
         if "anomaly_scores" not in normalized_pred:
             if "scores" in normalized_pred:
@@ -367,9 +394,7 @@ class DeepLearningService:
             raise ValueError("method must be one of lime/shap/hybrid")
 
         c, v = self._validate_coords_values(coords, values)
-        if model_name not in self.anomaly_models:
-            self.train_anomaly_model(model_name, coords, values, epochs=15)
-        model = self.anomaly_models[model_name]
+        model = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
         feature_analysis = self.anomaly_feature_registry.analyze(model_name)
 
         lime_adapter: Any | None = None
@@ -456,7 +481,12 @@ class DeepLearningService:
         if shap_result is not None:
             result["shap"] = shap_result
         if include_prediction:
-            pred = model.predict(c, v, threshold_method="percentile", percentile=95.0, k=2.5)
+            try:
+                pred = model.predict(c, v, threshold_method="percentile", percentile=95.0, k=2.5)
+            except Exception:
+                self.train_anomaly_model(model_name, coords, values, epochs=15)
+                model = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
+                pred = model.predict(c, v, threshold_method="percentile", percentile=95.0, k=2.5)
             result["prediction"] = pred
         return result
 
