@@ -130,6 +130,44 @@ describe('AnomalyDetectionPanel 时间序列异常标记', () => {
         panel.destroy();
     });
 
+    it('应兼容 GAN prediction 包裹结构并渲染异常结果', async () => {
+        const api = createApiMock();
+        api.predictAnomaly.mockResolvedValue({
+            model_name: 'gan',
+            prediction: {
+                anomaly_indices: [2, 4],
+                anomaly_scores: [0.08, 0.16, 0.89, 0.18, 0.86, 0.14],
+                score_components: {
+                    discriminator: [0.12, 0.22, 0.92, 0.24, 0.88, 0.19],
+                    reconstruction: [0.07, 0.13, 0.83, 0.11, 0.81, 0.09],
+                    gradient: [0.05, 0.09, 0.74, 0.08, 0.69, 0.07]
+                },
+                value_anomalies: {
+                    anomalies: [
+                        { index: 2, value: 9.0, type: 'high' },
+                        { index: 4, value: 8.6, type: 'high' }
+                    ]
+                }
+            },
+            score_preview: [0.08, 0.16, 0.89, 0.18, 0.86, 0.14]
+        });
+
+        const panel = new AnomalyDetectionPanel(host, api as any);
+        (host.querySelector('#dl-anomaly-model') as HTMLSelectElement).value = 'gan';
+        (host.querySelector('#dl-anomaly-predict') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(api.predictAnomaly).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model_name: 'gan'
+            })
+        );
+        expect(host.querySelectorAll('.series-anomaly-point').length).toBeGreaterThan(0);
+        expect(host.querySelector('#dl-anomaly-timeseries-summary')?.textContent).toContain('异常点');
+
+        panel.destroy();
+    });
+
     it('应支持严重级别筛选和异常分数数据源切换', async () => {
         const api = createApiMock();
         api.predictAnomaly.mockResolvedValue({
