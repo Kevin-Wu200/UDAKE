@@ -30,6 +30,13 @@ class LIMEConfig:
     random_state: int = 42
     max_workers: int = 4
     cache_size: int = 32
+    min_samples: int = 80
+    max_samples: int = 1200
+    neighborhood_size: int = 64
+    convergence_delta: float = 0.03
+    convergence_patience: int = 2
+    convergence_rounds: int = 3
+    sampling_step: int = 40
 
 
 class BaseLIMEExplainer:
@@ -88,9 +95,78 @@ class SpatiotemporalLIMEExplainer(BaseLIMEExplainer):
         return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
     def _dynamic_num_samples(self, n_features: int, n_nodes: int) -> int:
-        base = max(80, int(self.config.num_samples))
-        adaptive = min(1200, base + n_features * 12 + n_nodes * 3)
+        base = max(int(self.config.min_samples), int(self.config.num_samples))
+        adaptive = min(int(self.config.max_samples), base + n_features * 12 + n_nodes * 3)
         return adaptive
+
+    def _feature_sampling_weights(self, context: dict[str, Any], node_index: int) -> np.ndarray:
+        instance = np.asarray(context["scaled_x"][node_index], dtype=float)
+        model: Ridge = context["surrogate"]
+        coef = np.asarray(model.coef_, dtype=float)
+        coef_importance = np.abs(coef * (instance + 1e-8))
+        coef_importance = coef_importance / (np.sum(coef_importance) + 1e-8)
+        feature_std = np.std(np.asarray(context["scaled_x"], dtype=float), axis=0)
+        std_inv = 1.0 / (feature_std + 1e-6)
+        std_inv = std_inv / (np.sum(std_inv) + 1e-8)
+        weights = 0.65 * coef_importance + 0.35 * std_inv
+        weights = weights / (np.sum(weights) + 1e-8)
+        return np.maximum(weights, 1e-6)
+
+    def _build_node_neighborhood(self, context: dict[str, Any], node_index: int, node_score: float) -> np.ndarray:
+        x = np.asarray(context["scaled_x"], dtype=float)
+        n = int(x.shape[0])
+        if n <= 1:
+            return x.copy()
+        base_size = int(self.config.neighborhood_size)
+        adaptive_size = int(base_size * (1.0 + max(0.0, node_score) * 0.4))
+        k = max(16, min(n, adaptive_size))
+        instance = x[node_index]
+        weights = self._feature_sampling_weights(context, node_index)
+        diff = x - instance
+        distances = np.sqrt(np.sum((diff**2) * weights.reshape(1, -1), axis=1))
+        order = np.argsort(distances)
+        selected = np.unique(np.concatenate(([node_index], order[:k]))).astype(int)
+        return x[selected]
+
+    def _adaptive_node_samples(
+        self,
+        *,
+        base_samples: int,
+        node_scores: np.ndarray,
+        node_indices: list[int],
+        context: dict[str, Any],
+    ) -> dict[int, int]:
+        x = np.asarray(context["scaled_x"], dtype=float)
+        target = np.asarray(context["target"], dtype=float)
+        target_std = float(np.std(target)) + 1e-6
+        max_score = float(np.max(node_scores)) if len(node_scores) else 0.0
+        sample_plan: dict[int, int] = {}
+        for idx in node_indices:
+            raw_score = float(node_scores[idx]) if 0 <= idx < len(node_scores) else 0.0
+            normalized_score = raw_score / (max_score + 1e-6)
+            local_dispersion = float(np.std(x[idx]))
+            complexity = normalized_score * 0.55 + min(1.0, local_dispersion / (target_std + 1e-6)) * 0.45
+            factor = 0.8 + complexity * 0.7
+            planned = int(round(base_samples * factor))
+            sample_plan[idx] = int(max(self.config.min_samples, min(self.config.max_samples, planned)))
+        return sample_plan
+
+    def _weight_delta(
+        self,
+        prev_pairs: list[tuple[int, float]],
+        curr_pairs: list[tuple[int, float]],
+        num_features: int,
+    ) -> float:
+        prev_vec = np.zeros((num_features,), dtype=float)
+        curr_vec = np.zeros((num_features,), dtype=float)
+        for idx, w in prev_pairs:
+            if 0 <= idx < num_features:
+                prev_vec[idx] = float(w)
+        for idx, w in curr_pairs:
+            if 0 <= idx < num_features:
+                curr_vec[idx] = float(w)
+        denom = max(np.linalg.norm(prev_vec), np.linalg.norm(curr_vec), 1e-6)
+        return float(np.linalg.norm(curr_vec - prev_vec) / denom)
 
     def _build_feature_names(self, seq_len: int, n_raw_features: int) -> list[str]:
         names = ["spatial_lon", "spatial_lat", "spatial_dist_center", "spatial_neighbor_density"]
@@ -291,31 +367,59 @@ class SpatiotemporalLIMEExplainer(BaseLIMEExplainer):
         local_pairs: list[tuple[int, float]]
         fidelity = 0.5
         local_pred = float(predict_fn(instance.reshape(1, -1))[0])
+        convergence = {"converged": True, "rounds": 1, "delta": 0.0}
+        node_score = _safe_float(context.get("node_scores", np.zeros((1,), dtype=float))[node_index], default=0.0)
+        neighborhood = self._build_node_neighborhood(context, node_index=node_index, node_score=node_score)
 
         if lime_tabular is not None:
             explainer = lime_tabular.LimeTabularExplainer(
-                training_data=np.asarray(context["scaled_x"], dtype=float),
+                training_data=neighborhood,
                 feature_names=feature_names,
                 mode="regression",
                 discretize_continuous=False,
                 random_state=self.config.random_state,
             )
-            exp = explainer.explain_instance(
-                data_row=instance,
-                predict_fn=predict_fn,
-                num_features=max(1, min(int(top_k), len(feature_names))),
-                num_samples=max(80, int(num_samples)),
-            )
-            local_exp_map = exp.local_exp.get(1) or exp.local_exp.get(0) or []
-            local_pairs = [(int(idx), float(weight)) for idx, weight in local_exp_map]
-            fidelity = _safe_float(getattr(exp, "score", 0.5), default=0.5)
-            local_pred_values = getattr(exp, "local_pred", None)
-            if isinstance(local_pred_values, (list, tuple, np.ndarray)) and len(local_pred_values) > 0:
-                local_pred = _safe_float(local_pred_values[0], default=local_pred)
+            local_pairs = []
+            prev_pairs: list[tuple[int, float]] = []
+            stable_rounds = 0
+            final_delta = 1.0
+            rounds = max(1, int(self.config.convergence_rounds))
+            for round_idx in range(rounds):
+                round_samples = int(
+                    min(
+                        self.config.max_samples,
+                        max(self.config.min_samples, int(num_samples) + round_idx * int(self.config.sampling_step)),
+                    )
+                )
+                exp = explainer.explain_instance(
+                    data_row=instance,
+                    predict_fn=predict_fn,
+                    num_features=max(1, min(int(top_k), len(feature_names))),
+                    num_samples=round_samples,
+                )
+                local_exp_map = exp.local_exp.get(1) or exp.local_exp.get(0) or []
+                local_pairs = [(int(idx), float(weight)) for idx, weight in local_exp_map]
+                fidelity = _safe_float(getattr(exp, "score", 0.5), default=0.5)
+                local_pred_values = getattr(exp, "local_pred", None)
+                if isinstance(local_pred_values, (list, tuple, np.ndarray)) and len(local_pred_values) > 0:
+                    local_pred = _safe_float(local_pred_values[0], default=local_pred)
+                if prev_pairs:
+                    final_delta = self._weight_delta(prev_pairs, local_pairs, num_features=len(feature_names))
+                    if final_delta <= float(self.config.convergence_delta):
+                        stable_rounds += 1
+                    else:
+                        stable_rounds = 0
+                prev_pairs = local_pairs
+                if stable_rounds >= max(1, int(self.config.convergence_patience)):
+                    convergence = {"converged": True, "rounds": round_idx + 1, "delta": float(final_delta)}
+                    break
+            else:
+                convergence = {"converged": False, "rounds": rounds, "delta": float(final_delta)}
         else:
             local_pairs, fidelity, local_pred = self._fallback_local_weights(context, instance)
+            convergence = {"converged": True, "rounds": 1, "delta": 0.0}
 
-        return self._format_single(
+        out = self._format_single(
             node_index=node_index,
             context=context,
             local_pairs=local_pairs,
@@ -323,6 +427,12 @@ class SpatiotemporalLIMEExplainer(BaseLIMEExplainer):
             local_pred=local_pred,
             top_k=top_k,
         )
+        out["sampling"] = {
+            "num_samples": int(max(self.config.min_samples, min(self.config.max_samples, int(num_samples)))),
+            "neighborhood_size": int(neighborhood.shape[0]),
+            "convergence": convergence,
+        }
+        return out
 
     def _aggregate_feature_importance(
         self,
@@ -390,6 +500,8 @@ class SpatiotemporalLIMEExplainer(BaseLIMEExplainer):
                 "pred_hash": hashlib.md5(np.asarray(pred_mean).tobytes()).hexdigest(),
                 "top_k": int(top_k),
                 "nodes": node_indices,
+                "num_samples": int(num_samples) if num_samples is not None else None,
+                "max_explain_nodes": int(max_explain_nodes),
             }
         )
         cached = self._cache_get(cache_key)
@@ -402,6 +514,13 @@ class SpatiotemporalLIMEExplainer(BaseLIMEExplainer):
 
         context = self._build_context(model_type=model_type, coords=coords, series=series, pred_mean=pred_mean)
         samples = int(num_samples or self._dynamic_num_samples(context["scaled_x"].shape[1], n_nodes))
+        context["node_scores"] = np.asarray(node_scores, dtype=float)
+        sample_plan = self._adaptive_node_samples(
+            base_samples=samples,
+            node_scores=np.asarray(node_scores, dtype=float),
+            node_indices=node_indices,
+            context=context,
+        )
 
         max_workers = max(1, min(self.config.max_workers, explain_count))
         with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="lime-explain") as pool:
@@ -411,7 +530,7 @@ class SpatiotemporalLIMEExplainer(BaseLIMEExplainer):
                     node_index=node_idx,
                     context=context,
                     top_k=top_k,
-                    num_samples=samples,
+                    num_samples=sample_plan[node_idx],
                 )
                 for node_idx in node_indices
             ]
@@ -424,15 +543,23 @@ class SpatiotemporalLIMEExplainer(BaseLIMEExplainer):
             for idx, item in enumerate(top_global)
         ]
         avg_confidence = float(np.mean([_safe_float(item.get("confidence", 0.0)) for item in batch_explanations]))
+        used_samples = [int(item.get("sampling", {}).get("num_samples", samples)) for item in batch_explanations]
+        convergence_flags = [bool(item.get("sampling", {}).get("convergence", {}).get("converged", False)) for item in batch_explanations]
+        convergence_rounds = [
+            int(item.get("sampling", {}).get("convergence", {}).get("rounds", 1))
+            for item in batch_explanations
+        ]
 
         payload = {
             "summary": {
                 "method": "lime",
                 "top_features": top_features,
                 "explained_nodes": explain_count,
-                "num_samples": samples,
+                "num_samples": int(round(float(np.mean(used_samples)))) if used_samples else samples,
+                "sampling_range": [int(min(used_samples)) if used_samples else samples, int(max(used_samples)) if used_samples else samples],
                 "num_features": context["scaled_x"].shape[1],
                 "average_confidence": avg_confidence,
+                "convergence_rate": float(np.mean(convergence_flags)) if convergence_flags else 0.0,
             },
             "feature_importance": feature_importance,
             "batch_explanations": batch_explanations,
@@ -453,6 +580,11 @@ class SpatiotemporalLIMEExplainer(BaseLIMEExplainer):
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "parallel_workers": max_workers,
                 "cache_hit": False,
+                "sampling_plan": {str(k): int(v) for k, v in sample_plan.items()},
+                "sampling_mean": float(np.mean(used_samples)) if used_samples else float(samples),
+                "sampling_std": float(np.std(used_samples)) if used_samples else 0.0,
+                "convergence_rate": float(np.mean(convergence_flags)) if convergence_flags else 0.0,
+                "convergence_rounds_mean": float(np.mean(convergence_rounds)) if convergence_rounds else 1.0,
             },
         }
         self._cache_set(cache_key, payload)
