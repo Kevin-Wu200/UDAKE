@@ -103,4 +103,94 @@ describe('AnomalyDetectionPanel 时间序列异常标记', () => {
 
         panel.destroy();
     });
+
+    it('应渲染异常检测结果对比组件', () => {
+        const api = createApiMock();
+        const panel = new AnomalyDetectionPanel(host, api as any);
+
+        expect(host.querySelector('#dl-anomaly-run-compare')).toBeTruthy();
+        expect(host.querySelector('#dl-anomaly-compare-table')).toBeTruthy();
+        expect(host.querySelectorAll('.compare-model-checkbox').length).toBe(4);
+        expect(host.querySelector('#dl-anomaly-compare-summary')?.textContent).toContain('请选择至少两个模型');
+
+        panel.destroy();
+    });
+
+    it('运行模型对比后应展示表格、性能指标与一致性分析', async () => {
+        const api = createApiMock();
+        api.predictAnomaly.mockImplementation(async (payload: { model_name: string }) => {
+            const samples: Record<string, any> = {
+                vae: {
+                    anomaly_indices: [2, 3],
+                    anomaly_scores: [0.1, 0.2, 0.8, 0.9, 0.3, 0.2]
+                },
+                gcae: {
+                    anomaly_indices: [3, 4],
+                    anomaly_scores: [0.1, 0.3, 0.4, 0.88, 0.82, 0.2]
+                },
+                gan: {
+                    anomaly_indices: [2, 5],
+                    anomaly_scores: [0.2, 0.1, 0.86, 0.3, 0.2, 0.91]
+                }
+            };
+            return samples[payload.model_name];
+        });
+
+        const panel = new AnomalyDetectionPanel(host, api as any);
+        (host.querySelector('#dl-anomaly-run-compare') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(api.predictAnomaly).toHaveBeenCalledTimes(3);
+        expect(host.querySelector('.dl-compare-table')).toBeTruthy();
+        expect(host.querySelector('.compare-metric-card')).toBeTruthy();
+        expect(host.querySelector('#dl-anomaly-compare-consistency')?.textContent).toContain('平均Jaccard');
+        expect(host.querySelector('#dl-anomaly-compare-summary')?.textContent).toContain('已完成');
+
+        panel.destroy();
+    });
+
+    it('应支持模型选择器与自定义对比配置', async () => {
+        const api = createApiMock();
+        api.predictAnomaly.mockImplementation(async (payload: { model_name: string; threshold_method: string }) => {
+            if (payload.model_name === 'gcae') {
+                return { anomaly_indices: [1, 4], anomaly_scores: [0.1, 0.8, 0.2, 0.3, 0.85, 0.1] };
+            }
+            return { anomaly_indices: [2, 4], anomaly_scores: [0.05, 0.1, 0.9, 0.3, 0.87, 0.2] };
+        });
+
+        const panel = new AnomalyDetectionPanel(host, api as any);
+        const checkboxes = Array.from(host.querySelectorAll('.compare-model-checkbox')) as HTMLInputElement[];
+        checkboxes.forEach((box) => {
+            box.checked = box.value === 'gcae' || box.value === 'contrastive';
+        });
+        (host.querySelector('#dl-anomaly-compare-threshold') as HTMLSelectElement).value = 'statistical';
+        (host.querySelector('#dl-anomaly-compare-k') as HTMLInputElement).value = '3.2';
+        (host.querySelector('#dl-anomaly-compare-consensus-min') as HTMLInputElement).value = '2';
+        (host.querySelector('#dl-anomaly-compare-reference') as HTMLSelectElement).value = 'gcae';
+        (host.querySelector('#dl-anomaly-compare-focus') as HTMLSelectElement).value = 'anomaly_rate';
+
+        (host.querySelector('#dl-anomaly-run-compare') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(api.predictAnomaly).toHaveBeenCalledTimes(2);
+        expect(api.predictAnomaly).toHaveBeenNthCalledWith(
+            1,
+            expect.objectContaining({
+                model_name: 'gcae',
+                threshold_method: 'statistical',
+                k: 3.2
+            })
+        );
+        expect(api.predictAnomaly).toHaveBeenNthCalledWith(
+            2,
+            expect.objectContaining({
+                model_name: 'contrastive',
+                threshold_method: 'statistical',
+                k: 3.2
+            })
+        );
+        expect(host.querySelector('#dl-anomaly-compare-consistency')?.textContent).toContain('参考模型：GCAE');
+
+        panel.destroy();
+    });
 });

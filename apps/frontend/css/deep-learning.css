@@ -300,6 +300,123 @@
     margin-top: 8px;
 }
 
+.dl-compare-card {
+    margin-top: 12px;
+    border: 1px solid #dbe1ea;
+    border-radius: 10px;
+    padding: 10px;
+    background: linear-gradient(180deg, #f8fcff 0%, #ffffff 100%);
+}
+
+.dl-compare-controls {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 8px;
+}
+
+.dl-compare-model-picker {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.compare-model-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    border: 1px solid #d5d9e2;
+    border-radius: 999px;
+    padding: 4px 10px;
+    background: #ffffff;
+    font-size: 12px;
+    color: #334155;
+}
+
+.compare-model-checkbox {
+    accent-color: #2563eb;
+}
+
+.dl-compare-summary {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #1f2937;
+}
+
+.dl-compare-metrics {
+    margin-top: 8px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 8px;
+}
+
+.compare-metric-card {
+    border: 1px solid #dce2ed;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 8px;
+}
+
+.compare-metric-key {
+    font-size: 11px;
+    color: #64748b;
+}
+
+.compare-metric-value {
+    margin-top: 4px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.dl-compare-consistency {
+    margin-top: 8px;
+}
+
+.compare-consistency-overview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.compare-agree-chip {
+    font-size: 11px;
+    border-radius: 999px;
+    border: 1px solid #dce2ed;
+    background: #f8fafc;
+    color: #334155;
+    padding: 2px 8px;
+}
+
+.dl-compare-table-wrap {
+    margin-top: 8px;
+    overflow-x: auto;
+}
+
+.dl-compare-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+}
+
+.dl-compare-table th,
+.dl-compare-table td {
+    border: 1px solid #e2e8f0;
+    padding: 4px 6px;
+    text-align: left;
+}
+
+.dl-compare-table thead th {
+    background: #f8fafc;
+    color: #475569;
+}
+
+.compare-pairwise-table {
+    margin-top: 8px;
+}
+
 .dl-window-analysis-title {
     font-size: 12px;
     font-weight: 600;
@@ -358,6 +475,10 @@
     }
 
     .dl-timeseries-controls {
+        grid-template-columns: 1fr;
+    }
+
+    .dl-compare-controls {
         grid-template-columns: 1fr;
     }
 

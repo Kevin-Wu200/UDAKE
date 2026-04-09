@@ -2,6 +2,9 @@ import type { IAPIService } from '../../types/api';
 
 type SeverityLevel = 'high' | 'medium' | 'low';
 type SeverityFilter = SeverityLevel | 'all';
+type CompareModelName = 'vae' | 'gcae' | 'gan' | 'contrastive';
+type CompareThresholdMethod = 'percentile' | 'statistical' | 'adaptive';
+type CompareFocusMetric = 'coverage' | 'anomaly_rate' | 'avg_score';
 
 interface TimeSeriesPoint {
     index: number;
@@ -22,6 +25,32 @@ interface SlidingWindowSummary {
     anomalyCount: number;
     anomalyRate: number;
 }
+
+interface CompareModelResult {
+    model: CompareModelName;
+    label: string;
+    anomalyIndices: number[];
+    anomalyCount: number;
+    anomalyRate: number;
+    coverage: number;
+    avgScore: number;
+    scoreStd: number;
+    threshold: number | null;
+}
+
+interface ComparePairwiseStat {
+    left: string;
+    right: string;
+    jaccard: number;
+    overlapCount: number;
+}
+
+const COMPARE_MODEL_OPTIONS: Array<{ value: CompareModelName; label: string }> = [
+    { value: 'vae', label: 'VAE' },
+    { value: 'gcae', label: 'GCAE' },
+    { value: 'gan', label: 'GAN' },
+    { value: 'contrastive', label: 'Contrastive' }
+];
 
 /**
  * 异常检测子面板
@@ -147,6 +176,71 @@ export class AnomalyDetectionPanel {
                     <div id="dl-anomaly-timeseries" class="dl-timeseries-chart" aria-label="时间序列异常可视化"></div>
                     <div id="dl-anomaly-window-analysis" class="dl-window-analysis"></div>
                 </section>
+
+                <section class="dl-compare-card">
+                    <div class="dl-timeseries-header">
+                        <h5>异常检测结果对比</h5>
+                        <p>支持多模型对比、性能指标对比、一致性分析与自定义对比配置</p>
+                    </div>
+                    <div class="dl-compare-controls">
+                        <label class="dl-field">
+                            <span>阈值方法</span>
+                            <select id="dl-anomaly-compare-threshold" class="select">
+                                <option value="percentile">Percentile</option>
+                                <option value="statistical">Statistical</option>
+                                <option value="adaptive">Adaptive</option>
+                            </select>
+                        </label>
+                        <label class="dl-field">
+                            <span>Percentile</span>
+                            <input id="dl-anomaly-compare-percentile" class="input" type="number" min="50" max="99.9" step="0.1" value="95">
+                        </label>
+                        <label class="dl-field">
+                            <span>k 值</span>
+                            <input id="dl-anomaly-compare-k" class="input" type="number" min="1" max="6" step="0.1" value="2.5">
+                        </label>
+                        <label class="dl-field">
+                            <span>一致性最小模型数</span>
+                            <input id="dl-anomaly-compare-consensus-min" class="input" type="number" min="2" max="4" value="2">
+                        </label>
+                        <label class="dl-field">
+                            <span>参考模型</span>
+                            <select id="dl-anomaly-compare-reference" class="select">
+                                <option value="vae">VAE</option>
+                                <option value="gcae">GCAE</option>
+                                <option value="gan">GAN</option>
+                                <option value="contrastive">Contrastive</option>
+                            </select>
+                        </label>
+                        <label class="dl-field">
+                            <span>重点指标</span>
+                            <select id="dl-anomaly-compare-focus" class="select">
+                                <option value="coverage">覆盖率</option>
+                                <option value="anomaly_rate">异常率</option>
+                                <option value="avg_score">平均异常分数</option>
+                            </select>
+                        </label>
+                    </div>
+                    <div class="dl-compare-model-picker" id="dl-anomaly-compare-model-picker" aria-label="模型选择器">
+                        ${COMPARE_MODEL_OPTIONS.map(
+                            (item, index) => `
+                            <label class="compare-model-chip">
+                                <input class="compare-model-checkbox" type="checkbox" value="${item.value}" ${index < 3 ? 'checked' : ''}>
+                                <span>${item.label}</span>
+                            </label>
+                        `
+                        ).join('')}
+                    </div>
+                    <div class="dl-actions">
+                        <button id="dl-anomaly-compare-select-all" class="btn btn-secondary">全选模型</button>
+                        <button id="dl-anomaly-compare-clear" class="btn btn-secondary">清空选择</button>
+                        <button id="dl-anomaly-run-compare" class="btn btn-primary">运行结果对比</button>
+                    </div>
+                    <div id="dl-anomaly-compare-summary" class="dl-compare-summary">请选择至少两个模型并运行对比。</div>
+                    <div id="dl-anomaly-compare-metrics" class="dl-compare-metrics"></div>
+                    <div id="dl-anomaly-compare-consistency" class="dl-compare-consistency"></div>
+                    <div id="dl-anomaly-compare-table" class="dl-compare-table-wrap"></div>
+                </section>
             </div>
         `;
     }
@@ -177,6 +271,18 @@ export class AnomalyDetectionPanel {
                 this.selectedSeverityFilter = 'all';
             }
             this.renderTimeSeriesVisualization();
+        });
+
+        this.container.querySelector('#dl-anomaly-run-compare')?.addEventListener('click', () => {
+            void this.runCompareAnalysis();
+        });
+
+        this.container.querySelector('#dl-anomaly-compare-select-all')?.addEventListener('click', () => {
+            this.toggleCompareModelSelection(true);
+        });
+
+        this.container.querySelector('#dl-anomaly-compare-clear')?.addEventListener('click', () => {
+            this.toggleCompareModelSelection(false);
         });
     }
 
@@ -692,6 +798,333 @@ export class AnomalyDetectionPanel {
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
         this.setStatus('结果导出成功', 'success');
+    }
+
+    private toggleCompareModelSelection(checked: boolean): void {
+        this.container.querySelectorAll('.compare-model-checkbox').forEach((node) => {
+            const checkbox = node as HTMLInputElement;
+            checkbox.checked = checked;
+        });
+    }
+
+    private getSelectedCompareModels(): CompareModelName[] {
+        const selected: CompareModelName[] = [];
+        this.container.querySelectorAll('.compare-model-checkbox').forEach((node) => {
+            const checkbox = node as HTMLInputElement;
+            if (!checkbox.checked) {
+                return;
+            }
+            const value = checkbox.value;
+            if (value === 'vae' || value === 'gcae' || value === 'gan' || value === 'contrastive') {
+                selected.push(value);
+            }
+        });
+        return selected;
+    }
+
+    private getCompareThresholdMethod(): CompareThresholdMethod {
+        const raw = (this.container.querySelector('#dl-anomaly-compare-threshold') as HTMLSelectElement | null)?.value;
+        if (raw === 'statistical' || raw === 'adaptive') {
+            return raw;
+        }
+        return 'percentile';
+    }
+
+    private getCompareFocusMetric(): CompareFocusMetric {
+        const raw = (this.container.querySelector('#dl-anomaly-compare-focus') as HTMLSelectElement | null)?.value;
+        if (raw === 'anomaly_rate' || raw === 'avg_score') {
+            return raw;
+        }
+        return 'coverage';
+    }
+
+    private getCompareLabel(model: CompareModelName): string {
+        const match = COMPARE_MODEL_OPTIONS.find((item) => item.value === model);
+        return match ? match.label : model.toUpperCase();
+    }
+
+    private extractAnomalyIndicesFromResult(result: Record<string, unknown>, limit: number): number[] {
+        const indexSet = new Set<number>();
+        if (Array.isArray(result.anomaly_indices)) {
+            result.anomaly_indices.forEach((item) => {
+                const idx = Number(item);
+                if (Number.isInteger(idx) && idx >= 0 && idx < limit) {
+                    indexSet.add(idx);
+                }
+            });
+        }
+
+        const valueAnomalies = (result.value_anomalies || {}) as Record<string, unknown>;
+        if (Array.isArray(valueAnomalies.anomalies)) {
+            valueAnomalies.anomalies.forEach((item) => {
+                if (!item || typeof item !== 'object') {
+                    return;
+                }
+                const idx = Number((item as Record<string, unknown>).index);
+                if (Number.isInteger(idx) && idx >= 0 && idx < limit) {
+                    indexSet.add(idx);
+                }
+            });
+        }
+
+        return Array.from(indexSet).sort((a, b) => a - b);
+    }
+
+    private estimateThreshold(scores: number[], method: CompareThresholdMethod, percentile: number, k: number): number | null {
+        if (scores.length === 0) {
+            return null;
+        }
+        const stats = this.computeStats(scores);
+        if (method === 'statistical') {
+            return stats.mean + stats.std * k;
+        }
+        if (method === 'adaptive') {
+            const sorted = [...scores].sort((a, b) => a - b);
+            const q1 = sorted[Math.max(0, Math.floor(sorted.length * 0.25) - 1)] ?? sorted[0];
+            const q3 = sorted[Math.max(0, Math.floor(sorted.length * 0.75) - 1)] ?? sorted[sorted.length - 1];
+            return q3 + 0.5 * (q3 - q1);
+        }
+        const sorted = [...scores].sort((a, b) => a - b);
+        const index = Math.min(sorted.length - 1, Math.max(0, Math.ceil((percentile / 100) * sorted.length) - 1));
+        return sorted[index];
+    }
+
+    private buildPairwiseStats(rows: CompareModelResult[]): ComparePairwiseStat[] {
+        const output: ComparePairwiseStat[] = [];
+        for (let i = 0; i < rows.length; i++) {
+            for (let j = i + 1; j < rows.length; j++) {
+                const leftSet = new Set<number>(rows[i].anomalyIndices);
+                const rightSet = new Set<number>(rows[j].anomalyIndices);
+                const intersection = rows[i].anomalyIndices.filter((item) => rightSet.has(item));
+                const union = new Set<number>([...leftSet, ...rightSet]);
+                output.push({
+                    left: rows[i].label,
+                    right: rows[j].label,
+                    overlapCount: intersection.length,
+                    jaccard: union.size > 0 ? intersection.length / union.size : 0
+                });
+            }
+        }
+        return output;
+    }
+
+    private renderCompareTable(rows: CompareModelResult[]): string {
+        if (rows.length === 0) {
+            return '<div class="status-message">暂无可展示的模型对比结果</div>';
+        }
+        const body = rows
+            .map((item) => {
+                const thresholdLabel = typeof item.threshold === 'number' ? item.threshold.toFixed(4) : '-';
+                return `
+                    <tr>
+                        <td>${item.label}</td>
+                        <td>${item.anomalyCount}</td>
+                        <td>${(item.anomalyRate * 100).toFixed(2)}%</td>
+                        <td>${(item.coverage * 100).toFixed(2)}%</td>
+                        <td>${item.avgScore.toFixed(4)}</td>
+                        <td>${item.scoreStd.toFixed(4)}</td>
+                        <td>${thresholdLabel}</td>
+                        <td>${item.anomalyIndices.slice(0, 10).join(', ') || '-'}</td>
+                    </tr>
+                `;
+            })
+            .join('');
+
+        return `
+            <table class="dl-compare-table">
+                <thead>
+                    <tr>
+                        <th>模型</th>
+                        <th>异常数</th>
+                        <th>异常率</th>
+                        <th>覆盖率</th>
+                        <th>平均分</th>
+                        <th>分数标准差</th>
+                        <th>阈值估计</th>
+                        <th>异常索引样本</th>
+                    </tr>
+                </thead>
+                <tbody>${body}</tbody>
+            </table>
+        `;
+    }
+
+    private renderCompareMetrics(rows: CompareModelResult[], focusMetric: CompareFocusMetric): string {
+        if (rows.length === 0) {
+            return '';
+        }
+        const union = new Set<number>();
+        rows.forEach((item) => item.anomalyIndices.forEach((idx) => union.add(idx)));
+        const best = [...rows].sort((a, b) => {
+            if (focusMetric === 'avg_score') {
+                return b.avgScore - a.avgScore;
+            }
+            if (focusMetric === 'anomaly_rate') {
+                return b.anomalyRate - a.anomalyRate;
+            }
+            return b.coverage - a.coverage;
+        })[0];
+        const metricLabel = focusMetric === 'avg_score' ? '平均异常分数' : focusMetric === 'anomaly_rate' ? '异常率' : '覆盖率';
+        const avgRate = rows.reduce((sum, item) => sum + item.anomalyRate, 0) / rows.length;
+
+        return `
+            <div class="compare-metric-card">
+                <div class="compare-metric-key">优选模型（按${metricLabel}）</div>
+                <div class="compare-metric-value">${best.label}</div>
+            </div>
+            <div class="compare-metric-card">
+                <div class="compare-metric-key">并集异常点</div>
+                <div class="compare-metric-value">${union.size}</div>
+            </div>
+            <div class="compare-metric-card">
+                <div class="compare-metric-key">平均异常率</div>
+                <div class="compare-metric-value">${(avgRate * 100).toFixed(2)}%</div>
+            </div>
+        `;
+    }
+
+    private renderConsistency(
+        rows: CompareModelResult[],
+        pairwise: ComparePairwiseStat[],
+        consensusMin: number,
+        referenceModel: CompareModelName
+    ): string {
+        if (rows.length < 2) {
+            return '<div class="status-message">至少两个模型才能进行一致性分析</div>';
+        }
+        const occurrence = new Map<number, number>();
+        rows.forEach((item) => {
+            item.anomalyIndices.forEach((idx) => {
+                occurrence.set(idx, (occurrence.get(idx) || 0) + 1);
+            });
+        });
+        const consensusCount = Array.from(occurrence.values()).filter((count) => count >= consensusMin).length;
+        const conflictCount = Array.from(occurrence.values()).filter((count) => count === 1).length;
+        const avgJaccard = pairwise.length > 0 ? pairwise.reduce((sum, item) => sum + item.jaccard, 0) / pairwise.length : 0;
+
+        const fallbackRef = rows[0].model;
+        const targetRef = rows.some((item) => item.model === referenceModel) ? referenceModel : fallbackRef;
+        const refRow = rows.find((item) => item.model === targetRef) as CompareModelResult;
+        const refSet = new Set<number>(refRow.anomalyIndices);
+        const agreementRows = rows
+            .filter((item) => item.model !== targetRef)
+            .map((item) => {
+                const matched = item.anomalyIndices.filter((idx) => refSet.has(idx)).length;
+                const base = Math.max(1, new Set<number>([...item.anomalyIndices, ...refRow.anomalyIndices]).size);
+                const ratio = matched / base;
+                return `<span class="compare-agree-chip">${item.label} vs ${refRow.label}: ${(ratio * 100).toFixed(1)}%</span>`;
+            })
+            .join('');
+
+        const pairwiseRows = pairwise
+            .map((item) => `<tr><td>${item.left} ↔ ${item.right}</td><td>${item.overlapCount}</td><td>${(item.jaccard * 100).toFixed(2)}%</td></tr>`)
+            .join('');
+
+        return `
+            <div class="compare-consistency-overview">
+                <span class="compare-agree-chip">一致异常点（≥${consensusMin} 模型）：${consensusCount}</span>
+                <span class="compare-agree-chip">分歧点（仅单模型命中）：${conflictCount}</span>
+                <span class="compare-agree-chip">平均Jaccard：${(avgJaccard * 100).toFixed(2)}%</span>
+                <span class="compare-agree-chip">参考模型：${refRow.label}</span>
+                ${agreementRows}
+            </div>
+            <table class="dl-compare-table compare-pairwise-table">
+                <thead>
+                    <tr>
+                        <th>模型对</th>
+                        <th>重叠异常点</th>
+                        <th>Jaccard</th>
+                    </tr>
+                </thead>
+                <tbody>${pairwiseRows}</tbody>
+            </table>
+        `;
+    }
+
+    private async runCompareAnalysis(): Promise<void> {
+        const summary = this.container.querySelector('#dl-anomaly-compare-summary') as HTMLElement | null;
+        const metricsHost = this.container.querySelector('#dl-anomaly-compare-metrics') as HTMLElement | null;
+        const consistencyHost = this.container.querySelector('#dl-anomaly-compare-consistency') as HTMLElement | null;
+        const tableHost = this.container.querySelector('#dl-anomaly-compare-table') as HTMLElement | null;
+        if (!summary || !metricsHost || !consistencyHost || !tableHost) {
+            return;
+        }
+
+        try {
+            const selectedModels = this.getSelectedCompareModels();
+            if (selectedModels.length < 2) {
+                summary.textContent = '请至少选择两个模型后再运行对比。';
+                metricsHost.innerHTML = '';
+                consistencyHost.innerHTML = '';
+                tableHost.innerHTML = '';
+                return;
+            }
+
+            const coords = this.parseJson<Array<[number, number]>>('dl-anomaly-coords', 'coords');
+            const values = this.parseJson<number[]>('dl-anomaly-values', 'values');
+            const thresholdMethod = this.getCompareThresholdMethod();
+            const percentile = Number((this.container.querySelector('#dl-anomaly-compare-percentile') as HTMLInputElement | null)?.value || 95);
+            const k = Number((this.container.querySelector('#dl-anomaly-compare-k') as HTMLInputElement | null)?.value || 2.5);
+            const consensusMin = this.getNumberInputValue('dl-anomaly-compare-consensus-min', 2, 2, 4);
+            const focusMetric = this.getCompareFocusMetric();
+            const referenceModel = ((this.container.querySelector('#dl-anomaly-compare-reference') as HTMLSelectElement | null)?.value ||
+                'vae') as CompareModelName;
+
+            this.setStatus(`正在对比 ${selectedModels.length} 个异常检测模型...`, 'loading');
+            summary.textContent = '正在运行模型对比，请稍候...';
+
+            const requests = selectedModels.map(async (model) => {
+                const response = await this.apiService.predictAnomaly({
+                    model_name: model,
+                    coords,
+                    values,
+                    threshold_method: thresholdMethod,
+                    percentile,
+                    k
+                });
+                return { model, response: response as Record<string, unknown> };
+            });
+            const outputs = await Promise.all(requests);
+
+            const rows = outputs.map((item) => {
+                const anomalyIndices = this.extractAnomalyIndicesFromResult(item.response, values.length);
+                const scores = Array.isArray(item.response.anomaly_scores)
+                    ? item.response.anomaly_scores.map((raw) => Number(raw)).filter((score) => Number.isFinite(score))
+                    : [];
+                const stats = scores.length > 0 ? this.computeStats(scores) : { mean: 0, std: 0 };
+                return {
+                    model: item.model,
+                    label: this.getCompareLabel(item.model),
+                    anomalyIndices,
+                    anomalyCount: anomalyIndices.length,
+                    anomalyRate: anomalyIndices.length / Math.max(1, values.length),
+                    coverage: 0,
+                    avgScore: stats.mean,
+                    scoreStd: stats.std,
+                    threshold: this.estimateThreshold(scores, thresholdMethod, percentile, k)
+                };
+            });
+
+            const union = new Set<number>();
+            rows.forEach((item) => item.anomalyIndices.forEach((idx) => union.add(idx)));
+            rows.forEach((item) => {
+                item.coverage = union.size > 0 ? item.anomalyIndices.length / union.size : 0;
+            });
+
+            const pairwise = this.buildPairwiseStats(rows);
+            tableHost.innerHTML = this.renderCompareTable(rows);
+            metricsHost.innerHTML = this.renderCompareMetrics(rows, focusMetric);
+            consistencyHost.innerHTML = this.renderConsistency(rows, pairwise, consensusMin, referenceModel);
+
+            const avgJaccard = pairwise.length > 0 ? pairwise.reduce((sum, item) => sum + item.jaccard, 0) / pairwise.length : 0;
+            summary.textContent = `已完成 ${rows.length} 个模型对比：并集异常点 ${union.size} 个，平均两两一致性 ${(avgJaccard * 100).toFixed(
+                2
+            )}%。`;
+            this.setStatus('异常检测结果对比完成', 'success');
+        } catch (error) {
+            summary.textContent = '模型对比失败，请检查输入参数或后端服务状态。';
+            this.setStatus(`对比失败：${error instanceof Error ? error.message : String(error)}`, 'error');
+        }
     }
 
     public destroy(): void {
