@@ -372,8 +372,12 @@ class VAEAnomalyLIMEAdapter(_BaseVAEAdapter):
                 "num_samples": selected_samples,
                 "num_features": len(feature_names),
                 "top_features": [
-                    {"feature_index": int(idx), "feature_name": item["feature_name"], "importance": item["importance"]}
-                    for idx, item in enumerate(global_feature_importance)
+                    {
+                        "feature_index": int(feature_names.index(str(item["feature_name"]))),
+                        "feature_name": item["feature_name"],
+                        "importance": item["importance"],
+                    }
+                    for item in global_feature_importance
                 ],
                 "average_confidence": float(np.mean([item["confidence"] for item in batch_explanations])) if batch_explanations else 0.0,
             },
@@ -538,4 +542,3 @@ class VAEAnomalySHAPAdapter(_BaseVAEAdapter):
         }
         self._cache_set(cache_key, payload)
         return payload
-

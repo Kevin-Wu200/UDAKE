@@ -308,13 +308,19 @@ class DeepLearningService:
             percentile=percentile,
             k=k,
         )
+        normalized_pred = dict(pred)
+        if "anomaly_scores" not in normalized_pred:
+            if "scores" in normalized_pred:
+                normalized_pred["anomaly_scores"] = normalized_pred.get("scores", [])
+            elif "node_scores" in normalized_pred:
+                normalized_pred["anomaly_scores"] = normalized_pred.get("node_scores", [])
         count = float(pred.get("anomaly_count", len(pred.get("anomaly_indices", []))))
         self.metric_monitor.log(f"{model_name}_anomaly_count", count)
 
         scores = pred.get("scores", pred.get("node_scores", []))
         return {
             "model_name": model_name,
-            "prediction": pred,
+            "prediction": normalized_pred,
             "resource": self.resource_monitor.collect(),
             "score_preview": list(scores[:10]),
         }

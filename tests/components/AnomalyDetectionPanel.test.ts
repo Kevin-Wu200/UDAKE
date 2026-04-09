@@ -64,6 +64,38 @@ describe('AnomalyDetectionPanel 时间序列异常标记', () => {
         panel.destroy();
     });
 
+    it('应兼容后端 prediction 包裹结构并正确绘制异常结果', async () => {
+        const api = createApiMock();
+        api.predictAnomaly.mockResolvedValue({
+            model_name: 'vae',
+            prediction: {
+                anomaly_indices: [1, 4],
+                anomaly_scores: [0.03, 0.79, 0.05, 0.12, 0.86, 0.07],
+                value_anomalies: {
+                    anomalies: [
+                        { index: 1, value: 8.1, type: 'high' },
+                        { index: 4, value: 7.9, type: 'high' }
+                    ]
+                }
+            },
+            score_preview: [0.03, 0.79, 0.05, 0.12, 0.86, 0.07]
+        });
+
+        const panel = new AnomalyDetectionPanel(host, api as any);
+        (host.querySelector('#dl-anomaly-predict') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(api.predictAnomaly).toHaveBeenCalledWith(
+            expect.objectContaining({
+                model_name: 'vae'
+            })
+        );
+        expect(host.querySelectorAll('.series-anomaly-point').length).toBeGreaterThan(0);
+        expect(host.querySelector('#dl-anomaly-timeseries-summary')?.textContent).toContain('异常点');
+
+        panel.destroy();
+    });
+
     it('应支持严重级别筛选和异常分数数据源切换', async () => {
         const api = createApiMock();
         api.predictAnomaly.mockResolvedValue({

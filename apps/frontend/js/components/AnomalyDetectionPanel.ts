@@ -431,14 +431,22 @@ export class AnomalyDetectionPanel {
     }
 
     private extractSeriesData(source: string): TimeSeriesPoint[] {
+        const result = this.resolvePredictionResult(this.lastResult as Record<string, unknown> | null);
         let values: number[] = [];
         if (source === 'scores') {
-            const result = this.lastResult as Record<string, unknown> | null;
             const maybeScores = result ? result.anomaly_scores : null;
             if (Array.isArray(maybeScores)) {
                 values = maybeScores
                     .map((item) => Number(item))
                     .filter((item) => Number.isFinite(item));
+            }
+            if (values.length === 0) {
+                const maybePreview = (this.lastResult as Record<string, unknown> | null)?.score_preview;
+                if (Array.isArray(maybePreview)) {
+                    values = maybePreview
+                        .map((item) => Number(item))
+                        .filter((item) => Number.isFinite(item));
+                }
             }
         }
 
@@ -457,7 +465,7 @@ export class AnomalyDetectionPanel {
     }
 
     private extractAnomalyPoints(series: TimeSeriesPoint[]): AnomalyPoint[] {
-        const result = this.lastResult as Record<string, unknown> | null;
+        const result = this.resolvePredictionResult(this.lastResult as Record<string, unknown> | null);
         const stdInfo = this.computeStats(series.map((item) => item.value));
         const indexSet = new Set<number>();
 
@@ -843,10 +851,22 @@ export class AnomalyDetectionPanel {
         return match ? match.label : model.toUpperCase();
     }
 
+    private resolvePredictionResult(result: Record<string, unknown> | null): Record<string, unknown> | null {
+        if (!result || typeof result !== 'object') {
+            return null;
+        }
+        const prediction = result.prediction;
+        if (prediction && typeof prediction === 'object') {
+            return prediction as Record<string, unknown>;
+        }
+        return result;
+    }
+
     private extractAnomalyIndicesFromResult(result: Record<string, unknown>, limit: number): number[] {
+        const normalized = this.resolvePredictionResult(result) || result;
         const indexSet = new Set<number>();
-        if (Array.isArray(result.anomaly_indices)) {
-            result.anomaly_indices.forEach((item) => {
+        if (Array.isArray(normalized.anomaly_indices)) {
+            normalized.anomaly_indices.forEach((item) => {
                 const idx = Number(item);
                 if (Number.isInteger(idx) && idx >= 0 && idx < limit) {
                     indexSet.add(idx);
@@ -854,7 +874,7 @@ export class AnomalyDetectionPanel {
             });
         }
 
-        const valueAnomalies = (result.value_anomalies || {}) as Record<string, unknown>;
+        const valueAnomalies = (normalized.value_anomalies || {}) as Record<string, unknown>;
         if (Array.isArray(valueAnomalies.anomalies)) {
             valueAnomalies.anomalies.forEach((item) => {
                 if (!item || typeof item !== 'object') {
@@ -1087,10 +1107,14 @@ export class AnomalyDetectionPanel {
             const outputs = await Promise.all(requests);
 
             const rows = outputs.map((item) => {
+                const normalized = this.resolvePredictionResult(item.response) || item.response;
                 const anomalyIndices = this.extractAnomalyIndicesFromResult(item.response, values.length);
-                const scores = Array.isArray(item.response.anomaly_scores)
-                    ? item.response.anomaly_scores.map((raw) => Number(raw)).filter((score) => Number.isFinite(score))
-                    : [];
+                let scores: number[] = [];
+                if (Array.isArray(normalized.anomaly_scores)) {
+                    scores = normalized.anomaly_scores.map((raw) => Number(raw)).filter((score) => Number.isFinite(score));
+                } else if (Array.isArray(item.response.score_preview)) {
+                    scores = item.response.score_preview.map((raw) => Number(raw)).filter((score) => Number.isFinite(score));
+                }
                 const stats = scores.length > 0 ? this.computeStats(scores) : { mean: 0, std: 0 };
                 return {
                     model: item.model,
