@@ -1,0 +1,32 @@
+{
+  "suite": "anomaly_stage6_performance",
+  "plan": {
+    "single_sample_ms": 10000.0,
+    "batch_latency_ms": 10000.0,
+    "concurrency_latency_ms": 10000.0,
+    "batch_explain_nodes": 8,
+    "concurrency": 4
+  },
+  "metrics": {
+    "vae": {
+      "duration_ms": 314.848,
+      "cache_hit": 0.0,
+      "memory_bytes": 31152.0
+    },
+    "gcae": {
+      "duration_ms": 163.755,
+      "cache_hit": 0.0,
+      "memory_bytes": 0.0
+    },
+    "gan": {
+      "duration_ms": 110.1,
+      "cache_hit": 0.0,
+      "memory_bytes": 17568.0
+    },
+    "contrastive": {
+      "duration_ms": 147.352,
+      "cache_hit": 0.0,
+      "memory_bytes": 24240.0
+    }
+  }
+}

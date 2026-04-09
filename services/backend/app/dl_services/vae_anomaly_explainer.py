@@ -193,14 +193,14 @@ class _BaseVAEAdapter:
 
         context = {
             "context_key": key,
-            "feature_matrix": matrix,
-            "scaled_x": scaled_x,
+            "feature_matrix": self._to_float32(matrix),
+            "scaled_x": self._to_float32(scaled_x),
             "feature_names": feature_names,
             "scaler_stats": scaler_stats,
             "score_bundle": score_bundle,
-            "target": target,
+            "target": self._to_float32(target),
             "surrogate": surrogate,
-            "background": self._select_background(scaled_x, target),
+            "background": self._to_float32(self._select_background(scaled_x, target, size=48)),
         }
         self._context_set(key, context)
         return context
@@ -208,6 +208,47 @@ class _BaseVAEAdapter:
     def _predict_surrogate(self, context: dict[str, Any]) -> Callable[[np.ndarray], np.ndarray]:
         model: Ridge = context["surrogate"]
         return lambda x: model.predict(np.asarray(x, dtype=float))
+
+    @staticmethod
+    def _to_float32(arr: np.ndarray) -> np.ndarray:
+        x = np.asarray(arr, dtype=float)
+        if x.dtype == np.float32:
+            return x
+        return x.astype(np.float32, copy=False)
+
+    @staticmethod
+    def _memory_bytes(context: dict[str, Any], extra_arrays: Optional[list[np.ndarray]] = None) -> int:
+        keys = ["feature_matrix", "scaled_x", "background", "target"]
+        total = 0
+        for key in keys:
+            arr = context.get(key)
+            if isinstance(arr, np.ndarray):
+                total += int(arr.nbytes)
+        score_bundle = context.get("score_bundle", {})
+        if isinstance(score_bundle, dict):
+            for arr in score_bundle.values():
+                if isinstance(arr, np.ndarray):
+                    total += int(arr.nbytes)
+        for arr in extra_arrays or []:
+            total += int(np.asarray(arr).nbytes)
+        return int(total)
+
+    def _compressed_lime_training_data(self, context: dict[str, Any], explained_nodes: list[int]) -> np.ndarray:
+        x = np.asarray(context["scaled_x"], dtype=float)
+        if x.shape[0] <= 64:
+            return x
+        scores = np.asarray(context["target"], dtype=float).reshape(-1)
+        keep = min(96, x.shape[0])
+        top_k = max(8, min(len(explained_nodes) * 4, keep // 2))
+        top_idx = np.argsort(-scores)[:top_k].astype(int)
+        low_idx = np.argsort(scores)[:top_k].astype(int)
+        mixed = np.concatenate([top_idx, low_idx], axis=0)
+        if mixed.size < keep:
+            stride = max(1, x.shape[0] // max(1, keep - mixed.size))
+            sampled = np.arange(0, x.shape[0], stride, dtype=int)[: max(1, keep - mixed.size)]
+            mixed = np.concatenate([mixed, sampled], axis=0)
+        unique_idx = np.unique(mixed)[:keep]
+        return x[unique_idx]
 
     def _feature_category(self, name: str) -> str:
         item = self._feature_registry._COMMON_DEFINITIONS.get(name)
@@ -287,6 +328,19 @@ class VAEAnomalyLIMEAdapter(_BaseVAEAdapter):
         lime_module = self._load_lime_tabular()
         feature_names: list[str] = context["feature_names"]
         predict_fn = self._predict_surrogate(context)
+        lime_training_data = self._compressed_lime_training_data(context, explained_nodes)
+        lime_explainer = None
+        if lime_module is not None:
+            try:
+                lime_explainer = lime_module.LimeTabularExplainer(
+                    training_data=lime_training_data,
+                    feature_names=feature_names,
+                    mode="regression",
+                    discretize_continuous=False,
+                    random_state=self.config.random_state,
+                )
+            except Exception:
+                lime_explainer = None
         batch_explanations: list[dict[str, Any]] = []
         for node_idx in explained_nodes:
             instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
@@ -294,16 +348,9 @@ class VAEAnomalyLIMEAdapter(_BaseVAEAdapter):
             local_pred = float(predict_fn(instance.reshape(1, -1))[0])
             fidelity = 0.5
 
-            if lime_module is not None:
+            if lime_explainer is not None:
                 try:
-                    explainer = lime_module.LimeTabularExplainer(
-                        training_data=np.asarray(context["scaled_x"], dtype=float),
-                        feature_names=feature_names,
-                        mode="regression",
-                        discretize_continuous=False,
-                        random_state=self.config.random_state,
-                    )
-                    exp = explainer.explain_instance(
+                    exp = lime_explainer.explain_instance(
                         data_row=instance,
                         predict_fn=predict_fn,
                         num_features=max(1, min(int(top_k), len(feature_names))),
@@ -393,6 +440,9 @@ class VAEAnomalyLIMEAdapter(_BaseVAEAdapter):
             "performance": {
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "cache_hit": False,
+                "lime_training_size": int(lime_training_data.shape[0]),
+                "lime_sampling_budget": int(selected_samples),
+                "memory_bytes": self._memory_bytes(context),
             },
         }
         self._cache_set(cache_key, payload)
