@@ -42,6 +42,18 @@ type CachedEntry<T> = {
     data: T;
 };
 
+type ContributionCluster = 'high-positive' | 'high-negative' | 'low-impact';
+
+type FeatureContributionRow = {
+    feature: string;
+    value: number;
+    absValue: number;
+    normalized: number;
+    cluster: ContributionCluster;
+    source: 'LIME' | 'SHAP';
+    annotation: string;
+};
+
 /**
  * 时空预测可解释性面板
  * 支持 LIME / SHAP / Hybrid 任务提交、状态管理和可视化展示。
@@ -773,6 +785,7 @@ export class SpatiotemporalExplainPanel {
             container.innerHTML = this.renderLimeResult(result);
             this.bindAnomalyInteractive(container, this.extractAnomalyRows((result.lime || {}) as Record<string, unknown>), 'lime');
             this.bindReasonInteractive(container, this.parseAnomalyReasonRows((result.lime || {}) as Record<string, unknown>, 'LIME'), 'lime');
+            this.bindContributionHeatmapInteractive(container, this.collectLimeContributionRows(result), 'lime');
             void this.renderChartsForCurrentTab(result);
             return;
         }
@@ -781,6 +794,7 @@ export class SpatiotemporalExplainPanel {
             this.bindShapInteractive(container, result);
             this.bindAnomalyInteractive(container, this.extractAnomalyRows((result.shap || {}) as Record<string, unknown>), 'shap');
             this.bindReasonInteractive(container, this.parseAnomalyReasonRows((result.shap || {}) as Record<string, unknown>, 'SHAP'), 'shap');
+            this.bindContributionHeatmapInteractive(container, this.collectShapContributionRows(result), 'shap');
             void this.renderChartsForCurrentTab(result);
             return;
         }
@@ -858,6 +872,7 @@ export class SpatiotemporalExplainPanel {
             : [];
 
         const contributionRows = this.parseContributionRows(lime);
+        const contributionHeatmapRows = this.collectLimeContributionRows(result);
         const reasonRows = this.parseAnomalyReasonRows(lime, 'LIME');
 
         return `
@@ -876,6 +891,11 @@ export class SpatiotemporalExplainPanel {
                 <section class="result-card">
                     <h6>特征贡献度列表</h6>
                     ${this.renderFeatureBarList(contributionRows.slice(0, 12), 'contribution-bars')}
+                </section>
+
+                <section class="result-card full-width">
+                    <h6>LIME 特征贡献度热图</h6>
+                    ${this.renderContributionHeatmapPanel(contributionHeatmapRows, 'lime')}
                 </section>
 
                 <section class="result-card">
@@ -927,6 +947,266 @@ export class SpatiotemporalExplainPanel {
             .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
     }
 
+    private collectLimeContributionRows(result: Record<string, unknown>): FeatureContributionRow[] {
+        const lime = (result.lime || {}) as Record<string, unknown>;
+        const vis = (lime.visualization || {}) as Record<string, unknown>;
+        const featureImportance = this.parseImportanceRows(
+            vis.feature_importance_list || lime.global_feature_importance || []
+        );
+        const contributionRows = this.parseContributionRows(lime);
+        const merged = this.mergeContribution([...featureImportance, ...contributionRows]).slice(0, 40);
+        return this.buildFeatureContributionRows(merged, 'LIME');
+    }
+
+    private collectShapContributionRows(result: Record<string, unknown>): FeatureContributionRow[] {
+        const shap = (result.shap || {}) as Record<string, unknown>;
+        const vis = (shap.visualization || {}) as Record<string, unknown>;
+        const ranking = this.parseImportanceRows(vis.feature_ranking || shap.global_feature_importance || []);
+        const waterfall = this.parseImportanceRows(vis.waterfall_list || []);
+        const summaryStats = Array.isArray(vis.summary_stats) ? vis.summary_stats as Array<Record<string, unknown>> : [];
+        const merged = this.mergeContribution([...ranking, ...waterfall]);
+        const existed = new Set(merged.map((item) => item.name));
+        summaryStats.forEach((row, idx) => {
+            const name = String(row.feature || row.feature_name || `feature_${idx}`);
+            if (existed.has(name)) {
+                return;
+            }
+            const value = Number(row.mean_abs_shap ?? row.max_abs_shap ?? row.max_abs ?? 0);
+            if (!Number.isFinite(value)) {
+                return;
+            }
+            merged.push({ name, value });
+        });
+        return this.buildFeatureContributionRows(merged.slice(0, 40), 'SHAP');
+    }
+
+    private buildFeatureContributionRows(
+        rows: Array<{ name: string; value: number }>,
+        source: 'LIME' | 'SHAP'
+    ): FeatureContributionRow[] {
+        if (!rows.length) {
+            return [];
+        }
+        const valid = rows
+            .map((row) => ({
+                feature: row.name || 'feature',
+                value: Number(row.value || 0),
+                absValue: Math.abs(Number(row.value || 0))
+            }))
+            .filter((row) => Number.isFinite(row.value))
+            .sort((a, b) => b.absValue - a.absValue)
+            .slice(0, 40);
+
+        if (!valid.length) {
+            return [];
+        }
+        const maxAbs = Math.max(...valid.map((item) => item.absValue), 1e-6);
+        const sortedAbs = [...valid.map((item) => item.absValue)].sort((a, b) => a - b);
+        const pivotIndex = Math.min(sortedAbs.length - 1, Math.floor(sortedAbs.length * 0.65));
+        const clusterThreshold = sortedAbs[pivotIndex] || 0;
+        return valid.map((item) => {
+            const normalized = item.absValue / maxAbs;
+            let cluster: ContributionCluster = 'low-impact';
+            if (item.absValue >= clusterThreshold * 1.05) {
+                cluster = item.value >= 0 ? 'high-positive' : 'high-negative';
+            }
+            const annotation = cluster === 'high-positive'
+                ? '正向主导簇：提升异常判别分数'
+                : cluster === 'high-negative'
+                    ? '负向主导簇：抑制异常判别分数'
+                    : '低贡献簇：影响较弱';
+            return {
+                feature: item.feature,
+                value: item.value,
+                absValue: item.absValue,
+                normalized,
+                cluster,
+                source,
+                annotation
+            };
+        });
+    }
+
+    private renderContributionHeatmapPanel(rows: FeatureContributionRow[], prefix: 'lime' | 'shap'): string {
+        if (!rows.length) {
+            return '<div class="status-message">暂无贡献度热图数据</div>';
+        }
+        const maxThreshold = 100;
+        const initialThreshold = 0;
+        const cells = this.renderContributionHeatmapCells(rows, {
+            thresholdPct: initialThreshold,
+            polarity: 'all',
+            cluster: 'all',
+            keyword: ''
+        });
+        return `
+            <div class="contribution-heatmap-panel">
+                <div class="contribution-heatmap-controls">
+                    <label>贡献阈值
+                        <input id="${prefix}-contrib-threshold" type="range" min="0" max="${maxThreshold}" step="5" value="${initialThreshold}">
+                        <span id="${prefix}-contrib-threshold-label">${initialThreshold}%</span>
+                    </label>
+                    <label>方向
+                        <select id="${prefix}-contrib-polarity" class="select">
+                            <option value="all">全部</option>
+                            <option value="positive">正向贡献</option>
+                            <option value="negative">负向贡献</option>
+                        </select>
+                    </label>
+                    <label>聚类
+                        <select id="${prefix}-contrib-cluster" class="select">
+                            <option value="all">全部簇</option>
+                            <option value="high-positive">高正贡献簇</option>
+                            <option value="high-negative">高负贡献簇</option>
+                            <option value="low-impact">低贡献簇</option>
+                        </select>
+                    </label>
+                    <label>特征筛选
+                        <input id="${prefix}-contrib-search" class="input" type="text" placeholder="输入特征名关键字">
+                    </label>
+                </div>
+                <div class="contribution-heatmap-legend">
+                    <span class="legend-chip positive">正向贡献</span>
+                    <span class="legend-chip negative">负向贡献</span>
+                    <span class="legend-chip neutral">低贡献</span>
+                </div>
+                <div id="${prefix}-contrib-meta" class="contribution-meta">
+                    ${this.renderContributionClusterSummary(rows)}
+                </div>
+                <div id="${prefix}-contrib-grid" class="contribution-heatmap-grid">
+                    ${cells}
+                </div>
+            </div>
+        `;
+    }
+
+    private renderContributionClusterSummary(rows: FeatureContributionRow[]): string {
+        if (!rows.length) {
+            return '<div class="status-message">暂无聚类统计</div>';
+        }
+        const groups: Record<ContributionCluster, { count: number; mean: number }> = {
+            'high-positive': { count: 0, mean: 0 },
+            'high-negative': { count: 0, mean: 0 },
+            'low-impact': { count: 0, mean: 0 }
+        };
+        rows.forEach((row) => {
+            const item = groups[row.cluster];
+            item.count += 1;
+            item.mean += row.absValue;
+        });
+        (Object.keys(groups) as ContributionCluster[]).forEach((key) => {
+            const item = groups[key];
+            item.mean = item.count ? item.mean / item.count : 0;
+        });
+        const strongest = rows[0];
+        return `
+            <div class="contribution-cluster-summary">
+                <span>高正贡献簇: ${groups['high-positive'].count}（均值 ${groups['high-positive'].mean.toFixed(3)}）</span>
+                <span>高负贡献簇: ${groups['high-negative'].count}（均值 ${groups['high-negative'].mean.toFixed(3)}）</span>
+                <span>低贡献簇: ${groups['low-impact'].count}（均值 ${groups['low-impact'].mean.toFixed(3)}）</span>
+                <span>最强特征: ${strongest.feature} (${strongest.value.toFixed(4)})</span>
+            </div>
+        `;
+    }
+
+    private filterContributionRows(
+        rows: FeatureContributionRow[],
+        filter: { thresholdPct: number; polarity: 'all' | 'positive' | 'negative'; cluster: 'all' | ContributionCluster; keyword: string }
+    ): FeatureContributionRow[] {
+        const threshold = Math.max(0, Math.min(100, filter.thresholdPct)) / 100;
+        const keyword = filter.keyword.trim().toLowerCase();
+        return rows.filter((row) => {
+            if (row.normalized < threshold) {
+                return false;
+            }
+            if (filter.polarity === 'positive' && row.value < 0) {
+                return false;
+            }
+            if (filter.polarity === 'negative' && row.value >= 0) {
+                return false;
+            }
+            if (filter.cluster !== 'all' && row.cluster !== filter.cluster) {
+                return false;
+            }
+            if (keyword && !row.feature.toLowerCase().includes(keyword)) {
+                return false;
+            }
+            return true;
+        });
+    }
+
+    private renderContributionHeatmapCells(
+        rows: FeatureContributionRow[],
+        filter: { thresholdPct: number; polarity: 'all' | 'positive' | 'negative'; cluster: 'all' | ContributionCluster; keyword: string }
+    ): string {
+        const filtered = this.filterContributionRows(rows, filter);
+        if (!filtered.length) {
+            return '<div class="status-message">当前筛选条件下无贡献特征</div>';
+        }
+        return filtered.map((row) => {
+            const color = this.calcContributionCellColor(row);
+            const sign = row.value >= 0 ? 'positive' : 'negative';
+            return `
+                <button
+                    class="contribution-heatmap-cell ${sign} ${row.cluster}"
+                    type="button"
+                    data-sign="${sign}"
+                    data-cluster="${row.cluster}"
+                    data-feature="${row.feature}"
+                    title="${row.feature} | ${row.annotation}"
+                    style="background:${color};"
+                >
+                    <span class="contribution-feature">${row.feature}</span>
+                    <span class="contribution-value">${row.value.toFixed(4)}</span>
+                </button>
+            `;
+        }).join('');
+    }
+
+    private calcContributionCellColor(row: FeatureContributionRow): string {
+        const alpha = Math.max(0.14, Math.min(0.95, 0.22 + row.normalized * 0.72));
+        if (row.cluster === 'low-impact') {
+            return `rgba(148, 163, 184, ${alpha})`;
+        }
+        if (row.value >= 0) {
+            return `rgba(14, 165, 233, ${alpha})`;
+        }
+        return `rgba(239, 68, 68, ${alpha})`;
+    }
+
+    private bindContributionHeatmapInteractive(container: HTMLElement, rows: FeatureContributionRow[], prefix: 'lime' | 'shap'): void {
+        if (!rows.length) {
+            return;
+        }
+        const thresholdInput = container.querySelector(`#${prefix}-contrib-threshold`) as HTMLInputElement | null;
+        const thresholdLabel = container.querySelector(`#${prefix}-contrib-threshold-label`) as HTMLElement | null;
+        const polarityInput = container.querySelector(`#${prefix}-contrib-polarity`) as HTMLSelectElement | null;
+        const clusterInput = container.querySelector(`#${prefix}-contrib-cluster`) as HTMLSelectElement | null;
+        const searchInput = container.querySelector(`#${prefix}-contrib-search`) as HTMLInputElement | null;
+        const grid = container.querySelector(`#${prefix}-contrib-grid`) as HTMLElement | null;
+        const meta = container.querySelector(`#${prefix}-contrib-meta`) as HTMLElement | null;
+        if (!thresholdInput || !thresholdLabel || !polarityInput || !clusterInput || !searchInput || !grid || !meta) {
+            return;
+        }
+
+        const rerender = (): void => {
+            const filter = {
+                thresholdPct: Number(thresholdInput.value || 0),
+                polarity: (polarityInput.value || 'all') as 'all' | 'positive' | 'negative',
+                cluster: (clusterInput.value || 'all') as 'all' | ContributionCluster,
+                keyword: searchInput.value || ''
+            };
+            thresholdLabel.textContent = `${Math.max(0, Math.min(100, filter.thresholdPct))}%`;
+            const filtered = this.filterContributionRows(rows, filter);
+            grid.innerHTML = this.renderContributionHeatmapCells(rows, filter);
+            meta.innerHTML = this.renderContributionClusterSummary(filtered.length ? filtered : rows);
+        };
+        thresholdInput.addEventListener('input', rerender);
+        polarityInput.addEventListener('change', rerender);
+        clusterInput.addEventListener('change', rerender);
+        searchInput.addEventListener('input', this.createDebounced(rerender, 90));
+    }
+
     private renderLocalExplanationList(rows: Array<Record<string, unknown>>): string {
         if (!rows.length) {
             return '<div class="status-message">暂无局部解释</div>';
@@ -961,6 +1241,7 @@ export class SpatiotemporalExplainPanel {
         const beeswarm = Array.isArray(vis.beeswarm_data) ? vis.beeswarm_data as Array<Record<string, unknown>> : [];
         const dependence = Array.isArray(vis.dependence_data) ? vis.dependence_data as Array<Record<string, unknown>> : [];
         const summaryStats = Array.isArray(vis.summary_stats) ? vis.summary_stats as Array<Record<string, unknown>> : [];
+        const contributionHeatmapRows = this.collectShapContributionRows(result);
         const reasonRows = this.parseAnomalyReasonRows(shap, 'SHAP');
 
         return `
@@ -997,6 +1278,11 @@ export class SpatiotemporalExplainPanel {
                 <section class="result-card full-width">
                     <h6>SHAP 摘要统计表</h6>
                     ${this.renderSummaryTable(summaryStats)}
+                </section>
+
+                <section class="result-card full-width">
+                    <h6>SHAP 特征贡献度热图</h6>
+                    ${this.renderContributionHeatmapPanel(contributionHeatmapRows, 'shap')}
                 </section>
 
                 <section class="result-card full-width">

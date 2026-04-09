@@ -328,6 +328,8 @@ describe('SpatiotemporalExplainPanel', () => {
         await flushPromises();
 
         expect(host.querySelector('#chart-lime-feature')).toBeTruthy();
+        expect(host.querySelector('#lime-contrib-grid')).toBeTruthy();
+        expect(host.textContent).toContain('LIME 特征贡献度热图');
 
         (host.querySelector('[data-result-tab="shap"]') as HTMLButtonElement).click();
         await flushPromises();
@@ -335,6 +337,92 @@ describe('SpatiotemporalExplainPanel', () => {
         expect(host.querySelector('#chart-shap-waterfall')).toBeTruthy();
         expect(host.querySelector('#chart-shap-beeswarm')).toBeTruthy();
         expect(host.querySelector('#chart-shap-ranking')).toBeTruthy();
+        expect(host.querySelector('#shap-contrib-grid')).toBeTruthy();
+        expect(host.textContent).toContain('SHAP 特征贡献度热图');
+
+        panel.destroy();
+    });
+
+    it('应支持特征贡献热图聚类与交互式过滤', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        api.createSpatiotemporalExplainTask.mockResolvedValue({ task_id: 'task-heatmap' });
+        api.getSpatiotemporalExplainTask.mockResolvedValue({
+            task_id: 'task-heatmap',
+            status: 'completed',
+            result: {
+                method: 'hybrid',
+                lime: {
+                    visualization: {
+                        feature_importance_list: [
+                            { feature: 'traffic_flux', value: 0.51 },
+                            { feature: 'wind_speed', value: -0.33 },
+                            { feature: 'humidity', value: 0.08 }
+                        ]
+                    },
+                    batch_explanations: [
+                        {
+                            top_contributions: [
+                                { feature: 'traffic_flux', value: 0.41 },
+                                { feature: 'wind_speed', value: -0.27 },
+                                { feature_alias: 'temperature', value: -0.19 }
+                            ]
+                        }
+                    ]
+                },
+                shap: {
+                    visualization: {
+                        feature_ranking: [
+                            { feature: 'traffic_flux', value: 0.47 },
+                            { feature: 'wind_speed', value: -0.38 },
+                            { feature: 'humidity', value: 0.09 }
+                        ],
+                        waterfall_list: [
+                            { feature: 'traffic_flux', value: 0.21 },
+                            { feature: 'wind_speed', value: -0.18 }
+                        ]
+                    }
+                },
+                summary: {}
+            }
+        });
+
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(host.textContent).toContain('高正贡献簇');
+        const initialCells = host.querySelectorAll('#lime-contrib-grid .contribution-heatmap-cell');
+        expect(initialCells.length).toBeGreaterThan(0);
+
+        const polarity = host.querySelector('#lime-contrib-polarity') as HTMLSelectElement;
+        polarity.value = 'negative';
+        polarity.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushPromises();
+
+        const negativeCells = host.querySelectorAll('#lime-contrib-grid .contribution-heatmap-cell');
+        expect(negativeCells.length).toBeGreaterThan(0);
+        negativeCells.forEach((cell) => {
+            expect((cell as HTMLElement).dataset.sign).toBe('negative');
+        });
+
+        const threshold = host.querySelector('#lime-contrib-threshold') as HTMLInputElement;
+        threshold.value = '90';
+        threshold.dispatchEvent(new Event('input', { bubbles: true }));
+        await flushPromises();
+        expect(host.querySelectorAll('#lime-contrib-grid .contribution-heatmap-cell').length).toBe(0);
+
+        (host.querySelector('[data-result-tab="shap"]') as HTMLButtonElement).click();
+        await flushPromises();
+        const shapCluster = host.querySelector('#shap-contrib-cluster') as HTMLSelectElement;
+        shapCluster.value = 'high-positive';
+        shapCluster.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushPromises();
+        const shapCells = host.querySelectorAll('#shap-contrib-grid .contribution-heatmap-cell');
+        expect(shapCells.length).toBeGreaterThan(0);
+        shapCells.forEach((cell) => {
+            expect((cell as HTMLElement).dataset.cluster).toBe('high-positive');
+        });
 
         panel.destroy();
     });
