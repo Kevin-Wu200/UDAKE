@@ -94,6 +94,18 @@ class _BaseGNNKrigingAdapter:
         explain_count = max(1, min(int(max_explain_nodes), n))
         return np.argsort(-np.asarray(uncertainty, dtype=float))[:explain_count].astype(int).tolist()
 
+    @staticmethod
+    def _normalize_queries(sample_coords: np.ndarray, query_coords: np.ndarray | None) -> np.ndarray:
+        samples = np.asarray(sample_coords, dtype=float)
+        if query_coords is None:
+            return samples
+
+        queries = np.asarray(query_coords, dtype=float)
+        # 边界场景：空查询时回退到样本点查询，避免后续预处理和解释流程中断。
+        if queries.size == 0:
+            return samples
+        return queries
+
     def _build_context(
         self,
         *,
@@ -104,7 +116,7 @@ class _BaseGNNKrigingAdapter:
     ) -> dict[str, Any]:
         samples = np.asarray(sample_coords, dtype=float)
         values = np.asarray(sample_values, dtype=float).reshape(-1)
-        queries = np.asarray(query_coords, dtype=float) if query_coords is not None else samples
+        queries = self._normalize_queries(samples, query_coords)
         key = self._stable_hash(
             {
                 "sample_shape": [int(samples.shape[0]), int(samples.shape[1])],

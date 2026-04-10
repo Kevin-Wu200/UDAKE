@@ -96,6 +96,18 @@ class _BaseResidualKrigingAdapter:
         explain_count = max(1, min(int(max_explain_nodes), n))
         return np.argsort(-np.asarray(uncertainty, dtype=float))[:explain_count].astype(int).tolist()
 
+    @staticmethod
+    def _normalize_queries(sample_coords: np.ndarray, query_coords: np.ndarray | None) -> np.ndarray:
+        samples = np.asarray(sample_coords, dtype=float)
+        if query_coords is None:
+            return samples
+
+        queries = np.asarray(query_coords, dtype=float)
+        # 边界场景：空查询时回退到样本点查询，避免后续模型/解释器在空数组上失败。
+        if queries.size == 0:
+            return samples
+        return queries
+
     def _build_context(
         self,
         *,
@@ -106,7 +118,7 @@ class _BaseResidualKrigingAdapter:
     ) -> dict[str, Any]:
         samples = np.asarray(sample_coords, dtype=float)
         values = np.asarray(sample_values, dtype=float).reshape(-1)
-        queries = np.asarray(query_coords, dtype=float) if query_coords is not None else samples
+        queries = self._normalize_queries(samples, query_coords)
         key = self._stable_hash(
             {
                 "sample_shape": [int(samples.shape[0]), int(samples.shape[1])],
@@ -143,6 +155,7 @@ class _BaseResidualKrigingAdapter:
             "feature_names": list(pre["feature_names"]),
             "feature_matrix": np.asarray(pre["feature_matrix"], dtype=float),
             "scaled_x": x_scaled,
+            "query_coords": np.asarray(queries, dtype=float),
             "prediction": y_pred,
             "uncertainty": uncertainty,
             "residual": np.asarray(pred["residual"], dtype=float).reshape(-1),
@@ -522,13 +535,13 @@ class ResidualKrigingLIMEAdapter(_BaseResidualKrigingAdapter):
             model=model,
             sample_coords=np.asarray(sample_coords, dtype=float),
             sample_values=np.asarray(sample_values, dtype=float),
-            query_coords=np.asarray(query_coords, dtype=float) if query_coords is not None else np.asarray(sample_coords, dtype=float),
+            query_coords=np.asarray(context["query_coords"], dtype=float),
             prediction=np.asarray(context["prediction"], dtype=float),
             uncertainty=np.asarray(context["uncertainty"], dtype=float),
             residual=np.asarray(context["residual"], dtype=float),
         )
         residual_spatial_distribution = self._residual_spatial_distribution_payload(
-            query_coords=np.asarray(query_coords, dtype=float) if query_coords is not None else np.asarray(sample_coords, dtype=float),
+            query_coords=np.asarray(context["query_coords"], dtype=float),
             residual=np.asarray(context["residual"], dtype=float),
             uncertainty=np.asarray(context["uncertainty"], dtype=float),
         )
@@ -691,13 +704,13 @@ class ResidualKrigingSHAPAdapter(_BaseResidualKrigingAdapter):
             model=model,
             sample_coords=np.asarray(sample_coords, dtype=float),
             sample_values=np.asarray(sample_values, dtype=float),
-            query_coords=np.asarray(query_coords, dtype=float) if query_coords is not None else np.asarray(sample_coords, dtype=float),
+            query_coords=np.asarray(context["query_coords"], dtype=float),
             prediction=np.asarray(context["prediction"], dtype=float),
             uncertainty=np.asarray(context["uncertainty"], dtype=float),
             residual=np.asarray(context["residual"], dtype=float),
         )
         residual_spatial_distribution = self._residual_spatial_distribution_payload(
-            query_coords=np.asarray(query_coords, dtype=float) if query_coords is not None else np.asarray(sample_coords, dtype=float),
+            query_coords=np.asarray(context["query_coords"], dtype=float),
             residual=np.asarray(context["residual"], dtype=float),
             uncertainty=np.asarray(context["uncertainty"], dtype=float),
         )
