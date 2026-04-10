@@ -1509,6 +1509,140 @@
     background: #22c55e;
 }
 
+.dl-spatial-heatmap-wrap {
+    width: 100%;
+    overflow: auto;
+}
+
+.dl-spatial-heatmap-table {
+    width: 100%;
+    min-width: 420px;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+
+.dl-spatial-heatmap-table th,
+.dl-spatial-heatmap-table td {
+    border: 1px solid #dbe6f1;
+    padding: 4px 6px;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.dl-spatial-heatmap-table th {
+    background: #f1f5f9;
+    color: #334155;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+}
+
+.dl-spatial-heat-cell {
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+}
+
+.dl-spatial-color-legend {
+    margin-top: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    font-size: 11px;
+    color: #475569;
+}
+
+.dl-spatial-color-band {
+    width: 100px;
+    height: 10px;
+    border-radius: 999px;
+    border: 1px solid #d1d5db;
+    background: linear-gradient(90deg, hsl(210 85% 95%), hsl(45 85% 52%));
+    display: inline-block;
+}
+
+.dl-spatial-network-svg {
+    width: 100%;
+    height: 170px;
+    display: block;
+}
+
+.dl-spatial-network-edge {
+    stroke: rgba(14, 165, 233, 0.45);
+    stroke-linecap: round;
+}
+
+.dl-spatial-network-node {
+    fill: #0ea5e9;
+    stroke: #075985;
+    stroke-width: 1;
+}
+
+.dl-spatial-network-label {
+    fill: #0f172a;
+    font-size: 10px;
+    text-anchor: middle;
+    font-weight: 600;
+}
+
+.dl-spatial-network-meta {
+    fill: #475569;
+    font-size: 10px;
+    text-anchor: middle;
+}
+
+.dl-spatial-network-center {
+    fill: #f97316;
+    stroke: #9a3412;
+    stroke-width: 1.2;
+}
+
+.dl-spatial-network-center-label {
+    fill: #ffffff;
+    font-size: 11px;
+    text-anchor: middle;
+    font-weight: 700;
+}
+
+.dl-spatial-map-svg {
+    width: 100%;
+    height: 180px;
+    display: block;
+}
+
+.dl-spatial-map-frame {
+    fill: rgba(255, 255, 255, 0.78);
+    stroke: #cbd5e1;
+    stroke-width: 1;
+}
+
+.dl-spatial-map-sample {
+    stroke: #0f172a;
+    stroke-width: 0.9;
+}
+
+.dl-spatial-map-query {
+    stroke: #0f172a;
+    stroke-width: 1;
+    opacity: 0.9;
+}
+
+.dl-spatial-map-query.selected {
+    stroke: #dc2626;
+    stroke-width: 1.7;
+}
+
+.dl-spatial-map-link {
+    stroke: rgba(34, 197, 94, 0.45);
+    stroke-linecap: round;
+}
+
+.dl-spatial-map-label {
+    fill: #334155;
+    font-size: 10px;
+    font-weight: 500;
+}
+
 @media (max-width: 1180px) {
     .explain-layout-grid,
     .explain-result-grid {
@@ -1585,5 +1719,9 @@
     .dl-spatial-viz-header {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .dl-spatial-heatmap-table {
+        min-width: 340px;
     }
 }

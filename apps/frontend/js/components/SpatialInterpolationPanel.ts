@@ -22,6 +22,7 @@ type QueryVisualizationRow = {
     absConsistencyError: number;
     dominantNeighbor: NeighborImpact;
     neighbors: NeighborImpact[];
+    allNeighbors: NeighborImpact[];
 };
 
 type HistogramData = {
@@ -33,6 +34,26 @@ type SpatialVisualizationData = {
     rows: QueryVisualizationRow[];
     selectedQueryIndex: number;
     weightHistogram: HistogramData;
+    samplePoints: Array<{
+        sampleIndex: number;
+        coord: [number, number];
+        value: number;
+    }>;
+    queryPoints: Array<{
+        queryIndex: number;
+        coord: [number, number];
+        predicted: number;
+    }>;
+    valueRange: {
+        min: number;
+        max: number;
+    };
+    coordRange: {
+        minX: number;
+        maxX: number;
+        minY: number;
+        maxY: number;
+    };
     global: {
         mae: number;
         rmse: number;
@@ -134,6 +155,21 @@ export class SpatialInterpolationPanel {
                             <h6>插值结果对比图</h6>
                             <div id="dl-spatial-compare-summary" class="dl-spatial-summary">暂无数据</div>
                             <div id="dl-spatial-compare-chart" class="dl-spatial-chart"></div>
+                        </article>
+                        <article class="dl-spatial-viz-panel">
+                            <h6>权重热力图</h6>
+                            <div id="dl-spatial-heatmap-summary" class="dl-spatial-summary">暂无数据</div>
+                            <div id="dl-spatial-heatmap-chart" class="dl-spatial-chart"></div>
+                        </article>
+                        <article class="dl-spatial-viz-panel">
+                            <h6>邻域关系可视化</h6>
+                            <div id="dl-spatial-network-summary" class="dl-spatial-summary">暂无数据</div>
+                            <div id="dl-spatial-network-chart" class="dl-spatial-chart"></div>
+                        </article>
+                        <article class="dl-spatial-viz-panel">
+                            <h6>空间插值地图展示</h6>
+                            <div id="dl-spatial-map-summary" class="dl-spatial-summary">暂无数据</div>
+                            <div id="dl-spatial-map-chart" class="dl-spatial-chart"></div>
                         </article>
                     </div>
                 </section>
@@ -262,6 +298,11 @@ export class SpatialInterpolationPanel {
         const eps = 1e-6;
         const allWeights: number[] = [];
         const rows: QueryVisualizationRow[] = [];
+        const samplePoints = samples.map((sample, sampleIndex) => ({
+            sampleIndex,
+            coord: [sample[0], sample[1]] as [number, number],
+            value: this.toFiniteNumber(sample[2], 0)
+        }));
 
         for (let i = 0; i < queryCount; i += 1) {
             const queryCoord = queries[i];
@@ -307,7 +348,8 @@ export class SpatialInterpolationPanel {
                 consistencyError,
                 absConsistencyError: Math.abs(consistencyError),
                 dominantNeighbor: neighbors[0],
-                neighbors: neighbors.slice(0, 5)
+                neighbors: neighbors.slice(0, 5),
+                allNeighbors: neighbors
             });
         }
 
@@ -319,11 +361,36 @@ export class SpatialInterpolationPanel {
         const rmse = Math.sqrt(rows.reduce((sum, row) => sum + row.consistencyError * row.consistencyError, 0) / rows.length);
         const maxAbsError = Math.max(...rows.map(row => row.absConsistencyError));
         const meanDominantWeight = rows.reduce((sum, row) => sum + row.dominantNeighbor.weight, 0) / rows.length;
+        const queryPoints = rows.map(row => ({
+            queryIndex: row.queryIndex,
+            coord: row.queryCoord,
+            predicted: row.predicted
+        }));
+
+        const allValues = [...samplePoints.map(point => point.value), ...queryPoints.map(point => point.predicted)];
+        const valueRange = {
+            min: Math.min(...allValues),
+            max: Math.max(...allValues)
+        };
+
+        const allCoords = [...samplePoints.map(point => point.coord), ...queryPoints.map(point => point.coord)];
+        const xs = allCoords.map(coord => coord[0]);
+        const ys = allCoords.map(coord => coord[1]);
+        const coordRange = {
+            minX: Math.min(...xs),
+            maxX: Math.max(...xs),
+            minY: Math.min(...ys),
+            maxY: Math.max(...ys)
+        };
 
         return {
             rows,
             selectedQueryIndex: 0,
             weightHistogram: this.computeWeightHistogram(allWeights, 10),
+            samplePoints,
+            queryPoints,
+            valueRange,
+            coordRange,
             global: {
                 mae,
                 rmse,
@@ -391,6 +458,176 @@ export class SpatialInterpolationPanel {
         `;
     }
 
+    private clamp(value: number, min: number, max: number): number {
+        return Math.max(min, Math.min(max, value));
+    }
+
+    private normalize01(value: number, min: number, max: number): number {
+        const span = Math.max(1e-9, max - min);
+        return this.clamp((value - min) / span, 0, 1);
+    }
+
+    private heatColor(value: number, min: number, max: number): string {
+        const t = this.normalize01(value, min, max);
+        const hue = 210 - t * 165;
+        const lightness = 95 - t * 43;
+        return `hsl(${hue.toFixed(0)} 85% ${lightness.toFixed(0)}%)`;
+    }
+
+    private valueColor(value: number, min: number, max: number): string {
+        const t = this.normalize01(value, min, max);
+        const hue = 220 - t * 220;
+        return `hsl(${hue.toFixed(0)} 82% 52%)`;
+    }
+
+    private renderWeightHeatmap(data: SpatialVisualizationData): string {
+        const sampleCount = data.samplePoints.length;
+        if (sampleCount === 0 || data.rows.length === 0) {
+            return '<div class="dl-spatial-empty">暂无数据</div>';
+        }
+
+        const matrix = data.rows.map((row) => {
+            const values = Array.from({ length: sampleCount }, () => 0);
+            row.allNeighbors.forEach((neighbor) => {
+                values[neighbor.sampleIndex] = neighbor.weight;
+            });
+            return values;
+        });
+
+        let matrixMax = 0;
+        matrix.forEach((row) => {
+            row.forEach((cell) => {
+                matrixMax = Math.max(matrixMax, cell);
+            });
+        });
+        const max = Math.max(1e-9, matrixMax);
+
+        const headerCells = data.samplePoints
+            .map(point => `<th title="样本 S${point.sampleIndex} (${point.coord[0].toFixed(3)}, ${point.coord[1].toFixed(3)})">S${point.sampleIndex}</th>`)
+            .join('');
+        const bodyRows = matrix.map((weights, rowIndex) => `
+                <tr>
+                    <th title="查询点 Q${rowIndex}">Q${rowIndex}</th>
+                    ${weights.map((weight, colIndex) => {
+                        const color = this.heatColor(weight, 0, max);
+                        return `<td class="dl-spatial-heat-cell" style="background:${color};" title="Q${rowIndex}-S${colIndex} 权重 ${weight.toFixed(4)}">${weight.toFixed(3)}</td>`;
+                    }).join('')}
+                </tr>
+            `).join('');
+
+        return `
+            <div class="dl-spatial-heatmap-wrap">
+                <table class="dl-spatial-heatmap-table">
+                    <thead>
+                        <tr>
+                            <th>Q\\S</th>
+                            ${headerCells}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${bodyRows}
+                    </tbody>
+                </table>
+            </div>
+            <div class="dl-spatial-color-legend">
+                <span>低权重</span>
+                <i class="dl-spatial-color-band"></i>
+                <span>高权重</span>
+            </div>
+        `;
+    }
+
+    private buildNeighborhoodRelationSvg(row: QueryVisualizationRow): string {
+        const width = 560;
+        const height = 220;
+        const centerX = width * 0.47;
+        const centerY = height * 0.5;
+        const radiusBase = Math.min(width, height) * 0.32;
+        const neighbors = row.neighbors;
+        if (neighbors.length === 0) {
+            return '<div class="dl-spatial-empty">暂无邻域数据</div>';
+        }
+
+        const lineAndNode = neighbors.map((neighbor, index) => {
+            const angle = (Math.PI * 2 * index) / neighbors.length - Math.PI / 2;
+            const dynamicRadius = radiusBase - this.clamp(neighbor.weight * 70, 0, 45);
+            const nx = centerX + dynamicRadius * Math.cos(angle);
+            const ny = centerY + dynamicRadius * Math.sin(angle);
+            const strokeWidth = (1.2 + neighbor.weight * 7).toFixed(2);
+            const nodeR = (6 + neighbor.weight * 17).toFixed(2);
+            return `
+                <line x1="${centerX.toFixed(2)}" y1="${centerY.toFixed(2)}" x2="${nx.toFixed(2)}" y2="${ny.toFixed(2)}" class="dl-spatial-network-edge" style="stroke-width:${strokeWidth};"></line>
+                <circle cx="${nx.toFixed(2)}" cy="${ny.toFixed(2)}" r="${nodeR}" class="dl-spatial-network-node"></circle>
+                <text x="${nx.toFixed(2)}" y="${(ny - Number(nodeR) - 5).toFixed(2)}" class="dl-spatial-network-label">S${neighbor.sampleIndex}</text>
+                <text x="${nx.toFixed(2)}" y="${(ny + Number(nodeR) + 12).toFixed(2)}" class="dl-spatial-network-meta">${neighbor.weight.toFixed(3)}</text>
+            `;
+        }).join('');
+
+        return `
+            <svg class="dl-spatial-network-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="邻域关系可视化">
+                <circle cx="${centerX.toFixed(2)}" cy="${centerY.toFixed(2)}" r="20" class="dl-spatial-network-center"></circle>
+                <text x="${centerX.toFixed(2)}" y="${(centerY + 4).toFixed(2)}" class="dl-spatial-network-center-label">Q${row.queryIndex}</text>
+                ${lineAndNode}
+            </svg>
+        `;
+    }
+
+    private buildInterpolationMapSvg(data: SpatialVisualizationData, selected: QueryVisualizationRow): string {
+        const width = 560;
+        const height = 240;
+        const pad = { left: 36, right: 14, top: 12, bottom: 28 };
+        const spanX = Math.max(1e-9, data.coordRange.maxX - data.coordRange.minX);
+        const spanY = Math.max(1e-9, data.coordRange.maxY - data.coordRange.minY);
+        const toX = (x: number): number => pad.left + ((x - data.coordRange.minX) / spanX) * (width - pad.left - pad.right);
+        const toY = (y: number): number => pad.top + (1 - (y - data.coordRange.minY) / spanY) * (height - pad.top - pad.bottom);
+
+        const sampleDots = data.samplePoints.map((sample) => {
+            const cx = toX(sample.coord[0]).toFixed(2);
+            const cy = toY(sample.coord[1]).toFixed(2);
+            const fill = this.valueColor(sample.value, data.valueRange.min, data.valueRange.max);
+            return `
+                <circle cx="${cx}" cy="${cy}" r="6" class="dl-spatial-map-sample" style="fill:${fill};"></circle>
+                <text x="${(Number(cx) + 8).toFixed(2)}" y="${(Number(cy) - 6).toFixed(2)}" class="dl-spatial-map-label">S${sample.sampleIndex}</text>
+            `;
+        }).join('');
+
+        const queryDots = data.queryPoints.map((point) => {
+            const cx = toX(point.coord[0]).toFixed(2);
+            const cy = toY(point.coord[1]).toFixed(2);
+            const fill = this.valueColor(point.predicted, data.valueRange.min, data.valueRange.max);
+            const isSelected = point.queryIndex === selected.queryIndex;
+            const radius = isSelected ? 8 : 6;
+            return `
+                <circle cx="${cx}" cy="${cy}" r="${radius}" class="dl-spatial-map-query${isSelected ? ' selected' : ''}" style="fill:${fill};"></circle>
+                <text x="${(Number(cx) + 8).toFixed(2)}" y="${(Number(cy) + 12).toFixed(2)}" class="dl-spatial-map-label">Q${point.queryIndex}</text>
+            `;
+        }).join('');
+
+        const selectedX = toX(selected.queryCoord[0]);
+        const selectedY = toY(selected.queryCoord[1]);
+        const selectedLinks = selected.neighbors.map((neighbor) => {
+            const tx = toX(neighbor.sampleCoord[0]);
+            const ty = toY(neighbor.sampleCoord[1]);
+            return `
+                <line x1="${selectedX.toFixed(2)}" y1="${selectedY.toFixed(2)}" x2="${tx.toFixed(2)}" y2="${ty.toFixed(2)}" class="dl-spatial-map-link" style="stroke-width:${(1 + neighbor.weight * 5).toFixed(2)};"></line>
+            `;
+        }).join('');
+
+        return `
+            <svg class="dl-spatial-map-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="空间插值地图">
+                <rect x="${pad.left}" y="${pad.top}" width="${(width - pad.left - pad.right).toFixed(2)}" height="${(height - pad.top - pad.bottom).toFixed(2)}" class="dl-spatial-map-frame"></rect>
+                ${selectedLinks}
+                ${sampleDots}
+                ${queryDots}
+            </svg>
+            <div class="dl-spatial-legend">
+                <span><i class="line-dot weighted"></i>样本点 S</span>
+                <span><i class="line-dot predicted"></i>预测点 Q</span>
+                <span>颜色表示数值大小</span>
+            </div>
+        `;
+    }
+
     private buildCompareSvg(rows: QueryVisualizationRow[]): string {
         if (rows.length === 0) {
             return '<div class="dl-spatial-empty">暂无数据</div>';
@@ -438,8 +675,14 @@ export class SpatialInterpolationPanel {
         const neighborhoodChart = this.container.querySelector('#dl-spatial-neighborhood-chart') as HTMLElement | null;
         const compareSummary = this.container.querySelector('#dl-spatial-compare-summary') as HTMLElement | null;
         const compareChart = this.container.querySelector('#dl-spatial-compare-chart') as HTMLElement | null;
+        const heatmapSummary = this.container.querySelector('#dl-spatial-heatmap-summary') as HTMLElement | null;
+        const heatmapChart = this.container.querySelector('#dl-spatial-heatmap-chart') as HTMLElement | null;
+        const networkSummary = this.container.querySelector('#dl-spatial-network-summary') as HTMLElement | null;
+        const networkChart = this.container.querySelector('#dl-spatial-network-chart') as HTMLElement | null;
+        const mapSummary = this.container.querySelector('#dl-spatial-map-summary') as HTMLElement | null;
+        const mapChart = this.container.querySelector('#dl-spatial-map-chart') as HTMLElement | null;
 
-        if (!errorSummary || !errorChart || !weightSummary || !weightChart || !neighborhoodSummary || !neighborhoodChart || !compareSummary || !compareChart) {
+        if (!errorSummary || !errorChart || !weightSummary || !weightChart || !neighborhoodSummary || !neighborhoodChart || !compareSummary || !compareChart || !heatmapSummary || !heatmapChart || !networkSummary || !networkChart || !mapSummary || !mapChart) {
             return;
         }
 
@@ -453,6 +696,12 @@ export class SpatialInterpolationPanel {
             neighborhoodChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
             compareSummary.textContent = '暂无数据';
             compareChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
+            heatmapSummary.textContent = '暂无数据';
+            heatmapChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
+            networkSummary.textContent = '暂无数据';
+            networkChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
+            mapSummary.textContent = '暂无数据';
+            mapChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
             this.updateQuerySelector();
             return;
         }
@@ -490,6 +739,19 @@ export class SpatialInterpolationPanel {
         const delta = selected.predicted - selected.weightedMean;
         compareSummary.textContent = `Q${selected.queryIndex} 预测=${selected.predicted.toFixed(4)} | 邻域均值=${selected.weightedMean.toFixed(4)} | 最近邻=${selected.nearestValue.toFixed(4)} | 偏差=${delta.toFixed(4)}`;
         compareChart.innerHTML = this.buildCompareSvg(data.rows);
+
+        const globalMaxWeight = data.rows.reduce((max, row) => Math.max(max, ...row.allNeighbors.map(item => item.weight)), 0);
+        heatmapSummary.textContent = `查询点=${data.rows.length} | 样本点=${data.samplePoints.length} | 最大权重=${globalMaxWeight.toFixed(4)}`;
+        heatmapChart.innerHTML = this.renderWeightHeatmap(data);
+
+        const avgDistance = selected.neighbors.length > 0
+            ? selected.neighbors.reduce((sum, item) => sum + item.distance, 0) / selected.neighbors.length
+            : 0;
+        networkSummary.textContent = `Q${selected.queryIndex} 邻居数=${selected.neighbors.length} | 平均距离=${avgDistance.toFixed(4)} | 主导权重=${selected.dominantNeighbor.weight.toFixed(4)}`;
+        networkChart.innerHTML = this.buildNeighborhoodRelationSvg(selected);
+
+        mapSummary.textContent = `样本=${data.samplePoints.length} | 查询=${data.queryPoints.length} | 值域=[${data.valueRange.min.toFixed(4)}, ${data.valueRange.max.toFixed(4)}]`;
+        mapChart.innerHTML = this.buildInterpolationMapSvg(data, selected);
     }
 
     private async handleTrain(): Promise<void> {
