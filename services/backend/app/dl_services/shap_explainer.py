@@ -14,6 +14,7 @@ import numpy as np
 from sklearn.linear_model import Ridge
 
 from .lime_explainer import SpatiotemporalLIMEExplainer
+from .parallel_runtime import ParallelExecutionManager, ParallelTask
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -36,6 +37,8 @@ class SHAPConfig:
     background_drift_threshold: float = 0.12
     random_state: int = 42
     use_gpu_if_available: bool = True
+    max_workers: int = 4
+    min_parallel_workers: int = 1
 
 
 class BaseSHAPExplainer:
@@ -48,6 +51,11 @@ class BaseSHAPExplainer:
         self._background_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
         self._background_cache_hits = 0
         self._background_cache_misses = 0
+        self._parallel = ParallelExecutionManager(
+            name="shap",
+            max_workers=max(1, int(self.config.max_workers)),
+            min_workers=max(1, int(self.config.min_parallel_workers)),
+        )
 
     @staticmethod
     def _load_shap() -> Any:
@@ -687,16 +695,29 @@ class SpatiotemporalSHAPExplainer(BaseSHAPExplainer):
         )
         shap_module = self._load_shap()
         selected_nsamples = int(nsamples or self.config.nsamples)
-        batch_explanations = [
-            self._compute_single_shap(
-                context=context,
-                node_index=node_idx,
-                top_k=top_k,
-                nsamples=selected_nsamples,
-                shap_module=shap_module,
+        tasks = [
+            ParallelTask(
+                task_id=f"shap-node-{node_idx}",
+                priority=max(0, int(rank)),
+                payload={
+                    "node_index": int(node_idx),
+                    "top_k": int(top_k),
+                    "nsamples": int(selected_nsamples),
+                },
             )
-            for node_idx in node_indices
+            for rank, node_idx in enumerate(node_indices)
         ]
+        batch_explanations, run_report = self._parallel.run_tasks(
+            tasks=tasks,
+            task_type="cpu",
+            worker_fn=lambda payload: self._compute_single_shap(
+                context=context,
+                node_index=int(payload["node_index"]),
+                top_k=int(payload["top_k"]),
+                nsamples=int(payload["nsamples"]),
+                shap_module=shap_module,
+            ),
+        )
 
         raw_importance, global_ranking, category_stats = self._aggregate_global(
             explanations=batch_explanations,
@@ -756,6 +777,16 @@ class SpatiotemporalSHAPExplainer(BaseSHAPExplainer):
                 "background_size_impact": context["background_info"]["size_impact"],
                 "background_quality": context["background_info"]["quality"],
                 "background_cache_stats": context["background_info"]["cache_stats"],
+                "parallel_workers": int(run_report.workers),
+                "parallel_report": {
+                    "task_count": int(run_report.task_count),
+                    "queue_peak": int(run_report.queue_peak),
+                    "wait_ms_avg": float(run_report.wait_ms_avg),
+                    "exec_ms_avg": float(run_report.exec_ms_avg),
+                    "failed_tasks": int(run_report.failed_tasks),
+                    "task_type": run_report.task_type,
+                },
+                "parallel_monitor": self._parallel.snapshot(),
             },
         }
         self._cache_set(cache_key, payload)

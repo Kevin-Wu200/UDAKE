@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from collections import OrderedDict
-from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import hashlib
 import json
@@ -14,6 +13,8 @@ from typing import Any, Callable, Optional
 
 import numpy as np
 from sklearn.linear_model import Ridge
+
+from .parallel_runtime import ParallelExecutionManager, ParallelTask
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -37,6 +38,7 @@ class LIMEConfig:
     convergence_patience: int = 2
     convergence_rounds: int = 3
     sampling_step: int = 40
+    min_parallel_workers: int = 1
 
 
 class BaseLIMEExplainer:
@@ -47,6 +49,11 @@ class BaseLIMEExplainer:
         self._lock = threading.Lock()
         self._result_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
         self._context_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._parallel = ParallelExecutionManager(
+            name="lime",
+            max_workers=max(1, int(self.config.max_workers)),
+            min_workers=max(1, int(self.config.min_parallel_workers)),
+        )
 
     @staticmethod
     def _load_lime_tabular() -> Any:
@@ -522,19 +529,28 @@ class SpatiotemporalLIMEExplainer(BaseLIMEExplainer):
             context=context,
         )
 
-        max_workers = max(1, min(self.config.max_workers, explain_count))
-        with ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="lime-explain") as pool:
-            futures = [
-                pool.submit(
-                    self._explain_single,
-                    node_index=node_idx,
-                    context=context,
-                    top_k=top_k,
-                    num_samples=sample_plan[node_idx],
-                )
-                for node_idx in node_indices
-            ]
-            batch_explanations = [future.result() for future in futures]
+        tasks = [
+            ParallelTask(
+                task_id=f"lime-node-{node_idx}",
+                priority=max(0, int(rank)),
+                payload={
+                    "node_index": int(node_idx),
+                    "top_k": int(top_k),
+                    "num_samples": int(sample_plan[node_idx]),
+                },
+            )
+            for rank, node_idx in enumerate(node_indices)
+        ]
+        batch_explanations, run_report = self._parallel.run_tasks(
+            tasks=tasks,
+            task_type="cpu",
+            worker_fn=lambda payload: self._explain_single(
+                node_index=int(payload["node_index"]),
+                context=context,
+                top_k=int(payload["top_k"]),
+                num_samples=int(payload["num_samples"]),
+            ),
+        )
 
         feature_importance, global_feature_list = self._aggregate_feature_importance(batch_explanations, n_raw_features=n_raw_features)
         top_global = global_feature_list[: max(1, int(top_k))]
@@ -578,13 +594,22 @@ class SpatiotemporalLIMEExplainer(BaseLIMEExplainer):
             },
             "performance": {
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
-                "parallel_workers": max_workers,
+                "parallel_workers": int(run_report.workers),
                 "cache_hit": False,
                 "sampling_plan": {str(k): int(v) for k, v in sample_plan.items()},
                 "sampling_mean": float(np.mean(used_samples)) if used_samples else float(samples),
                 "sampling_std": float(np.std(used_samples)) if used_samples else 0.0,
                 "convergence_rate": float(np.mean(convergence_flags)) if convergence_flags else 0.0,
                 "convergence_rounds_mean": float(np.mean(convergence_rounds)) if convergence_rounds else 1.0,
+                "parallel_report": {
+                    "task_count": int(run_report.task_count),
+                    "queue_peak": int(run_report.queue_peak),
+                    "wait_ms_avg": float(run_report.wait_ms_avg),
+                    "exec_ms_avg": float(run_report.exec_ms_avg),
+                    "failed_tasks": int(run_report.failed_tasks),
+                    "task_type": run_report.task_type,
+                },
+                "parallel_monitor": self._parallel.snapshot(),
             },
         }
         self._cache_set(cache_key, payload)

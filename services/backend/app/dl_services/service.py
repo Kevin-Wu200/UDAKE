@@ -28,6 +28,7 @@ from .contrastive_anomaly_explainer import ContrastiveLimeAdapter, ContrastiveSh
 from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
 from .gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter
 from .lime_explainer import SpatiotemporalLIMEExplainer
+from .parallel_runtime import ParallelExecutionManager, ParallelTask
 from .shap_explainer import SpatiotemporalSHAPExplainer
 from .vae_anomaly_explainer import VAEAnomalyLIMEAdapter, VAEAnomalySHAPAdapter
 
@@ -99,6 +100,7 @@ class DeepLearningService:
         self.contrastive_shap_adapter = ContrastiveShapAdapter()
         self.anomaly_cache = AnomalyModelCache(cache_size=256, ttl_seconds=600)
         self._anomaly_model_versions: dict[str, int] = {}
+        self.batch_parallel = ParallelExecutionManager(name="st-batch", max_workers=4, min_workers=1)
 
     @staticmethod
     def _hash_array(value: np.ndarray) -> str:
@@ -880,17 +882,34 @@ class DeepLearningService:
 
         all_mean: list[np.ndarray] = []
         all_var: list[np.ndarray] = []
-        for start in range(0, n_nodes, batch_size):
-            end = min(n_nodes, start + batch_size)
-            pred = self.spatiotemporal_integrator.predict(
-                model_type=model_type,  # type: ignore[arg-type]
-                coords=coords[start:end],
-                series=series[start:end],
-                pred_horizon=pred_horizon,
-                fusion_strategy="gating",
-                blend_ratio=0.7,
-                enable_inference_acceleration=True,
+        chunks = [(start, min(n_nodes, start + batch_size)) for start in range(0, n_nodes, batch_size)]
+        tasks = [
+            ParallelTask(
+                task_id=f"batch-{start}-{end}",
+                priority=int(rank),
+                payload={"start": int(start), "end": int(end)},
             )
+            for rank, (start, end) in enumerate(chunks)
+        ]
+
+        outputs, _ = self.batch_parallel.run_tasks(
+            tasks=tasks,
+            task_type="cpu",
+            worker_fn=lambda payload: (
+                int(payload["start"]),
+                self.spatiotemporal_integrator.predict(
+                    model_type=model_type,  # type: ignore[arg-type]
+                    coords=coords[int(payload["start"]): int(payload["end"])],
+                    series=series[int(payload["start"]): int(payload["end"])],
+                    pred_horizon=pred_horizon,
+                    fusion_strategy="gating",
+                    blend_ratio=0.7,
+                    enable_inference_acceleration=True,
+                ),
+            )
+        )
+        outputs.sort(key=lambda item: item[0])
+        for _, pred in outputs:
             all_mean.append(pred.mean)
             all_var.append(pred.variance)
         return np.vstack(all_mean), np.vstack(all_var)
@@ -1028,6 +1047,11 @@ class DeepLearningService:
         if include_prediction:
             result["prediction"] = pred_mean.tolist()
             result["variance"] = pred_var.tolist()
+        result["parallel"] = {
+            "batch_monitor": self.batch_parallel.snapshot(),
+            "lime_monitor": self.lime_explainer._parallel.snapshot(),
+            "shap_monitor": self.shap_explainer._parallel.snapshot(),
+        }
         return result
 
     def train_fusion_profile(
