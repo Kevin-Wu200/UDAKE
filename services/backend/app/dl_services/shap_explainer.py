@@ -26,9 +26,14 @@ def _safe_float(value: Any, default: float = 0.0) -> float:
 @dataclass
 class SHAPConfig:
     background_size: int = 64
+    min_background_size: int = 16
+    max_background_size: int = 128
     max_explain_nodes: int = 8
     nsamples: int = 120
     cache_size: int = 32
+    background_cache_size: int = 16
+    background_update_interval_seconds: int = 300
+    background_drift_threshold: float = 0.12
     random_state: int = 42
     use_gpu_if_available: bool = True
 
@@ -40,6 +45,9 @@ class BaseSHAPExplainer:
         self.config = config or SHAPConfig()
         self._lock = threading.Lock()
         self._result_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._background_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._background_cache_hits = 0
+        self._background_cache_misses = 0
 
     @staticmethod
     def _load_shap() -> Any:
@@ -64,6 +72,35 @@ class BaseSHAPExplainer:
             while len(self._result_cache) > self.config.cache_size:
                 self._result_cache.popitem(last=False)
 
+    def _background_get(self, key: str) -> Optional[dict[str, Any]]:
+        with self._lock:
+            item = self._background_cache.get(key)
+            if item is None:
+                self._background_cache_misses += 1
+                return None
+            self._background_cache_hits += 1
+            self._background_cache.move_to_end(key)
+            return item
+
+    def _background_set(self, key: str, value: dict[str, Any]) -> None:
+        with self._lock:
+            self._background_cache[key] = value
+            self._background_cache.move_to_end(key)
+            max_size = max(1, int(self.config.background_cache_size))
+            while len(self._background_cache) > max_size:
+                self._background_cache.popitem(last=False)
+
+    def _background_cache_stats(self) -> dict[str, Any]:
+        with self._lock:
+            total = self._background_cache_hits + self._background_cache_misses
+            hit_rate = float(self._background_cache_hits / total) if total > 0 else 0.0
+            return {
+                "entries": int(len(self._background_cache)),
+                "hits": int(self._background_cache_hits),
+                "misses": int(self._background_cache_misses),
+                "hit_rate": hit_rate,
+            }
+
 
 class SpatiotemporalSHAPExplainer(BaseSHAPExplainer):
     """时空预测模型 SHAP 适配器。"""
@@ -83,15 +120,220 @@ class SpatiotemporalSHAPExplainer(BaseSHAPExplainer):
         std = np.where(std < 1e-8, 1.0, std)
         return (x - mean) / std, mean, std
 
-    def _select_background(self, x_scaled: np.ndarray, target: np.ndarray) -> np.ndarray:
-        n = x_scaled.shape[0]
-        k = max(8, min(int(self.config.background_size), n))
+    def _estimate_background_size(self, x_scaled: np.ndarray, target: np.ndarray, explain_count: int) -> int:
+        n = int(x_scaled.shape[0])
+        min_k = max(8, int(self.config.min_background_size))
+        max_k = max(min_k, int(self.config.max_background_size))
+        base = max(int(self.config.background_size), min_k)
+
+        target_std = float(np.std(target))
+        feature_dispersion = float(np.mean(np.std(x_scaled, axis=0)))
+        complexity = min(1.0, 0.55 * target_std + 0.45 * feature_dispersion)
+        node_factor = min(1.0, float(max(1, explain_count)) / max(1.0, float(n)))
+        scaled = int(round(base * (0.85 + 0.45 * complexity + 0.25 * node_factor)))
+        return int(max(min_k, min(max_k, min(n, scaled))))
+
+    def _dynamic_background_pool(
+        self,
+        *,
+        x_scaled: np.ndarray,
+        target: np.ndarray,
+        node_indices: list[int],
+        pool_size: int,
+    ) -> np.ndarray:
+        n = int(x_scaled.shape[0])
+        if n <= pool_size:
+            return np.arange(n, dtype=int)
+        if not node_indices:
+            node_indices = [0]
+
+        focus = x_scaled[np.asarray(node_indices, dtype=int)]
+        focus_center = np.mean(focus, axis=0)
+        focus_dist = np.linalg.norm(x_scaled - focus_center.reshape(1, -1), axis=1)
+        focus_dist = focus_dist / (np.max(focus_dist) + 1e-8)
+
+        target_center = float(np.mean(target[np.asarray(node_indices, dtype=int)]))
+        target_dev = np.abs(target - target_center)
+        target_dev = target_dev / (np.max(target_dev) + 1e-8)
+
+        score = 0.6 * focus_dist + 0.4 * target_dev
+        score[np.asarray(node_indices, dtype=int)] = 2.0
+        selected = np.argsort(-score)[:pool_size].astype(int)
+        return np.unique(selected)
+
+    def _select_diverse_indices(self, x_values: np.ndarray, size: int, seed_indices: np.ndarray) -> np.ndarray:
+        n = int(x_values.shape[0])
+        if n <= size:
+            return np.arange(n, dtype=int)
+        if seed_indices.size == 0:
+            seed_indices = np.asarray([0], dtype=int)
+
+        chosen: list[int] = [int(seed_indices[0])]
+        if n > 1:
+            dist_to_seed = np.linalg.norm(x_values - x_values[chosen[0]].reshape(1, -1), axis=1)
+            chosen.append(int(np.argmax(dist_to_seed)))
+
+        while len(chosen) < size:
+            chosen_arr = np.asarray(chosen, dtype=int)
+            centers = x_values[chosen_arr]
+            min_dist = np.min(np.linalg.norm(x_values[:, None, :] - centers[None, :, :], axis=2), axis=1)
+            min_dist[chosen_arr] = -1.0
+            next_idx = int(np.argmax(min_dist))
+            if next_idx in chosen:
+                break
+            chosen.append(next_idx)
+        return np.asarray(chosen[:size], dtype=int)
+
+    def _select_background(
+        self,
+        *,
+        x_scaled: np.ndarray,
+        target: np.ndarray,
+        node_indices: list[int],
+        background_size: int,
+    ) -> np.ndarray:
+        n = int(x_scaled.shape[0])
+        k = max(8, min(int(background_size), n))
         if n <= k:
             return x_scaled.copy()
-        by_target = np.argsort(target.astype(float))
-        evenly = np.linspace(0, n - 1, k, dtype=int)
-        idx = np.unique(by_target[evenly])
-        return x_scaled[idx]
+
+        pool_size = max(k * 3, min(n, k + max(12, int(np.sqrt(n)))))
+        pool_indices = self._dynamic_background_pool(
+            x_scaled=x_scaled,
+            target=target,
+            node_indices=node_indices,
+            pool_size=pool_size,
+        )
+        x_pool = x_scaled[pool_indices]
+        target_pool = target[pool_indices]
+
+        by_target = np.argsort(target_pool.astype(float))
+        strata = np.linspace(0, len(by_target) - 1, max(k, min(len(by_target), k * 2)), dtype=int)
+        stratified = np.unique(by_target[strata]).astype(int)
+        diverse = self._select_diverse_indices(x_pool, size=k, seed_indices=stratified)
+        chosen = np.unique(diverse).astype(int)
+        if len(chosen) < k:
+            fill = np.setdiff1d(np.arange(len(pool_indices), dtype=int), chosen, assume_unique=False)
+            chosen = np.concatenate((chosen, fill[: max(0, k - len(chosen))]))
+        return x_pool[np.asarray(chosen[:k], dtype=int)]
+
+    def _evaluate_background_quality(
+        self,
+        *,
+        x_scaled: np.ndarray,
+        target: np.ndarray,
+        background: np.ndarray,
+        node_indices: list[int],
+    ) -> dict[str, float]:
+        if background.size == 0:
+            return {"coverage": 0.0, "diversity": 0.0, "target_balance": 0.0, "local_focus": 0.0, "overall": 0.0}
+
+        dist = np.linalg.norm(x_scaled[:, None, :] - background[None, :, :], axis=2)
+        coverage = float(1.0 / (1.0 + np.mean(np.min(dist, axis=1))))
+
+        if background.shape[0] > 1:
+            pair = np.linalg.norm(background[:, None, :] - background[None, :, :], axis=2)
+            diversity = float(np.mean(pair[np.triu_indices(background.shape[0], k=1)]))
+            diversity = float(diversity / (1.0 + diversity))
+        else:
+            diversity = 0.0
+
+        bins = np.linspace(float(np.min(target)), float(np.max(target)) + 1e-12, 6)
+        hist_all, _ = np.histogram(target, bins=bins)
+        nearest = np.argmin(dist, axis=0)
+        bg_target = target[nearest]
+        hist_bg, _ = np.histogram(bg_target, bins=bins)
+        p_all = hist_all / (np.sum(hist_all) + 1e-8)
+        p_bg = hist_bg / (np.sum(hist_bg) + 1e-8)
+        target_balance = float(max(0.0, 1.0 - 0.5 * np.sum(np.abs(p_all - p_bg))))
+
+        if node_indices:
+            focus_center = np.mean(x_scaled[np.asarray(node_indices, dtype=int)], axis=0, keepdims=True)
+            local_focus = float(1.0 / (1.0 + np.mean(np.linalg.norm(background - focus_center, axis=1))))
+        else:
+            local_focus = coverage
+
+        overall = 0.3 * coverage + 0.25 * diversity + 0.2 * target_balance + 0.25 * local_focus
+        return {
+            "coverage": float(max(0.0, min(1.0, coverage))),
+            "diversity": float(max(0.0, min(1.0, diversity))),
+            "target_balance": float(max(0.0, min(1.0, target_balance))),
+            "local_focus": float(max(0.0, min(1.0, local_focus))),
+            "overall": float(max(0.0, min(1.0, overall))),
+        }
+
+    def _analyze_background_size_impact(
+        self,
+        *,
+        x_scaled: np.ndarray,
+        target: np.ndarray,
+        node_indices: list[int],
+    ) -> list[dict[str, Any]]:
+        n = int(x_scaled.shape[0])
+        if n == 0:
+            return []
+        sizes = sorted(
+            {
+                max(8, min(n, int(self.config.min_background_size))),
+                max(8, min(n, int(self.config.background_size))),
+                max(8, min(n, int(self.config.max_background_size))),
+            }
+        )
+        analysis: list[dict[str, Any]] = []
+        for size in sizes:
+            bg = self._select_background(
+                x_scaled=x_scaled,
+                target=target,
+                node_indices=node_indices,
+                background_size=size,
+            )
+            quality = self._evaluate_background_quality(
+                x_scaled=x_scaled,
+                target=target,
+                background=bg,
+                node_indices=node_indices,
+            )
+            analysis.append(
+                {
+                    "size": int(size),
+                    "quality_score": float(quality["overall"]),
+                    "coverage": float(quality["coverage"]),
+                    "diversity": float(quality["diversity"]),
+                }
+            )
+        return analysis
+
+    def _build_background_key(self, *, model_type: str, x_scaled: np.ndarray, target: np.ndarray) -> str:
+        payload = {
+            "model_type": model_type,
+            "x_shape": list(x_scaled.shape),
+            "target_shape": list(target.shape),
+            "x_hash": hashlib.md5(np.asarray(x_scaled, dtype=float).tobytes()).hexdigest(),
+        }
+        return self._stable_hash(payload)
+
+    def _should_refresh_background(
+        self,
+        cached_item: Optional[dict[str, Any]],
+        *,
+        target: np.ndarray,
+        background_size: int,
+    ) -> bool:
+        if cached_item is None:
+            return True
+        cached_bg = np.asarray(cached_item.get("background", np.zeros((0, 0), dtype=float)), dtype=float)
+        if cached_bg.shape[0] != int(background_size):
+            return True
+        now = time.time()
+        updated_at = _safe_float(cached_item.get("updated_at", 0.0), 0.0)
+        if now - updated_at >= float(self.config.background_update_interval_seconds):
+            return True
+        ref_mean = _safe_float(cached_item.get("target_mean", 0.0), 0.0)
+        ref_std = _safe_float(cached_item.get("target_std", 1.0), 1.0)
+        cur_mean = float(np.mean(target))
+        cur_std = float(np.std(target))
+        drift = abs(cur_mean - ref_mean) / (abs(ref_std) + 1e-6) + abs(cur_std - ref_std) / (abs(ref_std) + 1e-6)
+        return bool(drift >= float(self.config.background_drift_threshold))
 
     def _feature_alias(self, feature_names: list[str]) -> dict[str, str]:
         aliases: dict[str, str] = {}
@@ -118,13 +360,55 @@ class SpatiotemporalSHAPExplainer(BaseSHAPExplainer):
         coords: np.ndarray,
         series: np.ndarray,
         pred_mean: np.ndarray,
+        node_indices: list[int],
     ) -> dict[str, Any]:
         feature_matrix, feature_names = self._lime_feature_helper._build_feature_matrix(coords, series)
         x_scaled, x_mean, x_std = self._standardize(feature_matrix)
         target = np.mean(pred_mean, axis=1).astype(float)
         surrogate = Ridge(alpha=1.0, random_state=self.config.random_state)
         surrogate.fit(x_scaled, target)
-        background = self._select_background(x_scaled, target)
+
+        dynamic_bg_size = self._estimate_background_size(x_scaled, target, explain_count=len(node_indices))
+        background_key = self._build_background_key(model_type=model_type, x_scaled=x_scaled, target=target)
+        cached_bg = self._background_get(background_key)
+        refresh = self._should_refresh_background(cached_bg, target=target, background_size=dynamic_bg_size)
+        if refresh:
+            background = self._select_background(
+                x_scaled=x_scaled,
+                target=target,
+                node_indices=node_indices,
+                background_size=dynamic_bg_size,
+            )
+            self._background_set(
+                background_key,
+                {
+                    "background": background,
+                    "target_mean": float(np.mean(target)),
+                    "target_std": float(np.std(target)),
+                    "updated_at": time.time(),
+                },
+            )
+            background_cache_hit = False
+            update_reason = "new_or_refreshed"
+        else:
+            background = np.asarray(cached_bg["background"], dtype=float)
+            background_cache_hit = True
+            update_reason = "cache_reuse"
+
+        background_quality = self._evaluate_background_quality(
+            x_scaled=x_scaled,
+            target=target,
+            background=background,
+            node_indices=node_indices,
+        )
+        size_impact = self._analyze_background_size_impact(
+            x_scaled=x_scaled,
+            target=target,
+            node_indices=node_indices,
+        )
+        size_scores = {int(item["size"]): float(item["quality_score"]) for item in size_impact}
+        recommended = max(size_scores, key=size_scores.get) if size_scores else int(background.shape[0])
+
         aliases = self._feature_alias(feature_names)
         groups = self._feature_groups(feature_names)
         return {
@@ -139,6 +423,16 @@ class SpatiotemporalSHAPExplainer(BaseSHAPExplainer):
             "target": target,
             "surrogate": surrogate,
             "background": background,
+            "background_info": {
+                "dynamic_size": int(dynamic_bg_size),
+                "selected_size": int(background.shape[0]),
+                "recommended_size": int(recommended),
+                "cache_hit": bool(background_cache_hit),
+                "update_reason": update_reason,
+                "quality": background_quality,
+                "size_impact": size_impact,
+                "cache_stats": self._background_cache_stats(),
+            },
         }
 
     def _predict_fn(self, context: dict[str, Any], values: np.ndarray) -> np.ndarray:
@@ -389,6 +683,7 @@ class SpatiotemporalSHAPExplainer(BaseSHAPExplainer):
             coords=np.asarray(coords, dtype=float),
             series=np.asarray(series, dtype=float),
             pred_mean=np.asarray(pred_mean, dtype=float),
+            node_indices=node_indices,
         )
         shap_module = self._load_shap()
         selected_nsamples = int(nsamples or self.config.nsamples)
@@ -435,6 +730,8 @@ class SpatiotemporalSHAPExplainer(BaseSHAPExplainer):
                 "explained_nodes": explain_count,
                 "num_features": int(context["scaled_x"].shape[1]),
                 "background_size": int(context["background"].shape[0]),
+                "background_recommended_size": int(context["background_info"]["recommended_size"]),
+                "background_quality_score": float(context["background_info"]["quality"]["overall"]),
                 "nsamples": selected_nsamples,
                 "top_features": top_features,
                 "feature_group_importance": category_stats,
@@ -454,6 +751,11 @@ class SpatiotemporalSHAPExplainer(BaseSHAPExplainer):
                 "cache_hit": False,
                 "backend": "shap" if shap_module is not None else "surrogate_linear",
                 "gpu_enabled": bool(self.config.use_gpu_if_available and shap_module is not None),
+                "background_cache_hit": bool(context["background_info"]["cache_hit"]),
+                "background_update_reason": str(context["background_info"]["update_reason"]),
+                "background_size_impact": context["background_info"]["size_impact"],
+                "background_quality": context["background_info"]["quality"],
+                "background_cache_stats": context["background_info"]["cache_stats"],
             },
         }
         self._cache_set(cache_key, payload)
