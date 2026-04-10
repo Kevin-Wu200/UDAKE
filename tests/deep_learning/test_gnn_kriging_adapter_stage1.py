@@ -99,4 +99,13 @@ def test_gnn_kriging_adapter_cache_hit() -> None:
 
     assert first["performance"]["cache_hit"] is False
     assert second["performance"]["cache_hit"] is True
-
+    for _ in range(4):
+        second = adapter.explain(
+            model=model,
+            sample_coords=coords,
+            sample_values=values,
+            query_coords=queries,
+            top_k=3,
+            nsamples=70,
+        )
+    assert second["performance"]["result_cache_hit_rate"] > 0.6

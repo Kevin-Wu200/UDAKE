@@ -8,6 +8,7 @@ from typing import Any, Literal
 import numpy as np
 
 from .baselines import OrdinaryKrigingBaseline, UniversalKrigingBaseline
+from .spatial_index import SpatialIndex
 
 
 @dataclass
@@ -36,6 +37,8 @@ class ResidualKrigingModel:
         self.mlp_w2 = rng.normal(0.0, 0.08, size=(12, 1))
         self.res_scale = 1.0
         self.bias = 0.0
+        self._feature_index: SpatialIndex | None = None
+        self._feature_index_key: tuple[int, int, int] | None = None
 
     @staticmethod
     def _validate_inputs(
@@ -70,41 +73,52 @@ class ResidualKrigingModel:
         s_coords = np.asarray(sample_coords, dtype=float)
         s_vals = np.asarray(sample_values, dtype=float).reshape(-1)
         q_coords = np.asarray(query_coords, dtype=float)
+        if len(q_coords) == 0:
+            return np.zeros((0, 8), dtype=float)
 
-        features = np.zeros((len(q_coords), 8), dtype=float)
-        for i, q in enumerate(q_coords):
-            diff = s_coords - q[None, :]
-            dist = np.sqrt((diff * diff).sum(axis=1) + 1e-12)
-            ids = np.argsort(dist)[: min(k, len(dist))]
-            local_dist = dist[ids]
-            local_vals = s_vals[ids]
-            local_diff = diff[ids]
+        index = self._get_or_build_index(s_coords)
+        k_val = min(max(1, int(k)), int(s_coords.shape[0]))
+        knn = index.query_knn(q_coords, k=k_val, exclude_self=False)
+        ids = np.asarray(knn.indices, dtype=int)
+        local_dist = np.asarray(knn.distances, dtype=float)
+        local_vals = s_vals[ids]
+        local_diff = s_coords[ids] - q_coords[:, None, :]
 
-            mean_dist = float(np.mean(local_dist))
-            std_dist = float(np.std(local_dist))
-            direction = np.mean(local_diff / (local_dist[:, None] + 1e-12), axis=0)
-            density = float(len(ids) / (np.pi * (max(local_dist.max(), 1e-6) ** 2)))
+        mean_dist = np.mean(local_dist, axis=1)
+        std_dist = np.std(local_dist, axis=1)
+        direction = np.mean(local_diff / (local_dist[:, :, None] + 1e-12), axis=1)
+        local_max_dist = np.maximum(np.max(local_dist, axis=1), 1e-6)
+        density = k_val / (np.pi * (local_max_dist**2))
 
-            centered = local_vals - np.mean(local_vals)
-            std = float(np.std(local_vals) + 1e-12)
-            skew = float(np.mean((centered / std) ** 3))
-            kurt = float(np.mean((centered / std) ** 4))
+        local_mean = np.mean(local_vals, axis=1, keepdims=True)
+        centered = local_vals - local_mean
+        local_std = np.std(local_vals, axis=1, keepdims=True) + 1e-12
+        z = centered / local_std
+        skew = np.mean(z**3, axis=1)
+        kurt = np.mean(z**4, axis=1)
 
-            features[i] = np.array(
-                [
-                    mean_dist,
-                    std_dist,
-                    direction[0],
-                    direction[1],
-                    density,
-                    skew,
-                    kurt,
-                    float(prior_mean[i]),
-                ],
-                dtype=float,
-            )
+        return np.stack(
+            [
+                mean_dist,
+                std_dist,
+                direction[:, 0],
+                direction[:, 1],
+                density,
+                skew,
+                kurt,
+                np.asarray(prior_mean, dtype=float).reshape(-1),
+            ],
+            axis=1,
+        ).astype(float)
 
-        return features
+    def _get_or_build_index(self, sample_coords: np.ndarray) -> SpatialIndex:
+        coords = np.asarray(sample_coords, dtype=float)
+        key = (int(coords.shape[0]), int(coords.shape[1]), hash(coords.tobytes()))
+        if self._feature_index is not None and self._feature_index_key == key:
+            return self._feature_index
+        self._feature_index = SpatialIndex(coords)
+        self._feature_index_key = key
+        return self._feature_index
 
     def _mlp_branch(self, features: np.ndarray) -> np.ndarray:
         hidden = np.maximum(0.0, features @ self.mlp_w1)
@@ -118,13 +132,12 @@ class ResidualKrigingModel:
         # Grid-style local smoothing branch for residual approximation.
         x = features[:, -1]
         q = np.asarray(query_coords, dtype=float)
-        out = np.zeros_like(x)
-        for i, point in enumerate(q):
-            dist = np.sqrt(((q - point) ** 2).sum(axis=1) + 1e-12)
-            w = np.exp(-dist / 0.15)
-            w = w / (w.sum() + 1e-12)
-            out[i] = float(np.sum(w * x)) - x[i]
-        return out
+        if len(q) == 0:
+            return np.zeros((0,), dtype=float)
+        dist = np.sqrt(np.sum((q[:, None, :] - q[None, :, :]) ** 2, axis=2) + 1e-12)
+        w = np.exp(-dist / 0.15)
+        w = w / (np.sum(w, axis=1, keepdims=True) + 1e-12)
+        return (w @ x) - x
 
     def _multi_scale_fusion(
         self,

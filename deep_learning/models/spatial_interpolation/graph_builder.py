@@ -7,6 +7,8 @@ from typing import Literal
 
 import numpy as np
 
+from .spatial_index import SpatialIndex
+
 
 @dataclass
 class GraphData:
@@ -68,11 +70,12 @@ class SpatialGraphBuilder:
             return np.zeros((2, 0), dtype=int)
 
         k_val = min(max(1, int(k or self.default_k)), max(1, n - 1))
-        distances = self.pairwise_distance(coords)
+        index = SpatialIndex(coords)
+        knn = index.query_knn(coords, k=k_val, exclude_self=True)
         edges: set[tuple[int, int]] = set()
 
         for i in range(n):
-            nearest = np.argsort(distances[i])[1 : k_val + 1]
+            nearest = knn.indices[i]
             for j in nearest:
                 a, b = (i, int(j)) if i < int(j) else (int(j), i)
                 edges.add((a, b))
@@ -85,13 +88,18 @@ class SpatialGraphBuilder:
             return np.zeros((2, 0), dtype=int)
 
         r = float(radius if radius is not None else self.default_radius)
-        distances = self.pairwise_distance(coords)
+        index = SpatialIndex(coords)
+        neighbors = index.query_radius(coords, radius=r, exclude_self=True)
         edges: set[tuple[int, int]] = set()
 
         for i in range(n):
-            for j in range(i + 1, n):
-                if distances[i, j] <= r:
-                    edges.add((i, j))
+            row = neighbors[i]
+            if row.size == 0:
+                continue
+            for j in row.tolist():
+                j_idx = int(j)
+                if j_idx > i:
+                    edges.add((i, j_idx))
 
         if not edges:
             return self.build_knn_graph(coords, k=1)
@@ -169,11 +177,11 @@ class SpatialGraphBuilder:
 
     def to_adjacency(self, n_nodes: int, edge_index: np.ndarray, edge_weight: np.ndarray) -> np.ndarray:
         adjacency = np.zeros((n_nodes, n_nodes), dtype=float)
-        for idx in range(edge_index.shape[1]):
-            i = int(edge_index[0, idx])
-            j = int(edge_index[1, idx])
-            w = float(edge_weight[idx])
-            adjacency[i, j] += w
+        if edge_index.shape[1] == 0:
+            return adjacency
+        src = np.asarray(edge_index[0], dtype=int)
+        dst = np.asarray(edge_index[1], dtype=int)
+        np.add.at(adjacency, (src, dst), np.asarray(edge_weight, dtype=float))
         return adjacency
 
     def _edges_to_undirected_index(self, edges: set[tuple[int, int]]) -> np.ndarray:

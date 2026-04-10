@@ -38,6 +38,10 @@ class _BaseResidualKrigingAdapter:
         self._lock = threading.Lock()
         self._result_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
         self._context_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._result_cache_hits = 0
+        self._result_cache_misses = 0
+        self._context_cache_hits = 0
+        self._context_cache_misses = 0
 
     @staticmethod
     def _load_lime_tabular() -> Any:
@@ -59,7 +63,9 @@ class _BaseResidualKrigingAdapter:
         with self._lock:
             item = self._result_cache.get(key)
             if item is None:
+                self._result_cache_misses += 1
                 return None
+            self._result_cache_hits += 1
             self._result_cache.move_to_end(key)
             return dict(item)
 
@@ -74,7 +80,9 @@ class _BaseResidualKrigingAdapter:
         with self._lock:
             item = self._context_cache.get(key)
             if item is None:
+                self._context_cache_misses += 1
                 return None
+            self._context_cache_hits += 1
             self._context_cache.move_to_end(key)
             return item
 
@@ -88,6 +96,19 @@ class _BaseResidualKrigingAdapter:
     def _stable_hash(self, payload: dict[str, Any]) -> str:
         normalized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
         return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _cache_metrics(self) -> dict[str, float | int]:
+        with self._lock:
+            result_total = self._result_cache_hits + self._result_cache_misses
+            context_total = self._context_cache_hits + self._context_cache_misses
+            return {
+                "result_cache_hits": int(self._result_cache_hits),
+                "result_cache_misses": int(self._result_cache_misses),
+                "result_cache_hit_rate": float(self._result_cache_hits / max(1, result_total)),
+                "context_cache_hits": int(self._context_cache_hits),
+                "context_cache_misses": int(self._context_cache_misses),
+                "context_cache_hit_rate": float(self._context_cache_hits / max(1, context_total)),
+            }
 
     def _top_node_indices(self, uncertainty: np.ndarray, max_explain_nodes: int) -> list[int]:
         n = int(len(uncertainty))
@@ -447,7 +468,7 @@ class ResidualKrigingLIMEAdapter(_BaseResidualKrigingAdapter):
         )
         cached = self._cache_get(cache_key)
         if cached is not None:
-            cached["performance"] = {**cached.get("performance", {}), "cache_hit": True}
+            cached["performance"] = {**cached.get("performance", {}), "cache_hit": True, **self._cache_metrics()}
             return cached
 
         feature_names: list[str] = context["feature_names"]
@@ -573,6 +594,7 @@ class ResidualKrigingLIMEAdapter(_BaseResidualKrigingAdapter):
                 "meets_latency_target": bool(elapsed_ms < 8000.0),
                 "lime_training_size": int(training_data.shape[0]),
                 "lime_sampling_budget": int(effective_samples),
+                **self._cache_metrics(),
             },
         }
         self._cache_set(cache_key, payload)
@@ -614,7 +636,7 @@ class ResidualKrigingSHAPAdapter(_BaseResidualKrigingAdapter):
         )
         cached = self._cache_get(cache_key)
         if cached is not None:
-            cached["performance"] = {**cached.get("performance", {}), "cache_hit": True}
+            cached["performance"] = {**cached.get("performance", {}), "cache_hit": True, **self._cache_metrics()}
             return cached
 
         shap_module = self._load_shap()
@@ -744,6 +766,7 @@ class ResidualKrigingSHAPAdapter(_BaseResidualKrigingAdapter):
                 "meets_latency_target": bool(elapsed_ms < 8000.0),
                 "shap_background_size": int(background.shape[0]),
                 "shap_sampling_budget": int(effective_nsamples),
+                **self._cache_metrics(),
             },
         }
         self._cache_set(cache_key, payload)

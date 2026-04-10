@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import numpy as np
 
+from .spatial_index import SpatialIndex
+
 
 class OrdinaryKrigingBaseline:
     """Lightweight ordinary kriging baseline with IDW fallback."""
@@ -12,29 +14,29 @@ class OrdinaryKrigingBaseline:
         self.n_neighbors = max(1, int(n_neighbors))
         self.coords: np.ndarray | None = None
         self.values: np.ndarray | None = None
+        self._spatial_index: SpatialIndex | None = None
 
     def fit(self, coords: np.ndarray, values: np.ndarray) -> "OrdinaryKrigingBaseline":
         self.coords = np.asarray(coords, dtype=float)
         self.values = np.asarray(values, dtype=float).reshape(-1)
+        self._spatial_index = SpatialIndex(self.coords)
         return self
 
     def predict(self, query_coords: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        if self.coords is None or self.values is None:
+        if self.coords is None or self.values is None or self._spatial_index is None:
             raise ValueError("baseline is not fitted")
 
         q = np.asarray(query_coords, dtype=float)
-        preds = np.zeros(len(q), dtype=float)
-        vars_ = np.zeros(len(q), dtype=float)
+        k = min(self.n_neighbors, int(self.coords.shape[0]))
+        knn = self._spatial_index.query_knn(q, k=k, exclude_self=False)
+        ids = np.asarray(knn.indices, dtype=int)
+        d = np.maximum(np.asarray(knn.distances, dtype=float), 1e-8)
+        local_vals = self.values[ids]
 
-        for i, point in enumerate(q):
-            dist = np.sqrt(((self.coords - point) ** 2).sum(axis=1) + 1e-8)
-            ids = np.argsort(dist)[: min(self.n_neighbors, len(dist))]
-            d = dist[ids]
-            w = 1.0 / d
-            w = w / (w.sum() + 1e-12)
-            local_vals = self.values[ids]
-            preds[i] = np.sum(w * local_vals)
-            vars_[i] = np.sum(w * (local_vals - preds[i]) ** 2)
+        w = 1.0 / d
+        w = w / (np.sum(w, axis=1, keepdims=True) + 1e-12)
+        preds = np.sum(w * local_vals, axis=1)
+        vars_ = np.sum(w * (local_vals - preds[:, None]) ** 2, axis=1)
 
         return preds, np.maximum(vars_, 1e-6)
 
