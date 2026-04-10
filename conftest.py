@@ -21,12 +21,6 @@ warnings.filterwarnings(
 )
 
 import pytest
-from fastapi.testclient import TestClient
-
-from backend.app.main import app
-from backend.app.tasks.任务管理器 import TaskManager
-from realtime_interpolation.api import fastapi_routes as realtime_routes
-from multi_objective_optimization.api import fastapi_routes as mo_routes
 
 
 def _build_geojson(point_count: int = 12) -> Dict[str, Any]:
@@ -47,14 +41,21 @@ def _build_geojson(point_count: int = 12) -> Dict[str, Any]:
 
 @pytest.fixture
 def integration_client():
-    # 每个测试前清理全局状态，避免跨测试污染
-    TaskManager().reset()
+    # 延迟导入，避免根 conftest 对全局依赖产生收集期影响
+    testclient = pytest.importorskip("fastapi.testclient")
+    backend_main = pytest.importorskip("backend.app.main")
+    task_manager_mod = pytest.importorskip("backend.app.tasks.任务管理器")
+    realtime_routes = pytest.importorskip("realtime_interpolation.api.fastapi_routes")
+    mo_routes = pytest.importorskip("multi_objective_optimization.api.fastapi_routes")
+
+    app = backend_main.app
+    task_manager_mod.TaskManager().reset()
     realtime_routes.realtime_service.subscriptions.clear()
     if realtime_routes.realtime_service.cache_manager:
         realtime_routes.realtime_service.cache_manager.clear()
     mo_routes.tasks_db.clear()
 
-    with TestClient(app) as client:
+    with testclient.TestClient(app) as client:
         yield client
 
 
