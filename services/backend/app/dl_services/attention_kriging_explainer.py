@@ -108,6 +108,24 @@ class _BaseAttentionKrigingAdapter:
                 "context_cache_hit_rate": float(self._context_cache_hits / max(1, context_total)),
             }
 
+    @staticmethod
+    def _array_nbytes(value: Any) -> int:
+        try:
+            arr = np.asarray(value)
+            return int(arr.nbytes)
+        except Exception:
+            return 0
+
+    def _context_memory_bytes(self, context: dict[str, Any]) -> int:
+        total = 0
+        total += self._array_nbytes(context.get("feature_matrix"))
+        total += self._array_nbytes(context.get("scaled_x"))
+        total += self._array_nbytes(context.get("prediction"))
+        total += self._array_nbytes(context.get("uncertainty"))
+        total += self._array_nbytes(context.get("attention_mean_weight"))
+        total += self._array_nbytes(context.get("background"))
+        return int(total)
+
     def _top_node_indices(self, uncertainty: np.ndarray, max_explain_nodes: int) -> list[int]:
         n = int(len(uncertainty))
         if n <= 0:
@@ -162,13 +180,17 @@ class _BaseAttentionKrigingAdapter:
             sample_values=values,
             query_coords=queries,
         )
-        x_scaled = np.asarray(pre["processed_features"], dtype=float)
-        y_pred = np.asarray(out.mean, dtype=float).reshape(-1)
-        uncertainty = np.sqrt(np.maximum(np.asarray(out.variance, dtype=float).reshape(-1), 1e-9))
-        attention_weights = np.asarray(out.attention_weights, dtype=float)
+        x_scaled = np.asarray(pre["processed_features"], dtype=np.float32)
+        y_pred = np.asarray(out.mean, dtype=np.float32).reshape(-1)
+        uncertainty = np.sqrt(np.maximum(np.asarray(out.variance, dtype=np.float32).reshape(-1), 1e-9))
+        attention_weights = np.asarray(out.attention_weights, dtype=np.float32)
         surrogate = Ridge(alpha=1.0, random_state=self.config.random_state)
         surrogate.fit(x_scaled, y_pred)
-        background = x_scaled.copy() if x_scaled.shape[0] <= 32 else x_scaled[np.linspace(0, x_scaled.shape[0] - 1, 32, dtype=int)]
+        background = (
+            x_scaled.copy()
+            if x_scaled.shape[0] <= 32
+            else x_scaled[np.linspace(0, x_scaled.shape[0] - 1, 32, dtype=int)]
+        )
         attention_viz = self._attention_visualization_payload(
             query_coords=queries,
             sample_coords=samples,
@@ -190,16 +212,16 @@ class _BaseAttentionKrigingAdapter:
         context = {
             "context_key": key,
             "feature_names": list(pre["feature_names"]),
-            "feature_matrix": np.asarray(pre["feature_matrix"], dtype=float),
+            "feature_matrix": np.asarray(pre["feature_matrix"], dtype=np.float32),
             "scaled_x": x_scaled,
             "prediction": y_pred,
             "uncertainty": uncertainty,
-            "attention_mean_weight": np.mean(attention_weights, axis=1).astype(float).reshape(-1),
+            "attention_mean_weight": np.mean(attention_weights, axis=1).astype(np.float32).reshape(-1),
             "attention_visualization": attention_viz,
             "neighborhood_impact_analysis": neighborhood_impact,
             "spatial_weight_distribution": spatial_distribution,
             "surrogate": surrogate,
-            "background": np.asarray(background, dtype=float),
+            "background": np.asarray(background, dtype=np.float32),
         }
         self._context_set(key, context)
         return context
@@ -216,6 +238,24 @@ class _BaseAttentionKrigingAdapter:
         pairs = [(int(i), float(local[i])) for i in range(local.shape[0])]
         pred = float(surrogate.predict(instance.reshape(1, -1))[0])
         return pairs, pred
+
+    def _compressed_lime_training_data(self, context: dict[str, Any], explained_nodes: list[int]) -> np.ndarray:
+        x = np.asarray(context["scaled_x"], dtype=float)
+        n = int(x.shape[0])
+        keep = max(64, min(n, max(96, len(explained_nodes) * 16)))
+        if n <= keep:
+            return x
+
+        uncertainty = np.asarray(context["uncertainty"], dtype=float).reshape(-1)
+        top_k = max(8, min(len(explained_nodes) * 4, keep // 2))
+        top_idx = np.argsort(-uncertainty)[:top_k]
+        remaining = keep - int(top_idx.shape[0])
+        uniform_idx = np.linspace(0, n - 1, remaining, dtype=int) if remaining > 0 else np.asarray([], dtype=int)
+        selected = np.unique(np.concatenate([top_idx.astype(int), uniform_idx.astype(int)])).astype(int)
+        if selected.shape[0] < keep:
+            fill = np.setdiff1d(np.arange(n, dtype=int), selected, assume_unique=False)[: keep - selected.shape[0]]
+            selected = np.concatenate([selected, fill]).astype(int)
+        return x[selected[:keep]]
 
     def _attention_visualization_payload(
         self,
@@ -414,10 +454,12 @@ class AttentionKrigingLIMEAdapter(_BaseAttentionKrigingAdapter):
         predict_fn = self._predict_surrogate(context)
         lime_module = self._load_lime_tabular()
         lime_explainer = None
+        training_data = self._compressed_lime_training_data(context, explained_nodes)
+        effective_samples = max(80, min(selected_samples, 240))
         if lime_module is not None:
             try:
                 lime_explainer = lime_module.LimeTabularExplainer(
-                    training_data=np.asarray(context["scaled_x"], dtype=float),
+                    training_data=np.asarray(training_data, dtype=float),
                     feature_names=feature_names,
                     mode="regression",
                     discretize_continuous=False,
@@ -438,7 +480,7 @@ class AttentionKrigingLIMEAdapter(_BaseAttentionKrigingAdapter):
                         data_row=instance,
                         predict_fn=predict_fn,
                         num_features=max(1, min(int(top_k), len(feature_names))),
-                        num_samples=max(80, selected_samples),
+                        num_samples=effective_samples,
                     )
                     local_map = exp.local_exp.get(1) or exp.local_exp.get(0) or []
                     local_pairs = [(int(i), float(w)) for i, w in local_map]
@@ -509,11 +551,62 @@ class AttentionKrigingLIMEAdapter(_BaseAttentionKrigingAdapter):
                 "cache_hit": False,
                 "latency_target_ms": 8000.0,
                 "meets_latency_target": bool((time.perf_counter() - started) * 1000 < 8000.0),
+                "lime_training_size": int(training_data.shape[0]),
+                "lime_sampling_budget": int(effective_samples),
+                "context_memory_bytes": int(self._context_memory_bytes(context)),
                 **self._cache_metrics(),
             },
         }
         self._cache_set(cache_key, payload)
         return payload
+
+    def explain_batch(
+        self,
+        *,
+        model: Any,
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        query_coords_batch: list[np.ndarray | None],
+        top_k: int = 5,
+        num_samples: Optional[int] = None,
+        max_explain_nodes: Optional[int] = None,
+    ) -> dict[str, Any]:
+        started = time.perf_counter()
+        results: list[dict[str, Any]] = []
+        cache_hit_count = 0
+        for i, query_coords in enumerate(query_coords_batch):
+            out = self.explain(
+                model=model,
+                sample_coords=sample_coords,
+                sample_values=sample_values,
+                query_coords=query_coords,
+                top_k=top_k,
+                num_samples=num_samples,
+                max_explain_nodes=max_explain_nodes,
+            )
+            cache_hit_count += int(bool(out.get("performance", {}).get("cache_hit", False)))
+            results.append(
+                {
+                    "batch_index": int(i),
+                    "query_count": int(np.asarray(query_coords if query_coords is not None else sample_coords).shape[0]),
+                    "result": out,
+                }
+            )
+        total = max(1, len(results))
+        duration_ms = round((time.perf_counter() - started) * 1000, 3)
+        return {
+            "summary": {
+                "method": "lime",
+                "batch_size": int(len(results)),
+                "cache_hit_count": int(cache_hit_count),
+                "cache_hit_ratio": float(cache_hit_count / total),
+            },
+            "items": results,
+            "performance": {
+                "duration_ms": duration_ms,
+                "avg_duration_ms": float(duration_ms / total),
+            },
+        }
 
 
 class AttentionKrigingSHAPAdapter(_BaseAttentionKrigingAdapter):
@@ -559,6 +652,7 @@ class AttentionKrigingSHAPAdapter(_BaseAttentionKrigingAdapter):
         feature_names: list[str] = context["feature_names"]
         background = np.asarray(context["background"], dtype=float)
         baseline = np.mean(background, axis=0)
+        effective_nsamples = max(40, min(selected_nsamples, 180))
         shap_kernel_explainer = None
         if shap_module is not None:
             try:
@@ -578,7 +672,7 @@ class AttentionKrigingSHAPAdapter(_BaseAttentionKrigingAdapter):
                 try:
                     shap_arr = shap_kernel_explainer.shap_values(
                         instance.reshape(1, -1),
-                        nsamples=max(40, selected_nsamples),
+                        nsamples=effective_nsamples,
                         l1_reg="num_features(10)",
                     )
                     if isinstance(shap_arr, list):
@@ -658,8 +752,59 @@ class AttentionKrigingSHAPAdapter(_BaseAttentionKrigingAdapter):
                 "backend": "shap" if shap_module is not None else "surrogate_linear",
                 "latency_target_ms": 8000.0,
                 "meets_latency_target": bool((time.perf_counter() - started) * 1000 < 8000.0),
+                "shap_background_size": int(background.shape[0]),
+                "shap_sampling_budget": int(effective_nsamples),
+                "context_memory_bytes": int(self._context_memory_bytes(context)),
                 **self._cache_metrics(),
             },
         }
         self._cache_set(cache_key, payload)
         return payload
+
+    def explain_batch(
+        self,
+        *,
+        model: Any,
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        query_coords_batch: list[np.ndarray | None],
+        top_k: int = 5,
+        nsamples: Optional[int] = None,
+        max_explain_nodes: Optional[int] = None,
+    ) -> dict[str, Any]:
+        started = time.perf_counter()
+        results: list[dict[str, Any]] = []
+        cache_hit_count = 0
+        for i, query_coords in enumerate(query_coords_batch):
+            out = self.explain(
+                model=model,
+                sample_coords=sample_coords,
+                sample_values=sample_values,
+                query_coords=query_coords,
+                top_k=top_k,
+                nsamples=nsamples,
+                max_explain_nodes=max_explain_nodes,
+            )
+            cache_hit_count += int(bool(out.get("performance", {}).get("cache_hit", False)))
+            results.append(
+                {
+                    "batch_index": int(i),
+                    "query_count": int(np.asarray(query_coords if query_coords is not None else sample_coords).shape[0]),
+                    "result": out,
+                }
+            )
+        total = max(1, len(results))
+        duration_ms = round((time.perf_counter() - started) * 1000, 3)
+        return {
+            "summary": {
+                "method": "shap",
+                "batch_size": int(len(results)),
+                "cache_hit_count": int(cache_hit_count),
+                "cache_hit_ratio": float(cache_hit_count / total),
+            },
+            "items": results,
+            "performance": {
+                "duration_ms": duration_ms,
+                "avg_duration_ms": float(duration_ms / total),
+            },
+        }

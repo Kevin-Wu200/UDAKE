@@ -38,6 +38,7 @@ def _assert_common_stage2_payload(payload: dict, query_count: int, sample_count:
     assert perf["duration_ms"] < 8000.0
     assert perf["latency_target_ms"] == 8000.0
     assert perf["meets_latency_target"] is True
+    assert perf["context_memory_bytes"] > 0
 
 
 def test_attention_kriging_lime_stage2_visualization_and_neighborhood() -> None:
@@ -83,3 +84,29 @@ def test_attention_kriging_shap_stage2_distribution_and_performance() -> None:
 
     _assert_common_stage2_payload(out, query_count=18, sample_count=coords.shape[0])
     assert out["performance"]["backend"] in {"shap", "surrogate_linear"}
+    assert out["performance"]["shap_background_size"] <= 32
+    assert out["performance"]["shap_sampling_budget"] >= 40
+
+
+def test_attention_kriging_lime_stage2_batch_explain_with_cache() -> None:
+    coords, values = _make_data(seed=101)
+    model = AttentionKrigingModel(dim=24)
+    adapter = AttentionKrigingLIMEAdapter(
+        config=AttentionKrigingExplanationConfig(lime_num_samples=90, max_explain_nodes=3)
+    )
+
+    batches = [coords[:9], coords[9:18], coords[:9]]
+    out = adapter.explain_batch(
+        model=model,
+        sample_coords=coords,
+        sample_values=values,
+        query_coords_batch=batches,
+        top_k=3,
+        num_samples=80,
+    )
+
+    assert out["summary"]["method"] == "lime"
+    assert out["summary"]["batch_size"] == 3
+    assert out["summary"]["cache_hit_count"] >= 1
+    assert out["summary"]["cache_hit_ratio"] > 0.0
+    assert out["performance"]["avg_duration_ms"] > 0.0

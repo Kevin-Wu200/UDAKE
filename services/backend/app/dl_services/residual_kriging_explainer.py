@@ -110,6 +110,24 @@ class _BaseResidualKrigingAdapter:
                 "context_cache_hit_rate": float(self._context_cache_hits / max(1, context_total)),
             }
 
+    @staticmethod
+    def _array_nbytes(value: Any) -> int:
+        try:
+            arr = np.asarray(value)
+            return int(arr.nbytes)
+        except Exception:
+            return 0
+
+    def _context_memory_bytes(self, context: dict[str, Any]) -> int:
+        total = 0
+        total += self._array_nbytes(context.get("feature_matrix"))
+        total += self._array_nbytes(context.get("scaled_x"))
+        total += self._array_nbytes(context.get("prediction"))
+        total += self._array_nbytes(context.get("uncertainty"))
+        total += self._array_nbytes(context.get("residual"))
+        total += self._array_nbytes(context.get("background"))
+        return int(total)
+
     def _top_node_indices(self, uncertainty: np.ndarray, max_explain_nodes: int) -> list[int]:
         n = int(len(uncertainty))
         if n <= 0:
@@ -164,24 +182,28 @@ class _BaseResidualKrigingAdapter:
             sample_values=values,
             query_coords=queries,
         )
-        x_scaled = np.asarray(pre["processed_features"], dtype=float)
-        y_pred = np.asarray(pred["prediction"], dtype=float).reshape(-1)
-        uncertainty = np.asarray(pred["uncertainty"], dtype=float).reshape(-1)
+        x_scaled = np.asarray(pre["processed_features"], dtype=np.float32)
+        y_pred = np.asarray(pred["prediction"], dtype=np.float32).reshape(-1)
+        uncertainty = np.asarray(pred["uncertainty"], dtype=np.float32).reshape(-1)
         surrogate = Ridge(alpha=1.0, random_state=self.config.random_state)
         surrogate.fit(x_scaled, y_pred)
-        background = x_scaled.copy() if x_scaled.shape[0] <= 32 else x_scaled[np.linspace(0, x_scaled.shape[0] - 1, 32, dtype=int)]
+        background = (
+            x_scaled.copy()
+            if x_scaled.shape[0] <= 32
+            else x_scaled[np.linspace(0, x_scaled.shape[0] - 1, 32, dtype=int)]
+        )
 
         context = {
             "context_key": key,
             "feature_names": list(pre["feature_names"]),
-            "feature_matrix": np.asarray(pre["feature_matrix"], dtype=float),
+            "feature_matrix": np.asarray(pre["feature_matrix"], dtype=np.float32),
             "scaled_x": x_scaled,
-            "query_coords": np.asarray(queries, dtype=float),
+            "query_coords": np.asarray(queries, dtype=np.float32),
             "prediction": y_pred,
             "uncertainty": uncertainty,
-            "residual": np.asarray(pred["residual"], dtype=float).reshape(-1),
+            "residual": np.asarray(pred["residual"], dtype=np.float32).reshape(-1),
             "surrogate": surrogate,
-            "background": np.asarray(background, dtype=float),
+            "background": np.asarray(background, dtype=np.float32),
         }
         self._context_set(key, context)
         return context
@@ -594,11 +616,60 @@ class ResidualKrigingLIMEAdapter(_BaseResidualKrigingAdapter):
                 "meets_latency_target": bool(elapsed_ms < 8000.0),
                 "lime_training_size": int(training_data.shape[0]),
                 "lime_sampling_budget": int(effective_samples),
+                "context_memory_bytes": int(self._context_memory_bytes(context)),
                 **self._cache_metrics(),
             },
         }
         self._cache_set(cache_key, payload)
         return payload
+
+    def explain_batch(
+        self,
+        *,
+        model: Any,
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        query_coords_batch: list[np.ndarray | None],
+        top_k: int = 5,
+        num_samples: Optional[int] = None,
+        max_explain_nodes: Optional[int] = None,
+    ) -> dict[str, Any]:
+        started = time.perf_counter()
+        results: list[dict[str, Any]] = []
+        cache_hit_count = 0
+        for i, query_coords in enumerate(query_coords_batch):
+            out = self.explain(
+                model=model,
+                sample_coords=sample_coords,
+                sample_values=sample_values,
+                query_coords=query_coords,
+                top_k=top_k,
+                num_samples=num_samples,
+                max_explain_nodes=max_explain_nodes,
+            )
+            cache_hit_count += int(bool(out.get("performance", {}).get("cache_hit", False)))
+            results.append(
+                {
+                    "batch_index": int(i),
+                    "query_count": int(np.asarray(query_coords if query_coords is not None else sample_coords).shape[0]),
+                    "result": out,
+                }
+            )
+        total = max(1, len(results))
+        duration_ms = round((time.perf_counter() - started) * 1000, 3)
+        return {
+            "summary": {
+                "method": "lime",
+                "batch_size": int(len(results)),
+                "cache_hit_count": int(cache_hit_count),
+                "cache_hit_ratio": float(cache_hit_count / total),
+            },
+            "items": results,
+            "performance": {
+                "duration_ms": duration_ms,
+                "avg_duration_ms": float(duration_ms / total),
+            },
+        }
 
 
 class ResidualKrigingSHAPAdapter(_BaseResidualKrigingAdapter):
@@ -766,8 +837,57 @@ class ResidualKrigingSHAPAdapter(_BaseResidualKrigingAdapter):
                 "meets_latency_target": bool(elapsed_ms < 8000.0),
                 "shap_background_size": int(background.shape[0]),
                 "shap_sampling_budget": int(effective_nsamples),
+                "context_memory_bytes": int(self._context_memory_bytes(context)),
                 **self._cache_metrics(),
             },
         }
         self._cache_set(cache_key, payload)
         return payload
+
+    def explain_batch(
+        self,
+        *,
+        model: Any,
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        query_coords_batch: list[np.ndarray | None],
+        top_k: int = 5,
+        nsamples: Optional[int] = None,
+        max_explain_nodes: Optional[int] = None,
+    ) -> dict[str, Any]:
+        started = time.perf_counter()
+        results: list[dict[str, Any]] = []
+        cache_hit_count = 0
+        for i, query_coords in enumerate(query_coords_batch):
+            out = self.explain(
+                model=model,
+                sample_coords=sample_coords,
+                sample_values=sample_values,
+                query_coords=query_coords,
+                top_k=top_k,
+                nsamples=nsamples,
+                max_explain_nodes=max_explain_nodes,
+            )
+            cache_hit_count += int(bool(out.get("performance", {}).get("cache_hit", False)))
+            results.append(
+                {
+                    "batch_index": int(i),
+                    "query_count": int(np.asarray(query_coords if query_coords is not None else sample_coords).shape[0]),
+                    "result": out,
+                }
+            )
+        total = max(1, len(results))
+        duration_ms = round((time.perf_counter() - started) * 1000, 3)
+        return {
+            "summary": {
+                "method": "shap",
+                "batch_size": int(len(results)),
+                "cache_hit_count": int(cache_hit_count),
+                "cache_hit_ratio": float(cache_hit_count / total),
+            },
+            "items": results,
+            "performance": {
+                "duration_ms": duration_ms,
+                "avg_duration_ms": float(duration_ms / total),
+            },
+        }
