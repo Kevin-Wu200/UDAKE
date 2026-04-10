@@ -6,8 +6,10 @@ import copy
 from dataclasses import dataclass
 import hashlib
 import json
+import os
 from typing import Any
 import time
+import tempfile
 
 import numpy as np
 
@@ -98,7 +100,14 @@ class DeepLearningService:
         self.gan_shap_adapter = GANAnomalySHAPAdapter()
         self.contrastive_lime_adapter = ContrastiveLimeAdapter()
         self.contrastive_shap_adapter = ContrastiveShapAdapter()
-        self.anomaly_cache = AnomalyModelCache(cache_size=256, ttl_seconds=600)
+        cache_file = os.path.join(tempfile.gettempdir(), f"udake_anomaly_cache_{os.getpid()}.json")
+        self.anomaly_cache = AnomalyModelCache(
+            cache_size=256,
+            ttl_seconds=600,
+            persist_path=cache_file,
+            enable_compression=True,
+            compression_threshold_bytes=1024,
+        )
         self._anomaly_model_versions: dict[str, int] = {}
         self.batch_parallel = ParallelExecutionManager(name="st-batch", max_workers=4, min_workers=1)
 
@@ -118,6 +127,61 @@ class DeepLearningService:
 
     def _model_version(self, model_name: str) -> int:
         return int(self._anomaly_model_versions.get(model_name, 0))
+
+    def _cache_prefix(self, namespace: str, model_name: str, model_version: int) -> str:
+        return f"{namespace}:{model_name}:v{int(model_version)}:"
+
+    def _prediction_cache_key(
+        self,
+        *,
+        model_name: str,
+        model_version: int,
+        coords: np.ndarray,
+        values: np.ndarray,
+        threshold_method: str,
+        percentile: float,
+        k: float,
+    ) -> str:
+        digest = self._stable_hash(
+            {
+                "coords_shape": [int(coords.shape[0]), int(coords.shape[1])],
+                "coords_hash": self._hash_array(coords),
+                "values_hash": self._hash_array(values),
+                "threshold_method": threshold_method,
+                "percentile": float(percentile),
+                "k": float(k),
+            }
+        )
+        return f"{self._cache_prefix('prediction', model_name, model_version)}{digest}"
+
+    def _explanation_cache_key(
+        self,
+        *,
+        model_name: str,
+        model_version: int,
+        coords: np.ndarray,
+        values: np.ndarray,
+        method: str,
+        top_k: int,
+        include_prediction: bool,
+        num_samples: int | None,
+        nsamples: int | None,
+        max_explain_nodes: int,
+    ) -> str:
+        digest = self._stable_hash(
+            {
+                "coords_shape": [int(coords.shape[0]), int(coords.shape[1])],
+                "coords_hash": self._hash_array(coords),
+                "values_hash": self._hash_array(values),
+                "method": method,
+                "top_k": int(top_k),
+                "include_prediction": bool(include_prediction),
+                "num_samples": num_samples,
+                "nsamples": nsamples,
+                "max_explain_nodes": int(max_explain_nodes),
+            }
+        )
+        return f"{self._cache_prefix('explanation', model_name, model_version)}{digest}"
 
     def _with_cache_meta(self, payload: dict[str, Any], *, namespace: str, cache_hit: bool) -> dict[str, Any]:
         result = copy.deepcopy(payload)
@@ -322,6 +386,7 @@ class DeepLearningService:
             v,
         )
         self.anomaly_models[model_name] = payload["model"]
+        self.invalidate_anomaly_cache(model_name=model_name)
         self._bump_anomaly_model_version(model_name)
         self.metric_monitor.log(f"{model_name}_train", float(payload["training"].get("best_total_loss", payload["training"].get("final_loss", 0.0))))
         return {
@@ -345,18 +410,15 @@ class DeepLearningService:
         if model_name != "fusion":
             _ = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
 
-        predict_cache_key = self._stable_hash(
-            {
-                "namespace": "prediction",
-                "model_name": model_name,
-                "model_version": self._model_version(model_name),
-                "coords_shape": [int(c.shape[0]), int(c.shape[1])],
-                "coords_hash": self._hash_array(c),
-                "values_hash": self._hash_array(v),
-                "threshold_method": threshold_method,
-                "percentile": float(percentile),
-                "k": float(k),
-            }
+        model_version = self._model_version(model_name)
+        predict_cache_key = self._prediction_cache_key(
+            model_name=model_name,
+            model_version=model_version,
+            coords=c,
+            values=v,
+            threshold_method=threshold_method,
+            percentile=percentile,
+            k=k,
         )
         cached_prediction = self.anomaly_cache.get("prediction", predict_cache_key)
         if cached_prediction is not None:
@@ -455,21 +517,18 @@ class DeepLearningService:
 
         c, v = self._validate_coords_values(coords, values)
         model = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
-        explain_cache_key = self._stable_hash(
-            {
-                "namespace": "explanation",
-                "model_name": model_name,
-                "model_version": self._model_version(model_name),
-                "coords_shape": [int(c.shape[0]), int(c.shape[1])],
-                "coords_hash": self._hash_array(c),
-                "values_hash": self._hash_array(v),
-                "method": method,
-                "top_k": int(top_k),
-                "include_prediction": bool(include_prediction),
-                "num_samples": num_samples,
-                "nsamples": nsamples,
-                "max_explain_nodes": int(max_explain_nodes),
-            }
+        model_version = self._model_version(model_name)
+        explain_cache_key = self._explanation_cache_key(
+            model_name=model_name,
+            model_version=model_version,
+            coords=c,
+            values=v,
+            method=method,
+            top_k=top_k,
+            include_prediction=include_prediction,
+            num_samples=num_samples,
+            nsamples=nsamples,
+            max_explain_nodes=max_explain_nodes,
         )
         cached_explanation = self.anomaly_cache.get("explanation", explain_cache_key)
         if cached_explanation is not None:
@@ -585,6 +644,45 @@ class DeepLearningService:
     def cleanup_anomaly_cache(self, namespace: str | None = None) -> dict[str, Any]:
         removed = self.anomaly_cache.cleanup(namespace=namespace)
         return {"removed": removed, "stats": self.anomaly_cache.stats()}
+
+    def invalidate_anomaly_cache(
+        self,
+        *,
+        namespace: str | None = None,
+        model_name: str | None = None,
+        model_version: int | None = None,
+        key_prefix: str | None = None,
+    ) -> dict[str, Any]:
+        if model_name and namespace is None and key_prefix is None:
+            if model_version is None:
+                pred_prefix = f"prediction:{model_name}:"
+                exp_prefix = f"explanation:{model_name}:"
+            else:
+                pred_prefix = self._cache_prefix("prediction", model_name, int(model_version))
+                exp_prefix = self._cache_prefix("explanation", model_name, int(model_version))
+            removed_pred = self.anomaly_cache.invalidate(namespace="prediction", key_prefix=pred_prefix)
+            removed_exp = self.anomaly_cache.invalidate(namespace="explanation", key_prefix=exp_prefix)
+            removed = {
+                "prediction": int(removed_pred.get("prediction", 0)),
+                "explanation": int(removed_exp.get("explanation", 0)),
+            }
+            return {"removed": removed, "stats": self.anomaly_cache.stats(), "key_prefix": f"{pred_prefix}|{exp_prefix}"}
+
+        prefix = key_prefix
+        if prefix is None and model_name:
+            if model_version is None:
+                prefix = f"{namespace}:{model_name}:"
+            else:
+                prefix = self._cache_prefix(namespace or "prediction", model_name, int(model_version))
+        removed = self.anomaly_cache.invalidate(namespace=namespace, key_prefix=prefix)
+        return {"removed": removed, "stats": self.anomaly_cache.stats(), "key_prefix": prefix}
+
+    def warmup_anomaly_cache(self, items: list[dict[str, Any]]) -> dict[str, Any]:
+        summary = self.anomaly_cache.warmup(items)
+        return {"warmup": summary, "stats": self.anomaly_cache.stats()}
+
+    def persist_anomaly_cache(self) -> dict[str, Any]:
+        return self.anomaly_cache.persist()
 
     def clear_anomaly_cache(self, namespace: str | None = None) -> dict[str, Any]:
         removed = self.anomaly_cache.clear(namespace=namespace)

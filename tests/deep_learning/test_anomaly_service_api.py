@@ -119,3 +119,32 @@ def test_anomaly_cache_management_endpoints() -> None:
     clear_resp = client.post("/api/dl/anomaly/cache/clear", json={"namespace": "prediction"})
     assert clear_resp.status_code == 200
     assert "removed" in clear_resp.json()
+
+
+def test_anomaly_cache_warmup_invalidate_and_persist_endpoints() -> None:
+    app = FastAPI()
+    app.include_router(router, prefix="/api")
+    client = TestClient(app)
+
+    warmup_resp = client.post(
+        "/api/dl/anomaly/cache/warmup",
+        json={
+            "items": [
+                {"namespace": "prediction", "key": "prediction:vae:v0:api-k1", "value": {"x": 1}},
+                {"namespace": "explanation", "key": "explanation:vae:v0:api-k2", "value": {"y": 2}},
+            ]
+        },
+    )
+    assert warmup_resp.status_code == 200
+    assert warmup_resp.json()["warmup"]["succeeded"] == 2
+
+    invalidate_resp = client.post(
+        "/api/dl/anomaly/cache/invalidate",
+        json={"namespace": "prediction", "key_prefix": "prediction:vae:v0:"},
+    )
+    assert invalidate_resp.status_code == 200
+    assert invalidate_resp.json()["removed"]["prediction"] >= 1
+
+    persist_resp = client.post("/api/dl/anomaly/cache/persist")
+    assert persist_resp.status_code == 200
+    assert "persist_enabled" in persist_resp.json()

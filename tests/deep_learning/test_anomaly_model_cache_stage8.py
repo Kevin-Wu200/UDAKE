@@ -30,6 +30,49 @@ def test_anomaly_model_cache_ttl_and_cleanup() -> None:
     assert stats["namespaces"]["prediction"]["expirations"] >= 1
 
 
+def test_anomaly_model_cache_multilevel_persist_and_compression(tmp_path) -> None:
+    persist_file = tmp_path / "anomaly-cache-stage8.json"
+    cache = AnomalyModelCache(
+        cache_size=8,
+        ttl_seconds=60,
+        persist_path=str(persist_file),
+        enable_compression=True,
+        compression_threshold_bytes=64,
+    )
+
+    large_payload = {"values": [float(i) for i in range(256)], "message": "compress-me"}
+    cache.set("prediction", "prediction:vae:v1:demo", large_payload)
+    assert cache.stats()["compressions"] >= 1
+
+    restored = AnomalyModelCache(
+        cache_size=8,
+        ttl_seconds=60,
+        persist_path=str(persist_file),
+        enable_compression=True,
+        compression_threshold_bytes=64,
+    )
+    assert restored.get("prediction", "prediction:vae:v1:demo") == large_payload
+    assert restored.stats()["namespaces"]["prediction"]["l2_hits"] >= 1
+
+
+def test_anomaly_model_cache_warmup_and_prefix_invalidation() -> None:
+    cache = AnomalyModelCache(cache_size=16, ttl_seconds=120)
+    warm = cache.warmup(
+        [
+            {"namespace": "prediction", "key": "prediction:vae:v0:k1", "value": {"p": 1}},
+            {"namespace": "prediction", "key": "prediction:vae:v0:k2", "value": {"p": 2}},
+            {"namespace": "explanation", "key": "explanation:vae:v0:k1", "value": {"e": 1}},
+        ]
+    )
+    assert warm["succeeded"] == 3
+    assert cache.stats()["namespaces"]["prediction"]["warmup_sets"] >= 2
+
+    removed = cache.invalidate(namespace="prediction", key_prefix="prediction:vae:v0:")
+    assert removed["prediction"] >= 2
+    assert cache.get("prediction", "prediction:vae:v0:k1") is None
+    assert cache.get("explanation", "explanation:vae:v0:k1") == {"e": 1}
+
+
 def test_service_predict_cache_hit_stage8() -> None:
     service = DeepLearningService()
     coords, values = _build_payload(44)
@@ -116,3 +159,24 @@ def test_service_cache_expire_and_cleanup_stage8() -> None:
         k=2.0,
     )
     assert out2["cache"]["cache_hit"] is False
+
+
+def test_service_cache_invalidate_by_model_stage8() -> None:
+    service = DeepLearningService()
+    coords, values = _build_payload(36)
+    _ = service.predict_anomaly(model_name="vae", coords=coords, values=values)
+    _ = service.explain_anomaly(
+        model_name="vae",
+        coords=coords,
+        values=values,
+        method="lime",
+        top_k=3,
+        include_prediction=False,
+        max_explain_nodes=5,
+        num_samples=90,
+    )
+
+    invalidated = service.invalidate_anomaly_cache(model_name="vae")
+    assert invalidated["removed"]["prediction"] >= 1
+    assert invalidated["removed"]["explanation"] >= 1
+    assert invalidated["stats"]["namespaces"]["prediction"]["invalidations"] >= 1

@@ -102,6 +102,24 @@ class AnomalyCacheManageRequest(BaseModel):
     namespace: Optional[str] = Field(default=None, description="prediction/explanation，可选")
 
 
+class AnomalyCacheWarmupItem(BaseModel):
+    namespace: str = Field(description="prediction/explanation")
+    key: str = Field(description="缓存键")
+    value: dict[str, Any] = Field(default_factory=dict, description="缓存值")
+    ttl_seconds: Optional[int] = Field(default=None, ge=1, le=86400)
+
+
+class AnomalyCacheWarmupRequest(BaseModel):
+    items: list[AnomalyCacheWarmupItem] = Field(default_factory=list)
+
+
+class AnomalyCacheInvalidateRequest(BaseModel):
+    namespace: Optional[str] = Field(default=None, description="prediction/explanation，可选")
+    key_prefix: Optional[str] = Field(default=None, description="按前缀失效")
+    model_name: Optional[str] = Field(default=None, description="按模型失效")
+    model_version: Optional[int] = Field(default=None, ge=0, description="可选，指定版本")
+
+
 class SamplingRLTrainRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
@@ -359,6 +377,26 @@ def cleanup_anomaly_cache(payload: AnomalyCacheManageRequest) -> dict:
 @router.post("/anomaly/cache/clear")
 def clear_anomaly_cache(payload: AnomalyCacheManageRequest) -> dict:
     return service.clear_anomaly_cache(namespace=payload.namespace)
+
+
+@router.post("/anomaly/cache/warmup")
+def warmup_anomaly_cache(payload: AnomalyCacheWarmupRequest) -> dict:
+    return service.warmup_anomaly_cache(items=[item.model_dump() for item in payload.items])
+
+
+@router.post("/anomaly/cache/invalidate")
+def invalidate_anomaly_cache(payload: AnomalyCacheInvalidateRequest) -> dict:
+    return service.invalidate_anomaly_cache(
+        namespace=payload.namespace,
+        model_name=payload.model_name,
+        model_version=payload.model_version,
+        key_prefix=payload.key_prefix,
+    )
+
+
+@router.post("/anomaly/cache/persist")
+def persist_anomaly_cache() -> dict:
+    return service.persist_anomaly_cache()
 
 
 @router.post("/sampling-rl/train")
