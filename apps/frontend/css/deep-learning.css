@@ -1288,6 +1288,227 @@
     outline-offset: 2px;
 }
 
+.dl-spatial-viz-card {
+    margin-top: 12px;
+    border: 1px solid #dbe1ea;
+    border-radius: 10px;
+    padding: 10px;
+    background: linear-gradient(180deg, #f8fcff 0%, #ffffff 100%);
+}
+
+.dl-spatial-viz-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dl-spatial-viz-header h5 {
+    margin: 0;
+    font-size: 14px;
+    color: #1f2937;
+}
+
+.dl-spatial-viz-controls {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #4b5563;
+}
+
+.dl-spatial-viz-controls .select {
+    min-width: 110px;
+}
+
+.dl-spatial-viz-tip {
+    margin: 6px 0 0;
+    font-size: 12px;
+    color: #6b7280;
+}
+
+.dl-spatial-viz-grid {
+    margin-top: 10px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.dl-spatial-viz-panel {
+    border: 1px solid #dbe1ea;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 8px;
+}
+
+.dl-spatial-viz-panel h6 {
+    margin: 0;
+    font-size: 13px;
+    color: #1f2937;
+}
+
+.dl-spatial-summary {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #334155;
+}
+
+.dl-spatial-chart {
+    margin-top: 6px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+    min-height: 160px;
+    padding: 8px;
+}
+
+.dl-spatial-empty {
+    height: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.dl-spatial-bar-series,
+.dl-spatial-hist-series {
+    height: 140px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18px, 1fr));
+    align-items: end;
+    gap: 4px;
+}
+
+.dl-spatial-bar-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    min-height: 100%;
+    gap: 3px;
+}
+
+.dl-spatial-bar {
+    width: 100%;
+    border-radius: 4px 4px 2px 2px;
+    background: linear-gradient(180deg, #38bdf8 0%, #0ea5e9 100%);
+}
+
+.dl-spatial-bar-series.error .dl-spatial-bar {
+    background: linear-gradient(180deg, #f97316 0%, #ea580c 100%);
+}
+
+.dl-spatial-hist-bar {
+    background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+}
+
+.dl-spatial-bar-label {
+    font-size: 10px;
+    color: #64748b;
+}
+
+.dl-spatial-neighbor-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dl-spatial-neighbor-item {
+    border: 1px solid #dbeafe;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 6px;
+}
+
+.dl-spatial-neighbor-head {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #1f2937;
+}
+
+.dl-spatial-neighbor-bar {
+    margin-top: 4px;
+    height: 8px;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+}
+
+.dl-spatial-neighbor-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+}
+
+.dl-spatial-neighbor-meta {
+    margin-top: 4px;
+    font-size: 11px;
+    color: #475569;
+}
+
+.dl-spatial-compare-svg {
+    width: 100%;
+    height: 150px;
+    display: block;
+}
+
+.dl-spatial-axis {
+    stroke: #cbd5e1;
+    stroke-width: 1;
+}
+
+.dl-spatial-line {
+    fill: none;
+    stroke-width: 2;
+}
+
+.dl-spatial-line.predicted {
+    stroke: #ef4444;
+}
+
+.dl-spatial-line.weighted {
+    stroke: #2563eb;
+}
+
+.dl-spatial-line.nearest {
+    stroke: #22c55e;
+}
+
+.dl-spatial-legend {
+    margin-top: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 11px;
+    color: #475569;
+}
+
+.dl-spatial-legend span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.line-dot {
+    width: 12px;
+    height: 2px;
+    border-radius: 999px;
+    display: inline-block;
+}
+
+.line-dot.predicted {
+    background: #ef4444;
+}
+
+.line-dot.weighted {
+    background: #2563eb;
+}
+
+.line-dot.nearest {
+    background: #22c55e;
+}
+
 @media (max-width: 1180px) {
     .explain-layout-grid,
     .explain-result-grid {
@@ -1355,5 +1576,14 @@
 
     .reason-item-header {
         gap: 4px;
+    }
+
+    .dl-spatial-viz-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .dl-spatial-viz-header {
+        flex-direction: column;
+        align-items: stretch;
     }
 }
