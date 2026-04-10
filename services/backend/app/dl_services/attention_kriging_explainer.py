@@ -124,17 +124,35 @@ class _BaseAttentionKrigingAdapter:
             query_coords=queries,
             use_runtime_stats=True,
         )
-        pred = model.predict_standard(
+        out = model.forward(
             sample_coords=samples,
             sample_values=values,
             query_coords=queries,
         )
         x_scaled = np.asarray(pre["processed_features"], dtype=float)
-        y_pred = np.asarray(pred["prediction"], dtype=float).reshape(-1)
-        uncertainty = np.asarray(pred["uncertainty"], dtype=float).reshape(-1)
+        y_pred = np.asarray(out.mean, dtype=float).reshape(-1)
+        uncertainty = np.sqrt(np.maximum(np.asarray(out.variance, dtype=float).reshape(-1), 1e-9))
+        attention_weights = np.asarray(out.attention_weights, dtype=float)
         surrogate = Ridge(alpha=1.0, random_state=self.config.random_state)
         surrogate.fit(x_scaled, y_pred)
         background = x_scaled.copy() if x_scaled.shape[0] <= 32 else x_scaled[np.linspace(0, x_scaled.shape[0] - 1, 32, dtype=int)]
+        attention_viz = self._attention_visualization_payload(
+            query_coords=queries,
+            sample_coords=samples,
+            attention_weights=attention_weights,
+        )
+        neighborhood_impact = self._neighborhood_impact_payload(
+            query_coords=queries,
+            sample_coords=samples,
+            sample_values=values,
+            attention_weights=attention_weights,
+            top_neighbors=5,
+        )
+        spatial_distribution = self._spatial_weight_distribution_payload(
+            query_coords=queries,
+            attention_weights=attention_weights,
+            bins=10,
+        )
 
         context = {
             "context_key": key,
@@ -143,7 +161,10 @@ class _BaseAttentionKrigingAdapter:
             "scaled_x": x_scaled,
             "prediction": y_pred,
             "uncertainty": uncertainty,
-            "attention_mean_weight": np.asarray(pred.get("attention_summary", {}).get("mean_weight", []), dtype=float).reshape(-1),
+            "attention_mean_weight": np.mean(attention_weights, axis=1).astype(float).reshape(-1),
+            "attention_visualization": attention_viz,
+            "neighborhood_impact_analysis": neighborhood_impact,
+            "spatial_weight_distribution": spatial_distribution,
             "surrogate": surrogate,
             "background": np.asarray(background, dtype=float),
         }
@@ -162,6 +183,160 @@ class _BaseAttentionKrigingAdapter:
         pairs = [(int(i), float(local[i])) for i in range(local.shape[0])]
         pred = float(surrogate.predict(instance.reshape(1, -1))[0])
         return pairs, pred
+
+    def _attention_visualization_payload(
+        self,
+        *,
+        query_coords: np.ndarray,
+        sample_coords: np.ndarray,
+        attention_weights: np.ndarray,
+    ) -> dict[str, Any]:
+        q = np.asarray(query_coords, dtype=float)
+        s = np.asarray(sample_coords, dtype=float)
+        w = np.asarray(attention_weights, dtype=float)
+        if w.ndim != 2 or w.shape[0] == 0 or w.shape[1] == 0:
+            return {"type": "query_sample_heatmap", "shape": [0, 0], "heatmap": [], "top_attention_links": []}
+
+        w_norm = w / (np.sum(w, axis=1, keepdims=True) + 1e-12)
+        top_links: list[dict[str, Any]] = []
+        for qi in range(w_norm.shape[0]):
+            sj = int(np.argmax(w_norm[qi]))
+            top_links.append(
+                {
+                    "query_index": int(qi),
+                    "sample_index": int(sj),
+                    "weight": float(w_norm[qi, sj]),
+                    "query_coord": q[qi].astype(float).tolist(),
+                    "sample_coord": s[sj].astype(float).tolist(),
+                }
+            )
+
+        return {
+            "type": "query_sample_heatmap",
+            "shape": [int(w_norm.shape[0]), int(w_norm.shape[1])],
+            "heatmap": w_norm.astype(float).tolist(),
+            "query_coords": q.astype(float).tolist(),
+            "sample_coords": s.astype(float).tolist(),
+            "top_attention_links": top_links,
+        }
+
+    def _neighborhood_impact_payload(
+        self,
+        *,
+        query_coords: np.ndarray,
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        attention_weights: np.ndarray,
+        top_neighbors: int = 5,
+    ) -> dict[str, Any]:
+        q = np.asarray(query_coords, dtype=float)
+        s = np.asarray(sample_coords, dtype=float)
+        v = np.asarray(sample_values, dtype=float).reshape(-1)
+        w = np.asarray(attention_weights, dtype=float)
+        if w.ndim != 2 or w.shape[0] == 0 or w.shape[1] == 0:
+            return {"top_neighbors": int(max(1, top_neighbors)), "per_query": [], "global_summary": {}}
+
+        w_norm = w / (np.sum(w, axis=1, keepdims=True) + 1e-12)
+        distances = np.linalg.norm(q[:, None, :] - s[None, :, :], axis=2)
+        k = max(1, min(int(top_neighbors), w_norm.shape[1]))
+        top_idx = np.argsort(-w_norm, axis=1)[:, :k]
+        neighborhood_mean = np.sum(w_norm * v.reshape(1, -1), axis=1)
+
+        per_query: list[dict[str, Any]] = []
+        for qi in range(w_norm.shape[0]):
+            neighbors: list[dict[str, Any]] = []
+            for rank, sj in enumerate(top_idx[qi].tolist(), start=1):
+                weight = float(w_norm[qi, sj])
+                neighbors.append(
+                    {
+                        "rank": int(rank),
+                        "sample_index": int(sj),
+                        "weight": weight,
+                        "distance": float(distances[qi, sj]),
+                        "sample_value": float(v[sj]),
+                        "impact_score": float(weight * v[sj]),
+                    }
+                )
+            per_query.append(
+                {
+                    "query_index": int(qi),
+                    "query_coord": q[qi].astype(float).tolist(),
+                    "dominant_neighbor": neighbors[0] if neighbors else None,
+                    "weighted_neighborhood_mean": float(neighborhood_mean[qi]),
+                    "neighbors": neighbors,
+                }
+            )
+
+        return {
+            "top_neighbors": int(k),
+            "per_query": per_query,
+            "global_summary": {
+                "mean_weighted_neighborhood_mean": float(np.mean(neighborhood_mean)),
+                "std_weighted_neighborhood_mean": float(np.std(neighborhood_mean)),
+                "mean_dominant_weight": float(np.mean(np.max(w_norm, axis=1))),
+            },
+        }
+
+    def _spatial_weight_distribution_payload(
+        self,
+        *,
+        query_coords: np.ndarray,
+        attention_weights: np.ndarray,
+        bins: int = 10,
+    ) -> dict[str, Any]:
+        q = np.asarray(query_coords, dtype=float)
+        w = np.asarray(attention_weights, dtype=float)
+        if w.ndim != 2 or w.shape[0] == 0 or w.shape[1] == 0:
+            return {"histogram": {"edges": [], "counts": []}, "quantiles": {}, "spatial_bins": []}
+
+        w_norm = w / (np.sum(w, axis=1, keepdims=True) + 1e-12)
+        dominant_weight = np.max(w_norm, axis=1)
+        entropy = -np.sum(w_norm * np.log(w_norm + 1e-12), axis=1)
+        hist_counts, hist_edges = np.histogram(dominant_weight, bins=max(4, int(bins)), range=(0.0, 1.0))
+        quantiles = np.quantile(dominant_weight, [0.1, 0.25, 0.5, 0.75, 0.9])
+
+        x_mid = float(np.median(q[:, 0]))
+        y_mid = float(np.median(q[:, 1]))
+        masks = [
+            (q[:, 0] <= x_mid) & (q[:, 1] <= y_mid),
+            (q[:, 0] > x_mid) & (q[:, 1] <= y_mid),
+            (q[:, 0] <= x_mid) & (q[:, 1] > y_mid),
+            (q[:, 0] > x_mid) & (q[:, 1] > y_mid),
+        ]
+        labels = ["SW", "SE", "NW", "NE"]
+        spatial_bins: list[dict[str, Any]] = []
+        for label, mask in zip(labels, masks):
+            idx = np.where(mask)[0]
+            if idx.size == 0:
+                spatial_bins.append({"region": label, "query_count": 0, "mean_dominant_weight": 0.0, "mean_entropy": 0.0})
+                continue
+            spatial_bins.append(
+                {
+                    "region": label,
+                    "query_count": int(idx.size),
+                    "mean_dominant_weight": float(np.mean(dominant_weight[idx])),
+                    "mean_entropy": float(np.mean(entropy[idx])),
+                }
+            )
+
+        return {
+            "histogram": {
+                "edges": hist_edges.astype(float).tolist(),
+                "counts": hist_counts.astype(int).tolist(),
+            },
+            "quantiles": {
+                "p10": float(quantiles[0]),
+                "p25": float(quantiles[1]),
+                "p50": float(quantiles[2]),
+                "p75": float(quantiles[3]),
+                "p90": float(quantiles[4]),
+            },
+            "summary": {
+                "mean_dominant_weight": float(np.mean(dominant_weight)),
+                "mean_entropy": float(np.mean(entropy)),
+            },
+            "spatial_bins": spatial_bins,
+        }
 
 
 class AttentionKrigingLIMEAdapter(_BaseAttentionKrigingAdapter):
@@ -293,9 +468,14 @@ class AttentionKrigingLIMEAdapter(_BaseAttentionKrigingAdapter):
                 "uncertainty": np.asarray(context["uncertainty"], dtype=float).tolist(),
                 "attention_mean_weight": np.asarray(context["attention_mean_weight"], dtype=float).tolist(),
             },
+            "attention_visualization": context["attention_visualization"],
+            "neighborhood_impact_analysis": context["neighborhood_impact_analysis"],
+            "spatial_weight_distribution": context["spatial_weight_distribution"],
             "performance": {
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "cache_hit": False,
+                "latency_target_ms": 8000.0,
+                "meets_latency_target": bool((time.perf_counter() - started) * 1000 < 8000.0),
             },
         }
         self._cache_set(cache_key, payload)
@@ -345,16 +525,24 @@ class AttentionKrigingSHAPAdapter(_BaseAttentionKrigingAdapter):
         feature_names: list[str] = context["feature_names"]
         background = np.asarray(context["background"], dtype=float)
         baseline = np.mean(background, axis=0)
+        shap_kernel_explainer = None
+        if shap_module is not None:
+            try:
+                shap_kernel_explainer = shap_module.KernelExplainer(
+                    lambda x: surrogate.predict(np.asarray(x, dtype=float)),
+                    background,
+                )
+            except Exception:
+                shap_kernel_explainer = None
 
         batch_explanations: list[dict[str, Any]] = []
         for node_idx in explained_nodes:
             instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
             expected_value = float(surrogate.predict(baseline.reshape(1, -1))[0])
             backend = "surrogate_linear"
-            if shap_module is not None:
+            if shap_kernel_explainer is not None:
                 try:
-                    explainer = shap_module.KernelExplainer(lambda x: surrogate.predict(np.asarray(x, dtype=float)), background)
-                    shap_arr = explainer.shap_values(
+                    shap_arr = shap_kernel_explainer.shap_values(
                         instance.reshape(1, -1),
                         nsamples=max(40, selected_nsamples),
                         l1_reg="num_features(10)",
@@ -362,7 +550,7 @@ class AttentionKrigingSHAPAdapter(_BaseAttentionKrigingAdapter):
                     if isinstance(shap_arr, list):
                         shap_arr = shap_arr[0]
                     shap_values = np.asarray(shap_arr, dtype=float).reshape(-1)
-                    ev = getattr(explainer, "expected_value", expected_value)
+                    ev = getattr(shap_kernel_explainer, "expected_value", expected_value)
                     if isinstance(ev, (list, tuple, np.ndarray)):
                         expected_value = _safe_float(np.asarray(ev).reshape(-1)[0], expected_value)
                     else:
@@ -427,10 +615,15 @@ class AttentionKrigingSHAPAdapter(_BaseAttentionKrigingAdapter):
                 "uncertainty": np.asarray(context["uncertainty"], dtype=float).tolist(),
                 "attention_mean_weight": np.asarray(context["attention_mean_weight"], dtype=float).tolist(),
             },
+            "attention_visualization": context["attention_visualization"],
+            "neighborhood_impact_analysis": context["neighborhood_impact_analysis"],
+            "spatial_weight_distribution": context["spatial_weight_distribution"],
             "performance": {
                 "duration_ms": round((time.perf_counter() - started) * 1000, 3),
                 "cache_hit": False,
                 "backend": "shap" if shap_module is not None else "surrogate_linear",
+                "latency_target_ms": 8000.0,
+                "meets_latency_target": bool((time.perf_counter() - started) * 1000 < 8000.0),
             },
         }
         self._cache_set(cache_key, payload)
