@@ -9,7 +9,7 @@ import hashlib
 import json
 import threading
 import time
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Iterator, Optional
 
 import numpy as np
 from sklearn.linear_model import Ridge
@@ -44,6 +44,17 @@ class _BaseGANAdapter:
         self._result_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
         self._context_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
         self._score_cache: "OrderedDict[str, dict[str, np.ndarray]]" = OrderedDict()
+        self._buffer_pool: "OrderedDict[str, np.ndarray]" = OrderedDict()
+        self._buffer_pool_budget_bytes = 24 * 1024 * 1024
+        self._cache_budget_bytes = 96 * 1024 * 1024
+        self._memory_monitor = {
+            "reuse_hits": 0,
+            "reuse_misses": 0,
+            "cleanup_runs": 0,
+            "last_cleanup_released_bytes": 0,
+            "peak_cache_bytes": 0,
+            "peak_pool_bytes": 0,
+        }
         self._feature_registry = AnomalyFeatureRegistry()
 
     @staticmethod
@@ -80,6 +91,7 @@ class _BaseGANAdapter:
             self._result_cache.move_to_end(key)
             while len(self._result_cache) > self.config.cache_size:
                 self._result_cache.popitem(last=False)
+        self._cleanup_memory_if_needed()
 
     def _context_get(self, key: str) -> Optional[dict[str, Any]]:
         with self._lock:
@@ -95,6 +107,7 @@ class _BaseGANAdapter:
             self._context_cache.move_to_end(key)
             while len(self._context_cache) > self.config.cache_size:
                 self._context_cache.popitem(last=False)
+        self._cleanup_memory_if_needed()
 
     def _score_cache_get(self, key: str) -> Optional[dict[str, np.ndarray]]:
         with self._lock:
@@ -102,24 +115,26 @@ class _BaseGANAdapter:
             if item is None:
                 return None
             self._score_cache.move_to_end(key)
-            return {name: np.asarray(arr, dtype=float).copy() for name, arr in item.items()}
+            return {name: np.asarray(arr, dtype=np.float32).copy() for name, arr in item.items()}
 
     def _score_cache_set(self, key: str, value: dict[str, np.ndarray]) -> None:
         with self._lock:
-            self._score_cache[key] = {name: np.asarray(arr, dtype=float).copy() for name, arr in value.items()}
+            self._score_cache[key] = {name: np.asarray(arr, dtype=np.float32).copy() for name, arr in value.items()}
             self._score_cache.move_to_end(key)
             while len(self._score_cache) > self.config.cache_size:
                 self._score_cache.popitem(last=False)
+        self._cleanup_memory_if_needed()
 
     def _standardize_column(self, values: np.ndarray, strategy: str) -> tuple[np.ndarray, dict[str, float]]:
-        v = np.asarray(values, dtype=float).reshape(-1)
+        v = np.asarray(values, dtype=np.float32).reshape(-1)
         if strategy == "minmax":
             v_min = float(np.min(v))
             v_max = float(np.max(v))
             scale = v_max - v_min
             if abs(scale) < 1e-9:
-                return np.zeros_like(v), {"strategy": 2.0, "shift": v_min, "scale": 1.0}
-            return (v - v_min) / (scale + 1e-9), {"strategy": 2.0, "shift": v_min, "scale": scale}
+                return np.zeros_like(v, dtype=np.float32), {"strategy": 2.0, "shift": v_min, "scale": 1.0}
+            out = (v - np.float32(v_min)) / np.float32(scale + 1e-9)
+            return np.asarray(out, dtype=np.float32), {"strategy": 2.0, "shift": v_min, "scale": scale}
 
         if strategy == "robust_zscore":
             median = float(np.median(v))
@@ -128,18 +143,20 @@ class _BaseGANAdapter:
                 mean = float(np.mean(v))
                 std = float(np.std(v))
                 std = std if std > 1e-9 else 1.0
-                return (v - mean) / std, {"strategy": 1.0, "shift": mean, "scale": std}
-            scaled = robust_zscore(v)
+                out = (v - np.float32(mean)) / np.float32(std)
+                return np.asarray(out, dtype=np.float32), {"strategy": 1.0, "shift": mean, "scale": std}
+            scaled = robust_zscore(v).astype(np.float32, copy=False)
             return scaled, {"strategy": 1.0, "shift": median, "scale": mad}
 
         mean = float(np.mean(v))
         std = float(np.std(v))
         std = std if std > 1e-9 else 1.0
-        return (v - mean) / std, {"strategy": 0.0, "shift": mean, "scale": std}
+        out = (v - np.float32(mean)) / np.float32(std)
+        return np.asarray(out, dtype=np.float32), {"strategy": 0.0, "shift": mean, "scale": std}
 
     def _preprocess(self, matrix: np.ndarray, feature_names: list[str]) -> tuple[np.ndarray, dict[str, dict[str, float]]]:
         plan = self._feature_registry.standardization_plan("gan")
-        scaled = np.zeros_like(matrix, dtype=float)
+        scaled = np.zeros_like(matrix, dtype=np.float32)
         stats: dict[str, dict[str, float]] = {}
         for idx, name in enumerate(feature_names):
             strategy = plan.get(name, "zscore")
@@ -155,7 +172,7 @@ class _BaseGANAdapter:
             batch_size=batch_size,
             use_training_stats=True,
         )
-        matrix = np.asarray(pre["processed_features"], dtype=float)
+        matrix = np.asarray(pre["processed_features"], dtype=np.float32)
         names = [str(x) for x in pre["feature_names"]]
         return matrix, names, pre
 
@@ -231,6 +248,130 @@ class _BaseGANAdapter:
         if x.dtype == np.float32:
             return x
         return x.astype(np.float32, copy=False)
+
+    @staticmethod
+    def _iter_stream_batches(arr: np.ndarray, batch_size: int) -> Iterator[np.ndarray]:
+        x = np.asarray(arr)
+        size = max(1, int(batch_size))
+        total = int(x.shape[0]) if x.ndim > 0 else 0
+        for start in range(0, total, size):
+            yield x[start : min(total, start + size)]
+
+    @staticmethod
+    def _object_memory_bytes(value: Any, visited: Optional[set[int]] = None) -> int:
+        refs = visited or set()
+        obj_id = id(value)
+        if obj_id in refs:
+            return 0
+        refs.add(obj_id)
+        if isinstance(value, np.ndarray):
+            return int(value.nbytes)
+        if isinstance(value, dict):
+            return int(sum(_BaseGANAdapter._object_memory_bytes(v, refs) for v in value.values()))
+        if isinstance(value, (list, tuple)):
+            return int(sum(_BaseGANAdapter._object_memory_bytes(v, refs) for v in value))
+        return 0
+
+    def _cache_memory_bytes(self) -> int:
+        with self._lock:
+            total = 0
+            total += self._object_memory_bytes(self._result_cache)
+            total += self._object_memory_bytes(self._context_cache)
+            total += self._object_memory_bytes(self._score_cache)
+            self._memory_monitor["peak_cache_bytes"] = max(int(self._memory_monitor["peak_cache_bytes"]), int(total))
+            return int(total)
+
+    def _pool_memory_bytes(self) -> int:
+        with self._lock:
+            total = int(sum(int(arr.nbytes) for arr in self._buffer_pool.values()))
+            self._memory_monitor["peak_pool_bytes"] = max(int(self._memory_monitor["peak_pool_bytes"]), int(total))
+            return total
+
+    def _buffer_key(self, shape: tuple[int, ...], dtype: np.dtype[Any]) -> str:
+        dims = "x".join(str(int(v)) for v in shape)
+        return f"{np.dtype(dtype).str}:{dims}"
+
+    def _acquire_buffer(self, shape: tuple[int, ...], dtype: np.dtype[Any]) -> np.ndarray:
+        key = self._buffer_key(shape, dtype)
+        with self._lock:
+            buf = self._buffer_pool.pop(key, None)
+            if buf is not None:
+                self._memory_monitor["reuse_hits"] = int(self._memory_monitor["reuse_hits"]) + 1
+                return buf
+            self._memory_monitor["reuse_misses"] = int(self._memory_monitor["reuse_misses"]) + 1
+        return np.empty(shape, dtype=dtype)
+
+    def _release_buffer(self, arr: np.ndarray) -> None:
+        x = np.asarray(arr)
+        key = self._buffer_key(tuple(int(v) for v in x.shape), x.dtype)
+        with self._lock:
+            self._buffer_pool[key] = x
+            self._buffer_pool.move_to_end(key)
+            while sum(int(v.nbytes) for v in self._buffer_pool.values()) > int(self._buffer_pool_budget_bytes):
+                self._buffer_pool.popitem(last=False)
+
+    def _cleanup_memory_if_needed(self) -> None:
+        cache_bytes = self._cache_memory_bytes()
+        if cache_bytes <= int(self._cache_budget_bytes):
+            return
+        released = 0
+        with self._lock:
+            target = int(self._cache_budget_bytes * 0.8)
+            while self._object_memory_bytes(self._result_cache) + self._object_memory_bytes(self._context_cache) + self._object_memory_bytes(self._score_cache) > target:
+                if len(self._result_cache) > 0:
+                    _, removed = self._result_cache.popitem(last=False)
+                    released += self._object_memory_bytes(removed)
+                    continue
+                if len(self._context_cache) > 0:
+                    _, removed = self._context_cache.popitem(last=False)
+                    released += self._object_memory_bytes(removed)
+                    continue
+                if len(self._score_cache) > 0:
+                    _, removed = self._score_cache.popitem(last=False)
+                    released += self._object_memory_bytes(removed)
+                    continue
+                break
+            self._memory_monitor["cleanup_runs"] = int(self._memory_monitor["cleanup_runs"]) + 1
+            self._memory_monitor["last_cleanup_released_bytes"] = int(released)
+
+    def _memory_monitor_snapshot(self, *, context: Optional[dict[str, Any]] = None, extra_arrays: Optional[list[np.ndarray]] = None) -> dict[str, Any]:
+        context_bytes = self._memory_bytes(context or {}, extra_arrays=extra_arrays)
+        cache_bytes = self._cache_memory_bytes()
+        pool_bytes = self._pool_memory_bytes()
+        with self._lock:
+            return {
+                "context_bytes": int(context_bytes),
+                "cache_bytes": int(cache_bytes),
+                "buffer_pool_bytes": int(pool_bytes),
+                "buffer_reuse_hits": int(self._memory_monitor["reuse_hits"]),
+                "buffer_reuse_misses": int(self._memory_monitor["reuse_misses"]),
+                "cleanup_runs": int(self._memory_monitor["cleanup_runs"]),
+                "last_cleanup_released_bytes": int(self._memory_monitor["last_cleanup_released_bytes"]),
+                "peak_cache_bytes": int(self._memory_monitor["peak_cache_bytes"]),
+                "peak_buffer_pool_bytes": int(self._memory_monitor["peak_pool_bytes"]),
+            }
+
+    def _stream_mean_abs_values(self, *, explanations: list[dict[str, Any]], feature_count: int) -> np.ndarray:
+        if feature_count <= 0:
+            return np.zeros((0,), dtype=float)
+        acc = self._acquire_buffer((feature_count,), np.float64)
+        tmp = self._acquire_buffer((feature_count,), np.float64)
+        acc.fill(0.0)
+        tmp.fill(0.0)
+        count = 0
+        for item in explanations:
+            values = np.asarray(item.get("raw_shap_values", []), dtype=np.float64).reshape(-1)
+            if values.size == 0:
+                continue
+            width = min(feature_count, int(values.size))
+            tmp.fill(0.0)
+            np.abs(values[:width], out=tmp[:width])
+            acc[:width] += tmp[:width]
+            count += 1
+        out = (acc / max(1, count)).astype(float, copy=True)
+        self._release_buffer(acc)
+        self._release_buffer(tmp)
+        return out
 
     def _predict_surrogate(self, context: dict[str, Any]) -> Callable[[np.ndarray], np.ndarray]:
         model: Ridge = context["surrogate"]
@@ -314,6 +455,7 @@ class _BaseGANAdapter:
             "background": self._to_float32(self._select_background(scaled_x, target, size=48)),
             "preprocess": {
                 "batch_slices": pre_info.get("batch_slices", []),
+                "streaming_batches": int(len(pre_info.get("batch_slices", []))),
                 "validation": pre_info.get("validation", {}),
             },
             "generator_artifacts": {
@@ -1209,6 +1351,7 @@ class GANAnomalyLimeAdapter(_BaseGANAdapter):
                 "lime_training_size": int(lime_training_data.shape[0]),
                 "lime_sampling_budget": int(selected_samples),
                 "memory_bytes": self._memory_bytes(context),
+                "memory_monitor": self._memory_monitor_snapshot(context=context),
             },
         }
         self._cache_set(cache_key, payload)
@@ -1347,7 +1490,7 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
             with ThreadPoolExecutor(max_workers=workers) as executor:
                 batch_explanations = list(executor.map(_explain_one, explained_nodes))
 
-        mean_abs = np.mean(np.abs(np.asarray([item["raw_shap_values"] for item in batch_explanations], dtype=float)), axis=0)
+        mean_abs = self._stream_mean_abs_values(explanations=batch_explanations, feature_count=len(feature_names))
         ranking = np.argsort(-mean_abs).astype(int).tolist()
         top_features = [
             {
@@ -1461,6 +1604,7 @@ class GANAnomalySHAPAdapter(_BaseGANAdapter):
                 "effective_feature_count": int(len(feature_indices)),
                 "feature_reduction_ratio": float(len(feature_indices) / max(1, len(feature_names))),
                 "memory_bytes": self._memory_bytes(context, extra_arrays=[reduced_background]),
+                "memory_monitor": self._memory_monitor_snapshot(context=context, extra_arrays=[reduced_background]),
             },
         }
         self._cache_set(cache_key, payload)

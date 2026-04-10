@@ -66,3 +66,44 @@ def test_result_cache_unit_repeat_query_hits_cache(gan_case: tuple[GANAnomalyDet
     assert out2["performance"]["cache_hit"] is True
     assert out2["summary"]["method"] == out1["summary"]["method"]
     assert out2["summary"]["explained_nodes"] == out1["summary"]["explained_nodes"]
+
+
+def test_memory_optimization_unit_stream_aggregate_mean_abs() -> None:
+    adapter = GANAnomalyLimeAdapter(config=GANExplanationConfig())
+    explanations = [
+        {"raw_shap_values": [1.0, -2.0, 0.5]},
+        {"raw_shap_values": [-3.0, 1.0, -1.5]},
+        {"raw_shap_values": [2.0, 0.0, 2.5]},
+    ]
+
+    out = adapter._stream_mean_abs_values(explanations=explanations, feature_count=3)
+    expected = np.array([(1.0 + 3.0 + 2.0) / 3.0, (2.0 + 1.0 + 0.0) / 3.0, (0.5 + 1.5 + 2.5) / 3.0], dtype=float)
+    assert np.allclose(out, expected)
+
+
+def test_memory_optimization_unit_buffer_reuse_pool_hit() -> None:
+    adapter = GANAnomalyLimeAdapter(config=GANExplanationConfig())
+    first = adapter._acquire_buffer((5,), np.float64)
+    adapter._release_buffer(first)
+    _ = adapter._acquire_buffer((5,), np.float64)
+    monitor = adapter._memory_monitor_snapshot(context={})
+
+    assert monitor["buffer_reuse_hits"] >= 1
+    assert monitor["buffer_pool_bytes"] >= 0
+
+
+def test_memory_optimization_unit_memory_monitor_in_payload(
+    gan_case: tuple[GANAnomalyDetector, np.ndarray, np.ndarray],
+) -> None:
+    model, coords, values = gan_case
+    adapter = GANAnomalyLimeAdapter(config=GANExplanationConfig(parallel_workers=2, lime_num_samples=140))
+
+    out = adapter.explain(model=model, coords=coords, values=values, top_k=4, max_explain_nodes=5, num_samples=120)
+    perf = out["performance"]
+    preprocess = out["preprocess"]
+
+    assert "memory_monitor" in perf
+    assert "context_bytes" in perf["memory_monitor"]
+    assert "cache_bytes" in perf["memory_monitor"]
+    assert "streaming_batches" in preprocess
+    assert preprocess["streaming_batches"] >= 1
