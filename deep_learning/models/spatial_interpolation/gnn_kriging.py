@@ -53,6 +53,28 @@ class GNNKrigingModel:
         self.residual_gain = 1.0
         self.bias = 0.0
 
+    @staticmethod
+    def _validate_inputs(
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        query_coords: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        samples = np.asarray(sample_coords, dtype=float)
+        values = np.asarray(sample_values, dtype=float).reshape(-1)
+        queries = np.asarray(query_coords, dtype=float) if query_coords is not None else samples
+
+        if samples.ndim != 2 or samples.shape[1] != 2:
+            raise ValueError("sample_coords must be [[x, y], ...]")
+        if queries.ndim != 2 or queries.shape[1] != 2:
+            raise ValueError("query_coords must be [[x, y], ...]")
+        if samples.shape[0] != values.shape[0]:
+            raise ValueError("sample_coords and sample_values length mismatch")
+        if samples.shape[0] < 2:
+            raise ValueError("at least 2 sample points are required")
+        if not np.isfinite(samples).all() or not np.isfinite(queries).all() or not np.isfinite(values).all():
+            raise ValueError("coords and values must be finite")
+        return samples, values, queries
+
     def _build_query_covariance_feature(
         self,
         query_coords: np.ndarray,
@@ -94,9 +116,7 @@ class GNNKrigingModel:
         sample_values: np.ndarray,
         query_coords: np.ndarray | None = None,
     ) -> GNNKrigingOutput:
-        samples = np.asarray(sample_coords, dtype=float)
-        values = np.asarray(sample_values, dtype=float).reshape(-1)
-        queries = np.asarray(query_coords, dtype=float) if query_coords is not None else samples
+        samples, values, queries = self._validate_inputs(sample_coords, sample_values, query_coords)
 
         self.kriging_prior.fit(samples, values)
         prior_mean, prior_var = self.kriging_prior.predict(queries)
@@ -125,6 +145,143 @@ class GNNKrigingModel:
         pred_var = np.maximum(prior_var + np.abs(head_out["variance"]), 1e-6)
 
         return GNNKrigingOutput(mean=pred_mean, variance=pred_var, residual=residual, adjacency=graph.adjacency)
+
+    def preprocess_gnn_kriging_data(
+        self,
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        *,
+        query_coords: np.ndarray | None = None,
+        batch_size: int | None = None,
+        use_runtime_stats: bool = True,
+    ) -> dict[str, Any]:
+        samples, values, queries = self._validate_inputs(sample_coords, sample_values, query_coords)
+        self.kriging_prior.fit(samples, values)
+        prior_mean, prior_var = self.kriging_prior.predict(queries)
+        features = self._build_features(queries, samples, values, prior_mean, prior_var)
+
+        graph = self.graph_builder.build(
+            coords=queries,
+            values=prior_mean,
+            strategy=self.graph_strategy if self.graph_strategy in {"knn", "radius", "voronoi", "delaunay"} else "knn",
+            weight_mode="hybrid",
+        )
+
+        if use_runtime_stats:
+            mean = features.mean(axis=0, keepdims=True)
+            std = features.std(axis=0, keepdims=True) + 1e-6
+            processed = (features - mean) / std
+            scaler = {
+                "mean": mean.reshape(-1).astype(float).tolist(),
+                "std": std.reshape(-1).astype(float).tolist(),
+                "source": "runtime",
+            }
+        else:
+            processed = features.copy()
+            scaler = {
+                "mean": np.zeros((features.shape[1],), dtype=float).tolist(),
+                "std": np.ones((features.shape[1],), dtype=float).tolist(),
+                "source": "identity",
+            }
+
+        size = int(max(1, batch_size or len(queries)))
+        slices = [[int(i), int(min(i + size, len(queries)))] for i in range(0, len(queries), size)]
+        feature_names = [
+            "coord_x",
+            "coord_y",
+            "radius",
+            "angle",
+            "local_mean",
+            "local_var",
+            "trend_bias",
+            "trend_x",
+            "sin_pos_0",
+            "sin_pos_1",
+            "sin_pos_2",
+            "sin_pos_3",
+            "sin_pos_4",
+            "sin_pos_5",
+            "sin_pos_6",
+            "sin_pos_7",
+            "sin_pos_8",
+            "sin_pos_9",
+            "sin_pos_10",
+            "sin_pos_11",
+            "learn_pos_0",
+            "learn_pos_1",
+            "learn_pos_2",
+            "learn_pos_3",
+            "learn_pos_4",
+            "learn_pos_5",
+            "learn_pos_6",
+            "learn_pos_7",
+            "prior_mean",
+            "prior_var",
+        ]
+
+        return {
+            "sample_coords": samples,
+            "sample_values": values,
+            "query_coords": queries,
+            "feature_matrix": features.astype(float),
+            "processed_features": processed.astype(float),
+            "feature_names": feature_names[: processed.shape[1]],
+            "prior_mean": prior_mean.astype(float).tolist(),
+            "prior_variance": prior_var.astype(float).tolist(),
+            "adjacency_matrix": graph.adjacency.astype(float),
+            "edge_index": graph.edge_index.astype(int),
+            "batch_slices": slices,
+            "scaler": scaler,
+            "validation": {
+                "is_valid": bool(np.isfinite(processed).all()),
+                "n_samples": int(samples.shape[0]),
+                "n_queries": int(queries.shape[0]),
+                "batch_size": size,
+            },
+        }
+
+    def predict_standard(
+        self,
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        *,
+        query_coords: np.ndarray | None = None,
+        confidence_z: float = 1.96,
+    ) -> dict[str, Any]:
+        samples, values, queries = self._validate_inputs(sample_coords, sample_values, query_coords)
+        preprocessed = self.preprocess_gnn_kriging_data(
+            sample_coords=samples,
+            sample_values=values,
+            query_coords=queries,
+            use_runtime_stats=True,
+        )
+        out = self.forward(sample_coords=samples, sample_values=values, query_coords=queries)
+        std = np.sqrt(np.maximum(out.variance, 1e-9))
+        z = max(0.0, float(confidence_z))
+        lower = out.mean - z * std
+        upper = out.mean + z * std
+        return {
+            "prediction": out.mean.astype(float).tolist(),
+            "variance": out.variance.astype(float).tolist(),
+            "residual": out.residual.astype(float).tolist(),
+            "uncertainty": std.astype(float).tolist(),
+            "confidence_interval": {
+                "z_score": z,
+                "lower": lower.astype(float).tolist(),
+                "upper": upper.astype(float).tolist(),
+            },
+            "details": {
+                "graph_strategy": self.graph_strategy,
+                "sample_count": int(samples.shape[0]),
+                "query_count": int(queries.shape[0]),
+                "adjacency_density": float(np.mean(out.adjacency > 0)),
+            },
+            "preprocess": {
+                "feature_names": list(preprocessed["feature_names"]),
+                "batch_slices": list(preprocessed["batch_slices"]),
+                "validation": dict(preprocessed["validation"]),
+            },
+        }
 
     def train_step(self, batch: list[dict[str, Any]], lr: float = 1e-2, mixed_precision: bool = False) -> float:
         del mixed_precision
