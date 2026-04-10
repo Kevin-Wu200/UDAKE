@@ -59,6 +59,28 @@ class AttentionKrigingModel:
         self.dynamic_weight = 1.0
         self.bias = 0.0
 
+    @staticmethod
+    def _validate_inputs(
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        query_coords: np.ndarray | None = None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        samples = np.asarray(sample_coords, dtype=float)
+        values = np.asarray(sample_values, dtype=float).reshape(-1)
+        queries = np.asarray(query_coords, dtype=float) if query_coords is not None else samples
+
+        if samples.ndim != 2 or samples.shape[1] != 2:
+            raise ValueError("sample_coords must be [[x, y], ...]")
+        if queries.ndim != 2 or queries.shape[1] != 2:
+            raise ValueError("query_coords must be [[x, y], ...]")
+        if samples.shape[0] != values.shape[0]:
+            raise ValueError("sample_coords and sample_values length mismatch")
+        if samples.shape[0] < 2:
+            raise ValueError("at least 2 sample points are required")
+        if not np.isfinite(samples).all() or not np.isfinite(queries).all() or not np.isfinite(values).all():
+            raise ValueError("coords and values must be finite")
+        return samples, values, queries
+
     def _encode_samples(self, sample_coords: np.ndarray, sample_values: np.ndarray) -> np.ndarray:
         coords = np.asarray(sample_coords, dtype=float)
         values = np.asarray(sample_values, dtype=float).reshape(-1, 1)
@@ -96,9 +118,7 @@ class AttentionKrigingModel:
         sample_values: np.ndarray,
         query_coords: np.ndarray,
     ) -> AttentionKrigingOutput:
-        s_coords = np.asarray(sample_coords, dtype=float)
-        s_vals = np.asarray(sample_values, dtype=float).reshape(-1)
-        q_coords = np.asarray(query_coords, dtype=float)
+        s_coords, s_vals, q_coords = self._validate_inputs(sample_coords, sample_values, query_coords)
 
         self.baseline.fit(s_coords, s_vals)
         prior_mean, prior_var = self.baseline.predict(q_coords)
@@ -125,6 +145,147 @@ class AttentionKrigingModel:
         pred_var = np.maximum(prior_var + np.abs(out["variance"]), 1e-6)
 
         return AttentionKrigingOutput(mean=pred_mean, variance=pred_var, attention_weights=rel_bias)
+
+    def _build_features(
+        self,
+        query_coords: np.ndarray,
+        prior_mean: np.ndarray,
+        prior_var: np.ndarray,
+        rel_bias: np.ndarray,
+    ) -> tuple[np.ndarray, list[str]]:
+        queries = np.asarray(query_coords, dtype=float)
+        sin_pos = sinusoidal_position_encoding(queries, dim=self.dim // 2)
+        learn_pos = self.pos_encoder.encode(queries)
+        rel = np.asarray(rel_bias, dtype=float)
+
+        rel_norm = rel / (np.sum(rel, axis=1, keepdims=True) + 1e-12)
+        rel_entropy = -np.sum(rel_norm * np.log(rel_norm + 1e-12), axis=1)
+        rel_stats = np.stack(
+            [
+                np.mean(rel, axis=1),
+                np.max(rel, axis=1),
+                np.std(rel, axis=1),
+                rel_entropy,
+            ],
+            axis=1,
+        )
+        prior_feat = np.stack([np.asarray(prior_mean, dtype=float), np.asarray(prior_var, dtype=float)], axis=1)
+        features = np.concatenate([queries, sin_pos, learn_pos, prior_feat, rel_stats], axis=1)
+
+        feature_names = ["coord_x", "coord_y"]
+        feature_names.extend([f"sin_pos_{i}" for i in range(sin_pos.shape[1])])
+        feature_names.extend([f"learn_pos_{i}" for i in range(learn_pos.shape[1])])
+        feature_names.extend(["prior_mean", "prior_var"])
+        feature_names.extend(["attn_weight_mean", "attn_weight_max", "attn_weight_std", "attn_weight_entropy"])
+        return features, feature_names
+
+    def preprocess_attention_kriging_data(
+        self,
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        *,
+        query_coords: np.ndarray | None = None,
+        batch_size: int | None = None,
+        use_runtime_stats: bool = True,
+    ) -> dict[str, Any]:
+        samples, values, queries = self._validate_inputs(sample_coords, sample_values, query_coords)
+
+        self.baseline.fit(samples, values)
+        prior_mean, prior_var = self.baseline.predict(queries)
+        _, rel_bias = self._encode_queries(queries, samples)
+        features, feature_names = self._build_features(queries, prior_mean, prior_var, rel_bias)
+
+        if use_runtime_stats:
+            mean = features.mean(axis=0, keepdims=True)
+            std = features.std(axis=0, keepdims=True) + 1e-6
+            processed = (features - mean) / std
+            scaler = {
+                "mean": mean.reshape(-1).astype(float).tolist(),
+                "std": std.reshape(-1).astype(float).tolist(),
+                "source": "runtime",
+            }
+        else:
+            processed = features.copy()
+            scaler = {
+                "mean": np.zeros((features.shape[1],), dtype=float).tolist(),
+                "std": np.ones((features.shape[1],), dtype=float).tolist(),
+                "source": "identity",
+            }
+
+        size = int(max(1, batch_size or len(queries)))
+        slices = [[int(i), int(min(i + size, len(queries)))] for i in range(0, len(queries), size)]
+        rel_norm = rel_bias / (np.sum(rel_bias, axis=1, keepdims=True) + 1e-12)
+        entropy = -np.sum(rel_norm * np.log(rel_norm + 1e-12), axis=1)
+
+        return {
+            "sample_coords": samples,
+            "sample_values": values,
+            "query_coords": queries,
+            "feature_matrix": features.astype(float),
+            "processed_features": processed.astype(float),
+            "feature_names": feature_names[: processed.shape[1]],
+            "prior_mean": prior_mean.astype(float).tolist(),
+            "prior_variance": prior_var.astype(float).tolist(),
+            "attention_weights": rel_bias.astype(float),
+            "batch_slices": slices,
+            "scaler": scaler,
+            "attention_summary": {
+                "mean_weight": np.mean(rel_bias, axis=1).astype(float).tolist(),
+                "max_weight": np.max(rel_bias, axis=1).astype(float).tolist(),
+                "entropy": entropy.astype(float).tolist(),
+            },
+            "validation": {
+                "is_valid": bool(np.isfinite(processed).all()),
+                "n_samples": int(samples.shape[0]),
+                "n_queries": int(queries.shape[0]),
+                "batch_size": size,
+            },
+        }
+
+    def predict_standard(
+        self,
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        *,
+        query_coords: np.ndarray | None = None,
+        confidence_z: float = 1.96,
+    ) -> dict[str, Any]:
+        samples, values, queries = self._validate_inputs(sample_coords, sample_values, query_coords)
+        preprocessed = self.preprocess_attention_kriging_data(
+            sample_coords=samples,
+            sample_values=values,
+            query_coords=queries,
+            use_runtime_stats=True,
+        )
+        out = self.forward(sample_coords=samples, sample_values=values, query_coords=queries)
+        std = np.sqrt(np.maximum(out.variance, 1e-9))
+        z = max(0.0, float(confidence_z))
+        lower = out.mean - z * std
+        upper = out.mean + z * std
+        attn = np.asarray(out.attention_weights, dtype=float)
+        return {
+            "prediction": out.mean.astype(float).tolist(),
+            "variance": out.variance.astype(float).tolist(),
+            "uncertainty": std.astype(float).tolist(),
+            "attention_summary": {
+                "mean_weight": np.mean(attn, axis=1).astype(float).tolist(),
+                "max_weight": np.max(attn, axis=1).astype(float).tolist(),
+            },
+            "confidence_interval": {
+                "z_score": z,
+                "lower": lower.astype(float).tolist(),
+                "upper": upper.astype(float).tolist(),
+            },
+            "details": {
+                "sample_count": int(samples.shape[0]),
+                "query_count": int(queries.shape[0]),
+            },
+            "preprocess": {
+                "feature_names": list(preprocessed["feature_names"]),
+                "batch_slices": list(preprocessed["batch_slices"]),
+                "validation": dict(preprocessed["validation"]),
+            },
+        }
 
     def train_step(self, batch: list[dict[str, Any]], lr: float = 1e-2, mixed_precision: bool = False) -> float:
         del mixed_precision

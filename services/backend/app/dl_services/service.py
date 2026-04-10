@@ -26,6 +26,7 @@ from deep_learning.utils.device import DeviceManager
 from deep_learning.utils.monitoring import AlertManager, AlertRule, MetricMonitor, SystemResourceMonitor
 from .anomaly_cache import AnomalyModelCache
 from .anomaly_features import AnomalyFeatureRegistry
+from .attention_kriging_explainer import AttentionKrigingLIMEAdapter, AttentionKrigingSHAPAdapter
 from .contrastive_anomaly_explainer import ContrastiveLimeAdapter, ContrastiveShapAdapter
 from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
 from .gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter
@@ -101,6 +102,8 @@ class DeepLearningService:
         self.gan_shap_adapter = GANAnomalySHAPAdapter()
         self.gnn_kriging_lime_adapter = GNNKrigingLIMEAdapter()
         self.gnn_kriging_shap_adapter = GNNKrigingSHAPAdapter()
+        self.attention_kriging_lime_adapter = AttentionKrigingLIMEAdapter()
+        self.attention_kriging_shap_adapter = AttentionKrigingSHAPAdapter()
         self.contrastive_lime_adapter = ContrastiveLimeAdapter()
         self.contrastive_shap_adapter = ContrastiveShapAdapter()
         cache_file = os.path.join(tempfile.gettempdir(), f"udake_anomaly_cache_{os.getpid()}.json")
