@@ -34,6 +34,15 @@ python3 deep_learning/inference/run_spatial_interpolation_inference.py --model r
 ```bash
 python3 deep_learning/examples/anomaly_training_demo.py
 python3 deep_learning/examples/anomaly_inference_demo.py
+python3 deep_learning/examples/anomaly_vae_full_demo.py
+python3 deep_learning/examples/anomaly_gcae_full_demo.py
+python3 deep_learning/examples/anomaly_gan_full_demo.py
+python3 deep_learning/examples/anomaly_contrastive_full_demo.py
+python3 deep_learning/examples/anomaly_multi_model_comparison_demo.py
+python3 deep_learning/examples/anomaly_batch_processing_demo.py
+python3 deep_learning/examples/anomaly_custom_visualization_demo.py
+python3 deep_learning/examples/anomaly_performance_optimization_demo.py
+python3 deep_learning/examples/verify_anomaly_examples.py
 ```
 
 ## 阶段5快速命令
