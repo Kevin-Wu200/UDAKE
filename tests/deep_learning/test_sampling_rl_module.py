@@ -57,10 +57,27 @@ def test_sampling_env_and_features() -> None:
     spatial = feat.spatial_features(points, boundary=(0.0, 1.0, 0.0, 1.0))
     uncertainty = feat.uncertainty_features(umap)
     topo = feat.topology_features(points, k=2)
+    state_feat = feat.state_space_features(obs)
+    action_feat = feat.action_space_features({"position": [0.4, 0.6], "sample_count": 2}, env.action_space)
+    policy_feat = feat.policy_network_features(action_probs=np.array([0.2, 0.3, 0.5]), selected_action=2, action_mode="hybrid")
+    value_feat = feat.value_network_features(state_value=0.4, next_state_value=0.5, reward=0.2)
+    reward_feat = feat.reward_function_features(info["reward_breakdown"], reward_weights=env.reward_composer.weights)
+    reward_decomp = feat.decompose_reward(info["reward_breakdown"], reward_weights=env.reward_composer.weights)
+    state_action_bundle = feat.extract_state_action_features(obs, {"position": [0.4, 0.6], "sample_count": 2}, env.action_space)
+    name_map = feat.feature_name_mapping()
 
     assert spatial.shape[0] == 3
     assert uncertainty.shape[1] == 4
     assert topo.adjacency.shape == (3, 3)
+    assert state_feat.shape[0] == len(feat.STATE_FEATURE_NAMES)
+    assert action_feat.shape[0] == len(feat.ACTION_FEATURE_NAMES)
+    assert policy_feat.shape[0] == len(feat.POLICY_FEATURE_NAMES)
+    assert value_feat.shape[0] == len(feat.VALUE_FEATURE_NAMES)
+    assert reward_feat.shape[0] == len(feat.REWARD_FEATURE_NAMES)
+    assert reward_decomp.total_reward == reward_decomp.weighted_components["raw_total_reward"]
+    assert state_action_bundle.feature_vector.shape[0] == len(state_action_bundle.feature_names)
+    assert state_action_bundle.state_feature_count == len(feat.STATE_FEATURE_NAMES)
+    assert "state.mean_uncertainty" in name_map
 
 
 def test_ppo_dqn_a2c_training_cycle() -> None:

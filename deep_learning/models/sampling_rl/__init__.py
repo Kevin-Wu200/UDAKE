@@ -14,7 +14,7 @@ from .agents import (
 )
 from .env import ActionSpace, BaseEnv, SamplingEnv, register_to_gymnasium
 from .evaluation import EvaluationMetrics, SamplingRLEvaluator
-from .features import SamplingFeatureEngineer, TopologyFeatures
+from .features import RewardDecomposition, SamplingFeatureEngineer, StateActionFeatureBundle, TopologyFeatures
 from .integration import SamplingRLIntegrator, SamplingRecommendation
 from .marl import AgentMessage, MultiAgentSamplingSystem
 from .online import AdaptiveStrategyController, OnlineSamplingLearner, OnlineUpdateResult, TransferMetaLearner
@@ -64,6 +64,8 @@ __all__ = [
     "SamplingRLEvaluator",
     "SamplingFeatureEngineer",
     "TopologyFeatures",
+    "StateActionFeatureBundle",
+    "RewardDecomposition",
     "SamplingRLIntegrator",
     "SamplingRecommendation",
     "AgentMessage",
