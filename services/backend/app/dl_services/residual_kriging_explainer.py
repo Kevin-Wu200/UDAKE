@@ -13,6 +13,8 @@ from typing import Any, Callable, Optional
 import numpy as np
 from sklearn.linear_model import Ridge
 
+from deep_learning.models.spatial_interpolation.baselines import OrdinaryKrigingBaseline, UniversalKrigingBaseline
+
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
     try:
@@ -163,6 +165,239 @@ class _BaseResidualKrigingAdapter:
         pred = float(surrogate.predict(instance.reshape(1, -1))[0])
         return pairs, pred
 
+    def _compressed_lime_training_data(self, context: dict[str, Any], explained_nodes: list[int]) -> np.ndarray:
+        x = np.asarray(context["scaled_x"], dtype=float)
+        n = int(x.shape[0])
+        keep = max(64, min(n, max(96, len(explained_nodes) * 16)))
+        if n <= keep:
+            return x
+
+        uncertainty = np.asarray(context["uncertainty"], dtype=float).reshape(-1)
+        top_k = max(8, min(len(explained_nodes) * 4, keep // 2))
+        top_idx = np.argsort(-uncertainty)[:top_k]
+        remaining = keep - int(top_idx.shape[0])
+        uniform_idx = np.linspace(0, n - 1, remaining, dtype=int) if remaining > 0 else np.asarray([], dtype=int)
+        selected = np.unique(np.concatenate([top_idx.astype(int), uniform_idx.astype(int)])).astype(int)
+        if selected.shape[0] < keep:
+            fill = np.setdiff1d(np.arange(n, dtype=int), selected, assume_unique=False)[: keep - selected.shape[0]]
+            selected = np.concatenate([selected, fill]).astype(int)
+        return x[selected[:keep]]
+
+    def _residual_analysis_payload(
+        self,
+        *,
+        prediction: np.ndarray,
+        residual: np.ndarray,
+        uncertainty: np.ndarray,
+        top_k: int = 6,
+    ) -> dict[str, Any]:
+        pred = np.asarray(prediction, dtype=float).reshape(-1)
+        res = np.asarray(residual, dtype=float).reshape(-1)
+        unc = np.asarray(uncertainty, dtype=float).reshape(-1)
+        if pred.size == 0 or res.size == 0 or unc.size == 0:
+            return {
+                "residual_stats": {"mean": 0.0, "std": 0.0, "mae": 0.0, "rmse": 0.0, "max_abs": 0.0, "p95_abs": 0.0},
+                "uncertainty_alignment": {"corr_abs_residual_uncertainty": 0.0, "high_risk_ratio": 0.0},
+                "top_residual_nodes": [],
+                "diagnosis": {"bias_type": "balanced", "dominant_mode": "stable"},
+            }
+
+        abs_res = np.abs(res)
+        z = (res - np.mean(res)) / (np.std(res) + 1e-12)
+        n = int(res.size)
+        k = max(1, min(int(top_k), n))
+        top_idx = np.argsort(-abs_res)[:k].astype(int).tolist()
+        unc_thr = float(np.percentile(unc, 80))
+        res_thr = float(np.percentile(abs_res, 80))
+        high_risk = ((unc >= unc_thr) & (abs_res >= res_thr)).astype(float)
+        corr = float(np.corrcoef(abs_res, unc)[0, 1]) if n > 1 else 0.0
+        if not np.isfinite(corr):
+            corr = 0.0
+
+        top_nodes = [
+            {
+                "node_index": int(i),
+                "prediction": float(pred[i]),
+                "residual": float(res[i]),
+                "abs_residual": float(abs_res[i]),
+                "uncertainty": float(unc[i]),
+                "residual_zscore": float(z[i]),
+                "pattern_type": "under_prediction" if res[i] > 0 else "over_prediction",
+            }
+            for i in top_idx
+        ]
+
+        pos_ratio = float(np.mean((res > 0).astype(float)))
+        if pos_ratio > 0.6:
+            bias_type = "under_prediction_bias"
+        elif pos_ratio < 0.4:
+            bias_type = "over_prediction_bias"
+        else:
+            bias_type = "balanced"
+
+        dominant_mode = "high_variance" if float(np.mean(abs_res)) > float(np.mean(unc)) else "stable"
+        return {
+            "residual_stats": {
+                "mean": float(np.mean(res)),
+                "std": float(np.std(res)),
+                "mae": float(np.mean(abs_res)),
+                "rmse": float(np.sqrt(np.mean(res**2))),
+                "max_abs": float(np.max(abs_res)),
+                "p95_abs": float(np.percentile(abs_res, 95)),
+            },
+            "uncertainty_alignment": {
+                "corr_abs_residual_uncertainty": corr,
+                "uncertainty_threshold_p80": unc_thr,
+                "residual_threshold_p80": res_thr,
+                "high_risk_ratio": float(np.mean(high_risk)),
+            },
+            "top_residual_nodes": top_nodes,
+            "diagnosis": {
+                "bias_type": bias_type,
+                "dominant_mode": dominant_mode,
+            },
+        }
+
+    def _baseline_comparison_payload(
+        self,
+        *,
+        model: Any,
+        sample_coords: np.ndarray,
+        sample_values: np.ndarray,
+        query_coords: np.ndarray,
+        prediction: np.ndarray,
+        uncertainty: np.ndarray,
+        residual: np.ndarray,
+    ) -> dict[str, Any]:
+        samples = np.asarray(sample_coords, dtype=float)
+        values = np.asarray(sample_values, dtype=float).reshape(-1)
+        queries = np.asarray(query_coords, dtype=float)
+        pred = np.asarray(prediction, dtype=float).reshape(-1)
+        unc = np.asarray(uncertainty, dtype=float).reshape(-1)
+        res = np.asarray(residual, dtype=float).reshape(-1)
+        if pred.size == 0:
+            return {
+                "active_baseline": "unknown",
+                "query_count": 0,
+                "active_baseline_consistency": {"mae": 0.0, "rmse": 0.0, "corr": 0.0},
+                "candidate_baselines": [],
+            }
+
+        ordinary = OrdinaryKrigingBaseline().fit(samples, values)
+        universal = UniversalKrigingBaseline().fit(samples, values)
+        ord_pred, ord_var = ordinary.predict(queries)
+        uni_pred, uni_var = universal.predict(queries)
+        method_map = {
+            "ordinary": (np.asarray(ord_pred, dtype=float), np.asarray(ord_var, dtype=float)),
+            "universal": (np.asarray(uni_pred, dtype=float), np.asarray(uni_var, dtype=float)),
+        }
+
+        active_name = "universal" if isinstance(getattr(model, "baseline", None), UniversalKrigingBaseline) else "ordinary"
+        active_pred = method_map[active_name][0]
+        residual_reconstruction = pred - active_pred
+        consistency_err = residual_reconstruction - res
+        corr = float(np.corrcoef(pred, active_pred)[0, 1]) if pred.size > 1 else 0.0
+        if not np.isfinite(corr):
+            corr = 0.0
+
+        candidate_baselines: list[dict[str, Any]] = []
+        for name, (baseline_pred, baseline_var) in method_map.items():
+            correction = pred - baseline_pred
+            candidate_baselines.append(
+                {
+                    "name": name,
+                    "prediction_delta": {
+                        "mean_abs": float(np.mean(np.abs(correction))),
+                        "rmse": float(np.sqrt(np.mean(correction**2))),
+                        "mean_signed": float(np.mean(correction)),
+                    },
+                    "uncertainty_delta": {
+                        "mean_abs": float(np.mean(np.abs(unc - np.sqrt(np.maximum(baseline_var, 1e-9))))),
+                        "rmse": float(np.sqrt(np.mean((unc - np.sqrt(np.maximum(baseline_var, 1e-9))) ** 2))),
+                    },
+                }
+            )
+
+        candidate_baselines.sort(key=lambda item: item["prediction_delta"]["mean_abs"])
+        return {
+            "active_baseline": active_name,
+            "query_count": int(pred.size),
+            "active_baseline_consistency": {
+                "mae": float(np.mean(np.abs(consistency_err))),
+                "rmse": float(np.sqrt(np.mean(consistency_err**2))),
+                "corr": corr,
+            },
+            "candidate_baselines": candidate_baselines,
+        }
+
+    def _residual_spatial_distribution_payload(
+        self,
+        *,
+        query_coords: np.ndarray,
+        residual: np.ndarray,
+        uncertainty: np.ndarray,
+        bins: int = 10,
+        hotspot_count: int = 8,
+    ) -> dict[str, Any]:
+        q = np.asarray(query_coords, dtype=float)
+        res = np.asarray(residual, dtype=float).reshape(-1)
+        unc = np.asarray(uncertainty, dtype=float).reshape(-1)
+        if q.size == 0 or res.size == 0:
+            return {"histogram": {"edges": [], "counts": []}, "spatial_bins": [], "hotspots": []}
+
+        abs_res = np.abs(res)
+        hist_counts, hist_edges = np.histogram(abs_res, bins=max(4, int(bins)))
+        x_mid = float(np.median(q[:, 0]))
+        y_mid = float(np.median(q[:, 1]))
+        masks = [
+            (q[:, 0] <= x_mid) & (q[:, 1] <= y_mid),
+            (q[:, 0] > x_mid) & (q[:, 1] <= y_mid),
+            (q[:, 0] <= x_mid) & (q[:, 1] > y_mid),
+            (q[:, 0] > x_mid) & (q[:, 1] > y_mid),
+        ]
+        labels = ["SW", "SE", "NW", "NE"]
+        spatial_bins: list[dict[str, Any]] = []
+        for label, mask in zip(labels, masks):
+            idx = np.where(mask)[0]
+            if idx.size == 0:
+                spatial_bins.append({"region": label, "query_count": 0, "mean_abs_residual": 0.0, "mean_uncertainty": 0.0})
+                continue
+            spatial_bins.append(
+                {
+                    "region": label,
+                    "query_count": int(idx.size),
+                    "mean_abs_residual": float(np.mean(abs_res[idx])),
+                    "mean_uncertainty": float(np.mean(unc[idx])),
+                    "mean_signed_residual": float(np.mean(res[idx])),
+                }
+            )
+
+        k = max(1, min(int(hotspot_count), int(res.size)))
+        top_idx = np.argsort(-abs_res)[:k].astype(int).tolist()
+        hotspots = [
+            {
+                "node_index": int(i),
+                "coord": q[i].astype(float).tolist(),
+                "residual": float(res[i]),
+                "abs_residual": float(abs_res[i]),
+                "uncertainty": float(unc[i]),
+            }
+            for i in top_idx
+        ]
+        return {
+            "histogram": {
+                "edges": hist_edges.astype(float).tolist(),
+                "counts": hist_counts.astype(int).tolist(),
+            },
+            "summary": {
+                "mean_abs_residual": float(np.mean(abs_res)),
+                "max_abs_residual": float(np.max(abs_res)),
+                "mean_uncertainty": float(np.mean(unc)),
+            },
+            "spatial_bins": spatial_bins,
+            "hotspots": hotspots,
+        }
+
 
 class ResidualKrigingLIMEAdapter(_BaseResidualKrigingAdapter):
     def explain(
@@ -206,10 +441,12 @@ class ResidualKrigingLIMEAdapter(_BaseResidualKrigingAdapter):
         predict_fn = self._predict_surrogate(context)
         lime_module = self._load_lime_tabular()
         lime_explainer = None
+        training_data = self._compressed_lime_training_data(context, explained_nodes)
+        effective_samples = max(80, min(selected_samples, 240))
         if lime_module is not None:
             try:
                 lime_explainer = lime_module.LimeTabularExplainer(
-                    training_data=np.asarray(context["scaled_x"], dtype=float),
+                    training_data=np.asarray(training_data, dtype=float),
                     feature_names=feature_names,
                     mode="regression",
                     discretize_continuous=False,
@@ -230,7 +467,7 @@ class ResidualKrigingLIMEAdapter(_BaseResidualKrigingAdapter):
                         data_row=instance,
                         predict_fn=predict_fn,
                         num_features=max(1, min(int(top_k), len(feature_names))),
-                        num_samples=max(80, selected_samples),
+                        num_samples=effective_samples,
                     )
                     local_map = exp.local_exp.get(1) or exp.local_exp.get(0) or []
                     local_pairs = [(int(i), float(w)) for i, w in local_map]
@@ -276,6 +513,26 @@ class ResidualKrigingLIMEAdapter(_BaseResidualKrigingAdapter):
             }
             for idx in order
         ]
+        residual_analysis = self._residual_analysis_payload(
+            prediction=np.asarray(context["prediction"], dtype=float),
+            residual=np.asarray(context["residual"], dtype=float),
+            uncertainty=np.asarray(context["uncertainty"], dtype=float),
+        )
+        baseline_comparison = self._baseline_comparison_payload(
+            model=model,
+            sample_coords=np.asarray(sample_coords, dtype=float),
+            sample_values=np.asarray(sample_values, dtype=float),
+            query_coords=np.asarray(query_coords, dtype=float) if query_coords is not None else np.asarray(sample_coords, dtype=float),
+            prediction=np.asarray(context["prediction"], dtype=float),
+            uncertainty=np.asarray(context["uncertainty"], dtype=float),
+            residual=np.asarray(context["residual"], dtype=float),
+        )
+        residual_spatial_distribution = self._residual_spatial_distribution_payload(
+            query_coords=np.asarray(query_coords, dtype=float) if query_coords is not None else np.asarray(sample_coords, dtype=float),
+            residual=np.asarray(context["residual"], dtype=float),
+            uncertainty=np.asarray(context["uncertainty"], dtype=float),
+        )
+        elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
 
         payload = {
             "summary": {
@@ -293,9 +550,16 @@ class ResidualKrigingLIMEAdapter(_BaseResidualKrigingAdapter):
                 "uncertainty": np.asarray(context["uncertainty"], dtype=float).tolist(),
                 "residual": np.asarray(context["residual"], dtype=float).tolist(),
             },
+            "residual_analysis": residual_analysis,
+            "baseline_model_comparison": baseline_comparison,
+            "residual_spatial_distribution": residual_spatial_distribution,
             "performance": {
-                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                "duration_ms": elapsed_ms,
                 "cache_hit": False,
+                "latency_target_ms": 8000.0,
+                "meets_latency_target": bool(elapsed_ms < 8000.0),
+                "lime_training_size": int(training_data.shape[0]),
+                "lime_sampling_budget": int(effective_samples),
             },
         }
         self._cache_set(cache_key, payload)
@@ -345,24 +609,33 @@ class ResidualKrigingSHAPAdapter(_BaseResidualKrigingAdapter):
         feature_names: list[str] = context["feature_names"]
         background = np.asarray(context["background"], dtype=float)
         baseline = np.mean(background, axis=0)
+        effective_nsamples = max(40, min(selected_nsamples, 180))
+        shap_kernel_explainer = None
+        if shap_module is not None:
+            try:
+                shap_kernel_explainer = shap_module.KernelExplainer(
+                    lambda x: surrogate.predict(np.asarray(x, dtype=float)),
+                    background,
+                )
+            except Exception:
+                shap_kernel_explainer = None
 
         batch_explanations: list[dict[str, Any]] = []
         for node_idx in explained_nodes:
             instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
             expected_value = float(surrogate.predict(baseline.reshape(1, -1))[0])
             backend = "surrogate_linear"
-            if shap_module is not None:
+            if shap_kernel_explainer is not None:
                 try:
-                    explainer = shap_module.KernelExplainer(lambda x: surrogate.predict(np.asarray(x, dtype=float)), background)
-                    shap_arr = explainer.shap_values(
+                    shap_arr = shap_kernel_explainer.shap_values(
                         instance.reshape(1, -1),
-                        nsamples=max(40, selected_nsamples),
+                        nsamples=effective_nsamples,
                         l1_reg="num_features(10)",
                     )
                     if isinstance(shap_arr, list):
                         shap_arr = shap_arr[0]
                     shap_values = np.asarray(shap_arr, dtype=float).reshape(-1)
-                    ev = getattr(explainer, "expected_value", expected_value)
+                    ev = getattr(shap_kernel_explainer, "expected_value", expected_value)
                     if isinstance(ev, (list, tuple, np.ndarray)):
                         expected_value = _safe_float(np.asarray(ev).reshape(-1)[0], expected_value)
                     else:
@@ -409,6 +682,26 @@ class ResidualKrigingSHAPAdapter(_BaseResidualKrigingAdapter):
             }
             for idx in ranking[: max(1, min(int(top_k), len(feature_names)))]
         ]
+        residual_analysis = self._residual_analysis_payload(
+            prediction=np.asarray(context["prediction"], dtype=float),
+            residual=np.asarray(context["residual"], dtype=float),
+            uncertainty=np.asarray(context["uncertainty"], dtype=float),
+        )
+        baseline_comparison = self._baseline_comparison_payload(
+            model=model,
+            sample_coords=np.asarray(sample_coords, dtype=float),
+            sample_values=np.asarray(sample_values, dtype=float),
+            query_coords=np.asarray(query_coords, dtype=float) if query_coords is not None else np.asarray(sample_coords, dtype=float),
+            prediction=np.asarray(context["prediction"], dtype=float),
+            uncertainty=np.asarray(context["uncertainty"], dtype=float),
+            residual=np.asarray(context["residual"], dtype=float),
+        )
+        residual_spatial_distribution = self._residual_spatial_distribution_payload(
+            query_coords=np.asarray(query_coords, dtype=float) if query_coords is not None else np.asarray(sample_coords, dtype=float),
+            residual=np.asarray(context["residual"], dtype=float),
+            uncertainty=np.asarray(context["uncertainty"], dtype=float),
+        )
+        elapsed_ms = round((time.perf_counter() - started) * 1000, 3)
 
         payload = {
             "summary": {
@@ -427,10 +720,17 @@ class ResidualKrigingSHAPAdapter(_BaseResidualKrigingAdapter):
                 "uncertainty": np.asarray(context["uncertainty"], dtype=float).tolist(),
                 "residual": np.asarray(context["residual"], dtype=float).tolist(),
             },
+            "residual_analysis": residual_analysis,
+            "baseline_model_comparison": baseline_comparison,
+            "residual_spatial_distribution": residual_spatial_distribution,
             "performance": {
-                "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+                "duration_ms": elapsed_ms,
                 "cache_hit": False,
                 "backend": "shap" if shap_module is not None else "surrogate_linear",
+                "latency_target_ms": 8000.0,
+                "meets_latency_target": bool(elapsed_ms < 8000.0),
+                "shap_background_size": int(background.shape[0]),
+                "shap_sampling_budget": int(effective_nsamples),
             },
         }
         self._cache_set(cache_key, payload)
