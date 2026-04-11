@@ -180,6 +180,10 @@ class BayesianNeuralRegressor:
         self.elbo = ELBOLoss()
 
         self.history: list[dict[str, float]] = []
+        self.feature_names: list[str] = [f"feature_{i}" for i in range(self.in_dim)]
+        self._runtime_feature_mean = np.zeros(self.in_dim, dtype=float)
+        self._runtime_feature_std = np.ones(self.in_dim, dtype=float)
+        self._has_runtime_stats = False
 
     def _forward_mean(self, x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         z1 = self.hidden.forward(x, sample=False)
@@ -310,3 +314,73 @@ class BayesianNeuralRegressor:
             "confidence": float(confidence),
             "num_samples": int(max(2, num_samples)),
         }
+
+    def preprocess_bnn_data(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        feature_names: list[str] | None = None,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        x_raw = ensure_2d(np.asarray(features, dtype=float))
+        if x_raw.shape[1] != self.in_dim:
+            raise ValueError(f"输入维度不匹配：期望 {self.in_dim}，实际 {x_raw.shape[1]}")
+
+        names = list(feature_names) if feature_names is not None else [f"feature_{i}" for i in range(x_raw.shape[1])]
+        if len(names) != x_raw.shape[1]:
+            raise ValueError("feature_names 长度与特征维度不一致")
+
+        if use_training_stats and self._has_runtime_stats:
+            mean = np.asarray(self._runtime_feature_mean, dtype=float)
+            std = np.asarray(self._runtime_feature_std, dtype=float)
+            stats_source = "runtime"
+        else:
+            mean = np.mean(x_raw, axis=0)
+            std = np.std(x_raw, axis=0)
+            std = np.where(std > 1e-8, std, 1.0)
+            self._runtime_feature_mean = mean.astype(float)
+            self._runtime_feature_std = std.astype(float)
+            self._has_runtime_stats = True
+            stats_source = "batch"
+
+        x_scaled = (x_raw - mean.reshape(1, -1)) / std.reshape(1, -1)
+        self.feature_names = list(names)
+        return {
+            "raw_features": x_raw,
+            "processed_features": x_scaled,
+            "feature_names": list(names),
+            "scaler": {
+                "mean": [float(v) for v in mean.tolist()],
+                "std": [float(v) for v in std.tolist()],
+                "source": stats_source,
+            },
+            "validation": {
+                "is_valid": True,
+                "sample_count": int(x_raw.shape[0]),
+                "feature_dim": int(x_raw.shape[1]),
+                "stats_source": stats_source,
+            },
+        }
+
+    def predict_bnn(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        num_samples: int = 80,
+        confidence: float = 0.95,
+        temperature: float = 1.0,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        pre = self.preprocess_bnn_data(features, use_training_stats=use_training_stats)
+        pred = self.predict(
+            np.asarray(pre["processed_features"], dtype=float),
+            num_samples=num_samples,
+            confidence=confidence,
+            temperature=temperature,
+        )
+        pred["preprocess"] = {
+            "scaler": dict(pre["scaler"]),
+            "validation": dict(pre["validation"]),
+            "feature_names": list(pre["feature_names"]),
+        }
+        return pred
