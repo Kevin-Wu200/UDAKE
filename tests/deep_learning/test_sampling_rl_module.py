@@ -204,6 +204,9 @@ def test_integration_and_optimization_helpers() -> None:
     assert "sampling_efficiency_evaluation" in recommend["explanations"]
     assert "long_term_value_prediction" in recommend["explanations"]
     assert "policy_robustness_analysis" in recommend["explanations"]
+    assert "policy_history_record" in recommend["explanations"]
+    assert "policy_effect_prediction" in recommend["explanations"]
+    assert "multi_agent_collaboration_analysis" in recommend["explanations"]
     assert "summary" in recommend["explanations"]["policy_decision"]
     assert "action_value_points" in recommend["explanations"]["action_value_visualization"]
     assert "point_explanations" in recommend["explanations"]["sampling_point_recommendation"]
@@ -215,6 +218,9 @@ def test_integration_and_optimization_helpers() -> None:
     assert "combined_efficiency_score" in recommend["explanations"]["sampling_efficiency_evaluation"]["summary"]
     assert len(recommend["explanations"]["long_term_value_prediction"]["prediction_curve"]) >= 1
     assert "perturbation_tests" in recommend["explanations"]["policy_robustness_analysis"]
+    assert recommend["explanations"]["policy_history_record"]["summary"]["history_count"] >= 1
+    assert "future_effect_score" in recommend["explanations"]["policy_effect_prediction"]["summary"]
+    assert "applicable" in recommend["explanations"]["multi_agent_collaboration_analysis"]["summary"]
     assert optimized["best_strategy"] in {"rl_only", "rule_only", "hybrid"}
 
     batch_opt = BatchOptimizer().suggest(sample_count=256, feature_dim=32, memory_budget_mb=16)

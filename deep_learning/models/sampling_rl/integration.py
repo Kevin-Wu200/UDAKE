@@ -10,6 +10,7 @@ import numpy as np
 from .agents import ActorCriticAgent, DQNAgent, PPOAgent
 from .env import SamplingEnv
 from .evaluation import SamplingRLEvaluator
+from .marl import MultiAgentSamplingSystem
 from .training import SamplingRLTrainingConfig, train_agent
 
 ModelName = Literal["ppo", "dqn", "a2c", "a3c"]
@@ -31,6 +32,8 @@ class SamplingRLIntegrator:
         self.seed = seed
         self.agent: PPOAgent | DQNAgent | ActorCriticAgent | None = None
         self.latest_training: dict[str, Any] = {}
+        self.policy_history: list[dict[str, Any]] = []
+        self._recommend_iteration = 0
         self.evaluator = SamplingRLEvaluator()
 
     def _build_env(
@@ -697,6 +700,231 @@ class SamplingRLIntegrator:
             "perturbation_tests": tests,
         }
 
+    def _record_policy_history(
+        self,
+        *,
+        fusion_strategy: str,
+        rl_recs: list[SamplingRecommendation],
+        rule_recs: list[SamplingRecommendation],
+        final_recs: list[SamplingRecommendation],
+        density_analysis: dict[str, Any],
+        effect_evaluation: dict[str, Any],
+        long_term_value_prediction: dict[str, Any],
+        policy_robustness_analysis: dict[str, Any],
+    ) -> None:
+        self._recommend_iteration += 1
+        density_summary = density_analysis.get("summary", {})
+        effect_summary = effect_evaluation.get("summary", {})
+        long_term_summary = long_term_value_prediction.get("summary", {})
+        robust_summary = policy_robustness_analysis.get("summary", {})
+
+        rl_scores = np.asarray([float(r.score) for r in rl_recs], dtype=float)
+        rule_scores = np.asarray([float(r.score) for r in rule_recs], dtype=float)
+        final_scores = np.asarray([float(r.score) for r in final_recs], dtype=float)
+
+        self.policy_history.append(
+            {
+                "step": int(self._recommend_iteration),
+                "model_name": self.model_name,
+                "fusion_strategy": fusion_strategy,
+                "recommendation_count": int(len(final_recs)),
+                "rl_mean_score": float(np.mean(rl_scores)) if rl_scores.size else 0.0,
+                "rule_mean_score": float(np.mean(rule_scores)) if rule_scores.size else 0.0,
+                "final_mean_score": float(np.mean(final_scores)) if final_scores.size else 0.0,
+                "coverage_ratio": float(density_summary.get("coverage_ratio", 0.0)),
+                "quality_score": float(effect_summary.get("quality_score", 0.0)),
+                "reduction_ratio": float(effect_summary.get("uncertainty_reduction_ratio", 0.0)),
+                "long_term_value_score": float(long_term_summary.get("long_term_value_score", 0.0)),
+                "robustness_score": float(robust_summary.get("robustness_score", 0.0)),
+            }
+        )
+        self.policy_history = self.policy_history[-30:]
+
+    def _build_policy_history_record(self) -> dict[str, Any]:
+        if not self.policy_history:
+            return {
+                "summary": {
+                    "history_count": 0,
+                    "latest_strategy": "none",
+                    "mean_quality_score": 0.0,
+                    "mean_robustness_score": 0.0,
+                    "trend": "stable",
+                },
+                "history": [],
+                "trend_analysis": {"quality_slope": 0.0, "value_slope": 0.0},
+            }
+
+        history = self.policy_history[-12:]
+        quality = np.asarray([float(item.get("quality_score", 0.0)) for item in history], dtype=float)
+        value = np.asarray([float(item.get("long_term_value_score", 0.0)) for item in history], dtype=float)
+        robustness = np.asarray([float(item.get("robustness_score", 0.0)) for item in history], dtype=float)
+
+        if len(history) >= 2:
+            x = np.arange(len(history), dtype=float)
+            quality_slope = float(np.polyfit(x, quality, deg=1)[0])
+            value_slope = float(np.polyfit(x, value, deg=1)[0])
+        else:
+            quality_slope = 0.0
+            value_slope = 0.0
+
+        if quality_slope > 0.01:
+            trend = "improving"
+        elif quality_slope < -0.01:
+            trend = "declining"
+        else:
+            trend = "stable"
+
+        return {
+            "summary": {
+                "history_count": int(len(history)),
+                "latest_strategy": str(history[-1].get("fusion_strategy", "unknown")),
+                "mean_quality_score": float(np.mean(quality)) if quality.size else 0.0,
+                "mean_robustness_score": float(np.mean(robustness)) if robustness.size else 0.0,
+                "trend": trend,
+            },
+            "history": history,
+            "trend_analysis": {
+                "quality_slope": quality_slope,
+                "value_slope": value_slope,
+            },
+        }
+
+    def _build_policy_effect_prediction(
+        self,
+        *,
+        sampling_efficiency_evaluation: dict[str, Any],
+        long_term_value_prediction: dict[str, Any],
+        policy_robustness_analysis: dict[str, Any],
+        policy_history_record: dict[str, Any],
+    ) -> dict[str, Any]:
+        eff_summary = sampling_efficiency_evaluation.get("summary", {})
+        value_summary = long_term_value_prediction.get("summary", {})
+        robust_summary = policy_robustness_analysis.get("summary", {})
+        trend_analysis = policy_history_record.get("trend_analysis", {})
+
+        efficiency = float(eff_summary.get("combined_efficiency_score", 0.0))
+        long_term_value = float(value_summary.get("long_term_value_score", 0.0))
+        robustness = float(robust_summary.get("robustness_score", 0.0))
+        quality_slope = float(trend_analysis.get("quality_slope", 0.0))
+        value_slope = float(trend_analysis.get("value_slope", 0.0))
+
+        trend_gain = float(np.clip(0.5 + 2.5 * quality_slope + 0.8 * value_slope, 0.0, 1.0))
+        current_effectiveness = float(np.clip(0.45 * efficiency + 0.3 * robustness + 0.25 * trend_gain, 0.0, 1.0))
+        base_future = float(np.clip(0.4 * efficiency + 0.35 * robustness + 0.25 * trend_gain, 0.0, 1.0))
+
+        scenarios = [
+            {
+                "scenario": "optimistic",
+                "expected_effect_score": float(np.clip(base_future + 0.12, 0.0, 1.0)),
+                "description": "覆盖率与鲁棒性同步提升，策略收益稳步增长。",
+            },
+            {
+                "scenario": "baseline",
+                "expected_effect_score": base_future,
+                "description": "维持当前融合策略，收益按当前趋势缓慢变化。",
+            },
+            {
+                "scenario": "conservative",
+                "expected_effect_score": float(np.clip(base_future - 0.15, 0.0, 1.0)),
+                "description": "扰动增强或采样预算不足时，策略效果可能回落。",
+            },
+        ]
+
+        risk_level = "low" if base_future >= 0.65 else ("medium" if base_future >= 0.4 else "high")
+        return {
+            "summary": {
+                "current_effectiveness_score": current_effectiveness,
+                "future_effect_score": base_future,
+                "risk_level": risk_level,
+                "confidence": float(np.clip(0.4 + 0.6 * robustness, 0.0, 1.0)),
+                "reference_long_term_value": long_term_value,
+            },
+            "drivers": {
+                "efficiency_score": efficiency,
+                "robustness_score": robustness,
+                "trend_gain": trend_gain,
+            },
+            "forecast_scenarios": scenarios,
+        }
+
+    def _build_multi_agent_collaboration_analysis(
+        self,
+        *,
+        final_recs: list[SamplingRecommendation],
+        uncertainty_map: np.ndarray,
+        boundary: tuple[float, float, float, float],
+    ) -> dict[str, Any]:
+        arr = np.asarray(uncertainty_map, dtype=float)
+        h, w = arr.shape
+        if len(final_recs) < 2 or arr.size == 0:
+            return {
+                "summary": {
+                    "applicable": False,
+                    "reason": "推荐点不足或不确定性地图为空，跳过多智能体协作分析。",
+                },
+                "agent_messages": [],
+                "cooperation_plan": [],
+                "competition_plan": [],
+            }
+
+        n_agents = int(min(4, max(2, len(final_recs))))
+        marl = MultiAgentSamplingSystem(n_agents=n_agents, seed=self.seed)
+
+        final_cells: list[tuple[int, int]] = []
+        final_actions: list[int] = []
+        for rec in final_recs:
+            row, col = self._xy_to_grid(rec.x, rec.y, boundary=boundary, h=h, w=w)
+            final_cells.append((row, col))
+            final_actions.append(int(row * w + col))
+
+        coop_actions = marl.cooperative_strategy(arr, top_k=max(6, n_agents * 2))
+        comp_actions = marl.competitive_strategy(arr)
+        messages = marl.communicate(arr, coop_actions if coop_actions else final_actions)
+        state_features = arr.reshape(-1)[: min(64, arr.size)]
+        qmix_out = marl.train_step("qmix", uncertainty_map=arr, state_features=state_features)
+        maddpg_out = marl.train_step("maddpg", uncertainty_map=arr, state_features=state_features)
+
+        final_cell_set = set(final_cells)
+        coop_cells = {(int(idx) // w, int(idx) % w) for idx in coop_actions}
+        coop_overlap = float(len(final_cell_set & coop_cells) / max(1, len(final_cell_set)))
+        comp_diversity = float(len(set(comp_actions)) / max(1, len(comp_actions)))
+
+        flat = arr.reshape(-1)
+        coop_gain = float(np.mean([flat[idx] for idx in coop_actions])) if coop_actions else 0.0
+        final_gain = float(np.mean([flat[idx] for idx in final_actions])) if final_actions else 0.0
+
+        return {
+            "summary": {
+                "applicable": True,
+                "agent_count": n_agents,
+                "cooperation_overlap_ratio": coop_overlap,
+                "competition_diversity": comp_diversity,
+                "collaboration_gain": float(coop_gain - final_gain),
+            },
+            "agent_messages": [
+                {
+                    "agent_id": int(msg.agent_id),
+                    "suggested_action": int(msg.suggested_action),
+                    "suggested_row": int(msg.suggested_action // w),
+                    "suggested_col": int(msg.suggested_action % w),
+                    "local_uncertainty": float(msg.local_uncertainty),
+                }
+                for msg in messages
+            ],
+            "cooperation_plan": [int(x) for x in coop_actions],
+            "competition_plan": [int(x) for x in comp_actions],
+            "coordination_training": {
+                "qmix": {
+                    "best_action": int(qmix_out.get("best_action", 0)),
+                    "mixing_weights": [float(x) for x in np.asarray(qmix_out.get("mixing_weights", []), dtype=float).tolist()],
+                },
+                "maddpg": {
+                    "mean_action": float(maddpg_out.get("mean_action", 0.0)),
+                    "mean_gradient": float(maddpg_out.get("mean_gradient", 0.0)),
+                },
+            },
+        }
+
     def _build_sampling_optimization_suggestions(
         self,
         *,
@@ -895,6 +1123,28 @@ class SamplingRLIntegrator:
             uncertainty_map=arr,
             boundary=boundary,
         )
+        self._record_policy_history(
+            fusion_strategy=fusion_strategy,
+            rl_recs=rl_recs,
+            rule_recs=rule_recs,
+            final_recs=final,
+            density_analysis=density_analysis,
+            effect_evaluation=effect_evaluation,
+            long_term_value_prediction=long_term_value_prediction,
+            policy_robustness_analysis=policy_robustness_analysis,
+        )
+        policy_history_record = self._build_policy_history_record()
+        policy_effect_prediction = self._build_policy_effect_prediction(
+            sampling_efficiency_evaluation=sampling_efficiency_evaluation,
+            long_term_value_prediction=long_term_value_prediction,
+            policy_robustness_analysis=policy_robustness_analysis,
+            policy_history_record=policy_history_record,
+        )
+        multi_agent_collaboration_analysis = self._build_multi_agent_collaboration_analysis(
+            final_recs=final,
+            uncertainty_map=arr,
+            boundary=boundary,
+        )
 
         payload = {
             "model_name": self.model_name,
@@ -922,6 +1172,9 @@ class SamplingRLIntegrator:
                 "sampling_efficiency_evaluation": sampling_efficiency_evaluation,
                 "long_term_value_prediction": long_term_value_prediction,
                 "policy_robustness_analysis": policy_robustness_analysis,
+                "policy_history_record": policy_history_record,
+                "policy_effect_prediction": policy_effect_prediction,
+                "multi_agent_collaboration_analysis": multi_agent_collaboration_analysis,
             },
         }
         return payload
