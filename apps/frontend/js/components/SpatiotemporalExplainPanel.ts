@@ -2041,6 +2041,7 @@ export class SpatiotemporalExplainPanel {
 
         const coordinates = this.parseJSONInputSafe<Array<[number, number]>>('dl-explain-coords', []);
         const series = this.parseJSONInputSafe<number[][][]>('dl-explain-series', []);
+        const uncertaintyView = this.buildUncertaintyVisualizationData(result, coordinates, series);
         const reconstruction = this.collectReconstructionErrorData(result);
         const thresholdPercentile = 95;
         const threshold = this.computePercentile(reconstruction.combined, thresholdPercentile);
@@ -2091,6 +2092,26 @@ export class SpatiotemporalExplainPanel {
                     <div id="recon-compare-panel" class="summary-card recon-compare-panel">
                         ${this.renderReconstructionCompareRows(comparison)}
                     </div>
+                </section>
+
+                <section class="result-card full-width">
+                    <h6>不确定性来源解释</h6>
+                    ${this.renderUncertaintySourceExplanation(uncertaintyView)}
+                </section>
+
+                <section class="result-card full-width">
+                    <h6>置信区间可视化</h6>
+                    ${this.renderConfidenceIntervalVisualization(uncertaintyView)}
+                </section>
+
+                <section class="result-card full-width">
+                    <h6>认知/偶然不确定性区分展示</h6>
+                    ${this.renderUncertaintyDecompositionVisualization(uncertaintyView)}
+                </section>
+
+                <section class="result-card full-width">
+                    <h6>预测分布图</h6>
+                    ${this.renderPredictionDistributionVisualization(uncertaintyView)}
                 </section>
 
                 <section class="result-card">
@@ -2653,6 +2674,395 @@ export class SpatiotemporalExplainPanel {
             value,
             width: Math.round((Math.abs(value) / maxVal) * 100)
         }));
+    }
+
+    private flattenNumberArray(raw: unknown): number[] {
+        const rows: number[] = [];
+        const walk = (value: unknown): void => {
+            if (Array.isArray(value)) {
+                value.forEach((item) => walk(item));
+                return;
+            }
+            const num = Number(value);
+            if (Number.isFinite(num)) {
+                rows.push(num);
+            }
+        };
+        walk(raw);
+        return rows;
+    }
+
+    private pickFirstNumberArray(source: Record<string, unknown>, paths: string[][]): number[] {
+        for (const path of paths) {
+            let current: unknown = source;
+            let valid = true;
+            for (const key of path) {
+                if (!current || typeof current !== 'object') {
+                    valid = false;
+                    break;
+                }
+                current = (current as Record<string, unknown>)[key];
+            }
+            if (!valid) {
+                continue;
+            }
+            const rows = this.flattenNumberArray(current);
+            if (rows.length) {
+                return rows;
+            }
+        }
+        return [];
+    }
+
+    private normalizeLength(values: number[], size: number, fallback: number = 0): number[] {
+        if (size <= 0) {
+            return [];
+        }
+        if (!values.length) {
+            return Array.from({ length: size }, () => fallback);
+        }
+        return Array.from({ length: size }, (_, idx) => {
+            const value = values[idx];
+            if (Number.isFinite(value)) {
+                return Number(value);
+            }
+            return values[idx % values.length] ?? fallback;
+        });
+    }
+
+    private buildSpatialEpistemicRatios(coords: Array<[number, number]>, size: number): number[] {
+        if (!coords.length || size <= 0) {
+            return Array.from({ length: size }, () => 0.58);
+        }
+        const centerX = coords.reduce((acc, item) => acc + Number(item[0] || 0), 0) / coords.length;
+        const centerY = coords.reduce((acc, item) => acc + Number(item[1] || 0), 0) / coords.length;
+        const distances = coords.map((item) => {
+            const dx = Number(item[0] || 0) - centerX;
+            const dy = Number(item[1] || 0) - centerY;
+            return Math.sqrt(dx * dx + dy * dy);
+        });
+        const maxDist = Math.max(...distances, 1e-6);
+        return Array.from({ length: size }, (_, idx) => {
+            const dist = distances[idx % distances.length] || 0;
+            const normalized = Math.max(0, Math.min(1, dist / maxDist));
+            return Math.max(0.2, Math.min(0.9, 0.35 + normalized * 0.5));
+        });
+    }
+
+    private buildUncertaintyVisualizationData(
+        result: Record<string, unknown>,
+        coords: Array<[number, number]>,
+        series: number[][][]
+    ): {
+        prediction: number[];
+        variance: number[];
+        epistemic: number[];
+        aleatoric: number[];
+        lower: number[];
+        upper: number[];
+        decompositionMode: 'direct' | 'inferred';
+        sourceWeights: Array<{ name: string; ratio: number; detail: string }>;
+        distributionBins: Array<{ left: number; right: number; count: number; ratio: number }>;
+        quantiles: { p10: number; p50: number; p90: number };
+    } {
+        const predictionRaw = this.pickFirstNumberArray(result, [
+            ['prediction'],
+            ['mean'],
+            ['pred_mean']
+        ]);
+        const varianceRaw = this.pickFirstNumberArray(result, [
+            ['variance'],
+            ['uncertainty'],
+            ['total_uncertainty']
+        ]);
+        const epistemicRaw = this.pickFirstNumberArray(result, [
+            ['epistemic'],
+            ['uncertainty', 'knowledge'],
+            ['uncertainty', 'epistemic']
+        ]);
+        const aleatoricRaw = this.pickFirstNumberArray(result, [
+            ['aleatoric'],
+            ['uncertainty', 'data'],
+            ['uncertainty', 'aleatoric']
+        ]);
+        const lowerRaw = this.pickFirstNumberArray(result, [
+            ['lower'],
+            ['confidence_interval', 'lower'],
+            ['interval', 'lower'],
+            ['quantiles', 'q05'],
+            ['quantiles', 'p05']
+        ]);
+        const upperRaw = this.pickFirstNumberArray(result, [
+            ['upper'],
+            ['confidence_interval', 'upper'],
+            ['interval', 'upper'],
+            ['quantiles', 'q95'],
+            ['quantiles', 'p95']
+        ]);
+
+        const size = Math.max(
+            predictionRaw.length,
+            varianceRaw.length,
+            epistemicRaw.length,
+            aleatoricRaw.length,
+            lowerRaw.length,
+            upperRaw.length,
+            1
+        );
+        const prediction = this.normalizeLength(predictionRaw, size, 0);
+        const variance = this.normalizeLength(varianceRaw, size, 0).map((item) => Math.max(0, item));
+        let epistemic = this.normalizeLength(epistemicRaw, size, 0).map((item) => Math.max(0, item));
+        let aleatoric = this.normalizeLength(aleatoricRaw, size, 0).map((item) => Math.max(0, item));
+
+        let decompositionMode: 'direct' | 'inferred' = 'direct';
+        if (!epistemicRaw.length && !aleatoricRaw.length) {
+            const ratios = this.buildSpatialEpistemicRatios(coords, size);
+            epistemic = variance.map((item, idx) => item * ratios[idx]);
+            aleatoric = variance.map((item, idx) => Math.max(0, item - epistemic[idx]));
+            decompositionMode = 'inferred';
+        } else if (!epistemicRaw.length) {
+            epistemic = variance.map((item, idx) => Math.max(0, item - aleatoric[idx]));
+            decompositionMode = 'inferred';
+        } else if (!aleatoricRaw.length) {
+            aleatoric = variance.map((item, idx) => Math.max(0, item - epistemic[idx]));
+            decompositionMode = 'inferred';
+        }
+
+        const lowerExplicit = this.normalizeLength(lowerRaw, size, Number.NaN);
+        const upperExplicit = this.normalizeLength(upperRaw, size, Number.NaN);
+        const lower = prediction.map((pred, idx) => {
+            const explicit = lowerExplicit[idx];
+            if (Number.isFinite(explicit)) {
+                return explicit;
+            }
+            const sigma = Math.sqrt(Math.max(variance[idx], 0));
+            return pred - 1.96 * sigma;
+        });
+        const upper = prediction.map((pred, idx) => {
+            const explicit = upperExplicit[idx];
+            if (Number.isFinite(explicit)) {
+                return explicit;
+            }
+            const sigma = Math.sqrt(Math.max(variance[idx], 0));
+            return pred + 1.96 * sigma;
+        });
+
+        const epiMean = epistemic.reduce((acc, item) => acc + item, 0) / Math.max(1, epistemic.length);
+        const aleaMean = aleatoric.reduce((acc, item) => acc + item, 0) / Math.max(1, aleatoric.length);
+        const uncertaintySum = Math.max(1e-8, epiMean + aleaMean);
+
+        const timelineRows = this.buildTimelineRows(series);
+        const timelineMean = timelineRows.length
+            ? timelineRows.reduce((acc, item) => acc + Math.abs(item.value), 0) / timelineRows.length
+            : 0;
+        const spatialRatios = this.buildSpatialEpistemicRatios(coords, Math.max(1, coords.length));
+        const spatialSpread = spatialRatios.length
+            ? spatialRatios.reduce((acc, item) => acc + item, 0) / spatialRatios.length
+            : 0.58;
+
+        const sourceWeights = [
+            {
+                name: '认知不确定性（模型）',
+                ratio: Math.max(0, Math.min(1, epiMean / uncertaintySum)),
+                detail: decompositionMode === 'direct' ? '来自模型直接分解字段' : '基于空间分散度推断分解'
+            },
+            {
+                name: '偶然不确定性（数据）',
+                ratio: Math.max(0, Math.min(1, aleaMean / uncertaintySum)),
+                detail: decompositionMode === 'direct' ? '来自模型直接分解字段' : '由总不确定性与认知分量互补得到'
+            },
+            {
+                name: '时间漂移强度',
+                ratio: Math.max(0, Math.min(1, timelineMean / (timelineMean + 1))),
+                detail: '由序列相邻时刻平均变化幅度估计'
+            },
+            {
+                name: '空间离散度',
+                ratio: Math.max(0, Math.min(1, spatialSpread)),
+                detail: '由节点相对中心距离归一化估计'
+            }
+        ];
+
+        const distValues = prediction.filter((item) => Number.isFinite(item));
+        const distMin = distValues.length ? Math.min(...distValues) : 0;
+        const distMax = distValues.length ? Math.max(...distValues) : 0;
+        const bins = this.buildReconstructionHistogramRows(distValues, Number.NaN, 14).map((item) => ({
+            left: item.left,
+            right: item.right,
+            count: item.count,
+            ratio: item.ratio
+        }));
+        const quantiles = {
+            p10: this.computePercentile(distValues.length ? distValues : [distMin, distMax], 10),
+            p50: this.computePercentile(distValues.length ? distValues : [distMin, distMax], 50),
+            p90: this.computePercentile(distValues.length ? distValues : [distMin, distMax], 90)
+        };
+
+        return {
+            prediction,
+            variance,
+            epistemic,
+            aleatoric,
+            lower,
+            upper,
+            decompositionMode,
+            sourceWeights,
+            distributionBins: bins,
+            quantiles
+        };
+    }
+
+    private renderUncertaintySourceExplanation(data: {
+        decompositionMode: 'direct' | 'inferred';
+        sourceWeights: Array<{ name: string; ratio: number; detail: string }>;
+    }): string {
+        const modeText = data.decompositionMode === 'direct'
+            ? '分解模式：直接读取模型返回的认知/偶然不确定性字段。'
+            : '分解模式：后端暂未返回完整分解字段，前端基于空间与总方差推断。';
+        return `
+            <div class="uncert-source-panel">
+                <p class="muted">${modeText}</p>
+                <div class="uncert-source-list">
+                    ${data.sourceWeights.map((item) => {
+                        const pct = Math.round(Math.max(0, Math.min(1, item.ratio)) * 100);
+                        return `
+                            <div class="uncert-source-item">
+                                <div class="uncert-source-header">
+                                    <span>${item.name}</span>
+                                    <span>${pct}%</span>
+                                </div>
+                                <div class="uncert-source-track">
+                                    <div class="uncert-source-fill" style="width:${Math.max(2, pct)}%"></div>
+                                </div>
+                                <div class="uncert-source-detail">${item.detail}</div>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    private renderConfidenceIntervalVisualization(data: {
+        prediction: number[];
+        lower: number[];
+        upper: number[];
+    }): string {
+        const rows = data.prediction.map((pred, idx) => ({
+            index: idx,
+            prediction: pred,
+            lower: Math.min(data.lower[idx] ?? pred, data.upper[idx] ?? pred),
+            upper: Math.max(data.lower[idx] ?? pred, data.upper[idx] ?? pred)
+        }));
+        if (!rows.length) {
+            return '<div class="status-message">暂无置信区间数据</div>';
+        }
+        const sorted = [...rows].sort((a, b) => (b.upper - b.lower) - (a.upper - a.lower)).slice(0, 16);
+        const minVal = Math.min(...sorted.map((item) => item.lower));
+        const maxVal = Math.max(...sorted.map((item) => item.upper));
+        const span = Math.max(1e-6, maxVal - minVal);
+        return `
+            <div class="ci-list">
+                ${sorted.map((item) => {
+                    const left = ((item.lower - minVal) / span) * 100;
+                    const width = Math.max(1.2, ((item.upper - item.lower) / span) * 100);
+                    const point = ((item.prediction - minVal) / span) * 100;
+                    return `
+                        <div class="ci-item">
+                            <div class="ci-meta">
+                                <span>样本 #${item.index + 1}</span>
+                                <span>[${item.lower.toFixed(3)}, ${item.upper.toFixed(3)}]</span>
+                            </div>
+                            <div class="ci-track">
+                                <div class="ci-band" style="left:${left}%;width:${width}%"></div>
+                                <span class="ci-point" style="left:${point}%"></span>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    private renderUncertaintyDecompositionVisualization(data: {
+        epistemic: number[];
+        aleatoric: number[];
+        variance: number[];
+    }): string {
+        const size = Math.max(data.epistemic.length, data.aleatoric.length, data.variance.length);
+        if (!size) {
+            return '<div class="status-message">暂无认知/偶然不确定性数据</div>';
+        }
+        const rows = Array.from({ length: size }, (_, idx) => {
+            const epistemic = Math.max(0, Number(data.epistemic[idx] ?? 0));
+            const aleatoric = Math.max(0, Number(data.aleatoric[idx] ?? 0));
+            const total = Math.max(1e-8, Number(data.variance[idx] ?? (epistemic + aleatoric)));
+            return {
+                index: idx,
+                epistemic,
+                aleatoric,
+                total: Math.max(total, epistemic + aleatoric)
+            };
+        });
+        const top = rows.sort((a, b) => b.total - a.total).slice(0, 14);
+        return `
+            <div class="decomp-list">
+                ${top.map((item) => {
+                    const denom = Math.max(1e-8, item.epistemic + item.aleatoric);
+                    const epiPct = Math.max(0, Math.min(100, Math.round((item.epistemic / denom) * 100)));
+                    const alePct = Math.max(0, Math.min(100, 100 - epiPct));
+                    return `
+                        <div class="decomp-item">
+                            <div class="decomp-meta">
+                                <span>样本 #${item.index + 1}</span>
+                                <span>总不确定性 ${item.total.toFixed(4)}</span>
+                            </div>
+                            <div class="decomp-track">
+                                <div class="decomp-epi" style="width:${Math.max(1, epiPct)}%"></div>
+                                <div class="decomp-ale" style="width:${Math.max(1, alePct)}%"></div>
+                            </div>
+                            <div class="decomp-legend">
+                                <span>认知 ${item.epistemic.toFixed(4)} (${epiPct}%)</span>
+                                <span>偶然 ${item.aleatoric.toFixed(4)} (${alePct}%)</span>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    private renderPredictionDistributionVisualization(data: {
+        distributionBins: Array<{ left: number; right: number; count: number; ratio: number }>;
+        quantiles: { p10: number; p50: number; p90: number };
+    }): string {
+        if (!data.distributionBins.length) {
+            return '<div class="status-message">暂无预测分布数据</div>';
+        }
+        const maxCount = Math.max(...data.distributionBins.map((item) => item.count), 1);
+        return `
+            <div class="pred-dist-panel">
+                <div class="pred-dist-quantiles">
+                    <span>P10: ${data.quantiles.p10.toFixed(4)}</span>
+                    <span>P50: ${data.quantiles.p50.toFixed(4)}</span>
+                    <span>P90: ${data.quantiles.p90.toFixed(4)}</span>
+                </div>
+                <div class="pred-dist-list">
+                    ${data.distributionBins.map((item) => {
+                        const width = Math.max(2, Math.round((item.count / maxCount) * 100));
+                        return `
+                            <div class="pred-dist-row">
+                                <span class="pred-dist-bin">${item.left.toFixed(3)} ~ ${item.right.toFixed(3)}</span>
+                                <div class="pred-dist-track">
+                                    <div class="pred-dist-fill" style="width:${width}%"></div>
+                                </div>
+                                <span class="pred-dist-count">${item.count}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+            </div>
+        `;
     }
 
     private collectReconstructionErrorData(result: Record<string, unknown>): { lime: number[]; shap: number[]; combined: number[] } {
