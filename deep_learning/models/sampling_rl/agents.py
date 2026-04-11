@@ -733,6 +733,8 @@ class ActorCriticAgent:
         self.critic_b = 0.0
 
         self.buffer: list[dict[str, Any]] = []
+        self.preprocess_mean: np.ndarray | None = None
+        self.preprocess_std: np.ndarray | None = None
 
     def _ensure_params(self, state_dim: int) -> None:
         if self.actor_w is not None:
@@ -836,6 +838,116 @@ class ActorCriticAgent:
         self.buffer = merged
         return self.train_sync()
 
+    def preprocess_a2c_data(
+        self,
+        observations: list[dict[str, np.ndarray]] | np.ndarray,
+        *,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        if isinstance(observations, np.ndarray):
+            raw = np.asarray(observations, dtype=float)
+            if raw.ndim == 1:
+                raw = raw.reshape(1, -1)
+        else:
+            if not observations:
+                raise ValueError("observations 不能为空")
+            rows = [flatten_observation(obs).astype(float).reshape(-1) for obs in observations]
+            dim = int(rows[0].shape[0])
+            for i, row in enumerate(rows[1:], start=1):
+                if int(row.shape[0]) != dim:
+                    raise ValueError(f"第{i}条观测维度不一致: {int(row.shape[0])} != {dim}")
+            raw = np.stack(rows, axis=0)
+
+        if raw.ndim != 2 or raw.shape[0] == 0 or raw.shape[1] == 0:
+            raise ValueError("observations 必须可转换为二维特征矩阵")
+
+        mean_runtime = np.mean(raw, axis=0)
+        std_runtime = np.std(raw, axis=0)
+        std_runtime = np.where(std_runtime < 1e-8, 1.0, std_runtime)
+
+        scaler_source = "runtime"
+        mean = mean_runtime
+        std = std_runtime
+        if use_training_stats and self.preprocess_mean is not None and self.preprocess_std is not None:
+            if self.preprocess_mean.shape == mean_runtime.shape and self.preprocess_std.shape == std_runtime.shape:
+                mean = self.preprocess_mean
+                std = np.where(self.preprocess_std < 1e-8, 1.0, self.preprocess_std)
+                scaler_source = "trained"
+            else:
+                scaler_source = "runtime_fallback"
+        elif use_training_stats and (self.preprocess_mean is not None or self.preprocess_std is not None):
+            scaler_source = "runtime_fallback"
+
+        if self.preprocess_mean is None or self.preprocess_std is None:
+            self.preprocess_mean = mean_runtime
+            self.preprocess_std = std_runtime
+
+        scaled = (raw - mean) / std
+        feature_names = [f"state_feature_{i}" for i in range(raw.shape[1])]
+        return {
+            "raw_features": raw,
+            "processed_features": scaled,
+            "feature_names": feature_names,
+            "scaler": {
+                "source": scaler_source,
+                "mean": mean.tolist(),
+                "std": std.tolist(),
+            },
+            "validation": {
+                "is_valid": True,
+                "n_samples": int(raw.shape[0]),
+                "feature_dim": int(raw.shape[1]),
+                "zero_variance_feature_indices": np.where(np.std(raw, axis=0) < 1e-8)[0].astype(int).tolist(),
+            },
+        }
+
+    def predict_a2c(
+        self,
+        observations: list[dict[str, np.ndarray]] | np.ndarray,
+        *,
+        deterministic: bool = True,
+    ) -> dict[str, Any]:
+        pre = self.preprocess_a2c_data(observations, use_training_stats=True)
+        raw = np.asarray(pre["raw_features"], dtype=float)
+        self._ensure_params(int(raw.shape[1]))
+
+        actions: list[int] = []
+        action_probs: list[float] = []
+        values: list[float] = []
+        entropies: list[float] = []
+        policy_matrix: list[list[float]] = []
+
+        for row in raw:
+            probs = _softmax(row @ self.actor_w + self.actor_b)  # type: ignore[operator]
+            action = int(np.argmax(probs)) if deterministic else int(self.rng.choice(np.arange(self.action_dim), p=probs))
+            prob = float(probs[action])
+            value = float(row @ self.critic_w + self.critic_b)  # type: ignore[operator]
+            entropy = -float(np.sum(probs * np.log(probs + 1e-12)))
+
+            actions.append(action)
+            action_probs.append(prob)
+            values.append(value)
+            entropies.append(entropy)
+            policy_matrix.append([float(x) for x in probs.tolist()])
+
+        return {
+            "action_indices": actions,
+            "selected_action_probabilities": action_probs,
+            "state_values": values,
+            "policy_entropy": entropies,
+            "action_probabilities": policy_matrix,
+            "prediction": {
+                "action_indices": actions,
+                "selected_action_probabilities": action_probs,
+                "state_values": values,
+            },
+            "preprocess": {
+                "scaler": pre["scaler"],
+                "validation": pre["validation"],
+                "feature_names": pre["feature_names"],
+            },
+        }
+
     def save(self, path: str) -> None:
         if self.actor_w is None or self.actor_b is None or self.critic_w is None:
             raise ValueError("模型尚未初始化")
@@ -845,6 +957,8 @@ class ActorCriticAgent:
             actor_b=self.actor_b,
             critic_w=self.critic_w,
             critic_b=np.array([self.critic_b], dtype=float),
+            preprocess_mean=np.asarray(self.preprocess_mean if self.preprocess_mean is not None else np.array([], dtype=float), dtype=float),
+            preprocess_std=np.asarray(self.preprocess_std if self.preprocess_std is not None else np.array([], dtype=float), dtype=float),
         )
 
     def load(self, path: str) -> None:
@@ -853,6 +967,12 @@ class ActorCriticAgent:
         self.actor_b = np.asarray(data["actor_b"], dtype=float)
         self.critic_w = np.asarray(data["critic_w"], dtype=float)
         self.critic_b = float(np.asarray(data["critic_b"], dtype=float).reshape(-1)[0])
+        if "preprocess_mean" in data and "preprocess_std" in data:
+            loaded_mean = np.asarray(data["preprocess_mean"], dtype=float).reshape(-1)
+            loaded_std = np.asarray(data["preprocess_std"], dtype=float).reshape(-1)
+            if loaded_mean.size > 0 and loaded_std.size > 0 and loaded_mean.shape == loaded_std.shape:
+                self.preprocess_mean = loaded_mean
+                self.preprocess_std = np.where(loaded_std < 1e-8, 1.0, loaded_std)
 
 
 def save_agent(agent: Any, path: str) -> None:
