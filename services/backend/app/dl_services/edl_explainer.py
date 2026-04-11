@@ -109,6 +109,27 @@ class _BaseEDLAdapter:
                 "context_cache_hit_rate": float(self._context_cache_hits / max(1, ctx_total)),
             }
 
+    @staticmethod
+    def _array_bytes(*arrays: np.ndarray) -> int:
+        total = 0
+        for arr in arrays:
+            try:
+                total += int(np.asarray(arr).nbytes)
+            except Exception:
+                continue
+        return int(total)
+
+    @staticmethod
+    def _safe_corr(a: np.ndarray, b: np.ndarray) -> float:
+        x = np.asarray(a, dtype=float).reshape(-1)
+        y = np.asarray(b, dtype=float).reshape(-1)
+        if x.size < 2 or y.size < 2:
+            return 0.0
+        if float(np.std(x)) < 1e-8 or float(np.std(y)) < 1e-8:
+            return 0.0
+        corr = float(np.corrcoef(x, y)[0, 1])
+        return corr if np.isfinite(corr) else 0.0
+
     def _feature_fingerprint(self, x: np.ndarray) -> str:
         arr = np.ascontiguousarray(np.asarray(x, dtype=float))
         h = hashlib.sha256()
@@ -132,6 +153,8 @@ class _BaseEDLAdapter:
         pred = model.predict_edl(x, confidence=0.95, use_training_stats=True)
 
         x_scaled = np.asarray(pre["processed_features"], dtype=float)
+        evidence = np.asarray(pred["evidence"], dtype=float)
+        alpha = np.asarray(pred["alpha"], dtype=float)
         probs = np.asarray(pred["probabilities"], dtype=float)
         labels = np.asarray(pred["prediction"], dtype=int).reshape(-1)
         confidence = np.asarray(pred["confidence"], dtype=float).reshape(-1)
@@ -148,6 +171,8 @@ class _BaseEDLAdapter:
         background = x_scaled if x_scaled.shape[0] <= 24 else x_scaled[np.linspace(0, x_scaled.shape[0] - 1, 24, dtype=int)]
         return {
             "scaled_x": x_scaled,
+            "evidence": evidence,
+            "alpha": alpha,
             "feature_names": list(pre["feature_names"]),
             "probabilities": probs,
             "prediction_label": labels,
@@ -210,6 +235,194 @@ class _BaseEDLAdapter:
     def _predict_surrogate(self, context: dict[str, Any]) -> Callable[[np.ndarray], np.ndarray]:
         surrogate: Ridge = context["surrogate"]
         return lambda x: surrogate.predict(np.asarray(x, dtype=float))
+
+    def _edl_advanced_analysis(self, context: dict[str, Any], *, top_k: int) -> dict[str, Any]:
+        evidence = np.asarray(context.get("evidence", np.array([])), dtype=float)
+        alpha = np.asarray(context.get("alpha", np.array([])), dtype=float)
+        probs = np.asarray(context.get("probabilities", np.array([])), dtype=float)
+        labels = np.asarray(context.get("prediction_label", np.array([])), dtype=int).reshape(-1)
+        confidence = np.asarray(context.get("confidence", np.array([])), dtype=float).reshape(-1)
+        total_unc = np.asarray(context.get("uncertainty_total", np.array([])), dtype=float).reshape(-1)
+        data_unc = np.asarray(context.get("uncertainty_data", np.array([])), dtype=float).reshape(-1)
+        knowledge_unc = np.asarray(context.get("uncertainty_knowledge", np.array([])), dtype=float).reshape(-1)
+        total_evidence = np.sum(evidence, axis=1) if evidence.ndim == 2 else np.zeros_like(total_unc)
+        dirichlet_strength = np.sum(alpha, axis=1) if alpha.ndim == 2 else np.zeros_like(total_unc)
+        n = int(total_unc.size)
+        c = int(evidence.shape[1]) if evidence.ndim == 2 else 0
+        if n == 0:
+            empty = {"summary": {"sample_count": 0}}
+            return {
+                "evidence_explanation": empty,
+                "uncertainty_evidence_analysis": empty,
+                "confidence_distribution_analysis": empty,
+            }
+
+        k = min(max(1, int(top_k)), n)
+        high_evi_idx = np.argsort(total_evidence)[::-1][:k]
+        low_evi_idx = np.argsort(total_evidence)[:k]
+        high_unc_idx = np.argsort(total_unc)[::-1][:k]
+        low_conf_idx = np.argsort(confidence)[:k]
+
+        class_stats: list[dict[str, float | int]] = []
+        mean_total = float(np.mean(total_evidence))
+        for cls in range(c):
+            cls_e = evidence[:, cls]
+            class_stats.append(
+                {
+                    "class_index": int(cls),
+                    "mean_evidence": float(np.mean(cls_e)),
+                    "std_evidence": float(np.std(cls_e)),
+                    "p90_evidence": float(np.quantile(cls_e, 0.9)),
+                    "support_ratio_over_mean_total_per_class": float(np.mean(cls_e > (mean_total / float(max(c, 1))))),
+                }
+            )
+
+        q_edges = np.quantile(total_evidence, [0.0, 0.33, 0.66, 1.0])
+        bins = [("low", q_edges[0], q_edges[1]), ("medium", q_edges[1], q_edges[2]), ("high", q_edges[2], q_edges[3])]
+        profile: list[dict[str, float | int | str]] = []
+        for label, left, right in bins:
+            if label == "high":
+                mask = (total_evidence >= left) & (total_evidence <= right)
+            else:
+                mask = (total_evidence >= left) & (total_evidence < right)
+            if not np.any(mask):
+                profile.append(
+                    {
+                        "evidence_level": label,
+                        "sample_count": 0,
+                        "mean_total_evidence": 0.0,
+                        "mean_total_uncertainty": 0.0,
+                        "mean_knowledge_uncertainty": 0.0,
+                        "mean_data_uncertainty": 0.0,
+                        "mean_confidence": 0.0,
+                    }
+                )
+                continue
+            profile.append(
+                {
+                    "evidence_level": label,
+                    "sample_count": int(np.sum(mask)),
+                    "mean_total_evidence": float(np.mean(total_evidence[mask])),
+                    "mean_total_uncertainty": float(np.mean(total_unc[mask])),
+                    "mean_knowledge_uncertainty": float(np.mean(knowledge_unc[mask])),
+                    "mean_data_uncertainty": float(np.mean(data_unc[mask])),
+                    "mean_confidence": float(np.mean(confidence[mask])),
+                }
+            )
+
+        conf_quantiles = np.quantile(confidence, [0.05, 0.25, 0.5, 0.75, 0.95])
+        unc_quantiles = np.quantile(total_unc, [0.05, 0.25, 0.5, 0.75, 0.95])
+        pred_entropy = -np.sum(probs * np.log(np.maximum(probs, 1e-8)), axis=1) if probs.ndim == 2 else np.zeros(n, dtype=float)
+        centered = confidence - np.mean(confidence)
+        conf_std = float(np.std(confidence))
+        skew = float(np.mean(centered ** 3) / (max(conf_std, 1e-8) ** 3)) if n > 0 else 0.0
+        kurt = float(np.mean(centered ** 4) / (max(conf_std, 1e-8) ** 4) - 3.0) if n > 0 else 0.0
+        if not np.isfinite(skew):
+            skew = 0.0
+        if not np.isfinite(kurt):
+            kurt = 0.0
+
+        evidence_explanation = {
+            "summary": {
+                "sample_count": int(n),
+                "num_classes": int(c),
+                "mean_total_evidence": float(np.mean(total_evidence)),
+                "p90_total_evidence": float(np.quantile(total_evidence, 0.9)),
+                "mean_dirichlet_strength": float(np.mean(dirichlet_strength)),
+                "mean_confidence": float(np.mean(confidence)),
+                "mean_total_uncertainty": float(np.mean(total_unc)),
+            },
+            "class_evidence_statistics": class_stats,
+            "top_high_evidence_samples": [
+                {
+                    "sample_index": int(i),
+                    "prediction_label": int(labels[int(i)] if int(i) < labels.size else int(np.argmax(probs[int(i)]))),
+                    "total_evidence": float(total_evidence[int(i)]),
+                    "dirichlet_strength": float(dirichlet_strength[int(i)]),
+                    "confidence": float(confidence[int(i)]),
+                    "total_uncertainty": float(total_unc[int(i)]),
+                }
+                for i in high_evi_idx.tolist()
+            ],
+            "top_low_evidence_samples": [
+                {
+                    "sample_index": int(i),
+                    "prediction_label": int(labels[int(i)] if int(i) < labels.size else int(np.argmax(probs[int(i)]))),
+                    "total_evidence": float(total_evidence[int(i)]),
+                    "dirichlet_strength": float(dirichlet_strength[int(i)]),
+                    "confidence": float(confidence[int(i)]),
+                    "total_uncertainty": float(total_unc[int(i)]),
+                }
+                for i in low_evi_idx.tolist()
+            ],
+        }
+
+        uncertainty_evidence_analysis = {
+            "summary": {
+                "sample_count": int(n),
+                "mean_total_evidence": float(np.mean(total_evidence)),
+                "mean_total_uncertainty": float(np.mean(total_unc)),
+                "corr_total_uncertainty_total_evidence": self._safe_corr(total_unc, total_evidence),
+                "corr_knowledge_uncertainty_total_evidence": self._safe_corr(knowledge_unc, total_evidence),
+                "corr_data_uncertainty_total_evidence": self._safe_corr(data_unc, total_evidence),
+                "corr_confidence_total_evidence": self._safe_corr(confidence, total_evidence),
+            },
+            "evidence_uncertainty_profile": profile,
+            "top_high_uncertainty_samples": [
+                {
+                    "sample_index": int(i),
+                    "prediction_label": int(labels[int(i)] if int(i) < labels.size else int(np.argmax(probs[int(i)]))),
+                    "total_uncertainty": float(total_unc[int(i)]),
+                    "knowledge_uncertainty": float(knowledge_unc[int(i)]),
+                    "data_uncertainty": float(data_unc[int(i)]),
+                    "total_evidence": float(total_evidence[int(i)]),
+                    "confidence": float(confidence[int(i)]),
+                }
+                for i in high_unc_idx.tolist()
+            ],
+        }
+
+        confidence_distribution_analysis = {
+            "summary": {
+                "sample_count": int(n),
+                "mean_confidence": float(np.mean(confidence)),
+                "std_confidence": float(np.std(confidence)),
+                "p10_confidence": float(np.quantile(confidence, 0.1)),
+                "p90_confidence": float(np.quantile(confidence, 0.9)),
+                "mean_total_uncertainty": float(np.mean(total_unc)),
+                "mean_prediction_entropy": float(np.mean(pred_entropy)),
+                "mean_knowledge_uncertainty": float(np.mean(knowledge_unc)),
+                "mean_data_uncertainty": float(np.mean(data_unc)),
+                "corr_confidence_total_uncertainty": self._safe_corr(confidence, total_unc),
+                "corr_confidence_entropy": self._safe_corr(confidence, pred_entropy),
+                "confidence_skewness": skew,
+                "confidence_excess_kurtosis": kurt,
+            },
+            "quantiles": {
+                "q05": {"confidence": float(conf_quantiles[0]), "total_uncertainty": float(unc_quantiles[0])},
+                "q25": {"confidence": float(conf_quantiles[1]), "total_uncertainty": float(unc_quantiles[1])},
+                "q50": {"confidence": float(conf_quantiles[2]), "total_uncertainty": float(unc_quantiles[2])},
+                "q75": {"confidence": float(conf_quantiles[3]), "total_uncertainty": float(unc_quantiles[3])},
+                "q95": {"confidence": float(conf_quantiles[4]), "total_uncertainty": float(unc_quantiles[4])},
+            },
+            "top_low_confidence_samples": [
+                {
+                    "sample_index": int(i),
+                    "prediction_label": int(labels[int(i)] if int(i) < labels.size else int(np.argmax(probs[int(i)]))),
+                    "confidence": float(confidence[int(i)]),
+                    "total_uncertainty": float(total_unc[int(i)]),
+                    "knowledge_uncertainty": float(knowledge_unc[int(i)]),
+                    "data_uncertainty": float(data_unc[int(i)]),
+                    "prediction_entropy": float(pred_entropy[int(i)]),
+                }
+                for i in low_conf_idx.tolist()
+            ],
+        }
+        return {
+            "evidence_explanation": evidence_explanation,
+            "uncertainty_evidence_analysis": uncertainty_evidence_analysis,
+            "confidence_distribution_analysis": confidence_distribution_analysis,
+        }
 
     def _fallback_local_pairs(self, context: dict[str, Any], node_index: int) -> tuple[list[tuple[int, float]], float]:
         surrogate: Ridge = context["surrogate"]
@@ -317,6 +530,18 @@ class EDLLIMEAdapter(_BaseEDLAdapter):
             )
 
         global_importance = np.mean(np.abs(np.asarray(raw_local, dtype=float)), axis=0) if raw_local else np.zeros(0, dtype=float)
+        advanced = self._edl_advanced_analysis(context, top_k=int(top_k))
+        context_memory_bytes = self._array_bytes(
+            np.asarray(context.get("scaled_x", np.array([])), dtype=np.float32),
+            np.asarray(context.get("evidence", np.array([])), dtype=np.float32),
+            np.asarray(context.get("alpha", np.array([])), dtype=np.float32),
+            np.asarray(context.get("probabilities", np.array([])), dtype=np.float32),
+            np.asarray(context.get("uncertainty_total", np.array([])), dtype=np.float32),
+            np.asarray(context.get("uncertainty_data", np.array([])), dtype=np.float32),
+            np.asarray(context.get("uncertainty_knowledge", np.array([])), dtype=np.float32),
+            np.asarray(context.get("background", np.array([])), dtype=np.float32),
+        )
+        result_memory_bytes = self._array_bytes(np.asarray(raw_local, dtype=np.float32))
         payload = {
             "summary": {
                 "method": "lime",
@@ -327,6 +552,9 @@ class EDLLIMEAdapter(_BaseEDLAdapter):
             },
             "batch_explanations": batch_explanations,
             "global_feature_importance": self._top_features(context["feature_names"], global_importance, len(context["feature_names"])),
+            "evidence_explanation": advanced["evidence_explanation"],
+            "uncertainty_evidence_analysis": advanced["uncertainty_evidence_analysis"],
+            "confidence_distribution_analysis": advanced["confidence_distribution_analysis"],
             "preprocess": dict(context["preprocess"]),
             "explainer": {
                 "backend": "lime_tabular" if lime_module is not None else "surrogate_linear",
@@ -336,6 +564,12 @@ class EDLLIMEAdapter(_BaseEDLAdapter):
                 "latency_ms": float((time.perf_counter() - started) * 1000.0),
                 "context_cache_hit": bool(context_cache_hit),
                 "context_build_ms": float(context_build_ms),
+                "sample_count": int(np.asarray(context["scaled_x"]).shape[0]),
+                "feature_dim": int(np.asarray(context["scaled_x"]).shape[1]) if np.asarray(context["scaled_x"]).ndim == 2 else 0,
+                "context_memory_bytes": int(context_memory_bytes),
+                "result_memory_bytes": int(result_memory_bytes),
+                "latency_target_ms": 6000.0,
+                "meets_latency_target": float((time.perf_counter() - started) * 1000.0) < 6000.0,
                 **self._cache_metrics(),
             },
         }
@@ -437,6 +671,18 @@ class EDLSHAPAdapter(_BaseEDLAdapter):
             )
 
         global_importance = np.mean(np.abs(np.asarray(raw_values, dtype=float)), axis=0) if raw_values else np.zeros(0, dtype=float)
+        advanced = self._edl_advanced_analysis(context, top_k=int(top_k))
+        context_memory_bytes = self._array_bytes(
+            np.asarray(context.get("scaled_x", np.array([])), dtype=np.float32),
+            np.asarray(context.get("evidence", np.array([])), dtype=np.float32),
+            np.asarray(context.get("alpha", np.array([])), dtype=np.float32),
+            np.asarray(context.get("probabilities", np.array([])), dtype=np.float32),
+            np.asarray(context.get("uncertainty_total", np.array([])), dtype=np.float32),
+            np.asarray(context.get("uncertainty_data", np.array([])), dtype=np.float32),
+            np.asarray(context.get("uncertainty_knowledge", np.array([])), dtype=np.float32),
+            np.asarray(context.get("background", np.array([])), dtype=np.float32),
+        )
+        result_memory_bytes = self._array_bytes(np.asarray(raw_values, dtype=np.float32))
         payload = {
             "summary": {
                 "method": "shap",
@@ -447,6 +693,9 @@ class EDLSHAPAdapter(_BaseEDLAdapter):
             },
             "batch_explanations": batch_explanations,
             "global_feature_importance": self._top_features(context["feature_names"], global_importance, len(context["feature_names"])),
+            "evidence_explanation": advanced["evidence_explanation"],
+            "uncertainty_evidence_analysis": advanced["uncertainty_evidence_analysis"],
+            "confidence_distribution_analysis": advanced["confidence_distribution_analysis"],
             "preprocess": dict(context["preprocess"]),
             "explainer": {
                 "backend": "shap" if shap_module is not None else "surrogate_linear",
@@ -457,6 +706,12 @@ class EDLSHAPAdapter(_BaseEDLAdapter):
                 "latency_ms": float((time.perf_counter() - started) * 1000.0),
                 "context_cache_hit": bool(context_cache_hit),
                 "context_build_ms": float(context_build_ms),
+                "sample_count": int(np.asarray(context["scaled_x"]).shape[0]),
+                "feature_dim": int(np.asarray(context["scaled_x"]).shape[1]) if np.asarray(context["scaled_x"]).ndim == 2 else 0,
+                "context_memory_bytes": int(context_memory_bytes),
+                "result_memory_bytes": int(result_memory_bytes),
+                "latency_target_ms": 6000.0,
+                "meets_latency_target": float((time.perf_counter() - started) * 1000.0) < 6000.0,
                 **self._cache_metrics(),
             },
         }

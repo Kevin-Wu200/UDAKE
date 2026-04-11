@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -258,6 +258,299 @@ class EDLClassifier:
             "feature_names": list(pre["feature_names"]),
         }
         return pred
+
+    @staticmethod
+    def _safe_corr(a: np.ndarray, b: np.ndarray) -> float:
+        x = np.asarray(a, dtype=float).reshape(-1)
+        y = np.asarray(b, dtype=float).reshape(-1)
+        if x.size < 2 or y.size < 2:
+            return 0.0
+        if float(np.std(x)) < 1e-8 or float(np.std(y)) < 1e-8:
+            return 0.0
+        corr = float(np.corrcoef(x, y)[0, 1])
+        return corr if np.isfinite(corr) else 0.0
+
+    @staticmethod
+    def _moment_skew_kurt(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        arr = np.asarray(values, dtype=float)
+        mean = np.mean(arr, axis=0)
+        centered = arr - mean.reshape(1, -1)
+        std = np.std(arr, axis=0)
+        denom3 = np.maximum(std, 1e-8) ** 3
+        denom4 = np.maximum(std, 1e-8) ** 4
+        skew = np.mean(centered ** 3, axis=0) / denom3
+        kurt = np.mean(centered ** 4, axis=0) / denom4 - 3.0
+        skew = np.where(np.isfinite(skew), skew, 0.0)
+        kurt = np.where(np.isfinite(kurt), kurt, 0.0)
+        return skew.astype(float), kurt.astype(float)
+
+    def explain_evidence(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        top_k: int = 8,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        pre = self.preprocess_edl_data(features, use_training_stats=use_training_stats)
+        pred = self.predict_edl(features, use_training_stats=use_training_stats)
+
+        evidence = np.asarray(pred["evidence"], dtype=float)
+        alpha = np.asarray(pred["alpha"], dtype=float)
+        probs = np.asarray(pred["probabilities"], dtype=float)
+        confidence = np.asarray(pred["confidence"], dtype=float).reshape(-1)
+        total_uncertainty = np.asarray(pred["uncertainty"]["total"], dtype=float).reshape(-1)
+        n, c = evidence.shape if evidence.ndim == 2 else (0, int(self.config.num_classes))
+        if n == 0:
+            return {
+                "summary": {
+                    "sample_count": 0,
+                    "num_classes": int(c),
+                    "mean_total_evidence": 0.0,
+                    "mean_dirichlet_strength": 0.0,
+                    "mean_confidence": 0.0,
+                },
+                "class_evidence_statistics": [],
+                "top_high_evidence_samples": [],
+                "top_low_evidence_samples": [],
+            }
+
+        total_evidence = np.sum(evidence, axis=1)
+        dirichlet_strength = np.sum(alpha, axis=1)
+        mean_total = float(np.mean(total_evidence))
+        k = min(max(1, int(top_k)), n)
+        high_idx = np.argsort(total_evidence)[::-1][:k]
+        low_idx = np.argsort(total_evidence)[:k]
+
+        class_stats = []
+        for cls in range(c):
+            cls_e = evidence[:, cls]
+            class_stats.append(
+                {
+                    "class_index": int(cls),
+                    "mean_evidence": float(np.mean(cls_e)),
+                    "std_evidence": float(np.std(cls_e)),
+                    "p90_evidence": float(np.quantile(cls_e, 0.9)),
+                    "support_ratio_over_mean_total_per_class": float(np.mean(cls_e > (mean_total / float(max(c, 1))))),
+                }
+            )
+
+        return {
+            "summary": {
+                "sample_count": int(n),
+                "num_classes": int(c),
+                "mean_total_evidence": mean_total,
+                "p90_total_evidence": float(np.quantile(total_evidence, 0.9)),
+                "mean_dirichlet_strength": float(np.mean(dirichlet_strength)),
+                "mean_confidence": float(np.mean(confidence)),
+                "mean_total_uncertainty": float(np.mean(total_uncertainty)),
+            },
+            "class_evidence_statistics": class_stats,
+            "top_high_evidence_samples": [
+                {
+                    "sample_index": int(i),
+                    "prediction_label": int(np.argmax(probs[int(i)])),
+                    "total_evidence": float(total_evidence[int(i)]),
+                    "dirichlet_strength": float(dirichlet_strength[int(i)]),
+                    "confidence": float(confidence[int(i)]),
+                    "total_uncertainty": float(total_uncertainty[int(i)]),
+                }
+                for i in high_idx.tolist()
+            ],
+            "top_low_evidence_samples": [
+                {
+                    "sample_index": int(i),
+                    "prediction_label": int(np.argmax(probs[int(i)])),
+                    "total_evidence": float(total_evidence[int(i)]),
+                    "dirichlet_strength": float(dirichlet_strength[int(i)]),
+                    "confidence": float(confidence[int(i)]),
+                    "total_uncertainty": float(total_uncertainty[int(i)]),
+                }
+                for i in low_idx.tolist()
+            ],
+            "preprocess": {
+                "scaler": dict(pre["scaler"]),
+                "validation": dict(pre["validation"]),
+                "feature_names": list(pre["feature_names"]),
+            },
+        }
+
+    def analyze_uncertainty_evidence(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        top_k: int = 8,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        pre = self.preprocess_edl_data(features, use_training_stats=use_training_stats)
+        pred = self.predict_edl(features, use_training_stats=use_training_stats)
+
+        evidence = np.asarray(pred["evidence"], dtype=float)
+        probs = np.asarray(pred["probabilities"], dtype=float)
+        confidence = np.asarray(pred["confidence"], dtype=float).reshape(-1)
+        total_uncertainty = np.asarray(pred["uncertainty"]["total"], dtype=float).reshape(-1)
+        data_uncertainty = np.asarray(pred["uncertainty"]["data"], dtype=float).reshape(-1)
+        knowledge_uncertainty = np.asarray(pred["uncertainty"]["knowledge"], dtype=float).reshape(-1)
+        total_evidence = np.sum(evidence, axis=1) if evidence.ndim == 2 else np.zeros_like(total_uncertainty)
+
+        n = int(total_uncertainty.size)
+        if n == 0:
+            return {
+                "summary": {
+                    "sample_count": 0,
+                    "corr_total_uncertainty_total_evidence": 0.0,
+                    "corr_knowledge_uncertainty_total_evidence": 0.0,
+                    "corr_confidence_total_evidence": 0.0,
+                },
+                "evidence_uncertainty_profile": [],
+                "top_high_uncertainty_samples": [],
+            }
+
+        k = min(max(1, int(top_k)), n)
+        high_unc_idx = np.argsort(total_uncertainty)[::-1][:k]
+        q_edges = np.quantile(total_evidence, [0.0, 0.33, 0.66, 1.0]) if n > 0 else np.zeros(4, dtype=float)
+        bins = [("low", q_edges[0], q_edges[1]), ("medium", q_edges[1], q_edges[2]), ("high", q_edges[2], q_edges[3])]
+        profile: list[dict[str, Any]] = []
+        for label, left, right in bins:
+            if label == "high":
+                mask = (total_evidence >= left) & (total_evidence <= right)
+            else:
+                mask = (total_evidence >= left) & (total_evidence < right)
+            if not np.any(mask):
+                profile.append(
+                    {
+                        "evidence_level": label,
+                        "sample_count": 0,
+                        "mean_total_evidence": 0.0,
+                        "mean_total_uncertainty": 0.0,
+                        "mean_knowledge_uncertainty": 0.0,
+                        "mean_data_uncertainty": 0.0,
+                        "mean_confidence": 0.0,
+                    }
+                )
+                continue
+            profile.append(
+                {
+                    "evidence_level": label,
+                    "sample_count": int(np.sum(mask)),
+                    "mean_total_evidence": float(np.mean(total_evidence[mask])),
+                    "mean_total_uncertainty": float(np.mean(total_uncertainty[mask])),
+                    "mean_knowledge_uncertainty": float(np.mean(knowledge_uncertainty[mask])),
+                    "mean_data_uncertainty": float(np.mean(data_uncertainty[mask])),
+                    "mean_confidence": float(np.mean(confidence[mask])),
+                }
+            )
+
+        return {
+            "summary": {
+                "sample_count": int(n),
+                "mean_total_evidence": float(np.mean(total_evidence)),
+                "mean_total_uncertainty": float(np.mean(total_uncertainty)),
+                "corr_total_uncertainty_total_evidence": self._safe_corr(total_uncertainty, total_evidence),
+                "corr_knowledge_uncertainty_total_evidence": self._safe_corr(knowledge_uncertainty, total_evidence),
+                "corr_data_uncertainty_total_evidence": self._safe_corr(data_uncertainty, total_evidence),
+                "corr_confidence_total_evidence": self._safe_corr(confidence, total_evidence),
+            },
+            "evidence_uncertainty_profile": profile,
+            "top_high_uncertainty_samples": [
+                {
+                    "sample_index": int(i),
+                    "prediction_label": int(np.argmax(probs[int(i)])),
+                    "total_uncertainty": float(total_uncertainty[int(i)]),
+                    "knowledge_uncertainty": float(knowledge_uncertainty[int(i)]),
+                    "data_uncertainty": float(data_uncertainty[int(i)]),
+                    "total_evidence": float(total_evidence[int(i)]),
+                    "confidence": float(confidence[int(i)]),
+                }
+                for i in high_unc_idx.tolist()
+            ],
+            "preprocess": {
+                "scaler": dict(pre["scaler"]),
+                "validation": dict(pre["validation"]),
+                "feature_names": list(pre["feature_names"]),
+            },
+        }
+
+    def analyze_confidence_distribution(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        top_k: int = 8,
+        quantiles: Sequence[float] = (0.05, 0.25, 0.5, 0.75, 0.95),
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        pre = self.preprocess_edl_data(features, use_training_stats=use_training_stats)
+        pred = self.predict_edl(features, use_training_stats=use_training_stats)
+
+        probs = np.asarray(pred["probabilities"], dtype=float)
+        confidence = np.asarray(pred["confidence"], dtype=float).reshape(-1)
+        total_uncertainty = np.asarray(pred["uncertainty"]["total"], dtype=float).reshape(-1)
+        knowledge_uncertainty = np.asarray(pred["uncertainty"]["knowledge"], dtype=float).reshape(-1)
+        data_uncertainty = np.asarray(pred["uncertainty"]["data"], dtype=float).reshape(-1)
+        entropy = -np.sum(probs * np.log(np.maximum(probs, 1e-8)), axis=1) if probs.ndim == 2 else np.zeros_like(confidence)
+
+        n = int(confidence.size)
+        if n == 0:
+            return {
+                "summary": {
+                    "sample_count": 0,
+                    "mean_confidence": 0.0,
+                    "std_confidence": 0.0,
+                    "corr_confidence_total_uncertainty": 0.0,
+                },
+                "quantiles": {},
+                "top_low_confidence_samples": [],
+            }
+
+        q = np.asarray(list(quantiles), dtype=float)
+        q = np.clip(q, 0.0, 1.0)
+        if q.size == 0:
+            q = np.asarray([0.5], dtype=float)
+        q_conf = np.quantile(confidence, q)
+        q_unc = np.quantile(total_uncertainty, q)
+        k = min(max(1, int(top_k)), n)
+        low_conf_idx = np.argsort(confidence)[:k]
+        skew, kurt = self._moment_skew_kurt(confidence.reshape(-1, 1))
+
+        return {
+            "summary": {
+                "sample_count": int(n),
+                "mean_confidence": float(np.mean(confidence)),
+                "std_confidence": float(np.std(confidence)),
+                "p10_confidence": float(np.quantile(confidence, 0.1)),
+                "p90_confidence": float(np.quantile(confidence, 0.9)),
+                "mean_total_uncertainty": float(np.mean(total_uncertainty)),
+                "mean_prediction_entropy": float(np.mean(entropy)),
+                "mean_knowledge_uncertainty": float(np.mean(knowledge_uncertainty)),
+                "mean_data_uncertainty": float(np.mean(data_uncertainty)),
+                "corr_confidence_total_uncertainty": self._safe_corr(confidence, total_uncertainty),
+                "corr_confidence_entropy": self._safe_corr(confidence, entropy),
+                "confidence_skewness": float(skew[0]),
+                "confidence_excess_kurtosis": float(kurt[0]),
+            },
+            "quantiles": {
+                f"q{int(v * 100):02d}": {
+                    "confidence": float(q_conf[i]),
+                    "total_uncertainty": float(q_unc[i]),
+                }
+                for i, v in enumerate(q.tolist())
+            },
+            "top_low_confidence_samples": [
+                {
+                    "sample_index": int(i),
+                    "confidence": float(confidence[int(i)]),
+                    "total_uncertainty": float(total_uncertainty[int(i)]),
+                    "knowledge_uncertainty": float(knowledge_uncertainty[int(i)]),
+                    "data_uncertainty": float(data_uncertainty[int(i)]),
+                    "prediction_entropy": float(entropy[int(i)]),
+                }
+                for i in low_conf_idx.tolist()
+            ],
+            "preprocess": {
+                "scaler": dict(pre["scaler"]),
+                "validation": dict(pre["validation"]),
+                "feature_names": list(pre["feature_names"]),
+            },
+        }
 
     def reliability_diagram(self, probs: np.ndarray, labels: np.ndarray, n_bins: int = 10) -> dict[str, np.ndarray]:
         p = np.asarray(probs, dtype=float)
