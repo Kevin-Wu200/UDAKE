@@ -1,0 +1,25 @@
+{
+  "id": "amap-engine",
+  "provider": "amap",
+  "name": "高德地图引擎",
+  "version": "1.0.0",
+  "description": "高德地图引擎插件，提供 AMap JS API 的地图渲染与交互能力",
+  "author": "UDAKE Team",
+  "type": "map-engine",
+  "main": "./AMapMapEngine.ts",
+  "loader": "local",
+  "config": {
+    "defaultZoom": 10,
+    "defaultCenter": [
+      116.397428,
+      39.90923
+    ],
+    "securityPolicy": "web"
+  },
+  "permissions": [
+    "map:render",
+    "map:interact",
+    "location:read"
+  ],
+  "minAppVersion": "1.0.0"
+}

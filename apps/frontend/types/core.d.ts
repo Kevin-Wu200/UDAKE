@@ -206,8 +206,8 @@ export interface ValidationResult {
 
 // ========== 地图引擎 ==========
 
-/** 地图引擎类型 */
-export type MapEngineType = 'geoscene' | 'geoscene' | 'amap';
+/** 地图引擎类型（支持扩展引擎） */
+export type MapEngineType = 'geoscene' | 'amap' | (string & {});
 
 /** 地图初始化选项 */
 export interface MapInitOptions {

@@ -1,5 +1,6 @@
 {
   "id": "map25d-engine",
+  "provider": "tilted25d",
   "name": "2.5D 地图引擎",
   "version": "1.0.0",
   "type": "map-engine",

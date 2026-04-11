@@ -7,18 +7,17 @@ import { IMapAdapter } from '../types/map';
 import { MapConfig } from './config/map.config.js';
 import { AppConfig } from './config/AppConfig.js';
 import { Logger } from './utils/Logger.js';
-
-// 动态导入适配器（保留动态导入，因为适配器较大且按需加载）
-async function importAdapters() {
-    const GeoSceneAdapter = await import('./adapters/GeoSceneAdapter.js');
-    const AMapAdapter = await import('./adapters/AMapAdapter.js');
-    return { GeoSceneAdapter, AMapAdapter };
-}
+import {
+    ensureMapEngineRegistryReady,
+    getMapEngine,
+    getRegisteredMapEngines,
+    validateMapProvider,
+    type MapProvider
+} from './map/MapEngineRegistry.js';
 
 /**
- * 地图引擎提供商类型
+ * 地图引擎初始化超时
  */
-export type MapProvider = 'geoscene' | 'amap';
 const MAP_INIT_TIMEOUT_MS = AppConfig.map.initTimeoutMs;
 
 function withTimeout<T>(promise: Promise<T>, provider: MapProvider): Promise<T> {
@@ -33,6 +32,22 @@ function withTimeout<T>(promise: Promise<T>, provider: MapProvider): Promise<T> 
     ]);
 }
 
+async function createAdapterAndInitialize(containerId: string, provider: MapProvider): Promise<IMapAdapter> {
+    const engine = getMapEngine(provider);
+    if (!engine) {
+        throw new Error(`未注册的地图引擎: ${provider}`);
+    }
+
+    const adapter = await engine.createAdapter();
+    await withTimeout(adapter.initMap(containerId), provider);
+    return adapter;
+}
+
+async function syncProvidersToConfig(): Promise<void> {
+    await ensureMapEngineRegistryReady();
+    MapConfig.registerProviders(getRegisteredMapEngines().map((engine) => engine.provider));
+}
+
 /**
  * 初始化地图
  * 使用 ArcGIS API for JavaScript 或高德地图
@@ -40,29 +55,27 @@ function withTimeout<T>(promise: Promise<T>, provider: MapProvider): Promise<T> 
  * @returns 地图适配器实例
  */
 export async function initializeMap(containerId: string): Promise<IMapAdapter> {
-    // 动态导入适配器
-    const { GeoSceneAdapter, AMapAdapter } = await importAdapters();
+    await syncProvidersToConfig();
 
-    // 获取地图引擎提供商
-    const provider: MapProvider = MapConfig.getProvider() as MapProvider;
+    const fallbackProvider = MapConfig.FALLBACK_PROVIDER || 'geoscene';
+    const requestedProvider = MapConfig.getProvider();
+    const provider = validateMapProvider(requestedProvider, fallbackProvider);
     Logger.info('地图初始化', `使用地图引擎: ${provider}`);
 
-    let adapter: IMapAdapter;
+    try {
+        const adapter = await createAdapterAndInitialize(containerId, provider);
+        MapConfig.setProvider(provider);
+        return adapter;
+    } catch (error) {
+        if (provider === fallbackProvider) {
+            throw error;
+        }
 
-    switch (provider) {
-        case 'geoscene':
-            adapter = new GeoSceneAdapter.GeoSceneAdapter();
-            break;
-        case 'amap':
-            adapter = new AMapAdapter.AMapAdapter();
-            break;
-        default:
-            throw new Error(`不支持的地图引擎: ${provider}`);
+        Logger.warn('地图初始化', `引擎 ${provider} 初始化失败，回退到 ${fallbackProvider}`);
+        const fallbackAdapter = await createAdapterAndInitialize(containerId, fallbackProvider);
+        MapConfig.setProvider(fallbackProvider);
+        return fallbackAdapter;
     }
-
-    await withTimeout(adapter.initMap(containerId), provider);
-
-    return adapter;
 }
 
 /**
@@ -70,13 +83,21 @@ export async function initializeMap(containerId: string): Promise<IMapAdapter> {
  * @returns 'geoscene' 或 'amap'
  */
 export async function getMapProvider(): Promise<MapProvider> {
-    const provider = MapConfig.getProvider() as MapProvider;
-
-    if (provider !== 'geoscene' && provider !== 'amap') {
-        throw new Error(`无效的地图引擎: ${provider}`);
-    }
-
+    await syncProvidersToConfig();
+    const provider = validateMapProvider(MapConfig.getProvider(), MapConfig.FALLBACK_PROVIDER || 'geoscene');
+    MapConfig.setProvider(provider);
     return provider;
+}
+
+/**
+ * 获取可用地图引擎列表
+ */
+export async function getAvailableMapProviders(): Promise<Array<{ provider: MapProvider; displayName: string }>> {
+    await syncProvidersToConfig();
+    return getRegisteredMapEngines().map((engine) => ({
+        provider: engine.provider,
+        displayName: engine.displayName
+    }));
 }
 
 /**
@@ -88,24 +109,24 @@ export async function reinitializeMap(
     containerId: string,
     provider: MapProvider
 ): Promise<IMapAdapter> {
-    Logger.info('地图初始化', `重新初始化地图，使用引擎: ${provider}`);
+    await syncProvidersToConfig();
 
-    const { GeoSceneAdapter, AMapAdapter } = await importAdapters();
+    const fallbackProvider = MapConfig.FALLBACK_PROVIDER || 'geoscene';
+    const targetProvider = validateMapProvider(provider, fallbackProvider);
+    Logger.info('地图初始化', `重新初始化地图，使用引擎: ${targetProvider}`);
 
-    let adapter: IMapAdapter;
+    try {
+        const adapter = await createAdapterAndInitialize(containerId, targetProvider);
+        MapConfig.setProvider(targetProvider);
+        return adapter;
+    } catch (error) {
+        if (targetProvider === fallbackProvider) {
+            throw error;
+        }
 
-    switch (provider) {
-        case 'geoscene':
-            adapter = new GeoSceneAdapter.GeoSceneAdapter();
-            break;
-        case 'amap':
-            adapter = new AMapAdapter.AMapAdapter();
-            break;
-        default:
-            throw new Error(`不支持的地图引擎: ${provider}`);
+        Logger.warn('地图初始化', `引擎 ${targetProvider} 初始化失败，回退到 ${fallbackProvider}`);
+        const fallbackAdapter = await createAdapterAndInitialize(containerId, fallbackProvider);
+        MapConfig.setProvider(fallbackProvider);
+        return fallbackAdapter;
     }
-
-    await withTimeout(adapter.initMap(containerId), provider);
-
-    return adapter;
 }

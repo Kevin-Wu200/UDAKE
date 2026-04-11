@@ -1,30 +1,84 @@
 /**
  * 地图引擎切换器组件
- * 允许用户在 ArcGIS 和高德地图之间切换
+ * 支持动态发现的多引擎切换
  */
 
-/**
- * 地图引擎切换器组件
- */
+export interface MapEngineOption {
+    provider: string;
+    displayName: string;
+}
+
 export class MapEngineSwitcher {
     /** 切换按钮元素 */
     private button: HTMLElement | null = null;
 
     /** 当前地图引擎 */
-    private currentProvider: 'geoscene' | 'amap' = 'geoscene';
+    private currentProvider: string = 'geoscene';
 
     /** 切换回调函数 */
-    private onSwitch: ((provider: 'geoscene' | 'amap') => Promise<void>) | null = null;
+    private onSwitch: ((provider: string) => Promise<void>) | null = null;
 
     /** 是否正在切换 */
     private isSwitching: boolean = false;
 
+    /** 可用引擎列表 */
+    private availableProviders: MapEngineOption[] = [];
+
     constructor(
-        currentProvider: 'geoscene' | 'amap' = 'geoscene',
-        onSwitch?: (provider: 'geoscene' | 'amap') => Promise<void>
+        currentProvider: string = 'geoscene',
+        onSwitch?: (provider: string) => Promise<void>,
+        availableProviders: MapEngineOption[] = []
     ) {
         this.currentProvider = currentProvider;
         this.onSwitch = onSwitch || null;
+        this.availableProviders = this.normalizeProviders(availableProviders);
+    }
+
+    /**
+     * 规范化并去重可用引擎列表
+     */
+    private normalizeProviders(providers: MapEngineOption[]): MapEngineOption[] {
+        const deduplicated = new Map<string, MapEngineOption>();
+
+        for (const provider of providers) {
+            const key = (provider.provider || '').trim().toLowerCase();
+            if (!key) continue;
+            deduplicated.set(key, {
+                provider: key,
+                displayName: provider.displayName || key
+            });
+        }
+
+        if (deduplicated.size === 0) {
+            return [
+                { provider: 'geoscene', displayName: 'GeoScene' },
+                { provider: 'amap', displayName: '高德' }
+            ];
+        }
+
+        return Array.from(deduplicated.values());
+    }
+
+    /**
+     * 获取当前引擎显示名
+     */
+    private getCurrentProviderName(): string {
+        const current = this.availableProviders.find((item) => item.provider === this.currentProvider);
+        return current?.displayName || this.currentProvider;
+    }
+
+    /**
+     * 获取下一个引擎
+     */
+    private getNextProvider(): string | null {
+        if (this.availableProviders.length < 2) {
+            return null;
+        }
+
+        const currentIndex = this.availableProviders.findIndex((item) => item.provider === this.currentProvider);
+        const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+        const nextIndex = (safeIndex + 1) % this.availableProviders.length;
+        return this.availableProviders[nextIndex]?.provider || null;
     }
 
     /**
@@ -99,8 +153,7 @@ export class MapEngineSwitcher {
      * 更新按钮文本
      */
     private updateButtonText(textElement: HTMLElement): void {
-        const engineName = this.currentProvider === 'geoscene' ? 'GeoScene' : '高德';
-        textElement.textContent = `${engineName}`;
+        textElement.textContent = this.getCurrentProviderName();
     }
 
     /**
@@ -111,7 +164,10 @@ export class MapEngineSwitcher {
             return;
         }
 
-        const newProvider: 'geoscene' | 'amap' = this.currentProvider === 'geoscene' ? 'amap' : 'geoscene';
+        const newProvider = this.getNextProvider();
+        if (!newProvider) {
+            return;
+        }
 
         // 更新状态
         this.isSwitching = true;
@@ -205,15 +261,31 @@ export class MapEngineSwitcher {
     /**
      * 设置切换回调
      */
-    setOnSwitch(callback: (provider: 'geoscene' | 'amap') => Promise<void>): void {
+    setOnSwitch(callback: (provider: string) => Promise<void>): void {
         this.onSwitch = callback;
     }
 
     /**
      * 更新当前提供商
      */
-    setCurrentProvider(provider: 'geoscene' | 'amap'): void {
+    setCurrentProvider(provider: string): void {
         this.currentProvider = provider;
+
+        const textElement = this.button?.querySelector('.switcher-text') as HTMLElement;
+        if (textElement) {
+            this.updateButtonText(textElement);
+        }
+    }
+
+    /**
+     * 设置可用引擎列表
+     */
+    setAvailableProviders(providers: MapEngineOption[]): void {
+        this.availableProviders = this.normalizeProviders(providers);
+
+        if (!this.availableProviders.some((item) => item.provider === this.currentProvider)) {
+            this.currentProvider = this.availableProviders[0].provider;
+        }
 
         const textElement = this.button?.querySelector('.switcher-text') as HTMLElement;
         if (textElement) {

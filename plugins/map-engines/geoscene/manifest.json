@@ -1,1 +1,25 @@
-{"id": "geoscene-engine", "name": "GeoScene 地图引擎", "version": "1.0.0", "description": "GeoScene 地图引擎插件，提供专业的地理空间数据可视化功能", "author": "UDAKE Team", "type": "map-engine", "main": "./GeoSceneMapEngine.ts", "loader": "local", "config": {"apiKey": "YOUR_API_KEY", "defaultZoom": 10, "center": {"longitude": 116.404, "latitude": 39.915}}, "permissions": ["map:render", "map:interact", "data:load"], "minAppVersion": "1.0.0"}
+{
+  "id": "geoscene-engine",
+  "provider": "geoscene",
+  "name": "GeoScene 地图引擎",
+  "version": "1.0.0",
+  "description": "GeoScene 地图引擎插件，提供专业的地理空间数据可视化功能",
+  "author": "UDAKE Team",
+  "type": "map-engine",
+  "main": "./GeoSceneMapEngine.ts",
+  "loader": "local",
+  "config": {
+    "apiKey": "YOUR_API_KEY",
+    "defaultZoom": 10,
+    "center": {
+      "longitude": 116.404,
+      "latitude": 39.915
+    }
+  },
+  "permissions": [
+    "map:render",
+    "map:interact",
+    "data:load"
+  ],
+  "minAppVersion": "1.0.0"
+}

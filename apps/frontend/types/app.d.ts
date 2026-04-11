@@ -182,7 +182,7 @@ export interface IConfirmDialog {
 /** 应用配置 */
 export interface AppConfig {
     backendPort: number;
-    mapEngine: 'geoscene' | 'geoscene' | 'amap';
+    mapEngine: 'geoscene' | 'amap' | (string & {});
     defaultGridResolution: number;
 }
 

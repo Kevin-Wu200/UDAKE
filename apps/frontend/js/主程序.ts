@@ -40,11 +40,16 @@ import { CSSFeatureDetector } from './utils/CSSFeatureDetector.js';
 import { Logger } from './utils/Logger.js';
 import { RuntimeLifecycle } from './utils/RuntimeLifecycle.js';
 import { AppConfig } from './config/AppConfig.js';
+import { MapConfig } from './config/map.config.js';
 import { SkeletonLoader } from './utils/SkeletonLoader.js';
 import { ComputationService } from './services/ComputationService.js';
 import type { Kriging3DPanel } from './components/Kriging3DPanel.js';
 import type { DeepLearningPanel } from './components/DeepLearningPanel.js';
 import type { FrontendIntegrationHub } from './components/FrontendIntegrationHub.js';
+import {
+    getMapEngineDisplayName,
+    type MapProvider
+} from './map/MapEngineRegistry.js';
 
 // 导入管理器
 import { ComponentInitializer } from './managers/ComponentInitializer.js';
@@ -1936,14 +1941,20 @@ class App {
     /**
      * 处理地图引擎切换
      */
-    private async handleMapEngineSwitch(newProvider: 'geoscene' | 'amap'): Promise<void> {
+    private async handleMapEngineSwitch(newProvider: MapProvider): Promise<void> {
         // 检查是否正在切换，防止重复切换
         if (this.isSwitchingMap) {
             Logger.warn('主程序', '地图引擎正在切换中，请稍候');
             return;
         }
 
-        const previousProvider: 'geoscene' | 'amap' = newProvider === 'geoscene' ? 'amap' : 'geoscene';
+        const previousProvider = MapConfig.getProvider() as MapProvider;
+        if (newProvider === previousProvider) {
+            Logger.info('主程序', `当前已经是 ${getMapEngineDisplayName(newProvider)} 引擎，无需切换`);
+            return;
+        }
+
+        const newProviderName = getMapEngineDisplayName(newProvider);
         let samplingPoints: SamplingPoint[] = [];
         let projectPoints: SamplingPoint[] = [];
         let currentCenter: [number, number] | { lng: number; lat: number } | null = null;
@@ -2037,12 +2048,12 @@ class App {
             }
 
             LoadingManager.hide();
-            this.showStatus(`已切换到 ${newProvider === 'geoscene' ? 'GeoScene' : '高德'} 地图引擎`, 'success');
+            this.showStatus(`已切换到 ${newProviderName} 地图引擎`, 'success');
 
             HistoryManager.record({
                 action: '切换地图引擎',
                 type: 'map',
-                detail: `切换到 ${newProvider === 'geoscene' ? 'GeoScene' : '高德'} 地图引擎`,
+                detail: `切换到 ${newProviderName} 地图引擎`,
                 undoable: false
             });
 

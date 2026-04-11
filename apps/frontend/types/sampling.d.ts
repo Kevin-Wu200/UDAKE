@@ -245,8 +245,8 @@ export class RegionSampling {
 
 // ========== 地图管理器类型 ==========
 
-/** 地图提供者 */
-export type MapProvider = 'geoscene' | 'geoscene' | 'amap';
+/** 地图提供者（支持扩展引擎） */
+export type MapProvider = 'geoscene' | 'amap' | (string & {});
 
 /** 地图模式 */
 export type MapMode = 'normal' | 'areaSampling';

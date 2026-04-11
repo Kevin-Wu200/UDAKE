@@ -32,7 +32,8 @@ import { FeedbackCollector } from '../components/FeedbackCollector.js';
 import { MapEngineSwitcher } from '../components/MapEngineSwitcher';
 import { Map25DHeatmapController } from '../components/Map25DHeatmapController.js';
 import { TemplateStorageService } from '../services/TemplateStorageService.js';
-import { getMapProvider } from '../地图初始化.js';
+import { getAvailableMapProviders, getMapProvider } from '../地图初始化.js';
+import type { MapProvider } from '../map/MapEngineRegistry.js';
 import workflowWizardConfig from '../../../../configs/workflow-wizards.json';
 import type { DeepLearningPanel } from '../components/DeepLearningPanel.js';
 
@@ -288,10 +289,13 @@ export class ComponentInitializer {
         const provider = await getMapProvider();
 
         // 初始化地图引擎切换器
+        const availableProviders = await getAvailableMapProviders();
         const mapEngineSwitcher = new MapEngineSwitcher(
-            provider as 'geoscene' | 'amap',
-            async (newProvider) => await this.handleMapEngineSwitch(newProvider)
+            provider,
+            async (newProvider) => await this.handleMapEngineSwitch(newProvider),
+            availableProviders
         );
+        mapEngineSwitcher.setAvailableProviders(availableProviders);
         mapEngineSwitcher.addToContainer(mapContainer);
         this.components.set('mapEngineSwitcher', mapEngineSwitcher);
 
@@ -379,7 +383,7 @@ export class ComponentInitializer {
                 }
             }
         );
-        measureTool.init(this.config!.view, provider as 'geoscene' | 'amap');
+        measureTool.init(this.config!.view, provider);
         const measurePanel = measureTool.createPanel();
         measurePanel.style.display = 'none';
         mapContainer.appendChild(measurePanel);
@@ -618,7 +622,7 @@ export class ComponentInitializer {
     /**
      * 处理地图引擎切换
      */
-    private async handleMapEngineSwitch(newProvider: 'geoscene' | 'amap'): Promise<void> {
+    private async handleMapEngineSwitch(newProvider: MapProvider): Promise<void> {
         console.log('切换地图引擎:', newProvider);
         const event = new CustomEvent('map-engine-switch', { detail: newProvider });
         document.dispatchEvent(event);
