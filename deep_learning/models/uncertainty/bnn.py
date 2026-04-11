@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Union
+from typing import Any, Sequence, Union
 
 import numpy as np
 
@@ -384,3 +384,194 @@ class BayesianNeuralRegressor:
             "feature_names": list(pre["feature_names"]),
         }
         return pred
+
+    def _named_parameters(self) -> list[tuple[str, BayesianParameter]]:
+        return [
+            ("hidden.weight", self.hidden.weight),
+            ("hidden.bias", self.hidden.bias),
+            ("mean_head.weight", self.mean_head.weight),
+            ("mean_head.bias", self.mean_head.bias),
+            ("logvar_head.weight", self.logvar_head.weight),
+            ("logvar_head.bias", self.logvar_head.bias),
+        ]
+
+    def explain_bayesian_weights(self, top_k: int = 8) -> dict[str, Any]:
+        """输出贝叶斯权重解释（后验均值/方差与全局重要参数）。"""
+        named_params = self._named_parameters()
+        summaries: list[dict[str, Any]] = []
+        uncertain_pool: list[tuple[float, str, int, float, float, float]] = []
+        confident_pool: list[tuple[float, str, int, float, float, float]] = []
+
+        for name, param in named_params:
+            mu = np.asarray(param.mu, dtype=float).reshape(-1)
+            sigma = np.asarray(param.sigma, dtype=float).reshape(-1)
+            snr = np.abs(mu) / (sigma + 1e-8)
+            summaries.append(
+                {
+                    "parameter": name,
+                    "count": int(mu.size),
+                    "posterior_mean": {
+                        "mean": float(np.mean(mu)),
+                        "std": float(np.std(mu)),
+                        "abs_mean": float(np.mean(np.abs(mu))),
+                    },
+                    "posterior_std": {
+                        "mean": float(np.mean(sigma)),
+                        "std": float(np.std(sigma)),
+                        "min": float(np.min(sigma)),
+                        "max": float(np.max(sigma)),
+                    },
+                    "signal_noise_ratio": {
+                        "mean": float(np.mean(snr)),
+                        "p50": float(np.quantile(snr, 0.5)),
+                        "p90": float(np.quantile(snr, 0.9)),
+                    },
+                }
+            )
+            for idx in range(mu.size):
+                uncertain_pool.append((float(sigma[idx]), name, int(idx), float(mu[idx]), float(sigma[idx]), float(snr[idx])))
+                confident_pool.append((float(snr[idx]), name, int(idx), float(mu[idx]), float(sigma[idx]), float(snr[idx])))
+
+        k = max(1, int(top_k))
+        uncertain_pool.sort(key=lambda item: item[0], reverse=True)
+        confident_pool.sort(key=lambda item: item[0], reverse=True)
+        top_uncertain = [
+            {
+                "parameter": str(name),
+                "flat_index": int(idx),
+                "mu": float(mu),
+                "sigma": float(sig),
+                "signal_noise_ratio": float(snr),
+            }
+            for _, name, idx, mu, sig, snr in uncertain_pool[:k]
+        ]
+        top_confident = [
+            {
+                "parameter": str(name),
+                "flat_index": int(idx),
+                "mu": float(mu),
+                "sigma": float(sig),
+                "signal_noise_ratio": float(snr),
+            }
+            for _, name, idx, mu, sig, snr in confident_pool[:k]
+        ]
+
+        return {
+            "summary": {
+                "parameter_groups": int(len(named_params)),
+                "total_parameter_count": int(sum(item["count"] for item in summaries)),
+                "prior_type": type(self.prior).__name__,
+            },
+            "parameter_summaries": summaries,
+            "top_uncertain_parameters": top_uncertain,
+            "top_confident_parameters": top_confident,
+        }
+
+    def analyze_posterior_distributions(
+        self,
+        quantiles: Sequence[float] = (0.1, 0.25, 0.5, 0.75, 0.9),
+    ) -> dict[str, Any]:
+        """输出各层后验分布统计，用于后验分布分析。"""
+        q = np.asarray(list(quantiles), dtype=float)
+        q = np.clip(q, 0.0, 1.0)
+        if q.size == 0:
+            q = np.asarray([0.5], dtype=float)
+
+        layers: list[dict[str, Any]] = []
+        all_mu: list[np.ndarray] = []
+        all_sigma: list[np.ndarray] = []
+        low_snr_ratios: list[float] = []
+        for name, param in self._named_parameters():
+            mu = np.asarray(param.mu, dtype=float).reshape(-1)
+            sigma = np.asarray(param.sigma, dtype=float).reshape(-1)
+            snr = np.abs(mu) / (sigma + 1e-8)
+            low_snr_ratio = float(np.mean(snr < 1.0))
+            low_snr_ratios.append(low_snr_ratio)
+            all_mu.append(mu)
+            all_sigma.append(sigma)
+            layers.append(
+                {
+                    "parameter": name,
+                    "count": int(mu.size),
+                    "mu_quantiles": {f"q{int(v * 100):02d}": float(np.quantile(mu, v)) for v in q.tolist()},
+                    "sigma_quantiles": {f"q{int(v * 100):02d}": float(np.quantile(sigma, v)) for v in q.tolist()},
+                    "sigma_mean": float(np.mean(sigma)),
+                    "sigma_std": float(np.std(sigma)),
+                    "low_snr_ratio": low_snr_ratio,
+                }
+            )
+
+        mu_all = np.concatenate(all_mu) if all_mu else np.zeros((0,), dtype=float)
+        sigma_all = np.concatenate(all_sigma) if all_sigma else np.zeros((0,), dtype=float)
+        return {
+            "summary": {
+                "parameter_groups": int(len(layers)),
+                "global_mu_mean": float(np.mean(mu_all)) if mu_all.size else 0.0,
+                "global_mu_std": float(np.std(mu_all)) if mu_all.size else 0.0,
+                "global_sigma_mean": float(np.mean(sigma_all)) if sigma_all.size else 0.0,
+                "global_sigma_std": float(np.std(sigma_all)) if sigma_all.size else 0.0,
+                "mean_low_snr_ratio": float(np.mean(low_snr_ratios)) if low_snr_ratios else 0.0,
+            },
+            "layers": layers,
+            "quantiles": [float(v) for v in q.tolist()],
+        }
+
+    def analyze_epistemic_uncertainty(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        num_samples: int = 80,
+        top_k: int = 8,
+        temperature: float = 1.0,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        """输出认知不确定性分析。"""
+        pre = self.preprocess_bnn_data(features, use_training_stats=use_training_stats)
+        x_scaled = np.asarray(pre["processed_features"], dtype=float)
+        sampled_means, sampled_vars = self.sample_predict(x_scaled, num_samples=max(2, int(num_samples)), temperature=temperature)
+
+        epistemic = np.var(sampled_means, axis=0)
+        aleatoric = np.mean(sampled_vars, axis=0)
+        total = np.maximum(epistemic + aleatoric, 1e-8)
+        ratio = np.clip(epistemic / total, 0.0, 1.0)
+        pred_mean = np.mean(sampled_means, axis=0)
+
+        n = int(epistemic.size)
+        k = min(max(1, int(top_k)), max(1, n))
+        top_idx = np.argsort(epistemic)[::-1][:k] if n > 0 else np.asarray([], dtype=int)
+        corr = float(np.corrcoef(epistemic, total)[0, 1]) if n >= 2 else 0.0
+        if not np.isfinite(corr):
+            corr = 0.0
+
+        return {
+            "summary": {
+                "sample_count": int(n),
+                "monte_carlo_samples": int(max(2, int(num_samples))),
+                "mean_epistemic": float(np.mean(epistemic)) if n > 0 else 0.0,
+                "mean_aleatoric": float(np.mean(aleatoric)) if n > 0 else 0.0,
+                "mean_epistemic_ratio": float(np.mean(ratio)) if n > 0 else 0.0,
+                "p90_epistemic": float(np.quantile(epistemic, 0.9)) if n > 0 else 0.0,
+                "corr_epistemic_total": corr,
+            },
+            "top_epistemic_samples": [
+                {
+                    "sample_index": int(i),
+                    "prediction_mean": float(pred_mean[int(i)]),
+                    "epistemic": float(epistemic[int(i)]),
+                    "aleatoric": float(aleatoric[int(i)]),
+                    "total_variance": float(total[int(i)]),
+                    "epistemic_ratio": float(ratio[int(i)]),
+                }
+                for i in top_idx.tolist()
+            ],
+            "distribution": {
+                "epistemic": [float(v) for v in epistemic.tolist()],
+                "aleatoric": [float(v) for v in aleatoric.tolist()],
+                "epistemic_ratio": [float(v) for v in ratio.tolist()],
+            },
+            "preprocess": {
+                "scaler": dict(pre["scaler"]),
+                "validation": dict(pre["validation"]),
+                "feature_names": list(pre["feature_names"]),
+            },
+        }
