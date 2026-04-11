@@ -51,6 +51,7 @@ python3 deep_learning/examples/verify_anomaly_examples.py
 python3 deep_learning/training/train_sampling_rl.py --model ppo --episodes 30 --size 24
 python3 deep_learning/inference/run_sampling_rl_inference.py --model ppo --n 12 --strategy hybrid
 python3 deep_learning/examples/sampling_rl_demo.py
+python3 deep_learning/examples/rl_adapter_usage_demo.py
 ```
 
 ## 阶段4快速命令
