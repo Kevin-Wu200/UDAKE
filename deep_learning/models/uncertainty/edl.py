@@ -57,6 +57,10 @@ class EDLClassifier:
         self.b2 = np.zeros(c, dtype=float)
 
         self.history: list[dict[str, float]] = []
+        self.feature_names: list[str] = [f"feature_{i}" for i in range(int(config.in_dim))]
+        self._runtime_feature_mean = np.zeros(int(config.in_dim), dtype=float)
+        self._runtime_feature_std = np.ones(int(config.in_dim), dtype=float)
+        self._has_runtime_stats = False
 
     def _activate_evidence(self, logits: np.ndarray) -> np.ndarray:
         if self.config.evidence_activation == "relu":
@@ -187,6 +191,73 @@ class EDLClassifier:
                 "threshold": float(confidence),
             },
         }
+
+    def preprocess_edl_data(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        feature_names: list[str] | None = None,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        x_raw = ensure_2d(np.asarray(features, dtype=float))
+        expected_dim = int(self.config.in_dim)
+        if x_raw.shape[1] != expected_dim:
+            raise ValueError(f"输入维度不匹配：期望 {expected_dim}，实际 {x_raw.shape[1]}")
+
+        names = list(feature_names) if feature_names is not None else [f"feature_{i}" for i in range(x_raw.shape[1])]
+        if len(names) != x_raw.shape[1]:
+            raise ValueError("feature_names 长度与特征维度不一致")
+
+        if use_training_stats and self._has_runtime_stats:
+            mean = np.asarray(self._runtime_feature_mean, dtype=float)
+            std = np.asarray(self._runtime_feature_std, dtype=float)
+            stats_source = "runtime"
+        else:
+            mean = np.mean(x_raw, axis=0)
+            std = np.std(x_raw, axis=0)
+            std = np.where(std > 1e-8, std, 1.0)
+            self._runtime_feature_mean = mean.astype(float)
+            self._runtime_feature_std = std.astype(float)
+            self._has_runtime_stats = True
+            stats_source = "batch"
+
+        x_scaled = (x_raw - mean.reshape(1, -1)) / std.reshape(1, -1)
+        self.feature_names = list(names)
+        return {
+            "raw_features": x_raw,
+            "processed_features": x_scaled,
+            "feature_names": list(names),
+            "scaler": {
+                "mean": [float(v) for v in mean.tolist()],
+                "std": [float(v) for v in std.tolist()],
+                "source": stats_source,
+            },
+            "validation": {
+                "is_valid": True,
+                "sample_count": int(x_raw.shape[0]),
+                "feature_dim": int(x_raw.shape[1]),
+                "stats_source": stats_source,
+            },
+        }
+
+    def predict_edl(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        confidence: float = 0.95,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        pre = self.preprocess_edl_data(features, use_training_stats=use_training_stats)
+        pred = self.predict(
+            np.asarray(pre["processed_features"], dtype=float),
+            confidence=confidence,
+        )
+        pred["preprocess"] = {
+            "scaler": dict(pre["scaler"]),
+            "validation": dict(pre["validation"]),
+            "feature_names": list(pre["feature_names"]),
+        }
+        return pred
 
     def reliability_diagram(self, probs: np.ndarray, labels: np.ndarray, n_bins: int = 10) -> dict[str, np.ndarray]:
         p = np.asarray(probs, dtype=float)
