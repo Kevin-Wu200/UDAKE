@@ -33,6 +33,7 @@ from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
 from .gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter
 from .gnn_kriging_explainer import GNNKrigingLIMEAdapter, GNNKrigingSHAPAdapter
 from .lime_explainer import SpatiotemporalLIMEExplainer
+from .mc_dropout_explainer import MCDropoutLIMEAdapter, MCDropoutSHAPAdapter
 from .parallel_runtime import ParallelExecutionManager, ParallelTask
 from .residual_kriging_explainer import ResidualKrigingLIMEAdapter, ResidualKrigingSHAPAdapter
 from .shap_explainer import SpatiotemporalSHAPExplainer
@@ -112,6 +113,8 @@ class DeepLearningService:
         self.contrastive_shap_adapter = ContrastiveShapAdapter()
         self.bnn_lime_adapter = BNNLIMEAdapter()
         self.bnn_shap_adapter = BNNSHAPAdapter()
+        self.mc_dropout_lime_adapter = MCDropoutLIMEAdapter()
+        self.mc_dropout_shap_adapter = MCDropoutSHAPAdapter()
         cache_file = os.path.join(tempfile.gettempdir(), f"udake_anomaly_cache_{os.getpid()}.json")
         self.anomaly_cache = AnomalyModelCache(
             cache_size=256,

@@ -79,6 +79,10 @@ class MCDropoutRegressor:
 
         self.dropout = DropoutLayer(rate=config.dropout_rate, kind=config.dropout_type, seed=config.seed + 7)
         self.history: list[dict[str, float]] = []
+        self.feature_names: list[str] = [f"feature_{i}" for i in range(int(config.in_dim))]
+        self._runtime_feature_mean = np.zeros(int(config.in_dim), dtype=float)
+        self._runtime_feature_std = np.ones(int(config.in_dim), dtype=float)
+        self._has_runtime_stats = False
 
     def _forward(self, x: np.ndarray, training: bool, keep_dropout: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         z1 = x @ self.w1 + self.b1
@@ -192,3 +196,72 @@ class MCDropoutRegressor:
             "tolerance": float(tolerance),
             "min_t": int(min_t),
         }
+
+    def preprocess_mc_dropout_data(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        feature_names: list[str] | None = None,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        x_raw = ensure_2d(np.asarray(features, dtype=float))
+        expected_dim = int(self.config.in_dim)
+        if x_raw.shape[1] != expected_dim:
+            raise ValueError(f"输入维度不匹配：期望 {expected_dim}，实际 {x_raw.shape[1]}")
+
+        names = list(feature_names) if feature_names is not None else [f"feature_{i}" for i in range(x_raw.shape[1])]
+        if len(names) != x_raw.shape[1]:
+            raise ValueError("feature_names 长度与特征维度不一致")
+
+        if use_training_stats and self._has_runtime_stats:
+            mean = np.asarray(self._runtime_feature_mean, dtype=float)
+            std = np.asarray(self._runtime_feature_std, dtype=float)
+            stats_source = "runtime"
+        else:
+            mean = np.mean(x_raw, axis=0)
+            std = np.std(x_raw, axis=0)
+            std = np.where(std > 1e-8, std, 1.0)
+            self._runtime_feature_mean = mean.astype(float)
+            self._runtime_feature_std = std.astype(float)
+            self._has_runtime_stats = True
+            stats_source = "batch"
+
+        x_scaled = (x_raw - mean.reshape(1, -1)) / std.reshape(1, -1)
+        self.feature_names = list(names)
+        return {
+            "raw_features": x_raw,
+            "processed_features": x_scaled,
+            "feature_names": list(names),
+            "scaler": {
+                "mean": [float(v) for v in mean.tolist()],
+                "std": [float(v) for v in std.tolist()],
+                "source": stats_source,
+            },
+            "validation": {
+                "is_valid": True,
+                "sample_count": int(x_raw.shape[0]),
+                "feature_dim": int(x_raw.shape[1]),
+                "stats_source": stats_source,
+            },
+        }
+
+    def predict_mc_dropout(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        t: int = 50,
+        confidence: float = 0.95,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        pre = self.preprocess_mc_dropout_data(features, use_training_stats=use_training_stats)
+        pred = self.predict(
+            np.asarray(pre["processed_features"], dtype=float),
+            t=t,
+            confidence=confidence,
+        )
+        pred["preprocess"] = {
+            "scaler": dict(pre["scaler"]),
+            "validation": dict(pre["validation"]),
+            "feature_names": list(pre["feature_names"]),
+        }
+        return pred

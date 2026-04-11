@@ -1,0 +1,21 @@
+========================================
+模型可解释性增强 - 不确定性量化模型扩展
+========================================
+
+【章节】3. MC Dropout模型适配器（第1部分）
+
+【待办事项列表】
+
+- [x] 实现MC Dropout的LIME适配器
+- [x] 实现MC Dropout的SHAP适配器
+- [x] 封装MC Dropout预测函数
+- [x] 实现MC Dropout数据预处理
+
+【进度】4/4
+
+【相关文件】
+- 模型文件: deep_learning/models/uncertainty/mc_dropout.py
+- 解释服务: services/backend/app/dl_services/
+
+【依赖】
+- 模型特征分析完成
