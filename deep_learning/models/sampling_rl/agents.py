@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
+import time
 from typing import Any, Literal
 
 import numpy as np
@@ -14,6 +16,23 @@ def _softmax(logits: np.ndarray) -> np.ndarray:
     x = x - np.max(x)
     exp = np.exp(x)
     return exp / (np.sum(exp) + 1e-12)
+
+
+def _softmax_batch(logits: np.ndarray) -> np.ndarray:
+    x = np.asarray(logits, dtype=float)
+    if x.ndim == 1:
+        return _softmax(x).reshape(1, -1)
+    x = x - np.max(x, axis=1, keepdims=True)
+    exp = np.exp(x)
+    return exp / (np.sum(exp, axis=1, keepdims=True) + 1e-12)
+
+
+def _array_digest(arr: np.ndarray) -> str:
+    x = np.ascontiguousarray(np.asarray(arr, dtype=float))
+    h = hashlib.sha256()
+    h.update(str(tuple(int(v) for v in x.shape)).encode("utf-8"))
+    h.update(x.tobytes())
+    return h.hexdigest()
 
 
 def flatten_observation(obs: dict[str, np.ndarray]) -> np.ndarray:
@@ -53,6 +72,27 @@ class PPOAgent:
         self.trajectory: list[dict[str, Any]] = []
         self.preprocess_mean: np.ndarray | None = None
         self.preprocess_std: np.ndarray | None = None
+        self._inference_cache: dict[str, dict[str, Any]] = {}
+        self._inference_cache_size = 16
+
+    def _invalidate_inference_cache(self) -> None:
+        self._inference_cache.clear()
+
+    def _cache_get(self, key: str) -> dict[str, Any] | None:
+        found = self._inference_cache.get(key)
+        if found is None:
+            return None
+        # LRU refresh
+        self._inference_cache.pop(key, None)
+        self._inference_cache[key] = found
+        return found
+
+    def _cache_set(self, key: str, value: dict[str, Any]) -> None:
+        self._inference_cache.pop(key, None)
+        self._inference_cache[key] = value
+        if len(self._inference_cache) > int(self._inference_cache_size):
+            oldest = next(iter(self._inference_cache.keys()))
+            self._inference_cache.pop(oldest, None)
 
     def _ensure_params(self, state_dim: int) -> None:
         if self.actor_w is None:
@@ -61,6 +101,7 @@ class PPOAgent:
             self.actor_b = np.zeros((self.action_dim,), dtype=float)
             self.critic_w = self.rng.normal(0.0, scale, size=(state_dim,),)
             self.critic_b = 0.0
+            self._invalidate_inference_cache()
 
     def _policy(self, state_vec: np.ndarray) -> np.ndarray:
         logits = state_vec @ self.actor_w + self.actor_b  # type: ignore[operator]
@@ -188,6 +229,7 @@ class PPOAgent:
             entropy_value = entropy
 
         self.trajectory.clear()
+        self._invalidate_inference_cache()
         return {
             "policy_loss": float(policy_loss_value),
             "value_loss": float(value_loss_value),
@@ -219,6 +261,7 @@ class PPOAgent:
             if loaded_mean.size > 0 and loaded_std.size > 0 and loaded_mean.shape == loaded_std.shape:
                 self.preprocess_mean = loaded_mean
                 self.preprocess_std = np.where(loaded_std < 1e-8, 1.0, loaded_std)
+        self._invalidate_inference_cache()
 
     def preprocess_ppo_data(
         self,
@@ -289,30 +332,49 @@ class PPOAgent:
         *,
         deterministic: bool = True,
     ) -> dict[str, Any]:
+        start = time.perf_counter()
         pre = self.preprocess_ppo_data(observations, use_training_stats=True)
         raw = np.asarray(pre["raw_features"], dtype=float)
         self._ensure_params(int(raw.shape[1]))
+        cache_key = ""
+        if deterministic:
+            cache_key = f"ppo_predict:{_array_digest(raw)}"
+            cached = self._cache_get(cache_key)
+            if cached is not None:
+                out = dict(cached)
+                perf = dict(out.get("performance", {}))
+                perf["cache_hit"] = True
+                perf["latency_ms"] = float((time.perf_counter() - start) * 1000.0)
+                out["performance"] = perf
+                return out
 
-        actions: list[int] = []
-        action_probs: list[float] = []
-        values: list[float] = []
-        entropies: list[float] = []
-        policy_matrix: list[list[float]] = []
+        policy_start = time.perf_counter()
+        logits = raw @ self.actor_w + self.actor_b  # type: ignore[operator]
+        probs_matrix = _softmax_batch(logits)
+        policy_inference_ms = float((time.perf_counter() - policy_start) * 1000.0)
 
-        for row in raw:
-            probs = self._policy(row)
-            action = int(np.argmax(probs)) if deterministic else int(self.rng.choice(np.arange(self.action_dim), p=probs))
-            prob = float(probs[action])
-            value = float(row @ self.critic_w + self.critic_b)  # type: ignore[operator]
-            entropy = -float(np.sum(probs * np.log(probs + 1e-12)))
+        if deterministic:
+            actions_arr = np.argmax(probs_matrix, axis=1).astype(int)
+        else:
+            actions_arr = np.asarray(
+                [int(self.rng.choice(np.arange(self.action_dim), p=p)) for p in probs_matrix],
+                dtype=int,
+            )
 
-            actions.append(action)
-            action_probs.append(prob)
-            values.append(value)
-            entropies.append(entropy)
-            policy_matrix.append([float(x) for x in probs.tolist()])
+        value_start = time.perf_counter()
+        values_arr = raw @ self.critic_w + self.critic_b  # type: ignore[operator]
+        value_inference_ms = float((time.perf_counter() - value_start) * 1000.0)
 
-        return {
+        selected_probs = probs_matrix[np.arange(probs_matrix.shape[0]), actions_arr]
+        entropy_arr = -np.sum(probs_matrix * np.log(probs_matrix + 1e-12), axis=1)
+
+        actions = [int(x) for x in actions_arr.tolist()]
+        action_probs = [float(x) for x in selected_probs.tolist()]
+        values = [float(x) for x in np.asarray(values_arr, dtype=float).reshape(-1).tolist()]
+        entropies = [float(x) for x in np.asarray(entropy_arr, dtype=float).reshape(-1).tolist()]
+        policy_matrix = [[float(v) for v in row] for row in probs_matrix.tolist()]
+
+        result = {
             "action_indices": actions,
             "selected_action_probabilities": action_probs,
             "state_values": values,
@@ -328,7 +390,16 @@ class PPOAgent:
                 "validation": pre["validation"],
                 "feature_names": pre["feature_names"],
             },
+            "performance": {
+                "cache_hit": False,
+                "policy_inference_ms": policy_inference_ms,
+                "value_inference_ms": value_inference_ms,
+                "latency_ms": float((time.perf_counter() - start) * 1000.0),
+            },
         }
+        if deterministic and cache_key:
+            self._cache_set(cache_key, result)
+        return result
 
 
 class PrioritizedReplayBuffer:
@@ -413,6 +484,26 @@ class DQNAgent:
         self.action_visit = np.zeros((self.action_dim,), dtype=float)
         self.preprocess_mean: np.ndarray | None = None
         self.preprocess_std: np.ndarray | None = None
+        self._inference_cache: dict[str, dict[str, Any]] = {}
+        self._inference_cache_size = 16
+
+    def _invalidate_inference_cache(self) -> None:
+        self._inference_cache.clear()
+
+    def _cache_get(self, key: str) -> dict[str, Any] | None:
+        found = self._inference_cache.get(key)
+        if found is None:
+            return None
+        self._inference_cache.pop(key, None)
+        self._inference_cache[key] = found
+        return found
+
+    def _cache_set(self, key: str, value: dict[str, Any]) -> None:
+        self._inference_cache.pop(key, None)
+        self._inference_cache[key] = value
+        if len(self._inference_cache) > int(self._inference_cache_size):
+            oldest = next(iter(self._inference_cache.keys()))
+            self._inference_cache.pop(oldest, None)
 
     def _ensure_params(self, state_dim: int) -> None:
         if self.w is not None:
@@ -427,6 +518,7 @@ class DQNAgent:
         self.target_v_w = self.v_w.copy()
         self.v_b = 0.0
         self.target_v_b = 0.0
+        self._invalidate_inference_cache()
 
     def _q_values(self, state: np.ndarray, target: bool = False) -> np.ndarray:
         if target:
@@ -554,6 +646,7 @@ class DQNAgent:
             self.target_v_b = (1.0 - tau) * self.target_v_b + tau * self.v_b
 
         self.epsilon = max(self.config.epsilon_end, self.epsilon * self.config.epsilon_decay)
+        self._invalidate_inference_cache()
 
         return {
             "loss": loss,
@@ -596,6 +689,7 @@ class DQNAgent:
             if loaded_mean.size > 0 and loaded_std.size > 0 and loaded_mean.shape == loaded_std.shape:
                 self.preprocess_mean = loaded_mean
                 self.preprocess_std = np.where(loaded_std < 1e-8, 1.0, loaded_std)
+        self._invalidate_inference_cache()
 
     def preprocess_dqn_data(
         self,
@@ -666,31 +760,51 @@ class DQNAgent:
         *,
         deterministic: bool = True,
     ) -> dict[str, Any]:
+        start = time.perf_counter()
         pre = self.preprocess_dqn_data(observations, use_training_stats=True)
         raw = np.asarray(pre["raw_features"], dtype=float)
         self._ensure_params(int(raw.shape[1]))
+        cache_key = ""
+        if deterministic:
+            cache_key = f"dqn_predict:{self.config.network_type}:{_array_digest(raw)}"
+            cached = self._cache_get(cache_key)
+            if cached is not None:
+                out = dict(cached)
+                perf = dict(out.get("performance", {}))
+                perf["cache_hit"] = True
+                perf["latency_ms"] = float((time.perf_counter() - start) * 1000.0)
+                out["performance"] = perf
+                return out
 
-        actions: list[int] = []
-        selected_q_values: list[float] = []
-        max_q_values: list[float] = []
-        q_matrix: list[list[float]] = []
-        action_probabilities: list[list[float]] = []
+        policy_start = time.perf_counter()
+        q = raw @ self.w + self.b  # type: ignore[operator]
+        if self.config.network_type == "dueling":
+            v = (raw @ self.v_w + self.v_b).reshape(-1, 1)  # type: ignore[operator]
+            q = v + (q - np.mean(q, axis=1, keepdims=True))
+        policy_inference_ms = float((time.perf_counter() - policy_start) * 1000.0)
 
         temp = max(0.1, float(self.epsilon))
-        for row in raw:
-            q = np.asarray(self._q_values(row, target=False), dtype=float).reshape(-1)
-            probs = _softmax(q / temp)
-            if deterministic:
-                action = int(np.argmax(q))
-            else:
-                action = int(self.rng.choice(np.arange(self.action_dim), p=probs))
-            actions.append(action)
-            selected_q_values.append(float(q[action]))
-            max_q_values.append(float(np.max(q)))
-            q_matrix.append([float(x) for x in q.tolist()])
-            action_probabilities.append([float(x) for x in probs.tolist()])
+        probs_matrix = _softmax_batch(q / temp)
+        if deterministic:
+            actions_arr = np.argmax(q, axis=1).astype(int)
+        else:
+            actions_arr = np.asarray(
+                [int(self.rng.choice(np.arange(self.action_dim), p=p)) for p in probs_matrix],
+                dtype=int,
+            )
 
-        return {
+        value_start = time.perf_counter()
+        selected_q_arr = q[np.arange(q.shape[0]), actions_arr]
+        max_q_arr = np.max(q, axis=1)
+        value_inference_ms = float((time.perf_counter() - value_start) * 1000.0)
+
+        actions = [int(x) for x in actions_arr.tolist()]
+        selected_q_values = [float(x) for x in selected_q_arr.tolist()]
+        max_q_values = [float(x) for x in max_q_arr.tolist()]
+        q_matrix = [[float(v) for v in row] for row in q.tolist()]
+        action_probabilities = [[float(v) for v in row] for row in probs_matrix.tolist()]
+
+        result = {
             "action_indices": actions,
             "selected_q_values": selected_q_values,
             "max_q_values": max_q_values,
@@ -706,7 +820,16 @@ class DQNAgent:
                 "validation": pre["validation"],
                 "feature_names": pre["feature_names"],
             },
+            "performance": {
+                "cache_hit": False,
+                "policy_inference_ms": policy_inference_ms,
+                "value_inference_ms": value_inference_ms,
+                "latency_ms": float((time.perf_counter() - start) * 1000.0),
+            },
         }
+        if deterministic and cache_key:
+            self._cache_set(cache_key, result)
+        return result
 
 
 @dataclass
@@ -735,6 +858,26 @@ class ActorCriticAgent:
         self.buffer: list[dict[str, Any]] = []
         self.preprocess_mean: np.ndarray | None = None
         self.preprocess_std: np.ndarray | None = None
+        self._inference_cache: dict[str, dict[str, Any]] = {}
+        self._inference_cache_size = 16
+
+    def _invalidate_inference_cache(self) -> None:
+        self._inference_cache.clear()
+
+    def _cache_get(self, key: str) -> dict[str, Any] | None:
+        found = self._inference_cache.get(key)
+        if found is None:
+            return None
+        self._inference_cache.pop(key, None)
+        self._inference_cache[key] = found
+        return found
+
+    def _cache_set(self, key: str, value: dict[str, Any]) -> None:
+        self._inference_cache.pop(key, None)
+        self._inference_cache[key] = value
+        if len(self._inference_cache) > int(self._inference_cache_size):
+            oldest = next(iter(self._inference_cache.keys()))
+            self._inference_cache.pop(oldest, None)
 
     def _ensure_params(self, state_dim: int) -> None:
         if self.actor_w is not None:
@@ -744,6 +887,7 @@ class ActorCriticAgent:
         self.actor_b = np.zeros((self.action_dim,), dtype=float)
         self.critic_w = self.rng.normal(0.0, scale, size=(state_dim,))
         self.critic_b = 0.0
+        self._invalidate_inference_cache()
 
     def select_action(self, observation: dict[str, np.ndarray], deterministic: bool = False) -> tuple[int, float]:
         state = flatten_observation(observation)
@@ -824,6 +968,7 @@ class ActorCriticAgent:
         self.critic_b -= self.config.learning_rate_critic * critic_scale * grad_critic_b
 
         self.buffer.clear()
+        self._invalidate_inference_cache()
         return {
             "actor_loss": actor_loss,
             "critic_loss": critic_loss,
@@ -836,7 +981,9 @@ class ActorCriticAgent:
         for trace in episodes_results:
             merged.extend(trace)
         self.buffer = merged
-        return self.train_sync()
+        out = self.train_sync()
+        self._invalidate_inference_cache()
+        return out
 
     def preprocess_a2c_data(
         self,
@@ -907,30 +1054,49 @@ class ActorCriticAgent:
         *,
         deterministic: bool = True,
     ) -> dict[str, Any]:
+        start = time.perf_counter()
         pre = self.preprocess_a2c_data(observations, use_training_stats=True)
         raw = np.asarray(pre["raw_features"], dtype=float)
         self._ensure_params(int(raw.shape[1]))
+        cache_key = ""
+        if deterministic:
+            cache_key = f"a2c_predict:{_array_digest(raw)}"
+            cached = self._cache_get(cache_key)
+            if cached is not None:
+                out = dict(cached)
+                perf = dict(out.get("performance", {}))
+                perf["cache_hit"] = True
+                perf["latency_ms"] = float((time.perf_counter() - start) * 1000.0)
+                out["performance"] = perf
+                return out
 
-        actions: list[int] = []
-        action_probs: list[float] = []
-        values: list[float] = []
-        entropies: list[float] = []
-        policy_matrix: list[list[float]] = []
+        policy_start = time.perf_counter()
+        logits = raw @ self.actor_w + self.actor_b  # type: ignore[operator]
+        probs_matrix = _softmax_batch(logits)
+        policy_inference_ms = float((time.perf_counter() - policy_start) * 1000.0)
 
-        for row in raw:
-            probs = _softmax(row @ self.actor_w + self.actor_b)  # type: ignore[operator]
-            action = int(np.argmax(probs)) if deterministic else int(self.rng.choice(np.arange(self.action_dim), p=probs))
-            prob = float(probs[action])
-            value = float(row @ self.critic_w + self.critic_b)  # type: ignore[operator]
-            entropy = -float(np.sum(probs * np.log(probs + 1e-12)))
+        if deterministic:
+            actions_arr = np.argmax(probs_matrix, axis=1).astype(int)
+        else:
+            actions_arr = np.asarray(
+                [int(self.rng.choice(np.arange(self.action_dim), p=p)) for p in probs_matrix],
+                dtype=int,
+            )
 
-            actions.append(action)
-            action_probs.append(prob)
-            values.append(value)
-            entropies.append(entropy)
-            policy_matrix.append([float(x) for x in probs.tolist()])
+        value_start = time.perf_counter()
+        values_arr = raw @ self.critic_w + self.critic_b  # type: ignore[operator]
+        value_inference_ms = float((time.perf_counter() - value_start) * 1000.0)
 
-        return {
+        selected_probs = probs_matrix[np.arange(probs_matrix.shape[0]), actions_arr]
+        entropy_arr = -np.sum(probs_matrix * np.log(probs_matrix + 1e-12), axis=1)
+
+        actions = [int(x) for x in actions_arr.tolist()]
+        action_probs = [float(x) for x in selected_probs.tolist()]
+        values = [float(x) for x in np.asarray(values_arr, dtype=float).reshape(-1).tolist()]
+        entropies = [float(x) for x in np.asarray(entropy_arr, dtype=float).reshape(-1).tolist()]
+        policy_matrix = [[float(v) for v in row] for row in probs_matrix.tolist()]
+
+        result = {
             "action_indices": actions,
             "selected_action_probabilities": action_probs,
             "state_values": values,
@@ -946,7 +1112,16 @@ class ActorCriticAgent:
                 "validation": pre["validation"],
                 "feature_names": pre["feature_names"],
             },
+            "performance": {
+                "cache_hit": False,
+                "policy_inference_ms": policy_inference_ms,
+                "value_inference_ms": value_inference_ms,
+                "latency_ms": float((time.perf_counter() - start) * 1000.0),
+            },
         }
+        if deterministic and cache_key:
+            self._cache_set(cache_key, result)
+        return result
 
     def save(self, path: str) -> None:
         if self.actor_w is None or self.actor_b is None or self.critic_w is None:
@@ -973,6 +1148,7 @@ class ActorCriticAgent:
             if loaded_mean.size > 0 and loaded_std.size > 0 and loaded_mean.shape == loaded_std.shape:
                 self.preprocess_mean = loaded_mean
                 self.preprocess_std = np.where(loaded_std < 1e-8, 1.0, loaded_std)
+        self._invalidate_inference_cache()
 
 
 def save_agent(agent: Any, path: str) -> None:

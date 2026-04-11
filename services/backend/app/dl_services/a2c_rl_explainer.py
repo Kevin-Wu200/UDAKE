@@ -74,6 +74,7 @@ class _A2CBaseAdapter:
             "state_values": np.asarray(pred["state_values"], dtype=float).reshape(-1),
             "policy_entropy": np.asarray(pred.get("policy_entropy", []), dtype=float).reshape(-1),
             "action_probabilities": np.asarray(pred.get("action_probabilities", []), dtype=float),
+            "predict_performance": dict(pred.get("performance", {})),
         }
 
     def _build_context(self, model: Any, observations: list[dict[str, np.ndarray]] | np.ndarray) -> dict[str, Any]:
@@ -88,6 +89,7 @@ class _A2CBaseAdapter:
         state_values = np.asarray(pred["state_values"], dtype=float)
         policy_entropy = np.asarray(pred["policy_entropy"], dtype=float)
         action_probabilities = np.asarray(pred["action_probabilities"], dtype=float)
+        predict_performance = dict(pred.get("predict_performance", {}))
 
         policy_surrogate = Ridge(alpha=1.0, random_state=self.config.random_state)
         policy_surrogate.fit(x_scaled, selected_probs)
@@ -126,6 +128,7 @@ class _A2CBaseAdapter:
                 "scaler": pre["scaler"],
                 "validation": pre["validation"],
             },
+            "predict_performance": predict_performance,
         }
 
     def _select_explained_nodes(self, target: np.ndarray, max_explain_nodes: int) -> np.ndarray:
@@ -429,6 +432,11 @@ class A2CLIMEAdapter(_A2CBaseAdapter):
                 "sample_count": int(context["sample_count"]),
                 "feature_dim": int(context["feature_dim"]),
                 "action_dim": int(context["action_dim"]),
+                "policy_inference_ms": _safe_float(context.get("predict_performance", {}).get("policy_inference_ms", 0.0)),
+                "value_inference_ms": _safe_float(context.get("predict_performance", {}).get("value_inference_ms", 0.0)),
+                "model_predict_cache_hit": bool(context.get("predict_performance", {}).get("cache_hit", False)),
+                "latency_target_ms": 15000.0,
+                "meets_latency_target": float((time.perf_counter() - start) * 1000.0) < 15000.0,
             },
         }
         self._cache_set(cache_key, result)
@@ -565,6 +573,11 @@ class A2CSHAPAdapter(_A2CBaseAdapter):
                 "sample_count": int(context["sample_count"]),
                 "feature_dim": int(context["feature_dim"]),
                 "action_dim": int(context["action_dim"]),
+                "policy_inference_ms": _safe_float(context.get("predict_performance", {}).get("policy_inference_ms", 0.0)),
+                "value_inference_ms": _safe_float(context.get("predict_performance", {}).get("value_inference_ms", 0.0)),
+                "model_predict_cache_hit": bool(context.get("predict_performance", {}).get("cache_hit", False)),
+                "latency_target_ms": 15000.0,
+                "meets_latency_target": float((time.perf_counter() - start) * 1000.0) < 15000.0,
             },
             "explainer": {
                 "backend": "shap" if shap_module is not None else "surrogate_linear",
