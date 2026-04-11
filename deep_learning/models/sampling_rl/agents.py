@@ -411,6 +411,8 @@ class DQNAgent:
         self.epsilon = float(self.config.epsilon_start)
         self.step_counter = 0
         self.action_visit = np.zeros((self.action_dim,), dtype=float)
+        self.preprocess_mean: np.ndarray | None = None
+        self.preprocess_std: np.ndarray | None = None
 
     def _ensure_params(self, state_dim: int) -> None:
         if self.w is not None:
@@ -573,6 +575,8 @@ class DQNAgent:
             target_v_w=self.target_v_w,
             target_v_b=np.array([self.target_v_b], dtype=float),
             epsilon=np.array([self.epsilon], dtype=float),
+            preprocess_mean=np.asarray(self.preprocess_mean if self.preprocess_mean is not None else np.array([], dtype=float), dtype=float),
+            preprocess_std=np.asarray(self.preprocess_std if self.preprocess_std is not None else np.array([], dtype=float), dtype=float),
         )
 
     def load(self, path: str) -> None:
@@ -586,6 +590,123 @@ class DQNAgent:
         self.target_v_w = np.asarray(data["target_v_w"], dtype=float)
         self.target_v_b = float(np.asarray(data["target_v_b"], dtype=float).reshape(-1)[0])
         self.epsilon = float(np.asarray(data["epsilon"], dtype=float).reshape(-1)[0])
+        if "preprocess_mean" in data and "preprocess_std" in data:
+            loaded_mean = np.asarray(data["preprocess_mean"], dtype=float).reshape(-1)
+            loaded_std = np.asarray(data["preprocess_std"], dtype=float).reshape(-1)
+            if loaded_mean.size > 0 and loaded_std.size > 0 and loaded_mean.shape == loaded_std.shape:
+                self.preprocess_mean = loaded_mean
+                self.preprocess_std = np.where(loaded_std < 1e-8, 1.0, loaded_std)
+
+    def preprocess_dqn_data(
+        self,
+        observations: list[dict[str, np.ndarray]] | np.ndarray,
+        *,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        if isinstance(observations, np.ndarray):
+            raw = np.asarray(observations, dtype=float)
+            if raw.ndim == 1:
+                raw = raw.reshape(1, -1)
+        else:
+            if not observations:
+                raise ValueError("observations 不能为空")
+            rows = [flatten_observation(obs).astype(float).reshape(-1) for obs in observations]
+            dim = int(rows[0].shape[0])
+            for i, row in enumerate(rows[1:], start=1):
+                if int(row.shape[0]) != dim:
+                    raise ValueError(f"第{i}条观测维度不一致: {int(row.shape[0])} != {dim}")
+            raw = np.stack(rows, axis=0)
+
+        if raw.ndim != 2 or raw.shape[0] == 0 or raw.shape[1] == 0:
+            raise ValueError("observations 必须可转换为二维特征矩阵")
+
+        mean_runtime = np.mean(raw, axis=0)
+        std_runtime = np.std(raw, axis=0)
+        std_runtime = np.where(std_runtime < 1e-8, 1.0, std_runtime)
+
+        scaler_source = "runtime"
+        mean = mean_runtime
+        std = std_runtime
+        if use_training_stats and self.preprocess_mean is not None and self.preprocess_std is not None:
+            if self.preprocess_mean.shape == mean_runtime.shape and self.preprocess_std.shape == std_runtime.shape:
+                mean = self.preprocess_mean
+                std = np.where(self.preprocess_std < 1e-8, 1.0, self.preprocess_std)
+                scaler_source = "trained"
+            else:
+                scaler_source = "runtime_fallback"
+        elif use_training_stats and (self.preprocess_mean is not None or self.preprocess_std is not None):
+            scaler_source = "runtime_fallback"
+
+        if self.preprocess_mean is None or self.preprocess_std is None:
+            self.preprocess_mean = mean_runtime
+            self.preprocess_std = std_runtime
+
+        scaled = (raw - mean) / std
+        feature_names = [f"state_feature_{i}" for i in range(raw.shape[1])]
+        return {
+            "raw_features": raw,
+            "processed_features": scaled,
+            "feature_names": feature_names,
+            "scaler": {
+                "source": scaler_source,
+                "mean": mean.tolist(),
+                "std": std.tolist(),
+            },
+            "validation": {
+                "is_valid": True,
+                "n_samples": int(raw.shape[0]),
+                "feature_dim": int(raw.shape[1]),
+                "zero_variance_feature_indices": np.where(np.std(raw, axis=0) < 1e-8)[0].astype(int).tolist(),
+            },
+        }
+
+    def predict_dqn(
+        self,
+        observations: list[dict[str, np.ndarray]] | np.ndarray,
+        *,
+        deterministic: bool = True,
+    ) -> dict[str, Any]:
+        pre = self.preprocess_dqn_data(observations, use_training_stats=True)
+        raw = np.asarray(pre["raw_features"], dtype=float)
+        self._ensure_params(int(raw.shape[1]))
+
+        actions: list[int] = []
+        selected_q_values: list[float] = []
+        max_q_values: list[float] = []
+        q_matrix: list[list[float]] = []
+        action_probabilities: list[list[float]] = []
+
+        temp = max(0.1, float(self.epsilon))
+        for row in raw:
+            q = np.asarray(self._q_values(row, target=False), dtype=float).reshape(-1)
+            probs = _softmax(q / temp)
+            if deterministic:
+                action = int(np.argmax(q))
+            else:
+                action = int(self.rng.choice(np.arange(self.action_dim), p=probs))
+            actions.append(action)
+            selected_q_values.append(float(q[action]))
+            max_q_values.append(float(np.max(q)))
+            q_matrix.append([float(x) for x in q.tolist()])
+            action_probabilities.append([float(x) for x in probs.tolist()])
+
+        return {
+            "action_indices": actions,
+            "selected_q_values": selected_q_values,
+            "max_q_values": max_q_values,
+            "q_values": q_matrix,
+            "action_probabilities": action_probabilities,
+            "prediction": {
+                "action_indices": actions,
+                "selected_q_values": selected_q_values,
+                "max_q_values": max_q_values,
+            },
+            "preprocess": {
+                "scaler": pre["scaler"],
+                "validation": pre["validation"],
+                "feature_names": pre["feature_names"],
+            },
+        }
 
 
 @dataclass
