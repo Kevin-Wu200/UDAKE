@@ -231,6 +231,74 @@ def test_api_sampling_rl_routes() -> None:
     assert "policy_decision" in payload["recommendation"]["explanations"]
 
 
+def test_service_sampling_rl_train_and_recommend_a2c() -> None:
+    service = DeepLearningService()
+    uncertainty = _uncertainty_map(size=10)
+
+    train = service.train_sampling_rl(
+        model_name="a2c",
+        uncertainty_map=uncertainty,
+        existing_points=[[0.12, 0.16], [0.72, 0.64]],
+        episodes=8,
+        budget=12,
+    )
+    assert train["model_name"] == "a2c"
+    assert train["training"]["summary"]["episodes"] >= 1
+
+    rec = service.recommend_sampling_rl(
+        model_name="a2c",
+        uncertainty_map=uncertainty,
+        existing_points=[[0.12, 0.16], [0.72, 0.64]],
+        n_recommendations=6,
+        fusion_strategy="hybrid",
+        realtime=True,
+    )
+    assert rec["model_name"] == "a2c"
+    assert len(rec["recommendation"]["recommendations"]) >= 1
+    assert "explanations" in rec["recommendation"]
+    assert "policy_decision" in rec["recommendation"]["explanations"]
+    assert "optimization" in rec
+
+
+def test_api_sampling_rl_routes_a2c() -> None:
+    app = FastAPI()
+    app.include_router(router, prefix="/api")
+    client = TestClient(app)
+
+    uncertainty = _uncertainty_map(size=10)
+
+    train_resp = client.post(
+        "/api/dl/sampling-rl/train",
+        json={
+            "model_name": "a2c",
+            "uncertainty_map": uncertainty,
+            "existing_points": [[0.18, 0.22], [0.66, 0.58]],
+            "episodes": 8,
+            "budget": 12,
+        },
+    )
+    assert train_resp.status_code == 200
+    assert train_resp.json()["model_name"] == "a2c"
+
+    rec_resp = client.post(
+        "/api/dl/sampling-rl/recommend",
+        json={
+            "model_name": "a2c",
+            "uncertainty_map": uncertainty,
+            "existing_points": [[0.18, 0.22], [0.66, 0.58]],
+            "n_recommendations": 5,
+            "fusion_strategy": "hybrid",
+            "realtime": True,
+        },
+    )
+    assert rec_resp.status_code == 200
+    payload = rec_resp.json()
+    assert payload["model_name"] == "a2c"
+    assert len(payload["recommendation"]["recommendations"]) >= 1
+    assert "explanations" in payload["recommendation"]
+    assert "policy_decision" in payload["recommendation"]["explanations"]
+
+
 def test_service_spatiotemporal_train_predict_and_online_update() -> None:
     service = DeepLearningService()
     coords = _spatiotemporal_coords(10)
