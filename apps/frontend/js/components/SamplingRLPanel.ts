@@ -108,6 +108,39 @@ export class SamplingRLPanel {
                         </article>
                     </div>
                 </section>
+
+                <section class="dl-rl-visualizations dl-rl-visualizations-phase2">
+                    <h5>强化学习可视化组件（第2部分）</h5>
+                    <div class="dl-rl-viz-grid">
+                        <article class="dl-rl-viz-card">
+                            <h6>采样点地图</h6>
+                            <div id="dl-rl-sampling-point-map" class="dl-rl-viz-body">
+                                <div class="status-message">暂无可视化数据</div>
+                            </div>
+                        </article>
+
+                        <article class="dl-rl-viz-card">
+                            <h6>策略变化趋势图</h6>
+                            <div id="dl-rl-strategy-trend" class="dl-rl-viz-body">
+                                <div class="status-message">暂无可视化数据</div>
+                            </div>
+                        </article>
+
+                        <article class="dl-rl-viz-card">
+                            <h6>价值函数等高线图</h6>
+                            <div id="dl-rl-value-contour" class="dl-rl-viz-body">
+                                <div class="status-message">暂无可视化数据</div>
+                            </div>
+                        </article>
+
+                        <article class="dl-rl-viz-card">
+                            <h6>探索轨迹可视化</h6>
+                            <div id="dl-rl-exploration-trajectory" class="dl-rl-viz-body">
+                                <div class="status-message">暂无可视化数据</div>
+                            </div>
+                        </article>
+                    </div>
+                </section>
             </div>
         `;
     }
@@ -225,11 +258,24 @@ export class SamplingRLPanel {
     }
 
     private renderVisualizations(data: unknown): void {
-        const payload = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
-        this.renderPolicyDistribution(payload);
-        this.renderActionValueHeatmap(payload);
-        this.renderRewardBreakdown(payload);
-        this.renderStateActionTrajectory(payload);
+        const rootPayload = (data && typeof data === 'object' ? data : {}) as Record<string, unknown>;
+        const recommendationPayload = this.extractRecommendationPayload(rootPayload);
+        this.renderPolicyDistribution(recommendationPayload);
+        this.renderActionValueHeatmap(recommendationPayload);
+        this.renderRewardBreakdown(recommendationPayload);
+        this.renderStateActionTrajectory(recommendationPayload);
+        this.renderSamplingPointMap(recommendationPayload);
+        this.renderStrategyTrend(rootPayload, recommendationPayload);
+        this.renderValueFunctionContour(recommendationPayload);
+        this.renderExplorationTrajectory(recommendationPayload);
+    }
+
+    private extractRecommendationPayload(rootPayload: Record<string, unknown>): Record<string, unknown> {
+        const nested = this.getRecord(rootPayload.recommendation);
+        if (Object.keys(nested).length > 0) {
+            return nested;
+        }
+        return rootPayload;
     }
 
     private renderPolicyDistribution(payload: Record<string, unknown>): void {
@@ -477,6 +523,230 @@ export class SamplingRLPanel {
                 }).join('')}
             </svg>
             <div class="dl-rl-viz-footnote">轨迹点数 ${points.length} · 网格 ${maxRow + 1}×${maxCol + 1}</div>
+        `;
+    }
+
+    private renderSamplingPointMap(payload: Record<string, unknown>): void {
+        const container = this.container.querySelector('#dl-rl-sampling-point-map') as HTMLElement | null;
+        if (!container) {
+            return;
+        }
+        const recommendations = (Array.isArray(payload.recommendations) ? payload.recommendations : [])
+            .map((item) => this.getRecord(item))
+            .map((item) => ({
+                x: Number(item.x),
+                y: Number(item.y),
+                source: String(item.source || 'unknown'),
+                score: Number(item.score || 0)
+            }))
+            .filter((item) => Number.isFinite(item.x) && Number.isFinite(item.y));
+        const mapData = this.lastUncertaintyMap.length ? this.lastUncertaintyMap : [[1]];
+        const rows = mapData.length;
+        const cols = mapData[0]?.length || 1;
+        const width = 320;
+        const height = 210;
+        const padding = 16;
+        const gridWidth = width - padding * 2;
+        const gridHeight = height - padding * 2;
+        const flatValues = mapData.flat().filter((value) => Number.isFinite(value));
+        const minValue = flatValues.length ? Math.min(...flatValues) : 0;
+        const maxValue = flatValues.length ? Math.max(...flatValues) : 1;
+        const span = Math.max(1e-8, maxValue - minValue);
+        const cellWidth = gridWidth / Math.max(1, cols);
+        const cellHeight = gridHeight / Math.max(1, rows);
+        const scaleX = (x: number) => padding + Math.max(0, Math.min(1, x)) * gridWidth;
+        const scaleY = (y: number) => padding + Math.max(0, Math.min(1, y)) * gridHeight;
+
+        const heatCells = mapData.map((row, r) => row.map((value, c) => {
+            const normalized = (value - minValue) / span;
+            const alpha = 0.12 + normalized * 0.68;
+            return `<rect x="${(padding + c * cellWidth).toFixed(2)}" y="${(padding + r * cellHeight).toFixed(2)}" width="${cellWidth.toFixed(2)}" height="${cellHeight.toFixed(2)}" fill="rgba(14,165,233,${alpha.toFixed(3)})"></rect>`;
+        }).join('')).join('');
+
+        const existingPoints = this.lastExistingPoints
+            .map((point) => ({ x: Number(point[0]), y: Number(point[1]) }))
+            .filter((point) => Number.isFinite(point.x) && Number.isFinite(point.y))
+            .map((point) => `<circle class="dl-rl-map-existing" cx="${scaleX(point.x).toFixed(2)}" cy="${scaleY(point.y).toFixed(2)}" r="4"></circle>`)
+            .join('');
+
+        const recPoints = recommendations
+            .map((point, idx) => {
+                const cls = point.source === 'rl' ? 'rl' : 'rule';
+                return `
+                    <g class="dl-rl-map-recommend ${cls}">
+                        <circle cx="${scaleX(point.x).toFixed(2)}" cy="${scaleY(point.y).toFixed(2)}" r="4.6"></circle>
+                        <text x="${(scaleX(point.x) + 6).toFixed(2)}" y="${(scaleY(point.y) - 5).toFixed(2)}">${idx + 1}</text>
+                    </g>
+                `;
+            })
+            .join('');
+
+        container.innerHTML = `
+            <svg class="dl-rl-map-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="采样点地图">
+                <rect x="1" y="1" width="${width - 2}" height="${height - 2}" class="dl-rl-map-frame"></rect>
+                ${heatCells}
+                ${existingPoints}
+                ${recPoints}
+            </svg>
+            <div class="dl-rl-viz-footnote">已有点 ${this.lastExistingPoints.length} · 推荐点 ${recommendations.length}</div>
+        `;
+    }
+
+    private renderStrategyTrend(rootPayload: Record<string, unknown>, recommendationPayload: Record<string, unknown>): void {
+        const container = this.container.querySelector('#dl-rl-strategy-trend') as HTMLElement | null;
+        if (!container) {
+            return;
+        }
+        const optimization = this.getRecord(rootPayload.optimization);
+        const strategyScores = this.getRecord(optimization.strategy_scores);
+        const entries = Object.entries(strategyScores)
+            .map(([key, value]) => ({ key, value: Number(value) }))
+            .filter((item) => Number.isFinite(item.value));
+
+        if (entries.length > 0) {
+            const maxValue = Math.max(...entries.map((item) => item.value), 1e-6);
+            container.innerHTML = `
+                <div class="dl-rl-strategy-bars">
+                    ${entries.map((item) => {
+                        const label = item.key === 'rl_only' ? 'RL' : item.key === 'rule_only' ? 'Rule' : 'Hybrid';
+                        const width = Math.max(3, Math.round((item.value / maxValue) * 100));
+                        return `
+                            <div class="dl-rl-strategy-bar-item">
+                                <span class="dl-rl-strategy-label">${label}</span>
+                                <div class="dl-rl-strategy-track"><div class="dl-rl-strategy-fill" style="width:${width}%"></div></div>
+                                <span class="dl-rl-strategy-value">${item.value.toFixed(4)}</span>
+                            </div>
+                        `;
+                    }).join('')}
+                </div>
+                <div class="dl-rl-viz-footnote">最优策略：${this.escapeHtml(String(optimization.best_strategy || 'unknown'))}</div>
+            `;
+            return;
+        }
+
+        const trainingSummary = this.getRecord(recommendationPayload.training_summary);
+        const points = [
+            Number(trainingSummary.mean_reward),
+            Number(trainingSummary.best_reward),
+            Number(trainingSummary.final_reward)
+        ].filter((item) => Number.isFinite(item));
+        if (points.length === 0) {
+            container.innerHTML = '<div class="status-message">暂无策略趋势数据</div>';
+            return;
+        }
+        const width = 300;
+        const height = 180;
+        const padding = 20;
+        const maxV = Math.max(...points, 1e-6);
+        const minV = Math.min(...points);
+        const span = Math.max(1e-8, maxV - minV);
+        const scaleX = (idx: number) => padding + (idx / Math.max(1, points.length - 1)) * (width - padding * 2);
+        const scaleY = (v: number) => padding + (1 - (v - minV) / span) * (height - padding * 2);
+        const path = points.map((value, idx) => `${idx === 0 ? 'M' : 'L'} ${scaleX(idx).toFixed(2)} ${scaleY(value).toFixed(2)}`).join(' ');
+        container.innerHTML = `
+            <svg class="dl-rl-trend-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="策略趋势图">
+                <path d="${path}" class="dl-rl-trend-line"></path>
+                ${points.map((value, idx) => `<circle class="dl-rl-trend-point" cx="${scaleX(idx).toFixed(2)}" cy="${scaleY(value).toFixed(2)}" r="4"></circle>`).join('')}
+            </svg>
+            <div class="dl-rl-viz-footnote">使用训练摘要近似趋势：均值/最佳/最终奖励</div>
+        `;
+    }
+
+    private renderValueFunctionContour(payload: Record<string, unknown>): void {
+        const container = this.container.querySelector('#dl-rl-value-contour') as HTMLElement | null;
+        if (!container) {
+            return;
+        }
+        const explanations = this.getRecord(payload.explanations);
+        const actionValue = this.getRecord(explanations.action_value_visualization);
+        const regionVisualization = this.getRecord(explanations.sampling_region_visualization);
+        const contourSource = Array.isArray(regionVisualization.region_intensity_map)
+            ? regionVisualization.region_intensity_map
+            : actionValue.value_heatmap;
+        const map = this.normalizeHeatmap(Array.isArray(contourSource) ? contourSource : []);
+        if (!map.length) {
+            container.innerHTML = '<div class="status-message">暂无价值函数等高线数据</div>';
+            return;
+        }
+        const width = 320;
+        const height = 210;
+        const padding = 12;
+        const rows = map.length;
+        const cols = map[0]?.length || 1;
+        const cellWidth = (width - padding * 2) / Math.max(1, cols);
+        const cellHeight = (height - padding * 2) / Math.max(1, rows);
+        const flat = map.flat();
+        const minV = Math.min(...flat);
+        const maxV = Math.max(...flat);
+        const span = Math.max(1e-8, maxV - minV);
+        const bands = [0.2, 0.4, 0.6, 0.8];
+        const cells = map.map((row, r) => row.map((value, c) => {
+            const normalized = (value - minV) / span;
+            let band = 0;
+            bands.forEach((threshold, idx) => {
+                if (normalized >= threshold) {
+                    band = idx + 1;
+                }
+            });
+            return `<rect class="dl-rl-contour-band-${band}" x="${(padding + c * cellWidth).toFixed(2)}" y="${(padding + r * cellHeight).toFixed(2)}" width="${cellWidth.toFixed(2)}" height="${cellHeight.toFixed(2)}"></rect>`;
+        }).join('')).join('');
+        container.innerHTML = `
+            <svg class="dl-rl-contour-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="价值函数等高线图">
+                <rect x="1" y="1" width="${width - 2}" height="${height - 2}" class="dl-rl-contour-frame"></rect>
+                ${cells}
+            </svg>
+            <div class="dl-rl-viz-footnote">值域 ${minV.toFixed(4)} - ${maxV.toFixed(4)}</div>
+        `;
+    }
+
+    private renderExplorationTrajectory(payload: Record<string, unknown>): void {
+        const container = this.container.querySelector('#dl-rl-exploration-trajectory') as HTMLElement | null;
+        if (!container) {
+            return;
+        }
+        const explanations = this.getRecord(payload.explanations);
+        const actionValue = this.getRecord(explanations.action_value_visualization);
+        const heatmap = this.normalizeHeatmap(Array.isArray(actionValue.value_heatmap) ? actionValue.value_heatmap : []);
+        const maxRow = Math.max(1, heatmap.length - 1);
+        const maxCol = Math.max(1, (heatmap[0]?.length || 1) - 1);
+        const rawPoints = Array.isArray(actionValue.action_value_points) ? actionValue.action_value_points : [];
+        const points = rawPoints
+            .map((item, idx) => this.getRecord(item))
+            .map((item, idx) => ({
+                rank: Number(item.rank || idx + 1),
+                x: Number.isFinite(Number(item.x))
+                    ? Number(item.x)
+                    : Math.max(0, Math.min(1, Number(item.col) / Math.max(1, maxCol))),
+                y: Number.isFinite(Number(item.y))
+                    ? Number(item.y)
+                    : Math.max(0, Math.min(1, Number(item.row) / Math.max(1, maxRow))),
+                source: String(item.source || 'unknown')
+            }))
+            .filter((item) => Number.isFinite(item.x) && Number.isFinite(item.y))
+            .sort((a, b) => a.rank - b.rank);
+
+        if (!points.length) {
+            container.innerHTML = '<div class="status-message">暂无探索轨迹数据</div>';
+            return;
+        }
+        const width = 320;
+        const height = 210;
+        const padding = 14;
+        const scaleX = (x: number) => padding + Math.max(0, Math.min(1, x)) * (width - padding * 2);
+        const scaleY = (y: number) => padding + Math.max(0, Math.min(1, y)) * (height - padding * 2);
+        const path = points.map((point, idx) => `${idx === 0 ? 'M' : 'L'} ${scaleX(point.x).toFixed(2)} ${scaleY(point.y).toFixed(2)}`).join(' ');
+        container.innerHTML = `
+            <svg class="dl-rl-exploration-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="探索轨迹可视化">
+                <rect x="1" y="1" width="${width - 2}" height="${height - 2}" class="dl-rl-exploration-frame"></rect>
+                <path d="${path}" class="dl-rl-exploration-line"></path>
+                ${points.map((point) => `
+                    <g class="dl-rl-exploration-point ${point.source === 'rl' ? 'rl' : 'rule'}">
+                        <circle cx="${scaleX(point.x).toFixed(2)}" cy="${scaleY(point.y).toFixed(2)}" r="4"></circle>
+                        <text x="${(scaleX(point.x) + 5).toFixed(2)}" y="${(scaleY(point.y) - 4).toFixed(2)}">${point.rank}</text>
+                    </g>
+                `).join('')}
+            </svg>
+            <div class="dl-rl-viz-footnote">探索步数 ${points.length}</div>
         `;
     }
 
