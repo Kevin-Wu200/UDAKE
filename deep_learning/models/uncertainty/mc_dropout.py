@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Sequence
 
 import numpy as np
 
@@ -265,3 +265,239 @@ class MCDropoutRegressor:
             "feature_names": list(pre["feature_names"]),
         }
         return pred
+
+    def _named_parameter_arrays(self) -> list[tuple[str, np.ndarray]]:
+        return [
+            ("hidden.weight", np.asarray(self.w1, dtype=float)),
+            ("hidden.bias", np.asarray(self.b1, dtype=float)),
+            ("mean_head.weight", np.asarray(self.w_mean, dtype=float)),
+            ("mean_head.bias", np.asarray(self.b_mean, dtype=float)),
+            ("logvar_head.weight", np.asarray(self.w_logvar, dtype=float)),
+            ("logvar_head.bias", np.asarray(self.b_logvar, dtype=float)),
+        ]
+
+    def explain_dropout_weights(self, top_k: int = 8) -> dict[str, Any]:
+        """输出 Dropout 相关权重统计，用于权重解释。"""
+        keep_prob = float(max(1e-8, 1.0 - float(self.config.dropout_rate)))
+        summaries: list[dict[str, Any]] = []
+        important_pool: list[tuple[float, str, int, float, float]] = []
+        weak_pool: list[tuple[float, str, int, float, float]] = []
+
+        for name, arr in self._named_parameter_arrays():
+            flat = np.asarray(arr, dtype=float).reshape(-1)
+            abs_flat = np.abs(flat)
+            adjusted = abs_flat * keep_prob
+            sparsity = float(np.mean(abs_flat < 1e-3)) if flat.size else 0.0
+            summaries.append(
+                {
+                    "parameter": name,
+                    "count": int(flat.size),
+                    "shape": [int(v) for v in np.asarray(arr).shape],
+                    "value_stats": {
+                        "mean": float(np.mean(flat)) if flat.size else 0.0,
+                        "std": float(np.std(flat)) if flat.size else 0.0,
+                        "abs_mean": float(np.mean(abs_flat)) if flat.size else 0.0,
+                        "p90_abs": float(np.quantile(abs_flat, 0.9)) if flat.size else 0.0,
+                        "min": float(np.min(flat)) if flat.size else 0.0,
+                        "max": float(np.max(flat)) if flat.size else 0.0,
+                    },
+                    "dropout_effect": {
+                        "dropout_rate": float(self.config.dropout_rate),
+                        "keep_probability": keep_prob,
+                        "adjusted_abs_mean": float(np.mean(adjusted)) if flat.size else 0.0,
+                        "sparsity_ratio": sparsity,
+                    },
+                }
+            )
+            for idx, value in enumerate(flat.tolist()):
+                score = float(abs(value) * keep_prob)
+                important_pool.append((score, name, int(idx), float(value), keep_prob))
+                weak_pool.append((score, name, int(idx), float(value), keep_prob))
+
+        k = max(1, int(top_k))
+        important_pool.sort(key=lambda item: item[0], reverse=True)
+        weak_pool.sort(key=lambda item: item[0])
+        return {
+            "summary": {
+                "parameter_groups": int(len(summaries)),
+                "total_parameter_count": int(sum(item["count"] for item in summaries)),
+                "dropout_type": str(self.config.dropout_type),
+                "dropout_rate": float(self.config.dropout_rate),
+                "keep_probability": keep_prob,
+            },
+            "parameter_summaries": summaries,
+            "top_important_parameters": [
+                {
+                    "parameter": str(name),
+                    "flat_index": int(idx),
+                    "value": float(value),
+                    "adjusted_importance": float(score),
+                    "keep_probability": float(kp),
+                }
+                for score, name, idx, value, kp in important_pool[:k]
+            ],
+            "top_weak_parameters": [
+                {
+                    "parameter": str(name),
+                    "flat_index": int(idx),
+                    "value": float(value),
+                    "adjusted_importance": float(score),
+                    "keep_probability": float(kp),
+                }
+                for score, name, idx, value, kp in weak_pool[:k]
+            ],
+        }
+
+    def analyze_multiple_forward_passes(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        t: int = 80,
+        top_k: int = 8,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        """输出多次前向传播统计，用于稳定性分析。"""
+        pre = self.preprocess_mc_dropout_data(features, use_training_stats=use_training_stats)
+        x_scaled = np.asarray(pre["processed_features"], dtype=float)
+        steps = int(max(2, t))
+        sampled_means = np.zeros((steps, len(x_scaled)), dtype=float)
+        sampled_vars = np.zeros((steps, len(x_scaled)), dtype=float)
+        for i in range(steps):
+            _, _, mean_i, var_i = self._forward(x_scaled, training=False, keep_dropout=True)
+            sampled_means[i] = mean_i
+            sampled_vars[i] = var_i
+
+        pred_mean = np.mean(sampled_means, axis=0)
+        pred_std = np.std(sampled_means, axis=0)
+        epistemic = np.var(sampled_means, axis=0)
+        aleatoric = np.mean(sampled_vars, axis=0)
+        total = np.maximum(epistemic + aleatoric, 1e-8)
+        cv = pred_std / (np.abs(pred_mean) + 1e-8)
+        stability = 1.0 / (1.0 + cv)
+
+        n = int(pred_mean.size)
+        k = min(max(1, int(top_k)), max(1, n))
+        top_idx = np.argsort(pred_std)[::-1][:k] if n > 0 else np.asarray([], dtype=int)
+        corr = float(np.corrcoef(pred_std, epistemic)[0, 1]) if n >= 2 else 0.0
+        if not np.isfinite(corr):
+            corr = 0.0
+
+        return {
+            "summary": {
+                "sample_count": int(n),
+                "forward_passes": int(steps),
+                "mean_prediction_std": float(np.mean(pred_std)) if n > 0 else 0.0,
+                "p90_prediction_std": float(np.quantile(pred_std, 0.9)) if n > 0 else 0.0,
+                "mean_epistemic": float(np.mean(epistemic)) if n > 0 else 0.0,
+                "mean_aleatoric": float(np.mean(aleatoric)) if n > 0 else 0.0,
+                "mean_stability": float(np.mean(stability)) if n > 0 else 0.0,
+                "corr_prediction_std_epistemic": corr,
+            },
+            "top_unstable_samples": [
+                {
+                    "sample_index": int(i),
+                    "prediction_mean": float(pred_mean[int(i)]),
+                    "prediction_std": float(pred_std[int(i)]),
+                    "epistemic": float(epistemic[int(i)]),
+                    "aleatoric": float(aleatoric[int(i)]),
+                    "total_variance": float(total[int(i)]),
+                    "stability_score": float(stability[int(i)]),
+                }
+                for i in top_idx.tolist()
+            ],
+            "forward_pass_metrics": {
+                "per_pass_mean_prediction": [float(v) for v in np.mean(sampled_means, axis=1).tolist()],
+                "per_pass_mean_aleatoric": [float(v) for v in np.mean(sampled_vars, axis=1).tolist()],
+            },
+            "preprocess": {
+                "scaler": dict(pre["scaler"]),
+                "validation": dict(pre["validation"]),
+                "feature_names": list(pre["feature_names"]),
+            },
+        }
+
+    @staticmethod
+    def _moment_skew_kurt(values: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        arr = np.asarray(values, dtype=float)
+        mean = np.mean(arr, axis=0)
+        centered = arr - mean.reshape(1, -1)
+        std = np.std(arr, axis=0)
+        denom3 = np.maximum(std, 1e-8) ** 3
+        denom4 = np.maximum(std, 1e-8) ** 4
+        skew = np.mean(centered ** 3, axis=0) / denom3
+        kurt = np.mean(centered ** 4, axis=0) / denom4 - 3.0
+        skew = np.where(np.isfinite(skew), skew, 0.0)
+        kurt = np.where(np.isfinite(kurt), kurt, 0.0)
+        return skew.astype(float), kurt.astype(float)
+
+    def analyze_prediction_distribution(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        t: int = 80,
+        top_k: int = 8,
+        quantiles: Sequence[float] = (0.05, 0.25, 0.5, 0.75, 0.95),
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        """输出预测分布统计（分位区间/形态）。"""
+        pre = self.preprocess_mc_dropout_data(features, use_training_stats=use_training_stats)
+        x_scaled = np.asarray(pre["processed_features"], dtype=float)
+        steps = int(max(2, t))
+        sampled_means = np.zeros((steps, len(x_scaled)), dtype=float)
+        for i in range(steps):
+            _, _, mean_i, _ = self._forward(x_scaled, training=False, keep_dropout=True)
+            sampled_means[i] = mean_i
+
+        q = np.asarray(list(quantiles), dtype=float)
+        q = np.clip(q, 0.0, 1.0)
+        if q.size == 0:
+            q = np.asarray([0.5], dtype=float)
+
+        q_values = np.quantile(sampled_means, q, axis=0)
+        pred_mean = np.mean(sampled_means, axis=0)
+        pred_std = np.std(sampled_means, axis=0)
+        skew, kurt = self._moment_skew_kurt(sampled_means)
+        q05 = np.quantile(sampled_means, 0.05, axis=0)
+        q95 = np.quantile(sampled_means, 0.95, axis=0)
+        interval_width = q95 - q05
+
+        n = int(pred_mean.size)
+        k = min(max(1, int(top_k)), max(1, n))
+        top_idx = np.argsort(interval_width)[::-1][:k] if n > 0 else np.asarray([], dtype=int)
+
+        return {
+            "summary": {
+                "sample_count": int(n),
+                "forward_passes": int(steps),
+                "mean_predictive_std": float(np.mean(pred_std)) if n > 0 else 0.0,
+                "mean_interval_width_p05_p95": float(np.mean(interval_width)) if n > 0 else 0.0,
+                "p90_interval_width_p05_p95": float(np.quantile(interval_width, 0.9)) if n > 0 else 0.0,
+                "mean_abs_skewness": float(np.mean(np.abs(skew))) if n > 0 else 0.0,
+                "mean_excess_kurtosis": float(np.mean(kurt)) if n > 0 else 0.0,
+            },
+            "quantiles": {
+                f"q{int(v * 100):02d}": [float(x) for x in q_values[i].tolist()]
+                for i, v in enumerate(q.tolist())
+            },
+            "distribution_overview": {
+                f"q{int(v * 100):02d}_mean": float(np.mean(q_values[i])) if q_values.shape[1] > 0 else 0.0
+                for i, v in enumerate(q.tolist())
+            },
+            "top_wide_interval_samples": [
+                {
+                    "sample_index": int(i),
+                    "prediction_mean": float(pred_mean[int(i)]),
+                    "prediction_std": float(pred_std[int(i)]),
+                    "interval_p05_p95": [float(q05[int(i)]), float(q95[int(i)])],
+                    "interval_width_p05_p95": float(interval_width[int(i)]),
+                    "skewness": float(skew[int(i)]),
+                    "excess_kurtosis": float(kurt[int(i)]),
+                }
+                for i in top_idx.tolist()
+            ],
+            "preprocess": {
+                "scaler": dict(pre["scaler"]),
+                "validation": dict(pre["validation"]),
+                "feature_names": list(pre["feature_names"]),
+            },
+        }

@@ -36,8 +36,11 @@ class _BaseMCDropoutAdapter:
         self.config = config or MCDropoutExplanationConfig()
         self._lock = threading.Lock()
         self._result_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._context_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
         self._cache_hits = 0
         self._cache_misses = 0
+        self._context_cache_hits = 0
+        self._context_cache_misses = 0
 
     @staticmethod
     def _load_lime_tabular() -> Any:
@@ -76,14 +79,65 @@ class _BaseMCDropoutAdapter:
             while len(self._result_cache) > max(1, int(self.config.cache_size)):
                 self._result_cache.popitem(last=False)
 
+    def _context_cache_get(self, key: str) -> Optional[dict[str, Any]]:
+        with self._lock:
+            cached = self._context_cache.get(key)
+            if cached is None:
+                self._context_cache_misses += 1
+                return None
+            self._context_cache_hits += 1
+            self._context_cache.move_to_end(key)
+            return copy.deepcopy(cached)
+
+    def _context_cache_set(self, key: str, value: dict[str, Any]) -> None:
+        with self._lock:
+            self._context_cache[key] = copy.deepcopy(value)
+            self._context_cache.move_to_end(key)
+            while len(self._context_cache) > max(1, int(self.config.cache_size)):
+                self._context_cache.popitem(last=False)
+
     def _cache_metrics(self) -> dict[str, float | int]:
         with self._lock:
             total = self._cache_hits + self._cache_misses
+            ctx_total = self._context_cache_hits + self._context_cache_misses
             return {
                 "result_cache_hits": int(self._cache_hits),
                 "result_cache_misses": int(self._cache_misses),
                 "result_cache_hit_rate": float(self._cache_hits / max(1, total)),
+                "context_cache_hits": int(self._context_cache_hits),
+                "context_cache_misses": int(self._context_cache_misses),
+                "context_cache_hit_rate": float(self._context_cache_hits / max(1, ctx_total)),
             }
+
+    @staticmethod
+    def _array_bytes(*arrays: np.ndarray) -> int:
+        total = 0
+        for arr in arrays:
+            try:
+                total += int(np.asarray(arr).nbytes)
+            except Exception:
+                continue
+        return int(total)
+
+    def _feature_fingerprint(self, x: np.ndarray) -> str:
+        arr = np.ascontiguousarray(np.asarray(x, dtype=float))
+        h = hashlib.sha256()
+        h.update(str(tuple(int(v) for v in arr.shape)).encode("utf-8"))
+        h.update(arr.tobytes())
+        return h.hexdigest()
+
+    def _model_fingerprint(self, model: Any) -> str:
+        parts: list[float] = [float(len(getattr(model, "history", [])))]
+        for attr in ("w1", "b1", "w_mean", "b_mean", "w_logvar", "b_logvar"):
+            arr = np.asarray(getattr(model, attr, np.array([0.0])), dtype=float).reshape(-1)
+            if arr.size == 0:
+                continue
+            parts.extend([float(np.mean(arr)), float(np.std(arr)), float(np.mean(np.abs(arr)))])
+        cfg = getattr(model, "config", None)
+        if cfg is not None:
+            parts.append(float(getattr(cfg, "dropout_rate", 0.0)))
+        normalized = ",".join(f"{v:.8f}" for v in parts)
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
     def _build_context(self, model: Any, features: np.ndarray) -> dict[str, Any]:
         x = np.asarray(features, dtype=float)
@@ -116,6 +170,59 @@ class _BaseMCDropoutAdapter:
                 "scaler": dict(pre["scaler"]),
                 "validation": dict(pre["validation"]),
             },
+        }
+
+    def _build_context_cached(self, model: Any, features: np.ndarray) -> tuple[dict[str, Any], bool, float]:
+        x = np.asarray(features, dtype=float)
+        context_key = self._stable_hash(
+            {
+                "feature_hash": self._feature_fingerprint(x),
+                "shape": [int(x.shape[0]), int(x.shape[1]) if x.ndim == 2 else 0],
+                "model_hash": self._model_fingerprint(model),
+                "shap_nsamples": int(self.config.shap_nsamples),
+            }
+        )
+        started = time.perf_counter()
+        cached = self._context_cache_get(context_key)
+        if cached is not None:
+            return cached, True, float((time.perf_counter() - started) * 1000.0)
+
+        built = self._build_context(model=model, features=x)
+        self._context_cache_set(context_key, built)
+        return built, False, float((time.perf_counter() - started) * 1000.0)
+
+    def _mc_dropout_advanced_analysis(
+        self,
+        *,
+        model: Any,
+        features: np.ndarray,
+        top_k: int,
+    ) -> dict[str, Any]:
+        weight = model.explain_dropout_weights(top_k=max(4, int(top_k))) if hasattr(model, "explain_dropout_weights") else {}
+        forward = (
+            model.analyze_multiple_forward_passes(
+                features,
+                t=max(24, int(self.config.shap_nsamples)),
+                top_k=max(4, int(top_k)),
+                use_training_stats=True,
+            )
+            if hasattr(model, "analyze_multiple_forward_passes")
+            else {}
+        )
+        dist = (
+            model.analyze_prediction_distribution(
+                features,
+                t=max(24, int(self.config.shap_nsamples)),
+                top_k=max(4, int(top_k)),
+                use_training_stats=True,
+            )
+            if hasattr(model, "analyze_prediction_distribution")
+            else {}
+        )
+        return {
+            "dropout_weight_analysis": weight,
+            "forward_pass_analysis": forward,
+            "prediction_distribution_analysis": dist,
         }
 
     @staticmethod
@@ -192,7 +299,7 @@ class MCDropoutLIMEAdapter(_BaseMCDropoutAdapter):
             }
             return cached
 
-        context = self._build_context(model=model, features=x)
+        context, context_cache_hit, context_build_ms = self._build_context_cached(model=model, features=x)
         node_indices = self._select_explained_nodes(context["prediction_variance"], explain_nodes)
         predict_fn = self._predict_surrogate(context)
         lime_module = self._load_lime_tabular()
@@ -246,6 +353,14 @@ class MCDropoutLIMEAdapter(_BaseMCDropoutAdapter):
             )
 
         global_importance = np.mean(np.abs(np.asarray(raw_local, dtype=float)), axis=0) if raw_local else np.zeros(0, dtype=float)
+        advanced = self._mc_dropout_advanced_analysis(model=model, features=x, top_k=int(top_k))
+        context_memory_bytes = self._array_bytes(
+            np.asarray(context.get("scaled_x", np.array([])), dtype=np.float32),
+            np.asarray(context.get("prediction_mean", np.array([])), dtype=np.float32),
+            np.asarray(context.get("prediction_variance", np.array([])), dtype=np.float32),
+            np.asarray(context.get("background", np.array([])), dtype=np.float32),
+        )
+        result_memory_bytes = self._array_bytes(np.asarray(raw_local, dtype=np.float32))
         payload = {
             "summary": {
                 "method": "lime",
@@ -256,6 +371,9 @@ class MCDropoutLIMEAdapter(_BaseMCDropoutAdapter):
             },
             "batch_explanations": batch_explanations,
             "global_feature_importance": self._top_features(context["feature_names"], global_importance, len(context["feature_names"])),
+            "dropout_weight_analysis": advanced["dropout_weight_analysis"],
+            "forward_pass_analysis": advanced["forward_pass_analysis"],
+            "prediction_distribution_analysis": advanced["prediction_distribution_analysis"],
             "preprocess": dict(context["preprocess"]),
             "explainer": {
                 "backend": "lime_tabular" if lime_module is not None else "surrogate_linear",
@@ -263,6 +381,14 @@ class MCDropoutLIMEAdapter(_BaseMCDropoutAdapter):
             "performance": {
                 "cache_hit": False,
                 "latency_ms": float((time.perf_counter() - started) * 1000.0),
+                "context_cache_hit": bool(context_cache_hit),
+                "context_build_ms": float(context_build_ms),
+                "sample_count": int(np.asarray(context["scaled_x"]).shape[0]),
+                "feature_dim": int(np.asarray(context["scaled_x"]).shape[1]) if np.asarray(context["scaled_x"]).ndim == 2 else 0,
+                "context_memory_bytes": int(context_memory_bytes),
+                "result_memory_bytes": int(result_memory_bytes),
+                "latency_target_ms": 6000.0,
+                "meets_latency_target": float((time.perf_counter() - started) * 1000.0) < 6000.0,
                 **self._cache_metrics(),
             },
         }
@@ -307,7 +433,7 @@ class MCDropoutSHAPAdapter(_BaseMCDropoutAdapter):
             }
             return cached
 
-        context = self._build_context(model=model, features=x)
+        context, context_cache_hit, context_build_ms = self._build_context_cached(model=model, features=x)
         node_indices = self._select_explained_nodes(context["prediction_variance"], explain_nodes)
         surrogate: Ridge = context["surrogate"]
         baseline = np.asarray(context["baseline"], dtype=float).reshape(-1)
@@ -361,6 +487,14 @@ class MCDropoutSHAPAdapter(_BaseMCDropoutAdapter):
             )
 
         global_importance = np.mean(np.abs(np.asarray(raw_values, dtype=float)), axis=0) if raw_values else np.zeros(0, dtype=float)
+        advanced = self._mc_dropout_advanced_analysis(model=model, features=x, top_k=int(top_k))
+        context_memory_bytes = self._array_bytes(
+            np.asarray(context.get("scaled_x", np.array([])), dtype=np.float32),
+            np.asarray(context.get("prediction_mean", np.array([])), dtype=np.float32),
+            np.asarray(context.get("prediction_variance", np.array([])), dtype=np.float32),
+            np.asarray(context.get("background", np.array([])), dtype=np.float32),
+        )
+        result_memory_bytes = self._array_bytes(np.asarray(raw_values, dtype=np.float32))
         payload = {
             "summary": {
                 "method": "shap",
@@ -371,6 +505,9 @@ class MCDropoutSHAPAdapter(_BaseMCDropoutAdapter):
             },
             "batch_explanations": batch_explanations,
             "global_feature_importance": self._top_features(context["feature_names"], global_importance, len(context["feature_names"])),
+            "dropout_weight_analysis": advanced["dropout_weight_analysis"],
+            "forward_pass_analysis": advanced["forward_pass_analysis"],
+            "prediction_distribution_analysis": advanced["prediction_distribution_analysis"],
             "preprocess": dict(context["preprocess"]),
             "explainer": {
                 "backend": "shap" if shap_module is not None else "surrogate_linear",
@@ -379,6 +516,14 @@ class MCDropoutSHAPAdapter(_BaseMCDropoutAdapter):
             "performance": {
                 "cache_hit": False,
                 "latency_ms": float((time.perf_counter() - started) * 1000.0),
+                "context_cache_hit": bool(context_cache_hit),
+                "context_build_ms": float(context_build_ms),
+                "sample_count": int(np.asarray(context["scaled_x"]).shape[0]),
+                "feature_dim": int(np.asarray(context["scaled_x"]).shape[1]) if np.asarray(context["scaled_x"]).ndim == 2 else 0,
+                "context_memory_bytes": int(context_memory_bytes),
+                "result_memory_bytes": int(result_memory_bytes),
+                "latency_target_ms": 6000.0,
+                "meets_latency_target": float((time.perf_counter() - started) * 1000.0) < 6000.0,
                 **self._cache_metrics(),
             },
         }
