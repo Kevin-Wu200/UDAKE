@@ -415,3 +415,198 @@ class DeepEnsembleRegressor:
                 }
             )
         return records
+
+    @staticmethod
+    def _normalized_member_weights(
+        ids: list[str],
+        member_weights: dict[str, float] | None = None,
+    ) -> np.ndarray:
+        if not ids:
+            return np.zeros(0, dtype=float)
+        if not member_weights:
+            return np.ones(len(ids), dtype=float) / float(len(ids))
+        raw = np.asarray([float(member_weights.get(mid, 0.0)) for mid in ids], dtype=float)
+        raw = np.maximum(raw, 1e-8)
+        return raw / np.sum(raw)
+
+    def explain_member_contributions(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        aggregation: EnsembleAgg = "mean",
+        member_weights: dict[str, float] | None = None,
+        top_k: int = 6,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        pre = self.preprocess_deep_ensemble_data(features, use_training_stats=use_training_stats)
+        x_scaled = np.asarray(pre["processed_features"], dtype=float)
+        means, vars_, ids = self._collect_predictions(x_scaled)
+        weights = self._normalized_member_weights(ids, member_weights if aggregation == "weighted" else None)
+        ensemble_mean = np.sum(means * weights[:, None], axis=0)
+
+        summaries: list[dict[str, Any]] = []
+        member_pool: list[tuple[float, str, float, float]] = []
+        for i, mid in enumerate(ids):
+            pred = np.asarray(means[i], dtype=float)
+            var = np.asarray(vars_[i], dtype=float)
+            deviation = pred - ensemble_mean
+            abs_dev = np.abs(deviation)
+            mean_abs_dev = float(np.mean(abs_dev)) if abs_dev.size else 0.0
+            rmse_to_ensemble = float(np.sqrt(np.mean(deviation ** 2))) if deviation.size else 0.0
+            pred_std = float(np.std(pred)) if pred.size else 0.0
+            weight = float(weights[i])
+            contribution_score = float(weight * mean_abs_dev)
+            member_pool.append((contribution_score, str(mid), weight, mean_abs_dev))
+            summaries.append(
+                {
+                    "member_id": str(mid),
+                    "weight": weight,
+                    "prediction_mean": float(np.mean(pred)) if pred.size else 0.0,
+                    "prediction_std": pred_std,
+                    "mean_aleatoric": float(np.mean(var)) if var.size else 0.0,
+                    "mean_abs_deviation_to_ensemble": mean_abs_dev,
+                    "rmse_to_ensemble": rmse_to_ensemble,
+                    "contribution_score": contribution_score,
+                }
+            )
+
+        member_pool.sort(key=lambda item: item[0], reverse=True)
+        k = max(1, min(int(top_k), len(member_pool))) if member_pool else 0
+        top_members = [
+            {
+                "member_id": mid,
+                "weight": float(weight),
+                "mean_abs_deviation_to_ensemble": float(dev),
+                "contribution_score": float(score),
+            }
+            for score, mid, weight, dev in member_pool[:k]
+        ]
+
+        return {
+            "summary": {
+                "sample_count": int(x_scaled.shape[0]),
+                "member_count": int(len(ids)),
+                "aggregation": str(aggregation),
+                "mean_epistemic_from_members": float(np.mean(np.var(means, axis=0))) if means.size else 0.0,
+                "mean_aleatoric_from_members": float(np.mean(np.mean(vars_, axis=0))) if vars_.size else 0.0,
+            },
+            "member_summaries": summaries,
+            "top_contributing_members": top_members,
+            "preprocess": {
+                "scaler": dict(pre["scaler"]),
+                "validation": dict(pre["validation"]),
+                "feature_names": list(pre["feature_names"]),
+            },
+        }
+
+    def explain_ensemble_weights(
+        self,
+        *,
+        strategy: str = "validation_softmax",
+        temperature: float = 1.0,
+    ) -> dict[str, Any]:
+        ids = sorted(self.metadata.keys())
+        if not ids:
+            raise ValueError("ensemble 尚未训练")
+
+        t = float(max(1e-6, temperature))
+        val_nll = np.asarray([float(self.metadata[mid].val_nll) for mid in ids], dtype=float)
+        if strategy == "uniform":
+            weights = np.ones_like(val_nll, dtype=float) / float(len(ids))
+        else:
+            centered = (val_nll - np.min(val_nll)) / t
+            logits = -centered
+            logits = logits - np.max(logits)
+            exp_w = np.exp(logits)
+            weights = exp_w / np.sum(exp_w)
+
+        entropy = float(-np.sum(weights * np.log(np.maximum(weights, 1e-12))))
+        effective_members = float(1.0 / np.sum(np.maximum(weights, 1e-12) ** 2))
+        records = [
+            {
+                "member_id": str(mid),
+                "val_nll": float(self.metadata[mid].val_nll),
+                "weight": float(weights[i]),
+                "rank": int(i + 1),
+            }
+            for i, mid in enumerate([m for _, m in sorted(zip(weights, ids), key=lambda item: item[0], reverse=True)])
+        ]
+        return {
+            "summary": {
+                "strategy": str(strategy),
+                "temperature": t,
+                "member_count": int(len(ids)),
+                "weight_entropy": entropy,
+                "effective_member_count": effective_members,
+                "max_weight": float(np.max(weights)),
+                "min_weight": float(np.min(weights)),
+            },
+            "weight_distribution": records,
+        }
+
+    def analyze_model_diversity(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        top_k_pairs: int = 6,
+        use_training_stats: bool = True,
+    ) -> dict[str, Any]:
+        pre = self.preprocess_deep_ensemble_data(features, use_training_stats=use_training_stats)
+        x_scaled = np.asarray(pre["processed_features"], dtype=float)
+        means, _, ids = self._collect_predictions(x_scaled)
+        if means.shape[0] <= 1:
+            return {
+                "summary": {
+                    "member_count": int(means.shape[0]),
+                    "sample_count": int(x_scaled.shape[0]),
+                    "mean_pair_corr": 1.0,
+                    "mean_pair_disagreement": 0.0,
+                    "prediction_spread": 0.0,
+                },
+                "pairwise_diversity": [],
+                "top_diverse_pairs": [],
+            }
+
+        pairs: list[dict[str, Any]] = []
+        for i in range(means.shape[0]):
+            for j in range(i + 1, means.shape[0]):
+                a = np.asarray(means[i], dtype=float)
+                b = np.asarray(means[j], dtype=float)
+                if np.std(a) < 1e-8 or np.std(b) < 1e-8:
+                    corr = 1.0
+                else:
+                    corr = float(np.corrcoef(a, b)[0, 1])
+                    if not np.isfinite(corr):
+                        corr = 1.0
+                disagreement = float(np.mean(np.abs(a - b))) if a.size else 0.0
+                diversity_score = float((1.0 - corr) * 0.5 + disagreement)
+                pairs.append(
+                    {
+                        "member_a": str(ids[i]),
+                        "member_b": str(ids[j]),
+                        "correlation": corr,
+                        "mean_absolute_disagreement": disagreement,
+                        "diversity_score": diversity_score,
+                    }
+                )
+
+        pair_corr = np.asarray([float(item["correlation"]) for item in pairs], dtype=float)
+        pair_disagreement = np.asarray([float(item["mean_absolute_disagreement"]) for item in pairs], dtype=float)
+        sorted_pairs = sorted(pairs, key=lambda item: float(item["diversity_score"]), reverse=True)
+        k = max(1, min(int(top_k_pairs), len(sorted_pairs)))
+        return {
+            "summary": {
+                "member_count": int(means.shape[0]),
+                "sample_count": int(x_scaled.shape[0]),
+                "mean_pair_corr": float(np.mean(pair_corr)) if pair_corr.size else 1.0,
+                "mean_pair_disagreement": float(np.mean(pair_disagreement)) if pair_disagreement.size else 0.0,
+                "prediction_spread": float(np.mean(np.std(means, axis=0))),
+            },
+            "pairwise_diversity": pairs,
+            "top_diverse_pairs": sorted_pairs[:k],
+            "preprocess": {
+                "scaler": dict(pre["scaler"]),
+                "validation": dict(pre["validation"]),
+                "feature_names": list(pre["feature_names"]),
+            },
+        }
