@@ -25,6 +25,7 @@ class PPOExplanationConfig:
     lime_num_samples: int = 180
     shap_nsamples: int = 120
     cache_size: int = 16
+    batch_explain_chunk_size: int = 4
     random_state: int = 42
 
 
@@ -53,6 +54,41 @@ class _PPOBaseAdapter:
     def _stable_hash(self, payload: dict[str, Any]) -> str:
         normalized = json.dumps(payload, sort_keys=True, ensure_ascii=False, separators=(",", ":"), default=str)
         return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _observation_fingerprint(self, observations: list[dict[str, np.ndarray]] | np.ndarray) -> str:
+        h = hashlib.sha256()
+        if isinstance(observations, np.ndarray):
+            arr = np.ascontiguousarray(np.asarray(observations, dtype=float))
+            h.update(str(tuple(int(v) for v in arr.shape)).encode("utf-8"))
+            h.update(arr.tobytes())
+            return h.hexdigest()
+
+        order = ["sampling_distribution", "uncertainty_map", "sampled_values", "spatial_features", "boundary_info"]
+        h.update(str(len(observations)).encode("utf-8"))
+        for obs in observations:
+            for key in order:
+                arr = np.ascontiguousarray(np.asarray(obs.get(key, np.array([])), dtype=float).reshape(-1))
+                h.update(key.encode("utf-8"))
+                h.update(str(int(arr.shape[0])).encode("utf-8"))
+                h.update(arr.tobytes())
+        return h.hexdigest()
+
+    def _split_explained_batches(self, explained_nodes: np.ndarray) -> list[np.ndarray]:
+        nodes = np.asarray(explained_nodes, dtype=int).reshape(-1)
+        if nodes.size == 0:
+            return []
+        chunk = max(1, int(self.config.batch_explain_chunk_size))
+        return [nodes[i : i + chunk] for i in range(0, int(nodes.size), chunk)]
+
+    @staticmethod
+    def _array_bytes(*arrays: np.ndarray) -> int:
+        total = 0
+        for arr in arrays:
+            try:
+                total += int(np.asarray(arr).nbytes)
+            except Exception:
+                continue
+        return int(total)
 
     def _cache_get(self, key: str) -> dict[str, Any] | None:
         with self._lock:
@@ -228,6 +264,7 @@ class PPOLIMEAdapter(_PPOBaseAdapter):
             {
                 "method": "lime",
                 "shape": list(arr.shape),
+                "obs_fp": self._observation_fingerprint(observations),
                 "top_k": int(top_k),
                 "max_explain_nodes": int(max_explain_nodes),
                 "num_samples": int(num_samples or self.config.lime_num_samples),
@@ -262,57 +299,65 @@ class PPOLIMEAdapter(_PPOBaseAdapter):
         surrogate: Ridge = context["policy_surrogate"]
         baseline = np.asarray(context["baseline"], dtype=float)
 
-        for node_idx in explained_nodes.tolist():
-            instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
-            local_pairs: list[tuple[int, float]] = []
-            backend = "surrogate_linear"
-            if lime_explainer is not None:
-                try:
-                    exp = lime_explainer.explain_instance(
-                        instance,
-                        predict_fn=lambda x: surrogate.predict(np.asarray(x, dtype=float)),
-                        num_features=max(1, int(top_k)),
-                        num_samples=selected_samples,
-                    )
-                    local_pairs = [(int(i), float(w)) for i, w in exp.as_map().get(1, [])]
-                    backend = "lime_tabular"
-                except Exception:
-                    local_pairs = []
+        explained_batches = self._split_explained_batches(explained_nodes)
+        for node_batch in explained_batches:
+            for node_idx in node_batch.tolist():
+                instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
+                local_pairs: list[tuple[int, float]] = []
+                backend = "surrogate_linear"
+                if lime_explainer is not None:
+                    try:
+                        exp = lime_explainer.explain_instance(
+                            instance,
+                            predict_fn=lambda x: surrogate.predict(np.asarray(x, dtype=float)),
+                            num_features=max(1, int(top_k)),
+                            num_samples=selected_samples,
+                        )
+                        local_pairs = [(int(i), float(w)) for i, w in exp.as_map().get(1, [])]
+                        backend = "lime_tabular"
+                    except Exception:
+                        local_pairs = []
 
-            if not local_pairs:
-                local_weights = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
-                local_pairs = [(int(i), float(local_weights[i])) for i in range(local_weights.shape[0])]
-            else:
-                local_weights = np.zeros((len(context["feature_names"]),), dtype=float)
-                for i, w in local_pairs:
-                    if 0 <= i < local_weights.shape[0]:
-                        local_weights[i] = float(w)
+                if not local_pairs:
+                    local_weights = np.asarray(surrogate.coef_, dtype=np.float32) * np.asarray((instance - baseline), dtype=np.float32)
+                    local_pairs = [(int(i), float(local_weights[i])) for i in range(local_weights.shape[0])]
+                else:
+                    local_weights = np.zeros((len(context["feature_names"]),), dtype=np.float32)
+                    for i, w in local_pairs:
+                        if 0 <= i < local_weights.shape[0]:
+                            local_weights[i] = float(w)
 
-            local_pairs.sort(key=lambda item: abs(float(item[1])), reverse=True)
-            local_pairs = local_pairs[: max(1, int(top_k))]
-            raw_weight_rows.append(local_weights)
-            batch_explanations.append(
-                {
-                    "node_index": int(node_idx),
-                    "selected_action": int(context["actions"][node_idx]),
-                    "prediction": float(context["target_probs"][node_idx]),
-                    "state_value": float(context["state_values"][node_idx]),
-                    "backend": backend,
-                    "contributions": [
-                        {
-                            "feature_index": int(i),
-                            "feature_name": str(context["feature_names"][int(i)]),
-                            "weight": float(w),
-                            "abs_weight": float(abs(w)),
-                            "feature_value": float(instance[int(i)]),
-                        }
-                        for i, w in local_pairs
-                    ],
-                }
-            )
+                local_pairs.sort(key=lambda item: abs(float(item[1])), reverse=True)
+                local_pairs = local_pairs[: max(1, int(top_k))]
+                raw_weight_rows.append(local_weights)
+                batch_explanations.append(
+                    {
+                        "node_index": int(node_idx),
+                        "selected_action": int(context["actions"][node_idx]),
+                        "prediction": float(context["target_probs"][node_idx]),
+                        "state_value": float(context["state_values"][node_idx]),
+                        "backend": backend,
+                        "contributions": [
+                            {
+                                "feature_index": int(i),
+                                "feature_name": str(context["feature_names"][int(i)]),
+                                "weight": float(w),
+                                "abs_weight": float(abs(w)),
+                                "feature_value": float(instance[int(i)]),
+                            }
+                            for i, w in local_pairs
+                        ],
+                    }
+                )
 
-        raw_matrix = np.asarray(raw_weight_rows, dtype=float) if raw_weight_rows else np.zeros((0, len(context["feature_names"])))
+        raw_matrix = np.asarray(raw_weight_rows, dtype=np.float32) if raw_weight_rows else np.zeros((0, len(context["feature_names"])), dtype=np.float32)
         global_scores = np.mean(np.abs(raw_matrix), axis=0) if raw_matrix.size > 0 else np.zeros((len(context["feature_names"]),), dtype=float)
+        context_memory_bytes = self._array_bytes(
+            np.asarray(context.get("raw_x", np.array([])), dtype=np.float32),
+            np.asarray(context.get("scaled_x", np.array([])), dtype=np.float32),
+            np.asarray(context.get("action_probabilities", np.array([])), dtype=np.float32),
+        )
+        result_memory_bytes = self._array_bytes(raw_matrix)
         result = {
             "summary": {
                 "method": "lime",
@@ -333,9 +378,14 @@ class PPOLIMEAdapter(_PPOBaseAdapter):
             "performance": {
                 "cache_hit": False,
                 "latency_ms": float((time.perf_counter() - start) * 1000.0),
+                "batch_count": int(len(explained_batches)),
+                "batch_chunk_size": int(max(1, int(self.config.batch_explain_chunk_size))),
                 "policy_inference_ms": _safe_float(context.get("predict_performance", {}).get("policy_inference_ms", 0.0)),
                 "value_inference_ms": _safe_float(context.get("predict_performance", {}).get("value_inference_ms", 0.0)),
                 "model_predict_cache_hit": bool(context.get("predict_performance", {}).get("cache_hit", False)),
+                "context_memory_bytes": int(context_memory_bytes),
+                "result_memory_bytes": int(result_memory_bytes),
+                "result_cache_key": str(cache_key[:16]),
                 "latency_target_ms": 15000.0,
                 "meets_latency_target": float((time.perf_counter() - start) * 1000.0) < 15000.0,
             },
@@ -360,6 +410,7 @@ class PPOSHAPAdapter(_PPOBaseAdapter):
             {
                 "method": "shap",
                 "shape": list(arr.shape),
+                "obs_fp": self._observation_fingerprint(observations),
                 "top_k": int(top_k),
                 "max_explain_nodes": int(max_explain_nodes),
                 "nsamples": int(nsamples or self.config.shap_nsamples),
@@ -379,9 +430,9 @@ class PPOSHAPAdapter(_PPOBaseAdapter):
         shap_module = self._load_shap()
         shap_backend = "surrogate_linear"
         surrogate: Ridge = context["policy_surrogate"]
-        background = np.asarray(context["scaled_x"], dtype=float)
+        background = np.asarray(context["scaled_x"], dtype=np.float32)
         background = background[: max(1, min(32, background.shape[0]))]
-        baseline = np.asarray(context["baseline"], dtype=float)
+        baseline = np.asarray(context["baseline"], dtype=np.float32)
         kernel_explainer = None
 
         if shap_module is not None:
@@ -397,53 +448,61 @@ class PPOSHAPAdapter(_PPOBaseAdapter):
         batch_explanations: list[dict[str, Any]] = []
         raw_rows: list[np.ndarray] = []
 
-        for node_idx in explained_nodes.tolist():
-            instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
-            expected_value = float(surrogate.predict(baseline.reshape(1, -1))[0])
+        explained_batches = self._split_explained_batches(explained_nodes)
+        for node_batch in explained_batches:
+            for node_idx in node_batch.tolist():
+                instance = np.asarray(context["scaled_x"][node_idx], dtype=np.float32)
+                expected_value = float(surrogate.predict(baseline.reshape(1, -1))[0])
 
-            if kernel_explainer is not None:
-                try:
-                    shap_arr = kernel_explainer.shap_values(instance.reshape(1, -1), nsamples=selected_nsamples, silent=True)
-                    if isinstance(shap_arr, list):
-                        shap_arr = shap_arr[0]
-                    shap_values = np.asarray(shap_arr, dtype=float).reshape(-1)
-                    ev = getattr(kernel_explainer, "expected_value", expected_value)
-                    if np.asarray(ev).reshape(-1).size > 0:
-                        expected_value = _safe_float(np.asarray(ev).reshape(-1)[0], expected_value)
-                except Exception:
-                    shap_values = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
-            else:
-                shap_values = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
+                if kernel_explainer is not None:
+                    try:
+                        shap_arr = kernel_explainer.shap_values(instance.reshape(1, -1), nsamples=selected_nsamples, silent=True)
+                        if isinstance(shap_arr, list):
+                            shap_arr = shap_arr[0]
+                        shap_values = np.asarray(shap_arr, dtype=np.float32).reshape(-1)
+                        ev = getattr(kernel_explainer, "expected_value", expected_value)
+                        if np.asarray(ev).reshape(-1).size > 0:
+                            expected_value = _safe_float(np.asarray(ev).reshape(-1)[0], expected_value)
+                    except Exception:
+                        shap_values = np.asarray(surrogate.coef_, dtype=np.float32) * np.asarray((instance - baseline), dtype=np.float32)
+                else:
+                    shap_values = np.asarray(surrogate.coef_, dtype=np.float32) * np.asarray((instance - baseline), dtype=np.float32)
 
-            raw_rows.append(shap_values)
-            pred = float(surrogate.predict(instance.reshape(1, -1))[0])
-            order = np.argsort(np.abs(shap_values))[::-1][: max(1, int(top_k))]
-            contributions = [
-                {
-                    "feature_index": int(i),
-                    "feature_name": str(context["feature_names"][int(i)]),
-                    "shap_value": float(shap_values[int(i)]),
-                    "abs_shap": float(abs(shap_values[int(i)])),
-                    "feature_value": float(instance[int(i)]),
-                }
-                for i in order
-            ]
-            batch_explanations.append(
-                {
-                    "node_index": int(node_idx),
-                    "selected_action": int(context["actions"][node_idx]),
-                    "prediction": pred,
-                    "target_prediction": float(context["target_probs"][node_idx]),
-                    "state_value": float(context["state_values"][node_idx]),
-                    "expected_value": expected_value,
-                    "backend": shap_backend,
-                    "contributions": contributions,
-                    "raw_shap_values": [float(x) for x in shap_values.tolist()],
-                }
-            )
+                raw_rows.append(shap_values)
+                pred = float(surrogate.predict(instance.reshape(1, -1))[0])
+                order = np.argsort(np.abs(shap_values))[::-1][: max(1, int(top_k))]
+                contributions = [
+                    {
+                        "feature_index": int(i),
+                        "feature_name": str(context["feature_names"][int(i)]),
+                        "shap_value": float(shap_values[int(i)]),
+                        "abs_shap": float(abs(shap_values[int(i)])),
+                        "feature_value": float(instance[int(i)]),
+                    }
+                    for i in order
+                ]
+                batch_explanations.append(
+                    {
+                        "node_index": int(node_idx),
+                        "selected_action": int(context["actions"][node_idx]),
+                        "prediction": pred,
+                        "target_prediction": float(context["target_probs"][node_idx]),
+                        "state_value": float(context["state_values"][node_idx]),
+                        "expected_value": expected_value,
+                        "backend": shap_backend,
+                        "contributions": contributions,
+                        "raw_shap_values": [float(x) for x in shap_values.tolist()],
+                    }
+                )
 
-        raw_matrix = np.asarray(raw_rows, dtype=float) if raw_rows else np.zeros((0, len(context["feature_names"])))
+        raw_matrix = np.asarray(raw_rows, dtype=np.float32) if raw_rows else np.zeros((0, len(context["feature_names"])), dtype=np.float32)
         global_scores = np.mean(np.abs(raw_matrix), axis=0) if raw_matrix.size > 0 else np.zeros((len(context["feature_names"]),), dtype=float)
+        context_memory_bytes = self._array_bytes(
+            np.asarray(context.get("raw_x", np.array([])), dtype=np.float32),
+            np.asarray(context.get("scaled_x", np.array([])), dtype=np.float32),
+            np.asarray(context.get("action_probabilities", np.array([])), dtype=np.float32),
+        )
+        result_memory_bytes = self._array_bytes(raw_matrix, background)
         result = {
             "summary": {
                 "method": "shap",
@@ -464,9 +523,14 @@ class PPOSHAPAdapter(_PPOBaseAdapter):
             "performance": {
                 "cache_hit": False,
                 "latency_ms": float((time.perf_counter() - start) * 1000.0),
+                "batch_count": int(len(explained_batches)),
+                "batch_chunk_size": int(max(1, int(self.config.batch_explain_chunk_size))),
                 "policy_inference_ms": _safe_float(context.get("predict_performance", {}).get("policy_inference_ms", 0.0)),
                 "value_inference_ms": _safe_float(context.get("predict_performance", {}).get("value_inference_ms", 0.0)),
                 "model_predict_cache_hit": bool(context.get("predict_performance", {}).get("cache_hit", False)),
+                "context_memory_bytes": int(context_memory_bytes),
+                "result_memory_bytes": int(result_memory_bytes),
+                "result_cache_key": str(cache_key[:16]),
                 "latency_target_ms": 15000.0,
                 "meets_latency_target": float((time.perf_counter() - start) * 1000.0) < 15000.0,
             },
