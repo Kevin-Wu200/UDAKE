@@ -82,6 +82,11 @@ class _DQNBaseAdapter:
         surrogate = Ridge(alpha=1.0, random_state=self.config.random_state)
         surrogate.fit(x_scaled, selected_q_values)
         baseline = np.mean(x_scaled, axis=0)
+        surrogate_coef = np.asarray(surrogate.coef_, dtype=float).reshape(-1)
+        surrogate_local_weights = (x_scaled - baseline.reshape(1, -1)) * surrogate_coef.reshape(1, -1)
+        sample_count = int(x_scaled.shape[0])
+        feature_dim = int(x_scaled.shape[1]) if x_scaled.ndim == 2 else 0
+        action_dim = int(q_values.shape[1]) if q_values.ndim == 2 else 0
 
         return {
             "raw_x": x_raw,
@@ -94,9 +99,202 @@ class _DQNBaseAdapter:
             "action_probabilities": action_probabilities,
             "surrogate": surrogate,
             "baseline": baseline,
+            "surrogate_coef": surrogate_coef,
+            "surrogate_local_weights": surrogate_local_weights,
+            "sample_count": sample_count,
+            "feature_dim": feature_dim,
+            "action_dim": action_dim,
             "preprocess": {
                 "scaler": pre["scaler"],
                 "validation": pre["validation"],
+            },
+        }
+
+    def _select_explained_nodes(self, target: np.ndarray, max_explain_nodes: int) -> np.ndarray:
+        values = np.asarray(target, dtype=float).reshape(-1)
+        if values.size == 0:
+            return np.zeros((0,), dtype=int)
+        n = min(max(1, int(max_explain_nodes)), int(values.size))
+        if n >= int(values.size):
+            return np.argsort(values)[::-1].astype(int)
+        idx = np.argpartition(values, -n)[-n:]
+        return idx[np.argsort(values[idx])[::-1]].astype(int)
+
+    def _build_q_value_explanation(self, context: dict[str, Any], *, top_k: int, explained_nodes: np.ndarray) -> dict[str, Any]:
+        q_values = np.asarray(context["q_values"], dtype=float)
+        selected = np.asarray(context["selected_q_values"], dtype=float).reshape(-1)
+        max_q = np.asarray(context["max_q_values"], dtype=float).reshape(-1)
+        actions = np.asarray(context["actions"], dtype=int).reshape(-1)
+        feature_names = list(context["feature_names"])
+        local_matrix = np.asarray(context["surrogate_local_weights"], dtype=float)
+
+        if q_values.ndim == 2 and q_values.shape[0] > 0 and q_values.shape[1] > 1:
+            sorted_q = np.sort(q_values, axis=1)
+            top1_top2_gap = sorted_q[:, -1] - sorted_q[:, -2]
+            q_flat = q_values.reshape(-1)
+        else:
+            top1_top2_gap = np.zeros_like(selected)
+            q_flat = selected
+
+        hist_counts, hist_edges = np.histogram(q_flat, bins=min(12, max(4, int(np.sqrt(max(1, q_flat.size))))))
+        node_analysis: list[dict[str, Any]] = []
+        for idx in np.asarray(explained_nodes, dtype=int).tolist():
+            instance_q = q_values[idx] if q_values.ndim == 2 else np.asarray([selected[idx]], dtype=float)
+            order = np.argsort(instance_q)[::-1][: max(1, int(top_k))]
+            node_analysis.append(
+                {
+                    "node_index": int(idx),
+                    "selected_action": int(actions[idx]),
+                    "selected_q_value": float(selected[idx]),
+                    "max_q_value": float(max_q[idx]),
+                    "q_value_std": float(np.std(instance_q)) if instance_q.size else 0.0,
+                    "top1_top2_gap": float(top1_top2_gap[idx]) if top1_top2_gap.size > idx else 0.0,
+                    "top_actions_by_q": [
+                        {"action_index": int(a), "q_value": float(instance_q[int(a)])}
+                        for a in order.tolist()
+                    ],
+                    "dominant_features": self._top_features(feature_names, local_matrix[idx], int(top_k)),
+                }
+            )
+
+        return {
+            "summary": {
+                "network": "q_value",
+                "explained_samples": int(selected.shape[0]),
+                "q_value_mean": float(np.mean(selected)) if selected.size else 0.0,
+                "q_value_std": float(np.std(selected)) if selected.size else 0.0,
+                "q_value_min": float(np.min(selected)) if selected.size else 0.0,
+                "q_value_max": float(np.max(selected)) if selected.size else 0.0,
+                "top1_top2_gap_mean": float(np.mean(top1_top2_gap)) if top1_top2_gap.size else 0.0,
+                "top_features": self._top_features(feature_names, np.mean(np.abs(local_matrix), axis=0), int(top_k))
+                if local_matrix.size
+                else [],
+            },
+            "q_value_distribution": {
+                "sample_count": int(q_flat.size),
+                "counts": [int(x) for x in hist_counts.tolist()],
+                "bin_edges": [float(x) for x in hist_edges.tolist()],
+            },
+            "node_q_value_analysis": node_analysis,
+        }
+
+    def _build_action_value_analysis(self, context: dict[str, Any], *, top_k: int, explained_nodes: np.ndarray) -> dict[str, Any]:
+        q_values = np.asarray(context["q_values"], dtype=float)
+        actions = np.asarray(context["actions"], dtype=int).reshape(-1)
+        if q_values.ndim != 2 or q_values.size == 0:
+            return {
+                "summary": {"network": "action_value", "explained_samples": int(actions.shape[0]), "distinct_actions": 0},
+                "top_actions": [],
+                "action_selection_distribution": {"histogram": []},
+                "node_action_value_analysis": [],
+            }
+
+        action_mean = np.mean(q_values, axis=0)
+        action_std = np.std(q_values, axis=0)
+        order = np.argsort(action_mean)[::-1][: max(1, int(top_k))]
+        hist = np.bincount(actions, minlength=q_values.shape[1]).astype(int)
+        selection_ratio = hist / max(1, int(actions.size))
+
+        node_analysis: list[dict[str, Any]] = []
+        for idx in np.asarray(explained_nodes, dtype=int).tolist():
+            row = np.asarray(q_values[idx], dtype=float)
+            row_order = np.argsort(row)[::-1][: max(1, int(top_k))]
+            node_analysis.append(
+                {
+                    "node_index": int(idx),
+                    "selected_action": int(actions[idx]),
+                    "selected_action_rank": int(np.where(np.argsort(row)[::-1] == actions[idx])[0][0] + 1),
+                    "top_actions_by_q": [
+                        {"action_index": int(a), "q_value": float(row[int(a)])}
+                        for a in row_order.tolist()
+                    ],
+                }
+            )
+
+        return {
+            "summary": {
+                "network": "action_value",
+                "explained_samples": int(actions.shape[0]),
+                "distinct_actions": int(np.count_nonzero(hist)),
+                "mean_selected_action_value": float(np.mean(q_values[np.arange(q_values.shape[0]), actions])) if actions.size else 0.0,
+                "top_action_mean_value": float(action_mean[int(order[0])]) if order.size else 0.0,
+            },
+            "top_actions": [
+                {
+                    "action_index": int(i),
+                    "mean_q_value": float(action_mean[int(i)]),
+                    "std_q_value": float(action_std[int(i)]),
+                    "selected_count": int(hist[int(i)]),
+                    "selected_ratio": float(selection_ratio[int(i)]),
+                }
+                for i in order.tolist()
+            ],
+            "action_selection_distribution": {
+                "histogram": [
+                    {"action_index": int(i), "count": int(c), "ratio": float(selection_ratio[int(i)])}
+                    for i, c in enumerate(hist.tolist())
+                    if c > 0
+                ]
+            },
+            "node_action_value_analysis": node_analysis,
+        }
+
+    def _build_exploration_exploitation_analysis(self, model: Any, context: dict[str, Any], *, top_k: int) -> dict[str, Any]:
+        actions = np.asarray(context["actions"], dtype=int).reshape(-1)
+        q_values = np.asarray(context["q_values"], dtype=float)
+        action_probs = np.asarray(context["action_probabilities"], dtype=float)
+
+        action_dim = int(context.get("action_dim", q_values.shape[1] if q_values.ndim == 2 else 0))
+        epsilon = _safe_float(getattr(model, "epsilon", 0.0), 0.0)
+        exploration_mode = str(getattr(getattr(model, "config", {}), "exploration", "epsilon_greedy"))
+        visit = np.asarray(getattr(model, "action_visit", np.zeros((action_dim,), dtype=float)), dtype=float).reshape(-1)
+        if visit.size != action_dim:
+            visit = np.zeros((action_dim,), dtype=float)
+
+        if action_probs.ndim == 2 and action_probs.shape[0] == actions.shape[0] and action_probs.shape[1] > 0:
+            max_prob = np.max(action_probs, axis=1)
+            selected_prob = action_probs[np.arange(actions.shape[0]), actions]
+            entropy = -np.sum(action_probs * np.log(np.clip(action_probs, 1e-12, 1.0)), axis=1)
+            norm = np.log(max(2, action_probs.shape[1]))
+            normalized_entropy = entropy / norm
+        else:
+            max_prob = np.ones_like(actions, dtype=float)
+            selected_prob = np.ones_like(actions, dtype=float)
+            normalized_entropy = np.zeros_like(actions, dtype=float)
+
+        sorted_gap = np.sort(q_values, axis=1)[:, -1] - np.sort(q_values, axis=1)[:, -2] if q_values.ndim == 2 and q_values.shape[1] > 1 else np.zeros_like(selected_prob)
+        action_hist = np.bincount(actions, minlength=max(1, action_dim)).astype(int)
+        top_actions = np.argsort(action_hist)[::-1][: max(1, int(top_k))]
+
+        total_visit = float(np.sum(visit))
+        visit_ratio = visit / max(1.0, total_visit)
+        return {
+            "summary": {
+                "mode": exploration_mode,
+                "epsilon": float(epsilon),
+                "sample_count": int(actions.shape[0]),
+                "action_coverage_ratio": float(np.count_nonzero(action_hist) / max(1, action_dim)),
+                "mean_selected_probability": float(np.mean(selected_prob)) if selected_prob.size else 0.0,
+                "mean_normalized_entropy": float(np.mean(normalized_entropy)) if normalized_entropy.size else 0.0,
+                "mean_top1_top2_gap": float(np.mean(sorted_gap)) if sorted_gap.size else 0.0,
+            },
+            "exploration_signals": {
+                "normalized_entropy": [float(x) for x in normalized_entropy.tolist()],
+                "selected_action_probability": [float(x) for x in selected_prob.tolist()],
+                "max_action_probability": [float(x) for x in max_prob.tolist()],
+                "top1_top2_gap": [float(x) for x in sorted_gap.tolist()],
+            },
+            "action_preference": {
+                "top_selected_actions": [
+                    {"action_index": int(i), "count": int(action_hist[int(i)])}
+                    for i in top_actions.tolist()
+                    if action_hist[int(i)] > 0
+                ],
+                "visit_distribution": [
+                    {"action_index": int(i), "visit": float(visit[int(i)]), "visit_ratio": float(visit_ratio[int(i)])}
+                    for i in np.argsort(visit)[::-1][: max(1, int(top_k))].tolist()
+                    if visit[int(i)] > 0.0
+                ],
             },
         }
 
@@ -143,7 +341,7 @@ class DQNLIMEAdapter(_DQNBaseAdapter):
 
         context = self._build_context(model, observations)
         target = np.asarray(context["selected_q_values"], dtype=float)
-        explained_nodes = np.argsort(target)[::-1][: max(1, min(int(max_explain_nodes), len(target)))].astype(int)
+        explained_nodes = self._select_explained_nodes(target, int(max_explain_nodes))
         selected_samples = int(num_samples or self.config.lime_num_samples)
 
         lime_module = self._load_lime_tabular()
@@ -163,6 +361,7 @@ class DQNLIMEAdapter(_DQNBaseAdapter):
         raw_weight_rows: list[np.ndarray] = []
         surrogate: Ridge = context["surrogate"]
         baseline = np.asarray(context["baseline"], dtype=float)
+        local_weight_matrix = np.asarray(context["surrogate_local_weights"], dtype=float)
 
         for node_idx in explained_nodes.tolist():
             instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
@@ -182,7 +381,7 @@ class DQNLIMEAdapter(_DQNBaseAdapter):
                     local_pairs = []
 
             if not local_pairs:
-                local_weights = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
+                local_weights = np.asarray(local_weight_matrix[node_idx], dtype=float)
                 local_pairs = [(int(i), float(local_weights[i])) for i in range(local_weights.shape[0])]
             else:
                 local_weights = np.zeros((len(context["feature_names"]),), dtype=float)
@@ -225,10 +424,16 @@ class DQNLIMEAdapter(_DQNBaseAdapter):
             },
             "batch_explanations": batch_explanations,
             "global_feature_importance": self._top_features(context["feature_names"], global_scores, len(context["feature_names"])),
+            "q_value_explanation": self._build_q_value_explanation(context, top_k=int(top_k), explained_nodes=explained_nodes),
+            "action_value_analysis": self._build_action_value_analysis(context, top_k=int(top_k), explained_nodes=explained_nodes),
+            "exploration_exploitation_analysis": self._build_exploration_exploitation_analysis(model, context, top_k=int(top_k)),
             "preprocess": context["preprocess"],
             "performance": {
                 "cache_hit": False,
                 "latency_ms": float((time.perf_counter() - start) * 1000.0),
+                "sample_count": int(context["sample_count"]),
+                "feature_dim": int(context["feature_dim"]),
+                "action_dim": int(context["action_dim"]),
             },
         }
         self._cache_set(cache_key, result)
@@ -264,7 +469,7 @@ class DQNSHAPAdapter(_DQNBaseAdapter):
 
         context = self._build_context(model, observations)
         target = np.asarray(context["selected_q_values"], dtype=float)
-        explained_nodes = np.argsort(target)[::-1][: max(1, min(int(max_explain_nodes), len(target)))].astype(int)
+        explained_nodes = self._select_explained_nodes(target, int(max_explain_nodes))
         selected_nsamples = int(nsamples or self.config.shap_nsamples)
 
         shap_module = self._load_shap()
@@ -273,6 +478,8 @@ class DQNSHAPAdapter(_DQNBaseAdapter):
         background = np.asarray(context["scaled_x"], dtype=float)
         background = background[: max(1, min(32, background.shape[0]))]
         baseline = np.asarray(context["baseline"], dtype=float)
+        baseline_pred = float(surrogate.predict(baseline.reshape(1, -1))[0])
+        local_weight_matrix = np.asarray(context["surrogate_local_weights"], dtype=float)
         kernel_explainer = None
 
         if shap_module is not None:
@@ -290,7 +497,7 @@ class DQNSHAPAdapter(_DQNBaseAdapter):
 
         for node_idx in explained_nodes.tolist():
             instance = np.asarray(context["scaled_x"][node_idx], dtype=float)
-            expected_value = float(surrogate.predict(baseline.reshape(1, -1))[0])
+            expected_value = baseline_pred
 
             if kernel_explainer is not None:
                 try:
@@ -302,9 +509,9 @@ class DQNSHAPAdapter(_DQNBaseAdapter):
                     if np.asarray(ev).reshape(-1).size > 0:
                         expected_value = _safe_float(np.asarray(ev).reshape(-1)[0], expected_value)
                 except Exception:
-                    shap_values = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
+                    shap_values = np.asarray(local_weight_matrix[node_idx], dtype=float)
             else:
-                shap_values = np.asarray(surrogate.coef_, dtype=float) * (instance - baseline)
+                shap_values = np.asarray(local_weight_matrix[node_idx], dtype=float)
 
             raw_rows.append(shap_values)
             pred = float(surrogate.predict(instance.reshape(1, -1))[0])
@@ -345,10 +552,16 @@ class DQNSHAPAdapter(_DQNBaseAdapter):
             },
             "batch_explanations": batch_explanations,
             "global_feature_importance": self._top_features(context["feature_names"], global_scores, len(context["feature_names"])),
+            "q_value_explanation": self._build_q_value_explanation(context, top_k=int(top_k), explained_nodes=explained_nodes),
+            "action_value_analysis": self._build_action_value_analysis(context, top_k=int(top_k), explained_nodes=explained_nodes),
+            "exploration_exploitation_analysis": self._build_exploration_exploitation_analysis(model, context, top_k=int(top_k)),
             "preprocess": context["preprocess"],
             "performance": {
                 "cache_hit": False,
                 "latency_ms": float((time.perf_counter() - start) * 1000.0),
+                "sample_count": int(context["sample_count"]),
+                "feature_dim": int(context["feature_dim"]),
+                "action_dim": int(context["action_dim"]),
             },
             "explainer": {
                 "backend": "shap" if shap_module is not None else "surrogate_linear",
