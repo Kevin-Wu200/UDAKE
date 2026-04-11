@@ -197,10 +197,16 @@ def test_integration_and_optimization_helpers() -> None:
     assert "action_value_visualization" in recommend["explanations"]
     assert "sampling_point_recommendation" in recommend["explanations"]
     assert "sampling_density_analysis" in recommend["explanations"]
+    assert "sampling_region_visualization" in recommend["explanations"]
+    assert "sampling_effect_evaluation" in recommend["explanations"]
+    assert "sampling_optimization_suggestions" in recommend["explanations"]
     assert "summary" in recommend["explanations"]["policy_decision"]
     assert "action_value_points" in recommend["explanations"]["action_value_visualization"]
     assert "point_explanations" in recommend["explanations"]["sampling_point_recommendation"]
     assert "sparse_hotspots" in recommend["explanations"]["sampling_density_analysis"]
+    assert "region_intensity_map" in recommend["explanations"]["sampling_region_visualization"]
+    assert "uncertainty_reduction_ratio" in recommend["explanations"]["sampling_effect_evaluation"]["summary"]
+    assert "suggestions" in recommend["explanations"]["sampling_optimization_suggestions"]
     assert optimized["best_strategy"] in {"rl_only", "rule_only", "hybrid"}
 
     batch_opt = BatchOptimizer().suggest(sample_count=256, feature_dim=32, memory_budget_mb=16)

@@ -393,6 +393,186 @@ class SamplingRLIntegrator:
             "sparse_hotspots": hotspots,
         }
 
+    def _build_sampling_region_visualization(
+        self,
+        *,
+        recs: list[SamplingRecommendation],
+        uncertainty_map: np.ndarray,
+        boundary: tuple[float, float, float, float],
+    ) -> dict[str, Any]:
+        arr = np.asarray(uncertainty_map, dtype=float)
+        h, w = arr.shape
+        region_map = np.zeros((h, w), dtype=float)
+        region_points: list[dict[str, Any]] = []
+        min_x, max_x, min_y, max_y = boundary
+
+        for idx, rec in enumerate(recs):
+            row, col = self._xy_to_grid(rec.x, rec.y, boundary=boundary, h=h, w=w)
+            influence = max(0.1, float(rec.score))
+            for rr in range(max(0, row - 1), min(h, row + 2)):
+                for cc in range(max(0, col - 1), min(w, col + 2)):
+                    dist = abs(rr - row) + abs(cc - col)
+                    weight = 1.0 if dist == 0 else (0.6 if dist == 1 else 0.3)
+                    region_map[rr, cc] += influence * weight
+            region_points.append(
+                {
+                    "rank": int(idx + 1),
+                    "x": float(rec.x),
+                    "y": float(rec.y),
+                    "row": int(row),
+                    "col": int(col),
+                    "source": str(rec.source),
+                    "score": float(rec.score),
+                }
+            )
+
+        max_region = float(np.max(region_map)) if region_map.size else 0.0
+        norm_region = region_map / max(1e-8, max_region)
+        contour_levels = [0.25, 0.5, 0.75]
+        contours: list[dict[str, Any]] = []
+        for level in contour_levels:
+            idxs = np.argwhere(norm_region >= level)
+            if idxs.size == 0:
+                contours.append({"level": float(level), "cells": []})
+                continue
+            cells = []
+            for row, col in idxs[:48]:
+                x = min_x + (max_x - min_x) * (int(col) / max(1, w - 1))
+                y = min_y + (max_y - min_y) * (int(row) / max(1, h - 1))
+                cells.append({"row": int(row), "col": int(col), "x": float(x), "y": float(y)})
+            contours.append({"level": float(level), "cells": cells})
+
+        return {
+            "summary": {
+                "region_peak": max_region,
+                "region_mean": float(np.mean(region_map)) if region_map.size else 0.0,
+                "region_coverage_ratio": float(np.count_nonzero(norm_region >= 0.25) / max(1, h * w)),
+                "recommended_region_count": int(len(region_points)),
+            },
+            "recommended_regions": region_points,
+            "region_intensity_map": [[float(v) for v in row.tolist()] for row in norm_region],
+            "region_contours": contours,
+        }
+
+    def _build_sampling_effect_evaluation(
+        self,
+        *,
+        recs: list[SamplingRecommendation],
+        uncertainty_map: np.ndarray,
+        existing_points: np.ndarray,
+        boundary: tuple[float, float, float, float],
+    ) -> dict[str, Any]:
+        arr = np.asarray(uncertainty_map, dtype=float)
+        h, w = arr.shape
+        before_mean = float(np.mean(arr))
+        after_map = arr.copy()
+
+        for rec in recs:
+            row, col = self._xy_to_grid(rec.x, rec.y, boundary=boundary, h=h, w=w)
+            for rr in range(max(0, row - 1), min(h, row + 2)):
+                for cc in range(max(0, col - 1), min(w, col + 2)):
+                    dist = abs(rr - row) + abs(cc - col)
+                    decay = 0.2 if dist == 0 else (0.1 if dist == 1 else 0.05)
+                    after_map[rr, cc] = max(1e-6, float(after_map[rr, cc]) * (1.0 - decay))
+
+        after_mean = float(np.mean(after_map))
+        reduction = float(before_mean - after_mean)
+        reduction_ratio = float(reduction / max(1e-6, before_mean))
+        expected_gain = float(np.mean([rec.score for rec in recs])) if recs else 0.0
+
+        total_points = int(existing_points.shape[0]) + int(len(recs)) if existing_points.ndim == 2 else int(len(recs))
+        sampling_efficiency = float(reduction / max(1, len(recs)))
+        quality_score = float(np.clip(0.45 * reduction_ratio + 0.35 * expected_gain + 0.2 * min(1.0, total_points / 30.0), 0.0, 1.0))
+
+        return {
+            "summary": {
+                "uncertainty_before_mean": before_mean,
+                "uncertainty_after_mean": after_mean,
+                "uncertainty_reduction": reduction,
+                "uncertainty_reduction_ratio": reduction_ratio,
+                "expected_information_gain": expected_gain,
+                "sampling_efficiency": sampling_efficiency,
+                "quality_score": quality_score,
+            },
+            "before_uncertainty_map": [[float(v) for v in row.tolist()] for row in arr],
+            "after_uncertainty_map": [[float(v) for v in row.tolist()] for row in after_map],
+            "evaluation_notes": [
+                "基于推荐点邻域衰减估计采样后的不确定性变化。",
+                "质量评分综合考虑不确定性下降、信息增益与样本规模。",
+            ],
+        }
+
+    def _build_sampling_optimization_suggestions(
+        self,
+        *,
+        recs: list[SamplingRecommendation],
+        density_analysis: dict[str, Any],
+        effect_evaluation: dict[str, Any],
+    ) -> dict[str, Any]:
+        summary_density = density_analysis.get("summary", {})
+        summary_effect = effect_evaluation.get("summary", {})
+        coverage_ratio = float(summary_density.get("coverage_ratio", 0.0))
+        mean_density = float(summary_density.get("mean_density", 0.0))
+        reduction_ratio = float(summary_effect.get("uncertainty_reduction_ratio", 0.0))
+        quality_score = float(summary_effect.get("quality_score", 0.0))
+
+        suggestions: list[dict[str, Any]] = []
+        if coverage_ratio < 0.2:
+            suggestions.append(
+                {
+                    "category": "coverage",
+                    "priority": "high",
+                    "title": "扩大采样覆盖范围",
+                    "detail": "当前覆盖率偏低，建议在稀疏热点区域增加采样点以避免局部过拟合。",
+                }
+            )
+        if mean_density > 0.9:
+            suggestions.append(
+                {
+                    "category": "density_balance",
+                    "priority": "medium",
+                    "title": "控制局部采样密度",
+                    "detail": "局部密度较高，建议降低密集区采样频率并向边缘高不确定性区域转移。",
+                }
+            )
+        if reduction_ratio < 0.08:
+            suggestions.append(
+                {
+                    "category": "effectiveness",
+                    "priority": "high",
+                    "title": "调整融合策略",
+                    "detail": "当前预估降不确定性幅度有限，建议优先启用 hybrid 或 rule_only 进行对比。",
+                }
+            )
+        if quality_score < 0.45:
+            suggestions.append(
+                {
+                    "category": "model_feedback",
+                    "priority": "medium",
+                    "title": "提升策略学习稳定性",
+                    "detail": "建议增加训练回合或扩展历史轨迹，提升策略网络在高不确定性区域的识别能力。",
+                }
+            )
+        if not suggestions:
+            suggestions.append(
+                {
+                    "category": "status",
+                    "priority": "low",
+                    "title": "维持当前采样计划",
+                    "detail": "当前覆盖与效果表现稳定，可按现有推荐节奏持续采样并定期复评。",
+                }
+            )
+
+        return {
+            "summary": {
+                "suggestion_count": int(len(suggestions)),
+                "high_priority_count": int(sum(1 for s in suggestions if s["priority"] == "high")),
+                "recommended_next_step": suggestions[0]["title"],
+                "reference_points": int(len(recs)),
+            },
+            "suggestions": suggestions,
+        }
+
     def recommend(
         self,
         uncertainty_map: np.ndarray,
@@ -482,6 +662,22 @@ class SamplingRLIntegrator:
             uncertainty_map=arr,
             boundary=boundary,
         )
+        region_visualization = self._build_sampling_region_visualization(
+            recs=final,
+            uncertainty_map=arr,
+            boundary=boundary,
+        )
+        effect_evaluation = self._build_sampling_effect_evaluation(
+            recs=final,
+            uncertainty_map=arr,
+            existing_points=existing_arr,
+            boundary=boundary,
+        )
+        optimization_suggestions = self._build_sampling_optimization_suggestions(
+            recs=final,
+            density_analysis=density_analysis,
+            effect_evaluation=effect_evaluation,
+        )
 
         payload = {
             "model_name": self.model_name,
@@ -502,6 +698,9 @@ class SamplingRLIntegrator:
                 "action_value_visualization": action_value_vis,
                 "sampling_point_recommendation": point_rec_explain,
                 "sampling_density_analysis": density_analysis,
+                "sampling_region_visualization": region_visualization,
+                "sampling_effect_evaluation": effect_evaluation,
+                "sampling_optimization_suggestions": optimization_suggestions,
             },
         }
         return payload
