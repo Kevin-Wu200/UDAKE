@@ -189,6 +189,10 @@ def test_service_sampling_rl_train_and_recommend() -> None:
     assert "sampling_region_visualization" in rec["recommendation"]["explanations"]
     assert "sampling_effect_evaluation" in rec["recommendation"]["explanations"]
     assert "sampling_optimization_suggestions" in rec["recommendation"]["explanations"]
+    assert "strategy_comparison_analysis" in rec["recommendation"]["explanations"]
+    assert "sampling_efficiency_evaluation" in rec["recommendation"]["explanations"]
+    assert "long_term_value_prediction" in rec["recommendation"]["explanations"]
+    assert "policy_robustness_analysis" in rec["recommendation"]["explanations"]
     assert "optimization" in rec
 
 

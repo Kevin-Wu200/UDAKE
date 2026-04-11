@@ -200,6 +200,10 @@ def test_integration_and_optimization_helpers() -> None:
     assert "sampling_region_visualization" in recommend["explanations"]
     assert "sampling_effect_evaluation" in recommend["explanations"]
     assert "sampling_optimization_suggestions" in recommend["explanations"]
+    assert "strategy_comparison_analysis" in recommend["explanations"]
+    assert "sampling_efficiency_evaluation" in recommend["explanations"]
+    assert "long_term_value_prediction" in recommend["explanations"]
+    assert "policy_robustness_analysis" in recommend["explanations"]
     assert "summary" in recommend["explanations"]["policy_decision"]
     assert "action_value_points" in recommend["explanations"]["action_value_visualization"]
     assert "point_explanations" in recommend["explanations"]["sampling_point_recommendation"]
@@ -207,6 +211,10 @@ def test_integration_and_optimization_helpers() -> None:
     assert "region_intensity_map" in recommend["explanations"]["sampling_region_visualization"]
     assert "uncertainty_reduction_ratio" in recommend["explanations"]["sampling_effect_evaluation"]["summary"]
     assert "suggestions" in recommend["explanations"]["sampling_optimization_suggestions"]
+    assert "strategy_metrics" in recommend["explanations"]["strategy_comparison_analysis"]
+    assert "combined_efficiency_score" in recommend["explanations"]["sampling_efficiency_evaluation"]["summary"]
+    assert len(recommend["explanations"]["long_term_value_prediction"]["prediction_curve"]) >= 1
+    assert "perturbation_tests" in recommend["explanations"]["policy_robustness_analysis"]
     assert optimized["best_strategy"] in {"rl_only", "rule_only", "hybrid"}
 
     batch_opt = BatchOptimizer().suggest(sample_count=256, feature_dim=32, memory_budget_mb=16)

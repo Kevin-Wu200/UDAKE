@@ -502,6 +502,201 @@ class SamplingRLIntegrator:
             ],
         }
 
+    def _build_strategy_comparison_analysis(
+        self,
+        *,
+        fusion_strategy: str,
+        rl_recs: list[SamplingRecommendation],
+        rule_recs: list[SamplingRecommendation],
+        final_recs: list[SamplingRecommendation],
+        uncertainty_map: np.ndarray,
+        boundary: tuple[float, float, float, float],
+    ) -> dict[str, Any]:
+        arr = np.asarray(uncertainty_map, dtype=float)
+        h, w = arr.shape
+        top_threshold = float(np.quantile(arr.reshape(-1), 0.8))
+
+        def _stats(name: str, recs: list[SamplingRecommendation]) -> dict[str, Any]:
+            scores = np.asarray([float(r.score) for r in recs], dtype=float)
+            if scores.size == 0:
+                return {
+                    "strategy": name,
+                    "count": 0,
+                    "mean_score": 0.0,
+                    "std_score": 0.0,
+                    "best_score": 0.0,
+                    "spatial_diversity": 0.0,
+                    "high_uncertainty_hit_ratio": 0.0,
+                }
+
+            hits = 0
+            for rec in recs:
+                row, col = self._xy_to_grid(rec.x, rec.y, boundary=boundary, h=h, w=w)
+                if float(arr[row, col]) >= top_threshold:
+                    hits += 1
+            return {
+                "strategy": name,
+                "count": int(scores.size),
+                "mean_score": float(np.mean(scores)),
+                "std_score": float(np.std(scores)),
+                "best_score": float(np.max(scores)),
+                "spatial_diversity": self._estimate_spatial_diversity(recs),
+                "high_uncertainty_hit_ratio": float(hits / max(1, scores.size)),
+            }
+
+        rl_stats = _stats("rl_only", rl_recs)
+        rule_stats = _stats("rule_only", rule_recs)
+        final_stats = _stats(fusion_strategy, final_recs)
+        candidates = [rl_stats, rule_stats, final_stats]
+        best_mean = max(candidates, key=lambda x: x["mean_score"])["strategy"]
+        best_peak = max(candidates, key=lambda x: x["best_score"])["strategy"]
+
+        return {
+            "summary": {
+                "selected_strategy": fusion_strategy,
+                "best_by_mean_score": best_mean,
+                "best_by_peak_score": best_peak,
+                "final_mean_score": float(final_stats["mean_score"]),
+                "final_high_uncertainty_hit_ratio": float(final_stats["high_uncertainty_hit_ratio"]),
+            },
+            "strategy_metrics": [rl_stats, rule_stats, final_stats],
+        }
+
+    def _build_sampling_efficiency_evaluation(
+        self,
+        *,
+        recs: list[SamplingRecommendation],
+        effect_evaluation: dict[str, Any],
+        density_analysis: dict[str, Any],
+    ) -> dict[str, Any]:
+        effect_summary = effect_evaluation.get("summary", {})
+        density_summary = density_analysis.get("summary", {})
+        reduction = float(effect_summary.get("uncertainty_reduction", 0.0))
+        reduction_ratio = float(effect_summary.get("uncertainty_reduction_ratio", 0.0))
+        info_gain = float(effect_summary.get("expected_information_gain", 0.0))
+        coverage_ratio = float(density_summary.get("coverage_ratio", 0.0))
+        point_count = max(1, len(recs))
+
+        marginal_gain = float(reduction / point_count)
+        coverage_eff = float(coverage_ratio / point_count)
+        combined_eff = float(np.clip(0.5 * reduction_ratio + 0.35 * info_gain + 0.15 * min(1.0, coverage_ratio), 0.0, 1.0))
+
+        level = "high" if combined_eff >= 0.65 else ("medium" if combined_eff >= 0.4 else "low")
+        return {
+            "summary": {
+                "sample_count": int(point_count),
+                "marginal_uncertainty_reduction": marginal_gain,
+                "coverage_efficiency": coverage_eff,
+                "combined_efficiency_score": combined_eff,
+                "efficiency_level": level,
+            },
+            "cost_benefit": {
+                "uncertainty_reduction": reduction,
+                "uncertainty_reduction_ratio": reduction_ratio,
+                "expected_information_gain": info_gain,
+                "coverage_ratio": coverage_ratio,
+            },
+        }
+
+    def _build_long_term_value_prediction(
+        self,
+        *,
+        recs: list[SamplingRecommendation],
+        effect_evaluation: dict[str, Any],
+    ) -> dict[str, Any]:
+        effect_summary = effect_evaluation.get("summary", {})
+        base_gain = float(effect_summary.get("expected_information_gain", 0.0))
+        reduction_ratio = float(effect_summary.get("uncertainty_reduction_ratio", 0.0))
+        quality_score = float(effect_summary.get("quality_score", 0.0))
+        count_factor = min(1.0, len(recs) / 10.0)
+        stability = float(np.clip(0.55 * quality_score + 0.45 * count_factor, 0.0, 1.0))
+
+        horizons = [3, 5, 10]
+        curve: list[dict[str, Any]] = []
+        for step in horizons:
+            decay = 0.92 ** step
+            cumulative_value = float(base_gain * step * (0.75 + 0.25 * stability) * decay)
+            projected_reduction = float(np.clip(reduction_ratio * np.sqrt(step) * (0.8 + 0.2 * stability), 0.0, 1.0))
+            curve.append(
+                {
+                    "horizon_steps": int(step),
+                    "projected_cumulative_value": cumulative_value,
+                    "projected_uncertainty_reduction_ratio": projected_reduction,
+                }
+            )
+
+        return {
+            "summary": {
+                "base_information_gain": base_gain,
+                "stability_factor": stability,
+                "long_term_value_score": float(np.mean([x["projected_cumulative_value"] for x in curve])) if curve else 0.0,
+            },
+            "prediction_curve": curve,
+        }
+
+    def _build_policy_robustness_analysis(
+        self,
+        *,
+        final_recs: list[SamplingRecommendation],
+        uncertainty_map: np.ndarray,
+        boundary: tuple[float, float, float, float],
+    ) -> dict[str, Any]:
+        arr = np.asarray(uncertainty_map, dtype=float)
+        h, w = arr.shape
+        if not final_recs:
+            return {
+                "summary": {
+                    "robustness_score": 0.0,
+                    "sensitivity_index": 1.0,
+                    "stability_level": "low",
+                },
+                "perturbation_tests": [],
+            }
+
+        scales = [0.02, 0.05, 0.1]
+        rng = np.random.default_rng(self.seed)
+        tests: list[dict[str, Any]] = []
+        stability_scores: list[float] = []
+        topk = max(1, len(final_recs))
+        for scale in scales:
+            noise = rng.normal(0.0, scale, size=arr.shape)
+            perturbed = np.clip(arr + noise, 1e-6, None)
+            top_idx = np.argsort(perturbed.reshape(-1))[::-1][:topk]
+            top_cells = {(int(idx) // w, int(idx) % w) for idx in top_idx.tolist()}
+
+            hits = 0
+            score_shift: list[float] = []
+            for rec in final_recs:
+                row, col = self._xy_to_grid(rec.x, rec.y, boundary=boundary, h=h, w=w)
+                if (row, col) in top_cells:
+                    hits += 1
+                score_shift.append(abs(float(perturbed[row, col]) - float(arr[row, col])))
+
+            retention = float(hits / max(1, len(final_recs)))
+            mean_shift = float(np.mean(score_shift)) if score_shift else 0.0
+            stability = float(np.clip(retention - mean_shift, 0.0, 1.0))
+            stability_scores.append(stability)
+            tests.append(
+                {
+                    "noise_scale": float(scale),
+                    "topk_retention_ratio": retention,
+                    "mean_score_shift": mean_shift,
+                    "stability_score": stability,
+                }
+            )
+
+        robustness = float(np.mean(stability_scores)) if stability_scores else 0.0
+        sensitivity = float(1.0 - robustness)
+        level = "high" if robustness >= 0.65 else ("medium" if robustness >= 0.4 else "low")
+        return {
+            "summary": {
+                "robustness_score": robustness,
+                "sensitivity_index": sensitivity,
+                "stability_level": level,
+            },
+            "perturbation_tests": tests,
+        }
+
     def _build_sampling_optimization_suggestions(
         self,
         *,
@@ -678,6 +873,28 @@ class SamplingRLIntegrator:
             density_analysis=density_analysis,
             effect_evaluation=effect_evaluation,
         )
+        strategy_comparison_analysis = self._build_strategy_comparison_analysis(
+            fusion_strategy=fusion_strategy,
+            rl_recs=rl_recs,
+            rule_recs=rule_recs,
+            final_recs=final,
+            uncertainty_map=arr,
+            boundary=boundary,
+        )
+        sampling_efficiency_evaluation = self._build_sampling_efficiency_evaluation(
+            recs=final,
+            effect_evaluation=effect_evaluation,
+            density_analysis=density_analysis,
+        )
+        long_term_value_prediction = self._build_long_term_value_prediction(
+            recs=final,
+            effect_evaluation=effect_evaluation,
+        )
+        policy_robustness_analysis = self._build_policy_robustness_analysis(
+            final_recs=final,
+            uncertainty_map=arr,
+            boundary=boundary,
+        )
 
         payload = {
             "model_name": self.model_name,
@@ -701,6 +918,10 @@ class SamplingRLIntegrator:
                 "sampling_region_visualization": region_visualization,
                 "sampling_effect_evaluation": effect_evaluation,
                 "sampling_optimization_suggestions": optimization_suggestions,
+                "strategy_comparison_analysis": strategy_comparison_analysis,
+                "sampling_efficiency_evaluation": sampling_efficiency_evaluation,
+                "long_term_value_prediction": long_term_value_prediction,
+                "policy_robustness_analysis": policy_robustness_analysis,
             },
         }
         return payload
