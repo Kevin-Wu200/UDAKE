@@ -181,6 +181,11 @@ def test_service_sampling_rl_train_and_recommend() -> None:
     )
     assert rec["model_name"] == "ppo"
     assert len(rec["recommendation"]["recommendations"]) >= 1
+    assert "explanations" in rec["recommendation"]
+    assert "policy_decision" in rec["recommendation"]["explanations"]
+    assert "action_value_visualization" in rec["recommendation"]["explanations"]
+    assert "sampling_point_recommendation" in rec["recommendation"]["explanations"]
+    assert "sampling_density_analysis" in rec["recommendation"]["explanations"]
     assert "optimization" in rec
 
 
@@ -219,6 +224,8 @@ def test_api_sampling_rl_routes() -> None:
     payload = rec_resp.json()
     assert payload["model_name"] == "dqn"
     assert len(payload["recommendation"]["recommendations"]) >= 1
+    assert "explanations" in payload["recommendation"]
+    assert "policy_decision" in payload["recommendation"]["explanations"]
 
 
 def test_service_spatiotemporal_train_predict_and_online_update() -> None:

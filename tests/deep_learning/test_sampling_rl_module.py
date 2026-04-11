@@ -192,6 +192,15 @@ def test_integration_and_optimization_helpers() -> None:
 
     assert train_result["summary"]["episodes"] >= 1
     assert len(recommend["recommendations"]) >= 1
+    assert "explanations" in recommend
+    assert "policy_decision" in recommend["explanations"]
+    assert "action_value_visualization" in recommend["explanations"]
+    assert "sampling_point_recommendation" in recommend["explanations"]
+    assert "sampling_density_analysis" in recommend["explanations"]
+    assert "summary" in recommend["explanations"]["policy_decision"]
+    assert "action_value_points" in recommend["explanations"]["action_value_visualization"]
+    assert "point_explanations" in recommend["explanations"]["sampling_point_recommendation"]
+    assert "sparse_hotspots" in recommend["explanations"]["sampling_density_analysis"]
     assert optimized["best_strategy"] in {"rl_only", "rule_only", "hybrid"}
 
     batch_opt = BatchOptimizer().suggest(sample_count=256, feature_dim=32, memory_budget_mb=16)
