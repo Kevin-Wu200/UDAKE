@@ -91,6 +91,25 @@ def test_fusion_api_routes() -> None:
     assert optimize_resp.status_code == 200
     assert optimize_resp.json()["best_method"] is not None
 
+    explain_resp = client.post(
+        "/api/dl/fusion/explain",
+        json={
+            "models": _models(),
+            "method": "hybrid",
+            "top_k": 3,
+            "max_explain_nodes": 4,
+            "true_values": _true_values(),
+            "strategy": "dynamic",
+            "weight_method": "adaptive",
+        },
+    )
+    assert explain_resp.status_code == 200
+    explain_payload = explain_resp.json()
+    assert explain_payload["summary"]["method"] == "hybrid"
+    assert "lime" in explain_payload
+    assert "shap" in explain_payload
+    assert "prediction" in explain_payload
+
     hybrid_resp = client.post(
         "/api/dl/fusion/hybrid",
         json={

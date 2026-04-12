@@ -29,6 +29,7 @@ from .anomaly_features import AnomalyFeatureRegistry
 from .attention_kriging_explainer import AttentionKrigingLIMEAdapter, AttentionKrigingSHAPAdapter
 from .bnn_explainer import BNNLIMEAdapter, BNNSHAPAdapter
 from .contrastive_anomaly_explainer import ContrastiveLimeAdapter, ContrastiveShapAdapter
+from .fusion_explainer import FusionLIMEAdapter, FusionSHAPAdapter
 from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
 from .gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter
 from .gnn_kriging_explainer import GNNKrigingLIMEAdapter, GNNKrigingSHAPAdapter
@@ -115,6 +116,8 @@ class DeepLearningService:
         self.bnn_shap_adapter = BNNSHAPAdapter()
         self.mc_dropout_lime_adapter = MCDropoutLIMEAdapter()
         self.mc_dropout_shap_adapter = MCDropoutSHAPAdapter()
+        self.fusion_lime_adapter = FusionLIMEAdapter()
+        self.fusion_shap_adapter = FusionSHAPAdapter()
         cache_file = os.path.join(tempfile.gettempdir(), f"udake_anomaly_cache_{os.getpid()}.json")
         self.anomaly_cache = AnomalyModelCache(
             cache_size=256,
@@ -1302,3 +1305,83 @@ class DeepLearningService:
 
     def fusion_check_access(self, token: str | None, client_id: str = "anonymous") -> dict[str, Any]:
         return self.fusion_platform.check_access(token=token, client_id=client_id)
+
+    def explain_fusion(
+        self,
+        *,
+        models: list[dict[str, Any]],
+        method: str = "hybrid",
+        top_k: int = 5,
+        include_prediction: bool = True,
+        num_samples: int | None = None,
+        nsamples: int | None = None,
+        max_explain_nodes: int = 8,
+        profile_id: str | None = None,
+        strategy: str | None = None,
+        weight_method: str | None = None,
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+    ) -> dict[str, Any]:
+        if method not in {"lime", "shap", "hybrid"}:
+            raise ValueError("method must be one of lime/shap/hybrid")
+
+        lime_result: dict[str, Any] | None = None
+        if method in {"lime", "hybrid"}:
+            lime_result = self.fusion_lime_adapter.explain(
+                models=models,
+                top_k=top_k,
+                max_explain_nodes=max_explain_nodes,
+                num_samples=num_samples,
+                profile_id=profile_id,
+                strategy=strategy,
+                weight_method=weight_method,
+                true_values=true_values,
+                context=context,
+            )
+
+        shap_result: dict[str, Any] | None = None
+        if method in {"shap", "hybrid"}:
+            shap_result = self.fusion_shap_adapter.explain(
+                models=models,
+                top_k=top_k,
+                max_explain_nodes=max_explain_nodes,
+                nsamples=nsamples,
+                profile_id=profile_id,
+                strategy=strategy,
+                weight_method=weight_method,
+                true_values=true_values,
+                context=context,
+            )
+
+        top_features: list[dict[str, Any]] = []
+        if method == "lime" and lime_result is not None:
+            top_features = list(lime_result.get("summary", {}).get("top_features", []))
+        elif method == "shap" and shap_result is not None:
+            top_features = list(shap_result.get("summary", {}).get("top_features", []))
+        elif method == "hybrid":
+            if shap_result is not None:
+                top_features = list(shap_result.get("summary", {}).get("top_features", []))
+            if not top_features and lime_result is not None:
+                top_features = list(lime_result.get("summary", {}).get("top_features", []))
+
+        result: dict[str, Any] = {
+            "summary": {
+                "method": method,
+                "top_features": top_features,
+                "max_explain_nodes": int(max_explain_nodes),
+            }
+        }
+        if lime_result is not None:
+            result["lime"] = lime_result
+        if shap_result is not None:
+            result["shap"] = shap_result
+        if include_prediction:
+            result["prediction"] = self.predict_fusion(
+                models=models,
+                profile_id=profile_id,
+                strategy=strategy,
+                weight_method=weight_method,
+                true_values=true_values,
+                context=context,
+            )
+        return result
