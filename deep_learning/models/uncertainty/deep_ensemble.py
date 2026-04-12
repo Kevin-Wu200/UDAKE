@@ -99,6 +99,11 @@ class DeepEnsembleRegressor:
         self._predict_cache_size = 24
         self._predict_cache_hits = 0
         self._predict_cache_misses = 0
+        self._batch_cache_lock = threading.Lock()
+        self._batch_result_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._batch_cache_size = 16
+        self._batch_cache_hits = 0
+        self._batch_cache_misses = 0
 
     def _split_train_val(self, x: np.ndarray, y: np.ndarray, ratio: float = 0.2) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         n = len(y)
@@ -332,6 +337,145 @@ class DeepEnsembleRegressor:
             "feature_names": list(pre["feature_names"]),
         }
         return pred
+
+    def predict_deep_ensemble_batch(
+        self,
+        features: np.ndarray | list[list[float]],
+        *,
+        aggregation: EnsembleAgg = "mean",
+        member_weights: dict[str, float] | None = None,
+        confidence: float = 0.95,
+        batch_size: int = 128,
+        use_training_stats: bool = True,
+        optimize_memory: bool = True,
+        use_result_cache: bool = True,
+    ) -> dict[str, Any]:
+        pre = self.preprocess_deep_ensemble_data(features, use_training_stats=use_training_stats)
+        pred = self.predict_batch(
+            np.asarray(pre["processed_features"], dtype=float),
+            aggregation=aggregation,
+            member_weights=member_weights,
+            confidence=confidence,
+            batch_size=batch_size,
+            optimize_memory=optimize_memory,
+            use_result_cache=use_result_cache,
+        )
+        pred["preprocess"] = {
+            "scaler": dict(pre["scaler"]),
+            "validation": dict(pre["validation"]),
+            "feature_names": list(pre["feature_names"]),
+        }
+        return pred
+
+    def predict_batch(
+        self,
+        x: np.ndarray,
+        *,
+        aggregation: EnsembleAgg = "mean",
+        member_weights: dict[str, float] | None = None,
+        confidence: float = 0.95,
+        batch_size: int = 128,
+        optimize_memory: bool = True,
+        use_result_cache: bool = True,
+    ) -> dict[str, Any]:
+        features = ensure_2d(x)
+        conf = float(confidence)
+        chunk_size = int(max(1, batch_size))
+        compact = bool(optimize_memory)
+        normalized_weights = {str(k): float(v) for k, v in sorted((member_weights or {}).items())}
+        cache_key = self._batch_cache_key(
+            features=features,
+            aggregation=aggregation,
+            confidence=conf,
+            member_weights=normalized_weights,
+            batch_size=chunk_size,
+            optimize_memory=compact,
+        )
+        if use_result_cache:
+            cached = self._batch_cache_get(cache_key)
+            if cached is not None:
+                result = dict(cached)
+                result["performance"] = {
+                    **dict(result.get("performance", {})),
+                    "cache_hit": True,
+                    "batch_cache_metrics": self._batch_cache_metrics(),
+                }
+                return result
+
+        mean_list: list[np.ndarray] = []
+        var_list: list[np.ndarray] = []
+        ale_list: list[np.ndarray] = []
+        epi_list: list[np.ndarray] = []
+        low_list: list[np.ndarray] = []
+        up_list: list[np.ndarray] = []
+        q10_list: list[np.ndarray] = []
+        q50_list: list[np.ndarray] = []
+        q90_list: list[np.ndarray] = []
+        member_ids: list[str] = []
+        input_memory_bytes = 0
+
+        for start in range(0, features.shape[0], chunk_size):
+            end = min(start + chunk_size, features.shape[0])
+            x_batch = np.asarray(features[start:end], dtype=np.float32 if compact else float)
+            input_memory_bytes += int(x_batch.nbytes)
+            pred = self.predict(
+                np.asarray(x_batch, dtype=float),
+                aggregation=aggregation,
+                member_weights=member_weights,
+                confidence=conf,
+            )
+            if not member_ids:
+                member_ids = [str(mid) for mid in pred.get("member_ids", [])]
+            mean_list.append(np.asarray(pred["mean"], dtype=np.float32 if compact else float))
+            var_list.append(np.asarray(pred["variance"], dtype=np.float32 if compact else float))
+            ale_list.append(np.asarray(pred["aleatoric"], dtype=np.float32 if compact else float))
+            epi_list.append(np.asarray(pred["epistemic"], dtype=np.float32 if compact else float))
+            low_list.append(np.asarray(pred["lower"], dtype=np.float32 if compact else float))
+            up_list.append(np.asarray(pred["upper"], dtype=np.float32 if compact else float))
+            q10_list.append(np.asarray(pred["quantiles"]["q10"], dtype=np.float32 if compact else float))
+            q50_list.append(np.asarray(pred["quantiles"]["q50"], dtype=np.float32 if compact else float))
+            q90_list.append(np.asarray(pred["quantiles"]["q90"], dtype=np.float32 if compact else float))
+
+        result = {
+            "mean": np.concatenate(mean_list, axis=0) if mean_list else np.zeros((0,), dtype=np.float32),
+            "variance": np.concatenate(var_list, axis=0) if var_list else np.zeros((0,), dtype=np.float32),
+            "aleatoric": np.concatenate(ale_list, axis=0) if ale_list else np.zeros((0,), dtype=np.float32),
+            "epistemic": np.concatenate(epi_list, axis=0) if epi_list else np.zeros((0,), dtype=np.float32),
+            "lower": np.concatenate(low_list, axis=0) if low_list else np.zeros((0,), dtype=np.float32),
+            "upper": np.concatenate(up_list, axis=0) if up_list else np.zeros((0,), dtype=np.float32),
+            "quantiles": {
+                "q10": np.concatenate(q10_list, axis=0) if q10_list else np.zeros((0,), dtype=np.float32),
+                "q50": np.concatenate(q50_list, axis=0) if q50_list else np.zeros((0,), dtype=np.float32),
+                "q90": np.concatenate(q90_list, axis=0) if q90_list else np.zeros((0,), dtype=np.float32),
+            },
+            "member_ids": list(member_ids),
+            "aggregation": aggregation,
+            "performance": {
+                "cache_hit": False,
+                "batch_size": int(chunk_size),
+                "batch_count": int((features.shape[0] + chunk_size - 1) // chunk_size),
+                "sample_count": int(features.shape[0]),
+                "optimize_memory": compact,
+                "input_memory_bytes": int(input_memory_bytes),
+                "result_memory_bytes": 0,
+                "predict_cache_metrics": self._predict_cache_metrics(),
+                "batch_cache_metrics": self._batch_cache_metrics(),
+            },
+        }
+        result["performance"]["result_memory_bytes"] = int(
+            np.asarray(result["mean"]).nbytes
+            + np.asarray(result["variance"]).nbytes
+            + np.asarray(result["aleatoric"]).nbytes
+            + np.asarray(result["epistemic"]).nbytes
+            + np.asarray(result["lower"]).nbytes
+            + np.asarray(result["upper"]).nbytes
+            + np.asarray(result["quantiles"]["q10"]).nbytes
+            + np.asarray(result["quantiles"]["q50"]).nbytes
+            + np.asarray(result["quantiles"]["q90"]).nbytes
+        )
+        if use_result_cache:
+            self._batch_cache_set(cache_key, result)
+        return result
 
     def model_diversity(self, x: np.ndarray) -> dict[str, float]:
         means, _, _ = self._collect_predictions(x)
@@ -603,6 +747,60 @@ class DeepEnsembleRegressor:
                 "hits": int(self._predict_cache_hits),
                 "misses": int(self._predict_cache_misses),
                 "hit_rate": float(self._predict_cache_hits / max(1, total)),
+            }
+
+    def _batch_cache_key(
+        self,
+        *,
+        features: np.ndarray,
+        aggregation: EnsembleAgg,
+        confidence: float,
+        member_weights: dict[str, float],
+        batch_size: int,
+        optimize_memory: bool,
+    ) -> str:
+        payload = {
+            "feature_hash": self._feature_fingerprint(features),
+            "shape": [int(features.shape[0]), int(features.shape[1]) if features.ndim == 2 else 0],
+            "aggregation": str(aggregation),
+            "confidence": float(confidence),
+            "member_weights": dict(member_weights),
+            "batch_size": int(batch_size),
+            "optimize_memory": bool(optimize_memory),
+            "active_member_ids": list(self.active_member_ids),
+            "model_hash": self._model_signature(),
+        }
+        normalized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _batch_cache_get(self, key: str) -> dict[str, Any] | None:
+        with self._batch_cache_lock:
+            cached = self._batch_result_cache.get(key)
+            if cached is None:
+                self._batch_cache_misses += 1
+                return None
+            self._batch_cache_hits += 1
+            self._batch_result_cache.move_to_end(key)
+            return copy.deepcopy(cached)
+
+    def _batch_cache_set(self, key: str, value: dict[str, Any]) -> None:
+        with self._batch_cache_lock:
+            cached = copy.deepcopy(value)
+            perf = dict(cached.get("performance", {}))
+            perf.pop("cache_hit", None)
+            cached["performance"] = perf
+            self._batch_result_cache[key] = cached
+            self._batch_result_cache.move_to_end(key)
+            while len(self._batch_result_cache) > self._batch_cache_size:
+                self._batch_result_cache.popitem(last=False)
+
+    def _batch_cache_metrics(self) -> dict[str, float | int]:
+        with self._batch_cache_lock:
+            total = self._batch_cache_hits + self._batch_cache_misses
+            return {
+                "hits": int(self._batch_cache_hits),
+                "misses": int(self._batch_cache_misses),
+                "hit_rate": float(self._batch_cache_hits / max(1, total)),
             }
 
     def explain_ensemble_weights(
