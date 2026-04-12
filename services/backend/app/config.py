@@ -246,6 +246,13 @@ class Settings(BaseSettings):
                 return [139.767125, 35.681236]
         return v
 
+    @field_validator('GEOSCENE_API_KEY', mode='before')
+    @classmethod
+    def parse_geoscene_api_key(cls, v):
+        if v is None:
+            return ""
+        return str(v).strip()
+
     @field_validator(
         'FEEDBACK_FALLBACK_KEYS',
         'FEEDBACK_MASK_FIELDS',
@@ -359,6 +366,19 @@ class Settings(BaseSettings):
         if isinstance(self.GEOSCENE_DEFAULT_CENTER, str):
             return json.loads(self.GEOSCENE_DEFAULT_CENTER)
         return self.GEOSCENE_DEFAULT_CENTER
+
+    @property
+    def geoscene_is_mock(self) -> bool:
+        key = (self.GEOSCENE_API_KEY or "").strip()
+        if not key:
+            return True
+        normalized = key.upper()
+        mock_tokens = {
+            "YOUR_GEOSCENE_API_KEY_HERE",
+            "DEV_MOCK_GEOSCENE_KEY",
+            "DEV_MOCK_KEY_REPLACE_FOR_PROD",
+        }
+        return normalized in mock_tokens
 
     @property
     def is_development(self) -> bool:

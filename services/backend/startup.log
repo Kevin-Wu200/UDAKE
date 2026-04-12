@@ -1,0 +1,19 @@
+Redis 不可用，回退内存后端: No module named 'redis'
+/Users/wuchenkai/UDAKE/venv/lib/python3.9/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_name" has conflict with protected namespace "model_".
+
+You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+  warnings.warn(
+/Users/wuchenkai/UDAKE/venv/lib/python3.9/site-packages/pydantic/_internal/_fields.py:149: UserWarning: Field "model_version" has conflict with protected namespace "model_".
+
+You may be able to resolve this warning by setting `model_config['protected_namespaces'] = ()`.
+  warnings.warn(
+INFO:     Started server process [71858]
+INFO:     Waiting for application startup.
+2026-04-12 10:26:06,354 - root - INFO - 启动流程完成: {'status': 'ready', 'ready': True, 'degradation_level': 'none', 'fatal_error': None, 'startup_duration_ms': 1, 'current_status_text': '正在加载配置...', 'task_reports': [{'task_id': 'loadConfig', 'label': '加载基础配置', 'priority': 'P0', 'status_text': '正在加载配置...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1775960766.3539982, 'finished_at': 1775960766.354069, 'error': None, 'payload': {'environment': 'development', 'debug': True, 'version': '1.0.0'}}, {'task_id': 'connectBackend', 'label': '检查后端依赖', 'priority': 'P1', 'status_text': '正在连接服务器...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1775960766.354075, 'finished_at': 1775960766.354177, 'error': None, 'payload': {'results_dir_exists': True, 'data_dir_exists': True, 'results_dir_writable': True}}, {'task_id': 'loadUserData', 'label': '预加载业务数据', 'priority': 'P1', 'status_text': '正在准备地图数据...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1775960766.3541791, 'finished_at': 1775960766.3544, 'error': None, 'payload': {'template_count': 18}}, {'task_id': 'initPushService', 'label': '初始化推送服务', 'priority': 'P2', 'status_text': '即将完成...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1775960766.354402, 'finished_at': 1775960766.354464, 'error': None, 'payload': {'push_service': 'disabled'}}], 'preloaded_context': {'template_count': 18}}
+INFO:     Application startup complete.
+ERROR:    [Errno 1] error while attempting to bind on address ('0.0.0.0', 8000): operation not permitted
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+🚀 当前环境: development
+📝 配置文件: /Users/wuchenkai/UDAKE/configs/env/.env
+🔧 调试模式: True

@@ -32,7 +32,7 @@ async def get_map_config():
             "defaultBasemap": settings.GEOSCENE_DEFAULT_BASEMAP,
             "defaultCenter": settings.geoscene_center_list,
             "defaultZoom": settings.GEOSCENE_DEFAULT_ZOOM,
-            "isMock": settings.GEOSCENE_API_KEY == "YOUR_GEOSCENE_API_KEY_HERE"
+            "isMock": settings.geoscene_is_mock
         },
         "amap": {
             "apiKey": settings.AMAP_API_KEY,
@@ -109,7 +109,7 @@ async def get_all_config():
                 "defaultBasemap": settings.GEOSCENE_DEFAULT_BASEMAP,
                 "defaultCenter": settings.geoscene_center_list,
                 "defaultZoom": settings.GEOSCENE_DEFAULT_ZOOM,
-                "isMock": settings.GEOSCENE_API_KEY == "YOUR_GEOSCENE_API_KEY_HERE"
+                "isMock": settings.geoscene_is_mock
             },
             "amap": {
                 "apiKey": settings.AMAP_API_KEY,

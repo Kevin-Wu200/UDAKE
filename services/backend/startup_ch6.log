@@ -1,0 +1,11 @@
+Redis 不可用，回退内存后端: No module named 'redis'
+INFO:     Started server process [73869]
+INFO:     Waiting for application startup.
+2026-04-12 10:29:59,576 - root - INFO - 启动流程完成: {'status': 'ready', 'ready': True, 'degradation_level': 'none', 'fatal_error': None, 'startup_duration_ms': 1, 'current_status_text': '正在加载配置...', 'task_reports': [{'task_id': 'loadConfig', 'label': '加载基础配置', 'priority': 'P0', 'status_text': '正在加载配置...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1775960999.575798, 'finished_at': 1775960999.5758631, 'error': None, 'payload': {'environment': 'development', 'debug': True, 'version': '1.0.0'}}, {'task_id': 'connectBackend', 'label': '检查后端依赖', 'priority': 'P1', 'status_text': '正在连接服务器...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1775960999.575868, 'finished_at': 1775960999.575975, 'error': None, 'payload': {'results_dir_exists': True, 'data_dir_exists': True, 'results_dir_writable': True}}, {'task_id': 'loadUserData', 'label': '预加载业务数据', 'priority': 'P1', 'status_text': '正在准备地图数据...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1775960999.575978, 'finished_at': 1775960999.5762188, 'error': None, 'payload': {'template_count': 18}}, {'task_id': 'initPushService', 'label': '初始化推送服务', 'priority': 'P2', 'status_text': '即将完成...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1775960999.576222, 'finished_at': 1775960999.576267, 'error': None, 'payload': {'push_service': 'disabled'}}], 'preloaded_context': {'template_count': 18}}
+INFO:     Application startup complete.
+ERROR:    [Errno 1] error while attempting to bind on address ('0.0.0.0', 8000): operation not permitted
+INFO:     Waiting for application shutdown.
+INFO:     Application shutdown complete.
+🚀 当前环境: development
+📝 配置文件: /Users/wuchenkai/UDAKE/configs/env/.env
+🔧 调试模式: True

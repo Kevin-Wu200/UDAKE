@@ -3,9 +3,37 @@
 Real-time Interpolation System Configuration
 """
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from dataclasses import dataclass, field
 import os
+from pathlib import Path
+
+
+_DOTENV_CACHE: Optional[Dict[str, str]] = None
+
+
+def _load_dotenv_fallback() -> Dict[str, str]:
+    global _DOTENV_CACHE
+    if _DOTENV_CACHE is not None:
+        return _DOTENV_CACHE
+    env_file = Path(__file__).resolve().parents[1] / "configs" / "env" / ".env"
+    parsed: Dict[str, str] = {}
+    if env_file.exists():
+        for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            parsed[key.strip()] = value.strip()
+    _DOTENV_CACHE = parsed
+    return parsed
+
+
+def _get_env_value(key: str) -> Optional[str]:
+    value = os.getenv(key)
+    if value is not None:
+        return value
+    return _load_dotenv_fallback().get(key)
 
 
 @dataclass
@@ -138,29 +166,49 @@ class Config:
         """从环境变量加载配置"""
         config = cls()
 
+        redis_enabled_env = _get_env_value("REDIS_ENABLED")
+        if redis_enabled_env is not None:
+            redis_enabled = redis_enabled_env.strip().lower() in {"1", "true", "yes", "on"}
+            config.cache.l2_enabled = redis_enabled
+            if not redis_enabled:
+                config.cache.l2_url = ""
+                config.cache.l2_host = ""
+
         # 从环境变量覆盖配置
-        if os.getenv("REDIS_HOST"):
-            config.cache.l2_host = os.getenv("REDIS_HOST")
-        if os.getenv("REDIS_PORT"):
-            config.cache.l2_port = int(os.getenv("REDIS_PORT"))
-        if os.getenv("REDIS_DB"):
-            config.cache.l2_db = int(os.getenv("REDIS_DB"))
-        if os.getenv("REDIS_PASSWORD"):
-            config.cache.l2_password = os.getenv("REDIS_PASSWORD", "")
-        if os.getenv("REDIS_URL"):
-            config.cache.l2_url = os.getenv("REDIS_URL", "")
-        if os.getenv("REDIS_POOL_SIZE"):
-            config.cache.l2_pool_size = int(os.getenv("REDIS_POOL_SIZE"))
-        if os.getenv("REDIS_TIMEOUT"):
-            config.cache.l2_timeout = int(os.getenv("REDIS_TIMEOUT"))
-        if os.getenv("REDIS_RETRY_TIMES"):
-            config.cache.l2_retry_times = int(os.getenv("REDIS_RETRY_TIMES"))
-        if os.getenv("REDIS_STRICT"):
-            config.cache.l2_strict = os.getenv("REDIS_STRICT", "").strip().lower() in {"1", "true", "yes", "on"}
-        if os.getenv("LOG_LEVEL"):
-            config.logging.level = os.getenv("LOG_LEVEL")
-        if os.getenv("MAX_MEMORY_GB"):
-            config.performance.max_memory_usage_gb = float(os.getenv("MAX_MEMORY_GB"))
+        redis_host = _get_env_value("REDIS_HOST")
+        redis_port = _get_env_value("REDIS_PORT")
+        redis_db = _get_env_value("REDIS_DB")
+        redis_password = _get_env_value("REDIS_PASSWORD")
+        redis_url = _get_env_value("REDIS_URL")
+        redis_pool_size = _get_env_value("REDIS_POOL_SIZE")
+        redis_timeout = _get_env_value("REDIS_TIMEOUT")
+        redis_retry_times = _get_env_value("REDIS_RETRY_TIMES")
+        redis_strict = _get_env_value("REDIS_STRICT")
+        log_level = _get_env_value("LOG_LEVEL")
+        max_memory_gb = _get_env_value("MAX_MEMORY_GB")
+
+        if config.cache.l2_enabled and redis_host:
+            config.cache.l2_host = redis_host
+        if config.cache.l2_enabled and redis_port:
+            config.cache.l2_port = int(redis_port)
+        if config.cache.l2_enabled and redis_db:
+            config.cache.l2_db = int(redis_db)
+        if config.cache.l2_enabled and redis_password:
+            config.cache.l2_password = redis_password
+        if config.cache.l2_enabled and redis_url:
+            config.cache.l2_url = redis_url
+        if config.cache.l2_enabled and redis_pool_size:
+            config.cache.l2_pool_size = int(redis_pool_size)
+        if config.cache.l2_enabled and redis_timeout:
+            config.cache.l2_timeout = int(redis_timeout)
+        if config.cache.l2_enabled and redis_retry_times:
+            config.cache.l2_retry_times = int(redis_retry_times)
+        if config.cache.l2_enabled and redis_strict:
+            config.cache.l2_strict = redis_strict.strip().lower() in {"1", "true", "yes", "on"}
+        if log_level:
+            config.logging.level = log_level
+        if max_memory_gb:
+            config.performance.max_memory_usage_gb = float(max_memory_gb)
 
         return config
 

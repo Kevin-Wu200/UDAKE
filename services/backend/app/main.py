@@ -55,11 +55,25 @@ from .kriging_3d.api.路由 import router as kriging_3d_router
 from .dl_services.api import router as deep_learning_router
 import logging
 
-# 配置日志
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
+def _setup_logging() -> None:
+    """按配置初始化日志输出（控制台 + 可选文件）。"""
+    level_name = str(getattr(settings, "LOG_LEVEL", "INFO") or "INFO").upper()
+    level = getattr(logging, level_name, logging.INFO)
+    handlers = [logging.StreamHandler()]
+    log_file = getattr(settings, "LOG_FILE", None)
+    if log_file:
+        log_path = Path(log_file).expanduser()
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        handlers.append(logging.FileHandler(log_path, encoding="utf-8"))
+    logging.basicConfig(
+        level=level,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        handlers=handlers,
+        force=True,
+    )
+
+
+_setup_logging()
 
 startup_manager = StartupManager()
 

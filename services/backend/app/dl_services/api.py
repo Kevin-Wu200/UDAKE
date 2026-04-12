@@ -114,6 +114,8 @@ class AnomalyCacheWarmupRequest(BaseModel):
 
 
 class AnomalyCacheInvalidateRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     namespace: Optional[str] = Field(default=None, description="prediction/explanation，可选")
     key_prefix: Optional[str] = Field(default=None, description="按前缀失效")
     model_name: Optional[str] = Field(default=None, description="按模型失效")

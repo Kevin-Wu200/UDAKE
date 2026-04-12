@@ -135,11 +135,13 @@ async def api_versioning_middleware(request: Request, call_next):
             f'299 - "API v{resolution.version} is deprecated and '
             f'will be removed after {deprecated_meta["sunset"]}"'
         )
-        LOGGER.warning(
-            "检测到废弃 API 版本调用: version=%s path=%s",
-            resolution.version,
-            path,
-        )
+        # 仅在调用方显式使用废弃版本时记录告警，避免默认回退产生噪声日志。
+        if raw_header_version is not None or resolution.from_deprecated_path:
+            LOGGER.warning(
+                "检测到废弃 API 版本调用: version=%s path=%s",
+                resolution.version,
+                path,
+            )
 
     return response
 

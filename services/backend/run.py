@@ -3,10 +3,8 @@
 后端服务启动脚本
 """
 import warnings
-import uvicorn
-from app.config import settings
 
-# 抑制 macOS LibreSSL 与 urllib3 v2 的兼容性警告（不影响功能）
+# 尽早配置 warning 过滤，避免导入期噪声污染启动日志。
 warnings.filterwarnings("ignore", message=".*urllib3.*LibreSSL.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="urllib3")
 
@@ -14,8 +12,12 @@ warnings.filterwarnings("ignore", category=DeprecationWarning, module="urllib3")
 warnings.filterwarnings(
     "ignore",
     message=".*import python_multipart.*",
-    category=PendingDeprecationWarning
+    category=PendingDeprecationWarning,
+    module="starlette\\.formparsers",
 )
+
+import uvicorn
+from app.config import settings
 
 if __name__ == "__main__":
     print(f"🚀 启动 {settings.APP_NAME}")
