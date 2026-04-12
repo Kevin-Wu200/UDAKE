@@ -10,9 +10,33 @@ type ContributionRow = {
     reason: string;
 };
 
+type PerformanceRow = {
+    modelId: string;
+    score: number;
+    rmse?: number;
+    mae?: number;
+    r2?: number;
+    mape?: number;
+    source: string;
+};
+
+type TrendPoint = {
+    label: string;
+    value: number;
+};
+
+type DecisionNode = {
+    label: string;
+    detail: string;
+    children?: DecisionNode[];
+};
+
 type FusionVisualState = {
     weights: Record<string, number>;
     contributions: ContributionRow[];
+    performanceRows: PerformanceRow[];
+    trendSeries: TrendPoint[];
+    decisionTree: DecisionNode;
     strategyName: string;
     weightMethod: string;
     strategySummary: string;
@@ -48,7 +72,7 @@ export class ModelFusionPanel {
 
         this.mfStatusElement = document.createElement('div');
         this.mfStatusElement.className = 'status-message';
-        this.mfStatusElement.textContent = '可执行融合任务后自动生成解释可视化。';
+        this.mfStatusElement.textContent = '可执行融合任务后自动生成高级可视化（饼图/性能对比/趋势/决策树）。';
 
         this.mfResultElement = document.createElement('pre');
         this.mfResultElement.className = 'integration-result';
@@ -56,10 +80,10 @@ export class ModelFusionPanel {
 
         const visualGrid = document.createElement('div');
         visualGrid.className = 'fusion-visual-grid';
-        this.weightVizElement = this.createVizCard('融合权重解释可视化');
-        this.contributionVizElement = this.createVizCard('子模型贡献度对比');
-        this.strategyVizElement = this.createVizCard('融合策略解释');
-        this.recommendationElement = this.createVizCard('模型选择建议');
+        this.weightVizElement = this.createVizCard('权重分配饼图');
+        this.contributionVizElement = this.createVizCard('子模型性能对比图');
+        this.strategyVizElement = this.createVizCard('融合效果趋势图');
+        this.recommendationElement = this.createVizCard('策略决策树');
 
         visualGrid.appendChild(this.weightVizElement);
         visualGrid.appendChild(this.contributionVizElement);
@@ -323,6 +347,29 @@ export class ModelFusionPanel {
         return value as Record<string, unknown>;
     }
 
+    private asNumber(value: unknown): number | null {
+        const numeric = typeof value === 'number' ? value : Number(value);
+        return Number.isFinite(numeric) ? numeric : null;
+    }
+
+    private asNumberArray(value: unknown): number[] {
+        if (!Array.isArray(value)) {
+            return [];
+        }
+        return value
+            .map((item) => this.asNumber(item))
+            .filter((item): item is number => item !== null);
+    }
+
+    private escapeHtml(value: string): string {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    }
+
     private extractWeights(payload: Record<string, unknown>): Record<string, number> {
         const fromResult = this.asRecord(payload.result);
         const fromAnalysis = this.asRecord(payload.analysis);
@@ -409,6 +456,93 @@ export class ModelFusionPanel {
         return rows.sort((a, b) => b.value - a.value);
     }
 
+    private extractPerformanceRows(
+        payload: Record<string, unknown>,
+        contributions: ContributionRow[],
+        weights: Record<string, number>
+    ): PerformanceRow[] {
+        const modelScores = new Map<string, PerformanceRow>();
+        const result = this.asRecord(payload.result);
+        const inference = this.asRecord(payload.inference);
+        const inferenceResult = this.asRecord(inference?.result);
+        const diagnostics = this.asRecord(result?.diagnostics) ?? this.asRecord(inferenceResult?.diagnostics);
+        const diagnosticsModelMetrics = Array.isArray(diagnostics?.model_metrics) ? diagnostics.model_metrics : [];
+        const analysis = this.asRecord(payload.analysis);
+        const analysisRows = Array.isArray(analysis?.model_contributions) ? analysis.model_contributions : [];
+
+        analysisRows.forEach((item) => {
+            const row = this.asRecord(item);
+            if (!row) {
+                return;
+            }
+            const modelId = String(row.model_id ?? row.model ?? 'unknown');
+            const stability = this.asNumber(row.stability) ?? 0;
+            const gain = this.asNumber(row.marginal_gain) ?? 0;
+            const contribution = this.asNumber(row.mean_abs_contribution ?? row.contribution) ?? 0;
+            const baseScore = Math.max(0, contribution) * 0.6 + Math.max(0, gain) * 0.25 + stability * 0.15;
+            modelScores.set(modelId, {
+                modelId,
+                score: baseScore,
+                source: 'feature_analysis'
+            });
+        });
+
+        diagnosticsModelMetrics.forEach((item) => {
+            const row = this.asRecord(item);
+            if (!row) {
+                return;
+            }
+            const modelId = String(row.model_id ?? row.model ?? 'unknown');
+            const rmse = this.asNumber(row.rmse);
+            const mae = this.asNumber(row.mae);
+            const r2 = this.asNumber(row.r2);
+            const mape = this.asNumber(row.mape);
+            const qualityScore = (rmse ? 1 / (rmse + 1e-8) : 0) * 0.35
+                + (mae ? 1 / (mae + 1e-8) : 0) * 0.2
+                + ((r2 ?? 0) + 1) * 0.35
+                + (mape ? 1 / (mape + 1e-8) : 0) * 0.1;
+            const prev = modelScores.get(modelId);
+            modelScores.set(modelId, {
+                modelId,
+                score: Math.max(prev?.score ?? 0, qualityScore),
+                rmse: rmse ?? undefined,
+                mae: mae ?? undefined,
+                r2: r2 ?? undefined,
+                mape: mape ?? undefined,
+                source: prev ? `${prev.source}+diagnostics` : 'diagnostics'
+            });
+        });
+
+        if (modelScores.size === 0) {
+            contributions.forEach((row) => {
+                modelScores.set(row.modelId, {
+                    modelId: row.modelId,
+                    score: Math.max(0, row.value),
+                    source: 'contribution'
+                });
+            });
+        }
+
+        if (modelScores.size === 0) {
+            Object.entries(weights).forEach(([modelId, weight]) => {
+                modelScores.set(modelId, {
+                    modelId,
+                    score: Math.max(0, weight),
+                    source: 'weight'
+                });
+            });
+        }
+
+        const rows = [...modelScores.values()];
+        if (rows.length === 0) {
+            return rows;
+        }
+        const maxScore = Math.max(...rows.map((item) => item.score), 1e-6);
+        return rows
+            .map((item) => ({ ...item, score: item.score / maxScore }))
+            .sort((a, b) => b.score - a.score);
+    }
+
     private extractStrategy(payload: Record<string, unknown>): { strategyName: string; weightMethod: string; strategySummary: string } {
         const result = this.asRecord(payload.result);
         const analysis = this.asRecord(payload.analysis);
@@ -491,6 +625,127 @@ export class ModelFusionPanel {
         return recommendations.slice(0, 5);
     }
 
+    private extractTrendSeries(payload: Record<string, unknown>, contributions: ContributionRow[]): TrendPoint[] {
+        const result = this.asRecord(payload.result);
+        const inference = this.asRecord(payload.inference);
+        const inferenceResult = this.asRecord(inference?.result);
+        const prediction = this.asRecord(payload.prediction);
+
+        const fusedSeries = this.asNumberArray(
+            result?.fused_predictions
+            ?? inferenceResult?.fused_predictions
+            ?? payload.fused_predictions
+            ?? prediction?.fused_predictions
+            ?? payload.fused
+        );
+        if (fusedSeries.length > 1) {
+            return fusedSeries.map((value, index) => ({ label: `T${index + 1}`, value }));
+        }
+
+        const onlineWeights = this.asRecord(payload.online_weights) ?? this.asRecord(inference?.online_weights);
+        if (onlineWeights) {
+            const seriesList: number[][] = [];
+            Object.values(onlineWeights).forEach((item) => {
+                const arr = this.asNumberArray(item);
+                if (arr.length > 1) {
+                    seriesList.push(arr);
+                }
+            });
+            if (seriesList.length > 0) {
+                const length = Math.max(...seriesList.map((item) => item.length));
+                const points: TrendPoint[] = [];
+                for (let i = 0; i < length; i += 1) {
+                    const values = seriesList.map((arr) => arr[i]).filter((v): v is number => typeof v === 'number');
+                    if (values.length > 0) {
+                        points.push({
+                            label: `S${i + 1}`,
+                            value: Math.max(...values)
+                        });
+                    }
+                }
+                if (points.length > 1) {
+                    return points;
+                }
+            }
+        }
+
+        const analysis = this.asRecord(payload.analysis);
+        const ranking = Array.isArray(analysis?.ranking) ? analysis.ranking : [];
+        if (ranking.length > 1) {
+            const points = ranking
+                .map((item, index) => {
+                    const record = this.asRecord(item);
+                    const strategy = String(record?.strategy ?? `S${index + 1}`);
+                    const score = this.asNumber(record?.score);
+                    if (score === null) {
+                        return null;
+                    }
+                    return {
+                        label: strategy,
+                        value: score
+                    };
+                })
+                .filter((item): item is TrendPoint => item !== null);
+            if (points.length > 1) {
+                return points;
+            }
+        }
+
+        return contributions
+            .slice(0, 6)
+            .map((item, index) => ({ label: `M${index + 1}`, value: item.value }));
+    }
+
+    private buildDecisionTree(
+        weights: Record<string, number>,
+        contributions: ContributionRow[],
+        strategyName: string,
+        weightMethod: string,
+        strategySummary: string
+    ): DecisionNode {
+        const weightRows = Object.entries(weights).sort((a, b) => b[1] - a[1]);
+        const topWeight = weightRows[0];
+        const topContribution = contributions[0];
+        const tailContribution = contributions[contributions.length - 1];
+
+        return {
+            label: '融合策略决策',
+            detail: `目标策略 ${strategyName}`,
+            children: [
+                {
+                    label: '权重评估',
+                    detail: topWeight
+                        ? `${topWeight[0]} 权重 ${(topWeight[1] * 100).toFixed(1)}%`
+                        : '未检测到权重，使用默认均衡权重',
+                    children: [
+                        {
+                            label: '权重生成方式',
+                            detail: `方法: ${weightMethod}`
+                        }
+                    ]
+                },
+                {
+                    label: '子模型贡献评估',
+                    detail: topContribution
+                        ? `高贡献: ${topContribution.modelId} (${topContribution.value.toFixed(4)})`
+                        : '无贡献度数据，跳过排序',
+                    children: [
+                        {
+                            label: '低贡献处理',
+                            detail: tailContribution
+                                ? `${tailContribution.modelId} 可降权/替换`
+                                : '暂无低贡献模型'
+                        }
+                    ]
+                },
+                {
+                    label: '策略落地',
+                    detail: strategySummary
+                }
+            ]
+        };
+    }
+
     private normalizeState(raw: unknown): FusionVisualState | null {
         const payload = this.asRecord(raw);
         if (!payload) {
@@ -501,10 +756,22 @@ export class ModelFusionPanel {
         const contributions = this.extractContributions(payload, weights);
         const strategy = this.extractStrategy(payload);
         const recommendations = this.extractRecommendations(payload, contributions);
+        const performanceRows = this.extractPerformanceRows(payload, contributions, weights);
+        const trendSeries = this.extractTrendSeries(payload, contributions);
+        const decisionTree = this.buildDecisionTree(
+            weights,
+            contributions,
+            strategy.strategyName,
+            strategy.weightMethod,
+            strategy.strategySummary
+        );
 
         return {
             weights,
             contributions,
+            performanceRows,
+            trendSeries,
+            decisionTree,
             strategyName: strategy.strategyName,
             weightMethod: strategy.weightMethod,
             strategySummary: strategy.strategySummary,
@@ -518,9 +785,9 @@ export class ModelFusionPanel {
             return;
         }
         this.renderWeightVisualization(state.weights);
-        this.renderContributionVisualization(state.contributions);
-        this.renderStrategyVisualization(state);
-        this.renderRecommendationVisualization(state.recommendations);
+        this.renderContributionVisualization(state.performanceRows);
+        this.renderStrategyVisualization(state.trendSeries, state);
+        this.renderRecommendationVisualization(state.decisionTree, state.recommendations);
     }
 
     private renderWeightVisualization(weights: Record<string, number>): void {
@@ -538,19 +805,38 @@ export class ModelFusionPanel {
             return;
         }
 
-        body.innerHTML = rows.map(([modelId, value]) => {
-            const ratio = Math.max(0, Math.min(1, value));
-            const percent = `${(ratio * 100).toFixed(1)}%`;
-            return `
-                <div class="fusion-weight-row">
-                    <div class="fusion-row-label"><strong>${modelId}</strong><span>${percent}</span></div>
-                    <div class="fusion-weight-track"><div class="fusion-weight-fill" style="width:${ratio * 100}%"></div></div>
+        const total = rows.reduce((sum, [, value]) => sum + Math.max(0, value), 0);
+        const palette = ['#2563eb', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6'];
+        let start = 0;
+        const segments = rows.map(([, value], index) => {
+            const ratio = total > 0 ? Math.max(0, value) / total : 0;
+            const end = start + ratio * 100;
+            const color = palette[index % palette.length];
+            const segment = `${color} ${start.toFixed(2)}% ${end.toFixed(2)}%`;
+            start = end;
+            return segment;
+        });
+
+        body.innerHTML = `
+            <div class="fusion-pie-wrap">
+                <div class="fusion-pie-chart" style="background: conic-gradient(${segments.join(',')});"></div>
+                <div class="fusion-pie-legend">
+                    ${rows.map(([modelId, value], index) => {
+                        const ratio = total > 0 ? Math.max(0, value) / total : 0;
+                        return `
+                            <div class="fusion-pie-legend-row">
+                                <span class="fusion-pie-dot" style="background:${palette[index % palette.length]};"></span>
+                                <span class="fusion-pie-label">${this.escapeHtml(modelId)}</span>
+                                <span class="fusion-pie-value">${(ratio * 100).toFixed(1)}%</span>
+                            </div>
+                        `;
+                    }).join('')}
                 </div>
-            `;
-        }).join('');
+            </div>
+        `;
     }
 
-    private renderContributionVisualization(contributions: ContributionRow[]): void {
+    private renderContributionVisualization(performanceRows: PerformanceRow[]): void {
         if (!this.contributionVizElement) {
             return;
         }
@@ -559,25 +845,36 @@ export class ModelFusionPanel {
             return;
         }
 
-        if (contributions.length === 0) {
-            body.innerHTML = '<p class="fusion-viz-empty">暂无贡献度数据。</p>';
+        if (performanceRows.length === 0) {
+            body.innerHTML = '<p class="fusion-viz-empty">暂无可用于对比的子模型性能数据。</p>';
             return;
         }
 
-        const maxValue = Math.max(...contributions.map((item) => item.value), 1e-6);
-        body.innerHTML = contributions.map((row) => {
-            const ratio = Math.max(0, row.value / maxValue);
-            return `
-                <div class="fusion-weight-row">
-                    <div class="fusion-row-label"><strong>${row.modelId}</strong><span>${row.value.toFixed(4)}</span></div>
-                    <div class="fusion-weight-track"><div class="fusion-contribution-fill" style="width:${ratio * 100}%"></div></div>
-                    <p class="fusion-row-reason">${row.reason}</p>
-                </div>
-            `;
-        }).join('');
+        body.innerHTML = `
+            <div class="fusion-performance-list">
+                ${performanceRows.map((row) => `
+                    <div class="fusion-performance-row">
+                        <div class="fusion-row-label">
+                            <strong>${this.escapeHtml(row.modelId)}</strong>
+                            <span>${(row.score * 100).toFixed(1)} 分</span>
+                        </div>
+                        <div class="fusion-weight-track">
+                            <div class="fusion-contribution-fill" style="width:${Math.max(0, Math.min(1, row.score)) * 100}%"></div>
+                        </div>
+                        <div class="fusion-metric-badges">
+                            ${typeof row.rmse === 'number' ? `<span class="fusion-metric-badge">RMSE ${row.rmse.toFixed(4)}</span>` : ''}
+                            ${typeof row.mae === 'number' ? `<span class="fusion-metric-badge">MAE ${row.mae.toFixed(4)}</span>` : ''}
+                            ${typeof row.r2 === 'number' ? `<span class="fusion-metric-badge">R² ${row.r2.toFixed(4)}</span>` : ''}
+                            ${typeof row.mape === 'number' ? `<span class="fusion-metric-badge">MAPE ${row.mape.toFixed(2)}%</span>` : ''}
+                            <span class="fusion-metric-badge fusion-metric-source">${this.escapeHtml(row.source)}</span>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
     }
 
-    private renderStrategyVisualization(state: FusionVisualState): void {
+    private renderStrategyVisualization(trendSeries: TrendPoint[], state: FusionVisualState): void {
         if (!this.strategyVizElement) {
             return;
         }
@@ -586,16 +883,50 @@ export class ModelFusionPanel {
             return;
         }
 
+        if (trendSeries.length < 2) {
+            body.innerHTML = '<p class="fusion-viz-empty">暂无可绘制趋势的数据序列。</p>';
+            return;
+        }
+
+        const width = 420;
+        const height = 180;
+        const padding = 20;
+        const values = trendSeries.map((item) => item.value);
+        const minValue = Math.min(...values);
+        const maxValue = Math.max(...values);
+        const range = Math.max(maxValue - minValue, 1e-6);
+        const xStep = trendSeries.length > 1 ? (width - padding * 2) / (trendSeries.length - 1) : 0;
+        const points = trendSeries.map((item, index) => {
+            const x = padding + index * xStep;
+            const y = height - padding - ((item.value - minValue) / range) * (height - padding * 2);
+            return { x, y, label: item.label, value: item.value };
+        });
+        const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`).join(' ');
+        const areaPath = `${linePath} L ${(padding + (trendSeries.length - 1) * xStep).toFixed(2)} ${(height - padding).toFixed(2)} L ${padding.toFixed(2)} ${(height - padding).toFixed(2)} Z`;
+        const first = points[0];
+        const last = points[points.length - 1];
+        const direction = last.value >= first.value ? '上升' : '下降';
+        const changePct = Math.abs((last.value - first.value) / (Math.abs(first.value) > 1e-8 ? Math.abs(first.value) : 1) * 100);
+
         body.innerHTML = `
             <div class="fusion-strategy-meta">
-                <span class="fusion-tag">策略: ${state.strategyName}</span>
-                <span class="fusion-tag">权重方法: ${state.weightMethod}</span>
+                <span class="fusion-tag">策略: ${this.escapeHtml(state.strategyName)}</span>
+                <span class="fusion-tag">权重方法: ${this.escapeHtml(state.weightMethod)}</span>
+                <span class="fusion-tag">趋势: ${direction} ${changePct.toFixed(2)}%</span>
             </div>
-            <p class="fusion-strategy-summary">${state.strategySummary}</p>
+            <svg class="fusion-trend-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none" role="img" aria-label="融合效果趋势图">
+                <path d="${areaPath}" class="fusion-trend-area"></path>
+                <path d="${linePath}" class="fusion-trend-line"></path>
+                ${points.map((point) => `<circle cx="${point.x.toFixed(2)}" cy="${point.y.toFixed(2)}" r="3" class="fusion-trend-dot"></circle>`).join('')}
+            </svg>
+            <div class="fusion-trend-axis">
+                ${points.map((point) => `<span>${this.escapeHtml(point.label)}</span>`).join('')}
+            </div>
+            <p class="fusion-strategy-summary">${this.escapeHtml(state.strategySummary)}</p>
         `;
     }
 
-    private renderRecommendationVisualization(recommendations: string[]): void {
+    private renderRecommendationVisualization(decisionTree: DecisionNode, recommendations: string[]): void {
         if (!this.recommendationElement) {
             return;
         }
@@ -604,9 +935,20 @@ export class ModelFusionPanel {
             return;
         }
 
+        const renderNode = (node: DecisionNode): string => `
+            <div class="fusion-tree-node">
+                <div class="fusion-tree-title">${this.escapeHtml(node.label)}</div>
+                <div class="fusion-tree-detail">${this.escapeHtml(node.detail)}</div>
+                ${Array.isArray(node.children) && node.children.length > 0
+                    ? `<div class="fusion-tree-children">${node.children.map((child) => renderNode(child)).join('')}</div>`
+                    : ''}
+            </div>
+        `;
+
         body.innerHTML = `
+            <div class="fusion-tree-wrap">${renderNode(decisionTree)}</div>
             <ol class="fusion-recommend-list">
-                ${recommendations.map((item) => `<li>${item}</li>`).join('')}
+                ${recommendations.map((item) => `<li>${this.escapeHtml(item)}</li>`).join('')}
             </ol>
         `;
     }
