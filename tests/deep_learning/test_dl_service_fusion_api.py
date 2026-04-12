@@ -152,10 +152,16 @@ def test_fusion_api_routes() -> None:
     assert "submodel_stability_analysis" in explain_payload["lime"]
     assert "submodel_complementarity_analysis" in explain_payload["lime"]
     assert "submodel_weight_visualization" in explain_payload["lime"]
+    assert "submodel_contribution_ranking" in explain_payload["lime"]
+    assert "submodel_selection_recommendation" in explain_payload["lime"]
+    assert "submodel_alternative_solutions" in explain_payload["lime"]
     assert "submodel_performance_comparison" in explain_payload["shap"]
     assert "submodel_stability_analysis" in explain_payload["shap"]
     assert "submodel_complementarity_analysis" in explain_payload["shap"]
     assert "submodel_weight_visualization" in explain_payload["shap"]
+    assert "submodel_contribution_ranking" in explain_payload["shap"]
+    assert "submodel_selection_recommendation" in explain_payload["shap"]
+    assert "submodel_alternative_solutions" in explain_payload["shap"]
 
     hybrid_resp = client.post(
         "/api/dl/fusion/hybrid",

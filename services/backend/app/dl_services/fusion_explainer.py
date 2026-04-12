@@ -753,16 +753,249 @@ class _BaseFusionAdapter:
             },
         }
 
+    def _submodel_contribution_ranking(
+        self,
+        performance: dict[str, Any],
+        stability: dict[str, Any],
+        complementarity: dict[str, Any],
+        weights: dict[str, Any],
+    ) -> dict[str, Any]:
+        perf_rows = {
+            str(item.get("model_id", "")): item
+            for item in list(performance.get("ranking", []))
+            if str(item.get("model_id", "")) != ""
+        }
+        stability_rows = {
+            str(item.get("model_id", "")): item
+            for item in list(stability.get("ranking", []))
+            if str(item.get("model_id", "")) != ""
+        }
+        complement_rows = {
+            str(item.get("model_id", "")): item
+            for item in list(complementarity.get("model_complementarity_index", []))
+            if str(item.get("model_id", "")) != ""
+        }
+        weight_rows = {
+            str(item.get("model_id", "")): item
+            for item in list(weights.get("weight_distribution", []))
+            if str(item.get("model_id", "")) != ""
+        }
+
+        model_ids = sorted(set(perf_rows.keys()) | set(stability_rows.keys()) | set(complement_rows.keys()) | set(weight_rows.keys()))
+        ranked: list[dict[str, Any]] = []
+        for model_id in model_ids:
+            perf_row = perf_rows.get(model_id, {})
+            stability_row = stability_rows.get(model_id, {})
+            comp_row = complement_rows.get(model_id, {})
+            weight_row = weight_rows.get(model_id, {})
+
+            perf_score = float(np.clip(_safe_float(perf_row.get("score"), 0.0), 0.0, 1.0))
+            stability_score = float(np.clip(_safe_float(stability_row.get("overall_stability"), 0.0), 0.0, 1.0))
+            complement_score = float(np.clip(_safe_float(comp_row.get("complementarity_index"), 0.0), 0.0, 1.0))
+            weight_score = float(np.clip(_safe_float(weight_row.get("online_weight"), 0.0), 0.0, 1.0))
+            agreement = float(np.clip((_safe_float(perf_row.get("agreement_with_fusion"), 0.0) + 1.0) / 2.0, 0.0, 1.0))
+
+            contribution_score = float(
+                0.35 * perf_score
+                + 0.25 * stability_score
+                + 0.20 * weight_score
+                + 0.15 * complement_score
+                + 0.05 * agreement
+            )
+            ranked.append(
+                {
+                    "model_id": str(model_id),
+                    "contribution_score": contribution_score,
+                    "performance_score": perf_score,
+                    "stability_score": stability_score,
+                    "weight_score": weight_score,
+                    "complementarity_score": complement_score,
+                    "agreement_score": agreement,
+                }
+            )
+        ranked.sort(key=lambda item: float(item.get("contribution_score", 0.0)), reverse=True)
+        return {
+            "summary": {
+                "model_count": int(len(ranked)),
+                "top_contributor": str(ranked[0]["model_id"]) if ranked else "",
+                "score_formula": (
+                    "0.35*performance + 0.25*stability + 0.20*weight + "
+                    "0.15*complementarity + 0.05*agreement"
+                ),
+            },
+            "ranking": ranked,
+        }
+
+    def _submodel_selection_recommendation(
+        self,
+        contribution_ranking: dict[str, Any],
+        performance: dict[str, Any],
+        stability: dict[str, Any],
+    ) -> dict[str, Any]:
+        ranked = list(contribution_ranking.get("ranking", []))
+        perf_rows = {str(item.get("model_id", "")): item for item in list(performance.get("ranking", []))}
+        stability_rows = {str(item.get("model_id", "")): item for item in list(stability.get("ranking", []))}
+        if not ranked:
+            return {
+                "summary": {
+                    "model_count": 0,
+                    "recommended_count": 0,
+                    "selection_policy": "score_based_topk",
+                },
+                "recommended_models": [],
+                "watchlist_models": [],
+                "replacement_candidates": [],
+            }
+
+        model_count = len(ranked)
+        keep_count = int(np.clip(int(np.ceil(model_count * 0.6)), 1, max(1, min(4, model_count))))
+        keep_rows = ranked[:keep_count]
+        watch_rows = [item for item in ranked[keep_count:] if float(item.get("contribution_score", 0.0)) >= 0.45]
+        replace_rows = [item for item in ranked if float(item.get("contribution_score", 0.0)) < 0.45]
+
+        def _reason(model_id: str) -> str:
+            perf = float(_safe_float(perf_rows.get(model_id, {}).get("score"), 0.0))
+            stab = float(_safe_float(stability_rows.get(model_id, {}).get("overall_stability"), 0.0))
+            if perf < 0.40 and stab < 0.45:
+                return "性能与稳定性均偏弱"
+            if perf < 0.40:
+                return "性能表现偏弱"
+            if stab < 0.45:
+                return "稳定性偏弱"
+            return "综合贡献度良好"
+
+        return {
+            "summary": {
+                "model_count": int(model_count),
+                "recommended_count": int(len(keep_rows)),
+                "watchlist_count": int(len(watch_rows)),
+                "replacement_count": int(len(replace_rows)),
+                "selection_policy": "score_based_topk",
+            },
+            "recommended_models": [
+                {
+                    "model_id": str(item.get("model_id", "")),
+                    "contribution_score": float(item.get("contribution_score", 0.0)),
+                    "reason": _reason(str(item.get("model_id", ""))),
+                }
+                for item in keep_rows
+            ],
+            "watchlist_models": [
+                {
+                    "model_id": str(item.get("model_id", "")),
+                    "contribution_score": float(item.get("contribution_score", 0.0)),
+                    "reason": _reason(str(item.get("model_id", ""))),
+                }
+                for item in watch_rows
+            ],
+            "replacement_candidates": [
+                {
+                    "model_id": str(item.get("model_id", "")),
+                    "contribution_score": float(item.get("contribution_score", 0.0)),
+                    "reason": _reason(str(item.get("model_id", ""))),
+                }
+                for item in replace_rows
+            ],
+        }
+
+    def _submodel_alternative_solutions(
+        self,
+        contribution_ranking: dict[str, Any],
+        selection_recommendation: dict[str, Any],
+        complementarity: dict[str, Any],
+    ) -> dict[str, Any]:
+        ranked = list(contribution_ranking.get("ranking", []))
+        replace_rows = list(selection_recommendation.get("replacement_candidates", []))
+        pair_scores = list(complementarity.get("pair_scores", []))
+        complement_map: dict[tuple[str, str], float] = {}
+        for item in pair_scores:
+            a = str(item.get("model_a", ""))
+            b = str(item.get("model_b", ""))
+            if a == "" or b == "":
+                continue
+            score = float(_safe_float(item.get("complementarity_score"), 0.0))
+            complement_map[(a, b)] = score
+            complement_map[(b, a)] = score
+
+        score_map = {str(item.get("model_id", "")): float(_safe_float(item.get("contribution_score"), 0.0)) for item in ranked}
+        plans: list[dict[str, Any]] = []
+        for target in replace_rows:
+            target_id = str(target.get("model_id", ""))
+            target_score = float(_safe_float(target.get("contribution_score"), 0.0))
+            candidates: list[dict[str, Any]] = []
+            for candidate in ranked:
+                cand_id = str(candidate.get("model_id", ""))
+                if cand_id == "" or cand_id == target_id:
+                    continue
+                cand_score = float(_safe_float(candidate.get("contribution_score"), 0.0))
+                if cand_score <= target_score:
+                    continue
+                pair_score = float(complement_map.get((target_id, cand_id), 0.0))
+                replacement_score = float(0.70 * cand_score + 0.30 * pair_score)
+                candidates.append(
+                    {
+                        "model_id": cand_id,
+                        "contribution_score": cand_score,
+                        "target_pair_complementarity": pair_score,
+                        "replacement_score": replacement_score,
+                    }
+                )
+            candidates.sort(key=lambda item: float(item.get("replacement_score", 0.0)), reverse=True)
+            plans.append(
+                {
+                    "target_model_id": target_id,
+                    "target_contribution_score": target_score,
+                    "alternatives": candidates[:2],
+                }
+            )
+
+        global_candidates = sorted(
+            [
+                {"model_id": mid, "contribution_score": score}
+                for mid, score in score_map.items()
+                if mid != ""
+            ],
+            key=lambda item: float(item.get("contribution_score", 0.0)),
+            reverse=True,
+        )
+        return {
+            "summary": {
+                "replacement_target_count": int(len(replace_rows)),
+                "generated_plan_count": int(len(plans)),
+            },
+            "replacement_plans": plans,
+            "global_alternative_pool": global_candidates[:3],
+        }
+
     def _submodel_analysis(self, context: dict[str, Any], true_values: list[float] | None, top_k: int) -> dict[str, Any]:
         performance = self._submodel_performance_comparison(context, true_values)
         stability = self._submodel_stability_analysis(context, true_values)
         complementarity = self._submodel_complementarity_analysis(context, true_values, top_k=int(top_k))
         weights = self._submodel_weight_visualization(context, top_k=int(top_k))
+        contribution_ranking = self._submodel_contribution_ranking(
+            performance=performance,
+            stability=stability,
+            complementarity=complementarity,
+            weights=weights,
+        )
+        selection_recommendation = self._submodel_selection_recommendation(
+            contribution_ranking=contribution_ranking,
+            performance=performance,
+            stability=stability,
+        )
+        alternative_solutions = self._submodel_alternative_solutions(
+            contribution_ranking=contribution_ranking,
+            selection_recommendation=selection_recommendation,
+            complementarity=complementarity,
+        )
         return {
             "submodel_performance_comparison": performance,
             "submodel_stability_analysis": stability,
             "submodel_complementarity_analysis": complementarity,
             "submodel_weight_visualization": weights,
+            "submodel_contribution_ranking": contribution_ranking,
+            "submodel_selection_recommendation": selection_recommendation,
+            "submodel_alternative_solutions": alternative_solutions,
         }
 
     def _strategy_selection_explanation(self, context: dict[str, Any], true_values: list[float] | None) -> dict[str, Any]:
@@ -1064,6 +1297,9 @@ class FusionLIMEAdapter(_BaseFusionAdapter):
             "submodel_stability_analysis": submodel_analysis["submodel_stability_analysis"],
             "submodel_complementarity_analysis": submodel_analysis["submodel_complementarity_analysis"],
             "submodel_weight_visualization": submodel_analysis["submodel_weight_visualization"],
+            "submodel_contribution_ranking": submodel_analysis["submodel_contribution_ranking"],
+            "submodel_selection_recommendation": submodel_analysis["submodel_selection_recommendation"],
+            "submodel_alternative_solutions": submodel_analysis["submodel_alternative_solutions"],
             "strategy_selection_explanation": strategy_explanation,
             "preprocess": dict(built["preprocess"]),
             "explainer": {
@@ -1233,6 +1469,9 @@ class FusionSHAPAdapter(_BaseFusionAdapter):
             "submodel_stability_analysis": submodel_analysis["submodel_stability_analysis"],
             "submodel_complementarity_analysis": submodel_analysis["submodel_complementarity_analysis"],
             "submodel_weight_visualization": submodel_analysis["submodel_weight_visualization"],
+            "submodel_contribution_ranking": submodel_analysis["submodel_contribution_ranking"],
+            "submodel_selection_recommendation": submodel_analysis["submodel_selection_recommendation"],
+            "submodel_alternative_solutions": submodel_analysis["submodel_alternative_solutions"],
             "strategy_selection_explanation": strategy_explanation,
             "preprocess": dict(built["preprocess"]),
             "explainer": {
