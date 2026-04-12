@@ -14,6 +14,8 @@ from typing import Any, Optional
 import numpy as np
 from sklearn.linear_model import Ridge
 
+EPS = 1e-12
+
 from deep_learning.fusion.service import fusion_platform_service
 
 
@@ -112,6 +114,13 @@ class _BaseFusionAdapter:
             }
 
     @staticmethod
+    def _array_bytes(*arrays: np.ndarray) -> int:
+        total = 0
+        for arr in arrays:
+            total += int(np.asarray(arr).nbytes)
+        return int(total)
+
+    @staticmethod
     def _normalize_models(models: list[dict[str, Any]]) -> list[dict[str, Any]]:
         normalized: list[dict[str, Any]] = []
         for i, item in enumerate(models):
@@ -182,6 +191,8 @@ class _BaseFusionAdapter:
         surrogate = Ridge(alpha=1.0, random_state=int(self.config.random_state))
         surrogate.fit(matrix, fused_predictions)
         baseline = np.mean(matrix, axis=0)
+        surrogate_coef = np.asarray(surrogate.coef_, dtype=float).reshape(-1)
+        centered_matrix = matrix - np.asarray(baseline, dtype=float).reshape(1, -1)
         background = matrix if matrix.shape[0] <= 32 else matrix[np.linspace(0, matrix.shape[0] - 1, 32, dtype=int)]
         return {
             "matrix": matrix,
@@ -194,8 +205,11 @@ class _BaseFusionAdapter:
             "weight_method": str(result.get("weight_method", "")),
             "selected_strategy": str(payload.get("selected_strategy", "")),
             "metrics": dict(result.get("metrics", {})),
+            "diagnostics": dict(result.get("diagnostics", {})),
             "surrogate": surrogate,
             "baseline": np.asarray(baseline, dtype=float),
+            "surrogate_coef": surrogate_coef,
+            "centered_matrix": np.asarray(centered_matrix, dtype=float),
             "background": np.asarray(background, dtype=float),
             "preprocess": {
                 "sample_count": int(matrix.shape[0]),
@@ -273,6 +287,171 @@ class _BaseFusionAdapter:
         k = max(1, min(int(max_explain_nodes), int(score.shape[0])))
         return np.argsort(score)[::-1][:k].astype(int).tolist()
 
+    @staticmethod
+    def _ordered_weights(model_ids: list[str], raw: dict[str, Any]) -> np.ndarray:
+        vec = np.asarray([_safe_float(raw.get(mid, 0.0), 0.0) for mid in model_ids], dtype=float).reshape(-1)
+        total = float(np.sum(vec))
+        if total <= EPS:
+            return np.full((len(model_ids),), 1.0 / max(1, len(model_ids)), dtype=float)
+        return vec / total
+
+    def _fusion_weight_analysis(self, context: dict[str, Any], top_k: int) -> dict[str, Any]:
+        model_ids = list(context["model_ids"])
+        offline = self._ordered_weights(model_ids, dict(context.get("weights", {})))
+        online = self._ordered_weights(model_ids, dict(context.get("online_weights", {})))
+        delta = online - offline
+        entropy = float(-np.sum(online * np.log(np.clip(online, EPS, None))))
+        effective = float(1.0 / np.clip(np.sum(np.square(online)), EPS, None))
+        order = np.argsort(np.abs(delta))[::-1]
+        k = max(1, min(int(top_k), len(model_ids)))
+        dominant_idx = int(np.argmax(online)) if len(model_ids) else 0
+        return {
+            "summary": {
+                "model_count": int(len(model_ids)),
+                "requested_strategy": str(context.get("strategy", "")),
+                "selected_strategy": str(context.get("selected_strategy", "")),
+                "weight_method": str(context.get("weight_method", "")),
+                "effective_model_count": float(effective),
+                "weight_entropy": float(entropy),
+                "dominant_model": str(model_ids[dominant_idx]) if model_ids else "",
+            },
+            "weight_distribution": [
+                {
+                    "model_id": str(mid),
+                    "offline_weight": float(offline[i]),
+                    "online_weight": float(online[i]),
+                    "delta_weight": float(delta[i]),
+                    "abs_delta_weight": float(abs(delta[i])),
+                }
+                for i, mid in enumerate(model_ids)
+            ],
+            "top_weight_shift_models": [
+                {
+                    "model_id": str(model_ids[int(i)]),
+                    "offline_weight": float(offline[int(i)]),
+                    "online_weight": float(online[int(i)]),
+                    "delta_weight": float(delta[int(i)]),
+                }
+                for i in order[:k].tolist()
+            ],
+        }
+
+    def _submodel_contribution_analysis(
+        self,
+        context: dict[str, Any],
+        node_indices: list[int],
+        top_k: int,
+    ) -> dict[str, Any]:
+        model_ids = list(context["model_ids"])
+        local = np.asarray(context["centered_matrix"], dtype=float) * np.asarray(context["surrogate_coef"], dtype=float).reshape(1, -1)
+        abs_local = np.abs(local)
+        global_abs = np.mean(abs_local, axis=0) if abs_local.size else np.zeros((len(model_ids),), dtype=float)
+        per_node: list[dict[str, Any]] = []
+        dominant_counter = {mid: 0 for mid in model_ids}
+        for idx in node_indices:
+            row = np.asarray(local[int(idx)], dtype=float).reshape(-1)
+            row_abs = np.abs(row)
+            total = float(np.sum(row_abs))
+            shares = row_abs / max(EPS, total)
+            order = np.argsort(row_abs)[::-1]
+            k = max(1, min(int(top_k), len(model_ids)))
+            dominant = int(order[0]) if len(order) else 0
+            if model_ids:
+                dominant_counter[model_ids[dominant]] += 1
+            per_node.append(
+                {
+                    "node_index": int(idx),
+                    "dominant_model": {
+                        "model_id": str(model_ids[dominant]) if model_ids else "",
+                        "contribution": float(row[dominant]) if model_ids else 0.0,
+                        "share": float(shares[dominant]) if model_ids else 0.0,
+                    },
+                    "top_contributions": [
+                        {
+                            "model_id": str(model_ids[int(i)]),
+                            "contribution": float(row[int(i)]),
+                            "abs_contribution": float(row_abs[int(i)]),
+                            "share": float(shares[int(i)]),
+                        }
+                        for i in order[:k].tolist()
+                    ],
+                }
+            )
+        total_dominant = max(1, sum(dominant_counter.values()))
+        ranking_order = np.argsort(global_abs)[::-1]
+        return {
+            "summary": {
+                "model_count": int(len(model_ids)),
+                "sample_count": int(local.shape[0]) if local.ndim == 2 else 0,
+                "explained_nodes": int(len(node_indices)),
+                "mean_abs_contribution": float(np.mean(global_abs)) if global_abs.size else 0.0,
+            },
+            "global_contribution_ranking": [
+                {
+                    "model_id": str(model_ids[int(i)]),
+                    "mean_abs_contribution": float(global_abs[int(i)]),
+                    "dominant_ratio": float(dominant_counter.get(model_ids[int(i)], 0) / total_dominant),
+                }
+                for i in ranking_order.tolist()
+            ],
+            "top_global_contributions": self._top_features(model_ids, global_abs, int(top_k)),
+            "per_node": per_node,
+        }
+
+    def _strategy_selection_explanation(self, context: dict[str, Any], true_values: list[float] | None) -> dict[str, Any]:
+        selected = str(context.get("selected_strategy", ""))
+        requested = str(context.get("strategy", ""))
+        metrics = dict(context.get("metrics", {}))
+        diagnostics = dict(context.get("diagnostics", {}))
+        fused = np.asarray(context.get("fused_predictions", []), dtype=float).reshape(-1)
+        variances = np.asarray(context.get("fused_variances", []), dtype=float).reshape(-1)
+
+        error_mean = 0.0
+        error_max = 0.0
+        has_truth = False
+        if true_values is not None:
+            y = np.asarray(true_values, dtype=float).reshape(-1)
+            if y.shape[0] == fused.shape[0]:
+                has_truth = True
+                err = np.abs(fused - y)
+                error_mean = float(np.mean(err))
+                error_max = float(np.max(err))
+        reason_tags: list[str] = []
+        if requested and selected and requested != selected:
+            reason_tags.append("adaptive_strategy_override")
+        if has_truth:
+            reason_tags.append("ground_truth_feedback")
+        if float(np.mean(variances)) > 0.0:
+            reason_tags.append("uncertainty_aware")
+        if diagnostics:
+            reason_tags.append("diagnostics_available")
+
+        return {
+            "summary": {
+                "requested_strategy": requested,
+                "selected_strategy": selected,
+                "weight_method": str(context.get("weight_method", "")),
+                "strategy_changed": bool(requested and selected and requested != selected),
+                "has_ground_truth": bool(has_truth),
+                "reason_tags": reason_tags,
+            },
+            "evidence": {
+                "rmse": _safe_float(metrics.get("rmse"), 0.0),
+                "mae": _safe_float(metrics.get("mae"), 0.0),
+                "r2": _safe_float(metrics.get("r2"), 0.0),
+                "mean_abs_error": float(error_mean),
+                "max_abs_error": float(error_max),
+                "mean_fused_variance": float(np.mean(variances)) if variances.size else 0.0,
+                "std_fused_variance": float(np.std(variances)) if variances.size else 0.0,
+            },
+            "diagnostics_overview": {
+                "keys": sorted(diagnostics.keys()),
+                "has_dynamic_weights": bool(diagnostics.get("dynamic_weights")),
+                "has_diversity": bool(diagnostics.get("diversity")),
+                "has_uncertainty": bool(diagnostics.get("uncertainty")),
+            },
+        }
+
 
 class FusionLIMEAdapter(_BaseFusionAdapter):
     """融合模型的 LIME 解释适配器。"""
@@ -343,12 +522,12 @@ class FusionLIMEAdapter(_BaseFusionAdapter):
 
         batch: list[dict[str, Any]] = []
         backend = "surrogate_linear"
+        baseline = np.asarray(built["baseline"], dtype=float).reshape(-1)
+        surrogate_coef = np.asarray(built["surrogate_coef"], dtype=float).reshape(-1)
         for idx in node_indices:
             instance = np.asarray(built["matrix"][idx], dtype=float).reshape(-1)
             local_pred = float(predict_fn(instance.reshape(1, -1))[0])
-            local_weights = np.asarray(built["surrogate"].coef_, dtype=float).reshape(-1) * (
-                instance - np.asarray(built["baseline"], dtype=float).reshape(-1)
-            )
+            local_weights = surrogate_coef * (instance - baseline)
             pairs = [(int(i), float(local_weights[i])) for i in range(local_weights.shape[0])]
             if lime_explainer is not None:
                 try:
@@ -380,6 +559,16 @@ class FusionLIMEAdapter(_BaseFusionAdapter):
 
         raw = np.asarray([item["local_weights"] for item in batch], dtype=float) if batch else np.zeros((1, len(model_ids)), dtype=float)
         importance = np.mean(np.abs(raw), axis=0)
+        weight_analysis = self._fusion_weight_analysis(built, int(top_k))
+        contribution_analysis = self._submodel_contribution_analysis(built, node_indices, int(top_k))
+        strategy_explanation = self._strategy_selection_explanation(built, true_values)
+        context_memory_bytes = self._array_bytes(
+            np.asarray(built["matrix"], dtype=np.float32),
+            np.asarray(built["fused_predictions"], dtype=np.float32),
+            np.asarray(built["fused_variances"], dtype=np.float32),
+            np.asarray(built["background"], dtype=np.float32),
+        )
+        result_memory_bytes = self._array_bytes(np.asarray(raw, dtype=np.float32))
         result: dict[str, Any] = {
             "summary": {
                 "method": "lime",
@@ -391,6 +580,9 @@ class FusionLIMEAdapter(_BaseFusionAdapter):
             },
             "batch_explanations": batch,
             "global_feature_importance": [float(v) for v in importance.tolist()],
+            "fusion_weight_analysis": weight_analysis,
+            "submodel_contribution_analysis": contribution_analysis,
+            "strategy_selection_explanation": strategy_explanation,
             "preprocess": dict(built["preprocess"]),
             "explainer": {
                 "backend": backend,
@@ -400,6 +592,13 @@ class FusionLIMEAdapter(_BaseFusionAdapter):
                 "cache_hit": False,
                 "latency_ms": float((time.perf_counter() - started) * 1000.0),
                 "context_build_ms": float(context_ms),
+                "context_cache_hit": bool(context_cache_hit),
+                "sample_count": int(np.asarray(built["matrix"]).shape[0]),
+                "feature_dim": int(np.asarray(built["matrix"]).shape[1]) if np.asarray(built["matrix"]).ndim == 2 else 0,
+                "context_memory_bytes": int(context_memory_bytes),
+                "result_memory_bytes": int(result_memory_bytes),
+                "latency_target_ms": 2500.0,
+                "meets_latency_target": float((time.perf_counter() - started) * 1000.0) < 2500.0,
                 **self._cache_metrics(),
             },
         }
@@ -477,25 +676,36 @@ class FusionSHAPAdapter(_BaseFusionAdapter):
 
         batch: list[dict[str, Any]] = []
         raw_rows: list[list[float]] = []
-        for idx in node_indices:
+        surrogate_coef = np.asarray(built["surrogate_coef"], dtype=float).reshape(-1)
+        selected_matrix = np.asarray(built["matrix"], dtype=float)[node_indices] if node_indices else np.zeros((0, len(model_ids)))
+        fallback_shap = (selected_matrix - baseline.reshape(1, -1)) * surrogate_coef.reshape(1, -1) if selected_matrix.size else np.zeros((0, len(model_ids)))
+        expected_value = float(predict_fn(baseline.reshape(1, -1))[0])
+        batch_shap_values = np.asarray(fallback_shap, dtype=float)
+        batch_kernel_used = False
+        if kernel_explainer is not None and selected_matrix.size:
+            try:
+                shap_arr = kernel_explainer.shap_values(
+                    selected_matrix,
+                    nsamples=max(20, int(effective_nsamples)),
+                    silent=True,
+                )
+                if isinstance(shap_arr, list):
+                    shap_arr = shap_arr[0]
+                parsed = np.asarray(shap_arr, dtype=float)
+                if parsed.ndim == 1:
+                    parsed = parsed.reshape(1, -1)
+                if parsed.shape == batch_shap_values.shape:
+                    batch_shap_values = parsed
+                    batch_kernel_used = True
+                ev = getattr(kernel_explainer, "expected_value", expected_value)
+                if np.asarray(ev).reshape(-1).size > 0:
+                    expected_value = _safe_float(np.asarray(ev).reshape(-1)[0], expected_value)
+            except Exception:
+                batch_shap_values = np.asarray(fallback_shap, dtype=float)
+
+        for row_idx, idx in enumerate(node_indices):
             instance = np.asarray(built["matrix"][idx], dtype=float).reshape(-1)
-            expected_value = float(predict_fn(baseline.reshape(1, -1))[0])
-            shap_values = np.asarray(built["surrogate"].coef_, dtype=float).reshape(-1) * (instance - baseline)
-            if kernel_explainer is not None:
-                try:
-                    shap_arr = kernel_explainer.shap_values(
-                        instance.reshape(1, -1),
-                        nsamples=max(20, int(effective_nsamples)),
-                        silent=True,
-                    )
-                    if isinstance(shap_arr, list):
-                        shap_arr = shap_arr[0]
-                    shap_values = np.asarray(shap_arr, dtype=float).reshape(-1)
-                    ev = getattr(kernel_explainer, "expected_value", expected_value)
-                    if np.asarray(ev).reshape(-1).size > 0:
-                        expected_value = _safe_float(np.asarray(ev).reshape(-1)[0], expected_value)
-                except Exception:
-                    pass
+            shap_values = np.asarray(batch_shap_values[row_idx], dtype=float).reshape(-1)
             pred = float(predict_fn(instance.reshape(1, -1))[0])
             raw_rows.append([float(v) for v in shap_values.tolist()])
             batch.append(
@@ -512,6 +722,16 @@ class FusionSHAPAdapter(_BaseFusionAdapter):
 
         arr = np.asarray(raw_rows, dtype=float) if raw_rows else np.zeros((1, len(model_ids)), dtype=float)
         importance = np.mean(np.abs(arr), axis=0)
+        weight_analysis = self._fusion_weight_analysis(built, int(top_k))
+        contribution_analysis = self._submodel_contribution_analysis(built, node_indices, int(top_k))
+        strategy_explanation = self._strategy_selection_explanation(built, true_values)
+        context_memory_bytes = self._array_bytes(
+            np.asarray(built["matrix"], dtype=np.float32),
+            np.asarray(built["fused_predictions"], dtype=np.float32),
+            np.asarray(built["fused_variances"], dtype=np.float32),
+            np.asarray(built["background"], dtype=np.float32),
+        )
+        result_memory_bytes = self._array_bytes(np.asarray(arr, dtype=np.float32))
         result: dict[str, Any] = {
             "summary": {
                 "method": "shap",
@@ -523,16 +743,28 @@ class FusionSHAPAdapter(_BaseFusionAdapter):
             },
             "batch_explanations": batch,
             "global_feature_importance": [float(v) for v in importance.tolist()],
+            "fusion_weight_analysis": weight_analysis,
+            "submodel_contribution_analysis": contribution_analysis,
+            "strategy_selection_explanation": strategy_explanation,
             "preprocess": dict(built["preprocess"]),
             "explainer": {
                 "backend": backend,
                 "background_size": int(np.asarray(built["background"]).shape[0]),
                 "context_cache_hit": bool(context_cache_hit),
+                "batch_kernel_shap": bool(batch_kernel_used),
             },
             "performance": {
                 "cache_hit": False,
                 "latency_ms": float((time.perf_counter() - started) * 1000.0),
                 "context_build_ms": float(context_ms),
+                "context_cache_hit": bool(context_cache_hit),
+                "sample_count": int(np.asarray(built["matrix"]).shape[0]),
+                "feature_dim": int(np.asarray(built["matrix"]).shape[1]) if np.asarray(built["matrix"]).ndim == 2 else 0,
+                "context_memory_bytes": int(context_memory_bytes),
+                "result_memory_bytes": int(result_memory_bytes),
+                "batch_shap_size": int(len(node_indices)),
+                "latency_target_ms": 2500.0,
+                "meets_latency_target": float((time.perf_counter() - started) * 1000.0) < 2500.0,
                 **self._cache_metrics(),
             },
         }
