@@ -16,14 +16,6 @@ if str(PROJECT_ROOT) not in sys.path:
 warnings.filterwarnings("ignore", message=".*urllib3.*LibreSSL.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="urllib3")
 
-# 抑制 starlette 对 multipart 导入兼容层的待弃用提示
-warnings.filterwarnings(
-    "ignore",
-    message=".*import python_multipart.*",
-    category=PendingDeprecationWarning,
-    module="starlette\\.formparsers"
-)
-
 
 def _import_any(*module_names: str):
     for module_name in module_names:
