@@ -136,7 +136,7 @@ export const panelConfigs: Record<string, PanelConfig> = {
     modelFusion: {
         key: 'model-fusion',
         title: '模型融合面板',
-        description: '融合任务创建、状态追踪、结果获取、策略对比与权重优化。',
+        description: '融合任务创建、状态追踪、结果获取、策略对比与权重优化，并自动生成权重/贡献/策略/建议可视化。',
         fields: [
             { key: 'task_id', label: '融合任务 ID', type: 'text', defaultValue: 'fusion-task-001' },
             {
@@ -144,11 +144,49 @@ export const panelConfigs: Record<string, PanelConfig> = {
                 label: '融合参数(JSON)',
                 type: 'json',
                 defaultValue: {
-                    models: ['kriging', 'deep_learning'],
-                    strategy: 'weighted_average',
-                    predictions: [[10.2, 10.5], [10.6, 10.8]],
-                    uncertainty: [[0.3, 0.4], [0.5, 0.6]],
-                    weights: [0.6, 0.4]
+                    models: [
+                        {
+                            model_id: 'kriging',
+                            model_name: 'Kriging',
+                            predictions: [10.2, 10.5, 10.4, 10.7, 10.6],
+                            variances: [0.12, 0.14, 0.11, 0.13, 0.12]
+                        },
+                        {
+                            model_id: 'deep_learning',
+                            model_name: 'Deep Learning',
+                            predictions: [10.1, 10.4, 10.6, 10.8, 10.7],
+                            variances: [0.10, 0.09, 0.11, 0.12, 0.10]
+                        },
+                        {
+                            model_id: 'stgcn',
+                            model_name: 'STGCN',
+                            predictions: [10.3, 10.6, 10.5, 10.9, 10.8],
+                            variances: [0.11, 0.12, 0.12, 0.13, 0.11]
+                        }
+                    ],
+                    true_values: [10.15, 10.45, 10.5, 10.82, 10.72],
+                    config: {
+                        strategy: 'weighted_average',
+                        weight_method: 'rmse_based',
+                        min_weight: 0.0,
+                        max_weight: 1.0,
+                        normalize: true,
+                        smoothing: false,
+                        smoothing_factor: 0.1,
+                        enable_cross_validation: true,
+                        enable_stability_check: true,
+                        enable_uncertainty_propagation: true,
+                        n_folds: 5
+                    },
+                    strategy: 'dynamic',
+                    weight_method: 'adaptive',
+                    objective: 'rmse',
+                    context: {
+                        difficulty: [1.0, 1.0, 1.0, 1.0, 1.0]
+                    },
+                    top_k: 3,
+                    max_explain_nodes: 4,
+                    method: 'hybrid'
                 }
             }
         ],
@@ -158,6 +196,10 @@ export const panelConfigs: Record<string, PanelConfig> = {
             { id: 'fusion-result', label: '任务结果', method: 'GET', path: '/fusion/task/:task_id/result' },
             { id: 'fusion-compare', label: '策略对比', method: 'POST', path: '/fusion/compare-strategies', bodyFieldAsRoot: 'payload' },
             { id: 'fusion-optimize', label: '优化权重', method: 'POST', path: '/fusion/optimize-weights', bodyFieldAsRoot: 'payload' },
+            { id: 'fusion-feature-analysis', label: '融合特征分析', method: 'POST', path: '/dl/fusion/feature-analysis', bodyFieldAsRoot: 'payload' },
+            { id: 'fusion-strategy-analysis', label: '融合策略分析', method: 'POST', path: '/dl/fusion/strategy-analysis', bodyFieldAsRoot: 'payload' },
+            { id: 'fusion-strategy-recommend', label: '融合策略推荐', method: 'POST', path: '/dl/fusion/strategy-recommend', bodyFieldAsRoot: 'payload' },
+            { id: 'fusion-explain', label: '融合解释分析', method: 'POST', path: '/dl/fusion/explain', bodyFieldAsRoot: 'payload' },
             { id: 'fusion-list', label: '任务列表', method: 'GET', path: '/fusion/tasks' },
             { id: 'fusion-strategies', label: '融合策略', method: 'GET', path: '/fusion/strategies' },
             { id: 'fusion-weight-methods', label: '权重方法', method: 'GET', path: '/fusion/weight-methods' },

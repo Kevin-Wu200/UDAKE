@@ -280,6 +280,111 @@
     font-size: 12px;
 }
 
+.model-fusion-visual-panel .integration-result {
+    max-height: 280px;
+}
+
+.fusion-visual-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 10px;
+}
+
+.fusion-viz-card {
+    border: 1px solid var(--border-color, #e5e7eb);
+    border-radius: 8px;
+    background: var(--card-bg, #ffffff);
+    padding: 10px;
+}
+
+.fusion-viz-card > h4 {
+    margin: 0 0 8px;
+    font-size: 13px;
+}
+
+.fusion-viz-body {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.fusion-viz-empty {
+    margin: 0;
+    color: #6b7280;
+    font-size: 12px;
+}
+
+.fusion-weight-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.fusion-row-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+}
+
+.fusion-weight-track {
+    width: 100%;
+    height: 8px;
+    border-radius: 999px;
+    background: #e5e7eb;
+    overflow: hidden;
+}
+
+.fusion-weight-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #2563eb, #60a5fa);
+}
+
+.fusion-contribution-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #059669, #34d399);
+}
+
+.fusion-row-reason {
+    margin: 0;
+    font-size: 11px;
+    color: #6b7280;
+}
+
+.fusion-strategy-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.fusion-tag {
+    display: inline-flex;
+    align-items: center;
+    height: 24px;
+    border-radius: 999px;
+    padding: 0 10px;
+    font-size: 11px;
+    background: #dbeafe;
+    color: #1d4ed8;
+}
+
+.fusion-strategy-summary {
+    margin: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #374151;
+}
+
+.fusion-recommend-list {
+    margin: 0;
+    padding-left: 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
 .history-version-comparison-panel {
     gap: 12px;
 }
