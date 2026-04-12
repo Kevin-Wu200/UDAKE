@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
+import copy
+import hashlib
+import json
+import threading
 from typing import Any, Literal
 
 import numpy as np
@@ -89,6 +94,11 @@ class DeepEnsembleRegressor:
         self._runtime_feature_mean = np.zeros(self.in_dim, dtype=float)
         self._runtime_feature_std = np.ones(self.in_dim, dtype=float)
         self._has_runtime_stats = False
+        self._predict_cache_lock = threading.Lock()
+        self._predict_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._predict_cache_size = 24
+        self._predict_cache_hits = 0
+        self._predict_cache_misses = 0
 
     def _split_train_val(self, x: np.ndarray, y: np.ndarray, ratio: float = 0.2) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         n = len(y)
@@ -181,7 +191,25 @@ class DeepEnsembleRegressor:
         member_weights: dict[str, float] | None = None,
         confidence: float = 0.95,
     ) -> dict[str, Any]:
-        means, vars_, ids = self._collect_predictions(x)
+        features = ensure_2d(x)
+        conf = float(confidence)
+        cache_key = self._predict_cache_key(
+            features,
+            aggregation=aggregation,
+            confidence=conf,
+            member_weights=member_weights,
+        )
+        cached = self._predict_cache_get(cache_key)
+        if cached is not None:
+            result = dict(cached)
+            result["performance"] = {
+                **dict(result.get("performance", {})),
+                "cache_hit": True,
+                "cache_metrics": self._predict_cache_metrics(),
+            }
+            return result
+
+        means, vars_, ids = self._collect_predictions(features)
 
         if aggregation == "weighted":
             if not member_weights:
@@ -208,14 +236,14 @@ class DeepEnsembleRegressor:
         else:
             moments = decompose_uncertainty(means, vars_)
 
-        lower, upper = confidence_interval(moments.mean, moments.variance, confidence=confidence)
+        lower, upper = confidence_interval(moments.mean, moments.variance, confidence=conf)
         quantiles = {
             "q10": np.percentile(means, 10.0, axis=0),
             "q50": np.percentile(means, 50.0, axis=0),
             "q90": np.percentile(means, 90.0, axis=0),
         }
 
-        return {
+        result = {
             "mean": moments.mean,
             "variance": moments.variance,
             "aleatoric": moments.aleatoric,
@@ -225,7 +253,13 @@ class DeepEnsembleRegressor:
             "quantiles": quantiles,
             "member_ids": ids,
             "aggregation": aggregation,
+            "performance": {
+                "cache_hit": False,
+                "cache_metrics": self._predict_cache_metrics(),
+            },
         }
+        self._predict_cache_set(cache_key, result)
+        return result
 
     def preprocess_deep_ensemble_data(
         self,
@@ -498,6 +532,78 @@ class DeepEnsembleRegressor:
                 "feature_names": list(pre["feature_names"]),
             },
         }
+
+    def _model_signature(self) -> str:
+        stats: list[float] = [float(self.n_members), float(self.seed), float(len(self.members))]
+        for mid in sorted(self.metadata.keys()):
+            meta = self.metadata[mid]
+            stats.extend(
+                [
+                    float(meta.val_nll),
+                    float(meta.hidden_dim),
+                    float(meta.learning_rate),
+                    float(meta.train_size),
+                ]
+            )
+        normalized = ",".join(f"{v:.8f}" for v in stats)
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _feature_fingerprint(self, x: np.ndarray) -> str:
+        arr = np.ascontiguousarray(np.asarray(x, dtype=float))
+        h = hashlib.sha256()
+        h.update(str(tuple(int(v) for v in arr.shape)).encode("utf-8"))
+        h.update(arr.tobytes())
+        return h.hexdigest()
+
+    def _predict_cache_key(
+        self,
+        features: np.ndarray,
+        *,
+        aggregation: EnsembleAgg,
+        confidence: float,
+        member_weights: dict[str, float] | None,
+    ) -> str:
+        payload = {
+            "feature_hash": self._feature_fingerprint(features),
+            "shape": [int(features.shape[0]), int(features.shape[1]) if features.ndim == 2 else 0],
+            "aggregation": str(aggregation),
+            "confidence": float(confidence),
+            "active_member_ids": list(self.active_member_ids),
+            "member_weights": {str(k): float(v) for k, v in sorted((member_weights or {}).items())},
+            "model_hash": self._model_signature(),
+        }
+        normalized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _predict_cache_get(self, key: str) -> dict[str, Any] | None:
+        with self._predict_cache_lock:
+            cached = self._predict_cache.get(key)
+            if cached is None:
+                self._predict_cache_misses += 1
+                return None
+            self._predict_cache_hits += 1
+            self._predict_cache.move_to_end(key)
+            return copy.deepcopy(cached)
+
+    def _predict_cache_set(self, key: str, value: dict[str, Any]) -> None:
+        with self._predict_cache_lock:
+            cached = copy.deepcopy(value)
+            perf = dict(cached.get("performance", {}))
+            perf.pop("cache_hit", None)
+            cached["performance"] = perf
+            self._predict_cache[key] = cached
+            self._predict_cache.move_to_end(key)
+            while len(self._predict_cache) > self._predict_cache_size:
+                self._predict_cache.popitem(last=False)
+
+    def _predict_cache_metrics(self) -> dict[str, float | int]:
+        with self._predict_cache_lock:
+            total = self._predict_cache_hits + self._predict_cache_misses
+            return {
+                "hits": int(self._predict_cache_hits),
+                "misses": int(self._predict_cache_misses),
+                "hit_rate": float(self._predict_cache_hits / max(1, total)),
+            }
 
     def explain_ensemble_weights(
         self,

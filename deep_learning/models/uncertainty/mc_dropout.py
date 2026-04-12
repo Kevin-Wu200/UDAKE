@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
+import copy
+import hashlib
+import json
+import threading
 from typing import Any, Sequence
 
 import numpy as np
@@ -83,6 +88,11 @@ class MCDropoutRegressor:
         self._runtime_feature_mean = np.zeros(int(config.in_dim), dtype=float)
         self._runtime_feature_std = np.ones(int(config.in_dim), dtype=float)
         self._has_runtime_stats = False
+        self._predict_cache_lock = threading.Lock()
+        self._predict_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._predict_cache_size = 24
+        self._predict_cache_hits = 0
+        self._predict_cache_misses = 0
 
     def _forward(self, x: np.ndarray, training: bool, keep_dropout: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         z1 = x @ self.w1 + self.b1
@@ -145,17 +155,23 @@ class MCDropoutRegressor:
     def predict(self, x: np.ndarray, t: int = 50, confidence: float = 0.95) -> dict[str, Any]:
         features = ensure_2d(x)
         steps = int(max(2, t))
-        means = np.zeros((steps, len(features)), dtype=float)
-        vars_ = np.zeros((steps, len(features)), dtype=float)
+        conf = float(confidence)
+        cache_key = self._predict_cache_key(features, steps=steps, confidence=conf)
+        cached = self._predict_cache_get(cache_key)
+        if cached is not None:
+            result = dict(cached)
+            result["performance"] = {
+                **dict(result.get("performance", {})),
+                "cache_hit": True,
+                "sampling_strategy": "vectorized",
+                "cache_metrics": self._predict_cache_metrics(),
+            }
+            return result
 
-        for i in range(steps):
-            _, _, mean_i, var_i = self._forward(features, training=False, keep_dropout=True)
-            means[i] = mean_i
-            vars_[i] = var_i
-
+        means, vars_ = self._sample_forward_passes(features, steps=steps)
         moments: PredictiveMoments = decompose_uncertainty(means, vars_)
-        lower, upper = confidence_interval(moments.mean, moments.variance, confidence=confidence)
-        return {
+        lower, upper = confidence_interval(moments.mean, moments.variance, confidence=conf)
+        result = {
             "mean": moments.mean,
             "variance": moments.variance,
             "aleatoric": moments.aleatoric,
@@ -163,8 +179,15 @@ class MCDropoutRegressor:
             "lower": lower,
             "upper": upper,
             "t": steps,
-            "confidence": float(confidence),
+            "confidence": conf,
+            "performance": {
+                "cache_hit": False,
+                "sampling_strategy": "vectorized",
+                "cache_metrics": self._predict_cache_metrics(),
+            },
         }
+        self._predict_cache_set(cache_key, result)
+        return result
 
     def t_sensitivity(self, x: np.ndarray, t_values: list[int]) -> list[dict[str, float]]:
         features = ensure_2d(x)
@@ -360,12 +383,7 @@ class MCDropoutRegressor:
         pre = self.preprocess_mc_dropout_data(features, use_training_stats=use_training_stats)
         x_scaled = np.asarray(pre["processed_features"], dtype=float)
         steps = int(max(2, t))
-        sampled_means = np.zeros((steps, len(x_scaled)), dtype=float)
-        sampled_vars = np.zeros((steps, len(x_scaled)), dtype=float)
-        for i in range(steps):
-            _, _, mean_i, var_i = self._forward(x_scaled, training=False, keep_dropout=True)
-            sampled_means[i] = mean_i
-            sampled_vars[i] = var_i
+        sampled_means, sampled_vars = self._sample_forward_passes(x_scaled, steps=steps)
 
         pred_mean = np.mean(sampled_means, axis=0)
         pred_std = np.std(sampled_means, axis=0)
@@ -408,6 +426,7 @@ class MCDropoutRegressor:
             "forward_pass_metrics": {
                 "per_pass_mean_prediction": [float(v) for v in np.mean(sampled_means, axis=1).tolist()],
                 "per_pass_mean_aleatoric": [float(v) for v in np.mean(sampled_vars, axis=1).tolist()],
+                "sampling_strategy": "vectorized",
             },
             "preprocess": {
                 "scaler": dict(pre["scaler"]),
@@ -443,10 +462,7 @@ class MCDropoutRegressor:
         pre = self.preprocess_mc_dropout_data(features, use_training_stats=use_training_stats)
         x_scaled = np.asarray(pre["processed_features"], dtype=float)
         steps = int(max(2, t))
-        sampled_means = np.zeros((steps, len(x_scaled)), dtype=float)
-        for i in range(steps):
-            _, _, mean_i, _ = self._forward(x_scaled, training=False, keep_dropout=True)
-            sampled_means[i] = mean_i
+        sampled_means, _ = self._sample_forward_passes(x_scaled, steps=steps)
 
         q = np.asarray(list(quantiles), dtype=float)
         q = np.clip(q, 0.0, 1.0)
@@ -501,3 +517,89 @@ class MCDropoutRegressor:
                 "feature_names": list(pre["feature_names"]),
             },
         }
+
+    def _model_signature(self) -> str:
+        stats: list[float] = [float(len(self.history))]
+        for arr in (self.w1, self.b1, self.w_mean, self.b_mean, self.w_logvar, self.b_logvar):
+            flat = np.asarray(arr, dtype=float).reshape(-1)
+            if flat.size == 0:
+                continue
+            stats.extend([float(np.mean(flat)), float(np.std(flat)), float(np.mean(np.abs(flat)))])
+        normalized = ",".join(f"{v:.8f}" for v in stats)
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _feature_fingerprint(self, x: np.ndarray) -> str:
+        arr = np.ascontiguousarray(np.asarray(x, dtype=float))
+        h = hashlib.sha256()
+        h.update(str(tuple(int(v) for v in arr.shape)).encode("utf-8"))
+        h.update(arr.tobytes())
+        return h.hexdigest()
+
+    def _predict_cache_key(self, features: np.ndarray, *, steps: int, confidence: float) -> str:
+        payload = {
+            "feature_hash": self._feature_fingerprint(features),
+            "shape": [int(features.shape[0]), int(features.shape[1]) if features.ndim == 2 else 0],
+            "steps": int(steps),
+            "confidence": float(confidence),
+            "model_hash": self._model_signature(),
+            "dropout_type": str(self.config.dropout_type),
+            "dropout_rate": float(self.config.dropout_rate),
+        }
+        normalized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _predict_cache_get(self, key: str) -> dict[str, Any] | None:
+        with self._predict_cache_lock:
+            cached = self._predict_cache.get(key)
+            if cached is None:
+                self._predict_cache_misses += 1
+                return None
+            self._predict_cache_hits += 1
+            self._predict_cache.move_to_end(key)
+            return copy.deepcopy(cached)
+
+    def _predict_cache_set(self, key: str, value: dict[str, Any]) -> None:
+        with self._predict_cache_lock:
+            cached = copy.deepcopy(value)
+            perf = dict(cached.get("performance", {}))
+            perf.pop("cache_hit", None)
+            cached["performance"] = perf
+            self._predict_cache[key] = cached
+            self._predict_cache.move_to_end(key)
+            while len(self._predict_cache) > self._predict_cache_size:
+                self._predict_cache.popitem(last=False)
+
+    def _predict_cache_metrics(self) -> dict[str, float | int]:
+        with self._predict_cache_lock:
+            total = self._predict_cache_hits + self._predict_cache_misses
+            return {
+                "hits": int(self._predict_cache_hits),
+                "misses": int(self._predict_cache_misses),
+                "hit_rate": float(self._predict_cache_hits / max(1, total)),
+            }
+
+    def _sample_forward_passes(self, x: np.ndarray, *, steps: int) -> tuple[np.ndarray, np.ndarray]:
+        features = ensure_2d(x)
+        z1 = features @ self.w1 + self.b1
+        h = np.tanh(z1)
+        keep = float(max(1e-8, 1.0 - float(self.config.dropout_rate)))
+        n_samples, hidden_dim = h.shape
+
+        if self.config.dropout_type == "variational":
+            if self.dropout._variational_mask is None or self.dropout._variational_mask.shape != h.shape:
+                self.dropout._variational_mask = (
+                    (self.dropout.rng.uniform(0.0, 1.0, size=h.shape) < keep).astype(float) / keep
+                )
+            base_mask = np.asarray(self.dropout._variational_mask, dtype=float)
+            masks = np.repeat(base_mask.reshape(1, n_samples, hidden_dim), steps, axis=0)
+        elif self.config.dropout_type == "spatial":
+            base = (self.dropout.rng.uniform(0.0, 1.0, size=(steps, 1, hidden_dim)) < keep).astype(float)
+            masks = np.repeat(base, n_samples, axis=1) / keep
+        else:
+            masks = (self.dropout.rng.uniform(0.0, 1.0, size=(steps, n_samples, hidden_dim)) < keep).astype(float) / keep
+
+        h_drop = h.reshape(1, n_samples, hidden_dim) * masks
+        means = np.einsum("tnh,hk->tnk", h_drop, self.w_mean, optimize=True)[..., 0] + float(self.b_mean[0])
+        logvar = np.einsum("tnh,hk->tnk", h_drop, self.w_logvar, optimize=True)[..., 0] + float(self.b_logvar[0])
+        vars_ = np.exp(np.clip(logvar, -8.0, 5.0)) + 1e-6
+        return np.asarray(means, dtype=float), np.asarray(vars_, dtype=float)

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass
+import copy
+import hashlib
+import json
+import threading
 from typing import Any, Sequence, Union
 
 import numpy as np
@@ -184,6 +189,11 @@ class BayesianNeuralRegressor:
         self._runtime_feature_mean = np.zeros(self.in_dim, dtype=float)
         self._runtime_feature_std = np.ones(self.in_dim, dtype=float)
         self._has_runtime_stats = False
+        self._predict_cache_lock = threading.Lock()
+        self._predict_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._predict_cache_size = 24
+        self._predict_cache_hits = 0
+        self._predict_cache_misses = 0
 
     def _forward_mean(self, x: np.ndarray) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         z1 = self.hidden.forward(x, sample=False)
@@ -286,13 +296,36 @@ class BayesianNeuralRegressor:
     ) -> tuple[np.ndarray, np.ndarray]:
         features = ensure_2d(x)
         t = int(max(2, num_samples))
-        sampled_means = np.zeros((t, len(features)), dtype=float)
-        sampled_vars = np.zeros((t, len(features)), dtype=float)
-        for i in range(t):
-            mean_i, var_i = self._forward_sample(features, temperature=temperature)
-            sampled_means[i] = mean_i
-            sampled_vars[i] = var_i
-        return sampled_means, sampled_vars
+        temp = float(max(temperature, 1e-4))
+        n, _ = features.shape
+
+        hidden_w = self.hidden.weight.mu + temp * self.hidden.weight.sigma * self.rng.normal(
+            0.0, 1.0, size=(t, *self.hidden.weight.mu.shape)
+        )
+        hidden_b = self.hidden.bias.mu + temp * self.hidden.bias.sigma * self.rng.normal(
+            0.0, 1.0, size=(t, *self.hidden.bias.mu.shape)
+        )
+        z1 = np.einsum("nd,tdh->tnh", features, hidden_w, optimize=True) + hidden_b[:, None, :]
+        h = np.tanh(z1)
+
+        mean_w = self.mean_head.weight.mu + temp * self.mean_head.weight.sigma * self.rng.normal(
+            0.0, 1.0, size=(t, *self.mean_head.weight.mu.shape)
+        )
+        mean_b = self.mean_head.bias.mu + temp * self.mean_head.bias.sigma * self.rng.normal(
+            0.0, 1.0, size=(t, *self.mean_head.bias.mu.shape)
+        )
+        sampled_means = np.einsum("tnh,thk->tnk", h, mean_w, optimize=True)[..., 0] + mean_b[:, None, 0]
+
+        logvar_w = self.logvar_head.weight.mu + temp * self.logvar_head.weight.sigma * self.rng.normal(
+            0.0, 1.0, size=(t, *self.logvar_head.weight.mu.shape)
+        )
+        logvar_b = self.logvar_head.bias.mu + temp * self.logvar_head.bias.sigma * self.rng.normal(
+            0.0, 1.0, size=(t, *self.logvar_head.bias.mu.shape)
+        )
+        sampled_logvar = np.einsum("tnh,thk->tnk", h, logvar_w, optimize=True)[..., 0] + logvar_b[:, None, 0]
+        sampled_vars = temperature_scale_variance(np.exp(np.clip(sampled_logvar, -8.0, 5.0)), temperature=temp)
+
+        return np.asarray(sampled_means, dtype=float), np.asarray(sampled_vars, dtype=float)
 
     def predict(
         self,
@@ -301,19 +334,42 @@ class BayesianNeuralRegressor:
         confidence: float = 0.95,
         temperature: float = 1.0,
     ) -> dict[str, Any]:
-        sampled_means, sampled_vars = self.sample_predict(x, num_samples=num_samples, temperature=temperature)
+        features = ensure_2d(x)
+        samples = int(max(2, num_samples))
+        conf = float(confidence)
+        temp = float(max(temperature, 1e-4))
+        cache_key = self._predict_cache_key(features, samples=samples, confidence=conf, temperature=temp)
+        cached = self._predict_cache_get(cache_key)
+        if cached is not None:
+            result = dict(cached)
+            result["performance"] = {
+                **dict(result.get("performance", {})),
+                "cache_hit": True,
+                "sampling_strategy": "vectorized_posterior",
+                "cache_metrics": self._predict_cache_metrics(),
+            }
+            return result
+
+        sampled_means, sampled_vars = self.sample_predict(features, num_samples=samples, temperature=temp)
         moments: PredictiveMoments = decompose_uncertainty(sampled_means, sampled_vars)
-        lower, upper = confidence_interval(moments.mean, moments.variance, confidence=confidence)
-        return {
+        lower, upper = confidence_interval(moments.mean, moments.variance, confidence=conf)
+        result = {
             "mean": moments.mean,
             "variance": moments.variance,
             "aleatoric": moments.aleatoric,
             "epistemic": moments.epistemic,
             "lower": lower,
             "upper": upper,
-            "confidence": float(confidence),
-            "num_samples": int(max(2, num_samples)),
+            "confidence": conf,
+            "num_samples": samples,
+            "performance": {
+                "cache_hit": False,
+                "sampling_strategy": "vectorized_posterior",
+                "cache_metrics": self._predict_cache_metrics(),
+            },
         }
+        self._predict_cache_set(cache_key, result)
+        return result
 
     def preprocess_bnn_data(
         self,
@@ -575,3 +631,79 @@ class BayesianNeuralRegressor:
                 "feature_names": list(pre["feature_names"]),
             },
         }
+
+    def _model_signature(self) -> str:
+        stats: list[float] = [float(len(self.history))]
+        for layer in (self.hidden, self.mean_head, self.logvar_head):
+            for param in (layer.weight, layer.bias):
+                mu = np.asarray(param.mu, dtype=float).reshape(-1)
+                rho = np.asarray(param.rho, dtype=float).reshape(-1)
+                if mu.size == 0:
+                    continue
+                stats.extend(
+                    [
+                        float(np.mean(mu)),
+                        float(np.std(mu)),
+                        float(np.mean(np.abs(mu))),
+                        float(np.mean(rho)),
+                        float(np.std(rho)),
+                    ]
+                )
+        normalized = ",".join(f"{v:.8f}" for v in stats)
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _feature_fingerprint(self, x: np.ndarray) -> str:
+        arr = np.ascontiguousarray(np.asarray(x, dtype=float))
+        h = hashlib.sha256()
+        h.update(str(tuple(int(v) for v in arr.shape)).encode("utf-8"))
+        h.update(arr.tobytes())
+        return h.hexdigest()
+
+    def _predict_cache_key(
+        self,
+        features: np.ndarray,
+        *,
+        samples: int,
+        confidence: float,
+        temperature: float,
+    ) -> str:
+        payload = {
+            "feature_hash": self._feature_fingerprint(features),
+            "shape": [int(features.shape[0]), int(features.shape[1]) if features.ndim == 2 else 0],
+            "num_samples": int(samples),
+            "confidence": float(confidence),
+            "temperature": float(temperature),
+            "model_hash": self._model_signature(),
+        }
+        normalized = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+        return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+    def _predict_cache_get(self, key: str) -> dict[str, Any] | None:
+        with self._predict_cache_lock:
+            cached = self._predict_cache.get(key)
+            if cached is None:
+                self._predict_cache_misses += 1
+                return None
+            self._predict_cache_hits += 1
+            self._predict_cache.move_to_end(key)
+            return copy.deepcopy(cached)
+
+    def _predict_cache_set(self, key: str, value: dict[str, Any]) -> None:
+        with self._predict_cache_lock:
+            cached = copy.deepcopy(value)
+            perf = dict(cached.get("performance", {}))
+            perf.pop("cache_hit", None)
+            cached["performance"] = perf
+            self._predict_cache[key] = cached
+            self._predict_cache.move_to_end(key)
+            while len(self._predict_cache) > self._predict_cache_size:
+                self._predict_cache.popitem(last=False)
+
+    def _predict_cache_metrics(self) -> dict[str, float | int]:
+        with self._predict_cache_lock:
+            total = self._predict_cache_hits + self._predict_cache_misses
+            return {
+                "hits": int(self._predict_cache_hits),
+                "misses": int(self._predict_cache_misses),
+                "hit_rate": float(self._predict_cache_hits / max(1, total)),
+            }
