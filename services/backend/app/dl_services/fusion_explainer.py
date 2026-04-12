@@ -417,6 +417,354 @@ class _BaseFusionAdapter:
             "per_node": per_node,
         }
 
+    @staticmethod
+    def _safe_corr(a: np.ndarray, b: np.ndarray) -> float:
+        x = np.asarray(a, dtype=float).reshape(-1)
+        y = np.asarray(b, dtype=float).reshape(-1)
+        if x.size != y.size or x.size <= 1:
+            return 0.0
+        if float(np.std(x)) <= EPS or float(np.std(y)) <= EPS:
+            return 0.0
+        c = float(np.corrcoef(x, y)[0, 1])
+        if np.isnan(c):
+            return 0.0
+        return c
+
+    @staticmethod
+    def _safe_r2(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        y = np.asarray(y_true, dtype=float).reshape(-1)
+        p = np.asarray(y_pred, dtype=float).reshape(-1)
+        if y.size != p.size or y.size == 0:
+            return 0.0
+        ss_res = float(np.sum((y - p) ** 2))
+        ss_tot = float(np.sum((y - np.mean(y)) ** 2))
+        if ss_tot <= EPS:
+            return 0.0
+        return float(np.clip(1.0 - ss_res / ss_tot, -1.0, 1.0))
+
+    @staticmethod
+    def _trend_slope(series: np.ndarray) -> float:
+        arr = np.asarray(series, dtype=float).reshape(-1)
+        if arr.size <= 1:
+            return 0.0
+        x = np.arange(arr.size, dtype=float)
+        x_mean = float(np.mean(x))
+        y_mean = float(np.mean(arr))
+        denom = float(np.sum((x - x_mean) ** 2))
+        if denom <= EPS:
+            return 0.0
+        return float(np.sum((x - x_mean) * (arr - y_mean)) / denom)
+
+    @staticmethod
+    def _gini(arr: np.ndarray) -> float:
+        data = np.sort(np.clip(np.asarray(arr, dtype=float).reshape(-1), 0.0, None))
+        n = int(data.size)
+        if n == 0:
+            return 0.0
+        total = float(np.sum(data))
+        if total <= EPS:
+            return 0.0
+        idx = np.arange(1, n + 1, dtype=float)
+        return float((2.0 * np.sum(idx * data) / (n * total)) - (n + 1.0) / n)
+
+    def _submodel_performance_comparison(self, context: dict[str, Any], true_values: list[float] | None) -> dict[str, Any]:
+        model_ids = list(context.get("model_ids", []))
+        matrix = np.asarray(context.get("matrix", []), dtype=float)
+        fused = np.asarray(context.get("fused_predictions", []), dtype=float).reshape(-1)
+        online_weights = self._ordered_weights(model_ids, dict(context.get("online_weights", {})))
+        y_true = None if true_values is None else np.asarray(true_values, dtype=float).reshape(-1)
+        if y_true is not None and y_true.shape[0] != matrix.shape[0]:
+            y_true = None
+
+        rows: list[dict[str, Any]] = []
+        for i, model_id in enumerate(model_ids):
+            pred = np.asarray(matrix[:, i], dtype=float).reshape(-1) if matrix.ndim == 2 and i < matrix.shape[1] else np.zeros((0,))
+            rmse_to_fused = float(np.sqrt(np.mean((pred - fused) ** 2))) if pred.size and pred.size == fused.size else 0.0
+            mae_to_fused = float(np.mean(np.abs(pred - fused))) if pred.size and pred.size == fused.size else 0.0
+            pred_stability = float(1.0 / (1.0 + np.std(np.diff(pred)))) if pred.size > 1 else 1.0
+            row: dict[str, Any] = {
+                "model_id": str(model_id),
+                "online_weight": float(online_weights[i]) if i < online_weights.size else 0.0,
+                "rmse_to_fusion": float(rmse_to_fused),
+                "mae_to_fusion": float(mae_to_fused),
+                "agreement_with_fusion": float(self._safe_corr(pred, fused)) if pred.size else 0.0,
+                "prediction_stability": float(pred_stability),
+                "score": 0.0,
+            }
+            if y_true is not None and pred.size == y_true.size:
+                err = pred - y_true
+                rmse = float(np.sqrt(np.mean(err ** 2)))
+                mae = float(np.mean(np.abs(err)))
+                mape = float(np.mean(np.abs(err) / np.clip(np.abs(y_true), EPS, None)) * 100.0)
+                r2 = float(self._safe_r2(y_true, pred))
+                score = float(
+                    0.45 * (1.0 / (1.0 + rmse))
+                    + 0.25 * ((r2 + 1.0) / 2.0)
+                    + 0.20 * pred_stability
+                    + 0.10 * float(online_weights[i] if i < online_weights.size else 0.0)
+                )
+                row.update(
+                    {
+                        "rmse": rmse,
+                        "mae": mae,
+                        "mape": mape,
+                        "r2": r2,
+                        "bias": float(np.mean(err)),
+                        "error_std": float(np.std(err)),
+                        "score": score,
+                    }
+                )
+            else:
+                score = float(
+                    0.55 * (1.0 / (1.0 + rmse_to_fused))
+                    + 0.30 * pred_stability
+                    + 0.15 * float(online_weights[i] if i < online_weights.size else 0.0)
+                )
+                row["score"] = score
+            rows.append(row)
+
+        ranking = sorted(rows, key=lambda item: float(item.get("score", 0.0)), reverse=True)
+        return {
+            "summary": {
+                "model_count": int(len(model_ids)),
+                "has_ground_truth": bool(y_true is not None),
+                "scoring_formula": (
+                    "有真值: 0.45*(1/(1+rmse))+0.25*((r2+1)/2)+0.20*stability+0.10*weight; "
+                    "无真值: 0.55*(1/(1+rmse_to_fusion))+0.30*stability+0.15*weight"
+                ),
+                "top_model": str(ranking[0]["model_id"]) if ranking else "",
+            },
+            "ranking": ranking,
+        }
+
+    def _submodel_stability_analysis(self, context: dict[str, Any], true_values: list[float] | None) -> dict[str, Any]:
+        model_ids = list(context.get("model_ids", []))
+        matrix = np.asarray(context.get("matrix", []), dtype=float)
+        y_true = None if true_values is None else np.asarray(true_values, dtype=float).reshape(-1)
+        if y_true is not None and y_true.shape[0] != matrix.shape[0]:
+            y_true = None
+
+        rows: list[dict[str, Any]] = []
+        win = max(2, min(5, int(matrix.shape[0]) if matrix.ndim == 2 else 2))
+        for i, model_id in enumerate(model_ids):
+            pred = np.asarray(matrix[:, i], dtype=float).reshape(-1) if matrix.ndim == 2 and i < matrix.shape[1] else np.zeros((0,))
+            if pred.size <= 1:
+                rows.append(
+                    {
+                        "model_id": str(model_id),
+                        "prediction_volatility": 0.0,
+                        "rolling_variance_mean": 0.0,
+                        "prediction_stability": 1.0,
+                        "error_stability": 1.0,
+                        "overall_stability": 1.0,
+                    }
+                )
+                continue
+            volatility = float(np.std(np.diff(pred)))
+            rolling_vars = [float(np.var(pred[s : s + win])) for s in range(0, pred.size - win + 1)]
+            rolling_mean = float(np.mean(rolling_vars)) if rolling_vars else 0.0
+            pred_stability = float(1.0 / (1.0 + volatility + rolling_mean))
+            error_stability = 1.0
+            error_std = 0.0
+            error_drift = 0.0
+            if y_true is not None and y_true.size == pred.size:
+                err = pred - y_true
+                error_std = float(np.std(err))
+                error_drift = float(np.mean(np.abs(np.diff(err)))) if err.size > 1 else 0.0
+                error_stability = float(1.0 / (1.0 + error_std + error_drift))
+            overall = float(0.6 * pred_stability + 0.4 * error_stability)
+            rows.append(
+                {
+                    "model_id": str(model_id),
+                    "prediction_volatility": volatility,
+                    "rolling_variance_mean": rolling_mean,
+                    "prediction_stability": pred_stability,
+                    "error_std": error_std,
+                    "error_drift": error_drift,
+                    "error_stability": float(error_stability),
+                    "overall_stability": overall,
+                }
+            )
+        ranking = sorted(rows, key=lambda item: float(item.get("overall_stability", 0.0)), reverse=True)
+        return {
+            "summary": {
+                "model_count": int(len(model_ids)),
+                "window_size": int(win),
+                "has_ground_truth": bool(y_true is not None),
+                "most_stable_model": str(ranking[0]["model_id"]) if ranking else "",
+            },
+            "ranking": ranking,
+        }
+
+    def _submodel_complementarity_analysis(self, context: dict[str, Any], true_values: list[float] | None, top_k: int) -> dict[str, Any]:
+        model_ids = list(context.get("model_ids", []))
+        matrix = np.asarray(context.get("matrix", []), dtype=float)
+        n_models = int(len(model_ids))
+        y_true = None if true_values is None else np.asarray(true_values, dtype=float).reshape(-1)
+        if y_true is not None and (matrix.ndim != 2 or y_true.shape[0] != matrix.shape[0]):
+            y_true = None
+
+        heatmap = np.eye(n_models, dtype=float)
+        pairs: list[dict[str, Any]] = []
+        per_model_scores: dict[str, list[float]] = {mid: [] for mid in model_ids}
+        for i in range(n_models):
+            for j in range(i + 1, n_models):
+                p_i = np.asarray(matrix[:, i], dtype=float)
+                p_j = np.asarray(matrix[:, j], dtype=float)
+                pred_corr = abs(self._safe_corr(p_i, p_j))
+                pred_complement = float(1.0 - pred_corr)
+                residual_complement = 0.0
+                synergy_gain = 0.0
+                if y_true is not None:
+                    e_i = p_i - y_true
+                    e_j = p_j - y_true
+                    residual_complement = float(1.0 - abs(self._safe_corr(e_i, e_j)))
+                    pair_pred = 0.5 * (p_i + p_j)
+                    pair_rmse = float(np.sqrt(np.mean((pair_pred - y_true) ** 2)))
+                    best_single_rmse = float(
+                        min(
+                            np.sqrt(np.mean((p_i - y_true) ** 2)),
+                            np.sqrt(np.mean((p_j - y_true) ** 2)),
+                        )
+                    )
+                    synergy_gain = float(best_single_rmse - pair_rmse)
+                spread = float(np.mean(np.abs(p_i - p_j)))
+                norm_spread = float(spread / (np.std(np.concatenate([p_i, p_j])) + 1.0))
+                score = float(0.55 * pred_complement + 0.30 * residual_complement + 0.15 * min(1.0, norm_spread))
+                heatmap[i, j] = score
+                heatmap[j, i] = score
+                per_model_scores[model_ids[i]].append(score)
+                per_model_scores[model_ids[j]].append(score)
+                pairs.append(
+                    {
+                        "model_a": str(model_ids[i]),
+                        "model_b": str(model_ids[j]),
+                        "prediction_correlation_abs": float(pred_corr),
+                        "prediction_complementarity": float(pred_complement),
+                        "residual_complementarity": float(residual_complement),
+                        "spread": float(spread),
+                        "synergy_gain_vs_best_single_rmse": float(synergy_gain),
+                        "complementarity_score": float(score),
+                    }
+                )
+        pairs.sort(key=lambda item: float(item.get("complementarity_score", 0.0)), reverse=True)
+        k = max(1, min(int(top_k), len(pairs))) if pairs else 0
+        model_index = [
+            {
+                "model_id": str(mid),
+                "complementarity_index": float(np.mean(vals)) if vals else 0.0,
+            }
+            for mid, vals in per_model_scores.items()
+        ]
+        model_index.sort(key=lambda item: float(item.get("complementarity_index", 0.0)), reverse=True)
+        return {
+            "summary": {
+                "model_count": int(n_models),
+                "pair_count": int(len(pairs)),
+                "has_ground_truth": bool(y_true is not None),
+                "most_complementary_pair": (
+                    {"model_a": str(pairs[0]["model_a"]), "model_b": str(pairs[0]["model_b"])} if pairs else {}
+                ),
+            },
+            "pair_scores": pairs,
+            "top_complementary_pairs": pairs[:k] if k > 0 else [],
+            "model_complementarity_index": model_index,
+            "complementarity_heatmap": {
+                "model_ids": [str(mid) for mid in model_ids],
+                "matrix": [[float(v) for v in row] for row in heatmap.tolist()],
+            },
+        }
+
+    def _submodel_weight_visualization(self, context: dict[str, Any], top_k: int) -> dict[str, Any]:
+        model_ids = list(context.get("model_ids", []))
+        offline = self._ordered_weights(model_ids, dict(context.get("weights", {})))
+        online = self._ordered_weights(model_ids, dict(context.get("online_weights", {})))
+        delta = online - offline
+        entropy = float(-np.sum(online * np.log(np.clip(online, EPS, None)))) if online.size else 0.0
+        effective = float(1.0 / np.clip(np.sum(np.square(online)), EPS, None)) if online.size else 0.0
+        gini = float(self._gini(online))
+        order = np.argsort(np.abs(delta))[::-1]
+        k = max(1, min(int(top_k), len(model_ids))) if model_ids else 0
+
+        diagnostics = dict(context.get("diagnostics", {}))
+        dynamic_weights = diagnostics.get("dynamic_weights", {})
+        traces: list[dict[str, Any]] = []
+        if isinstance(dynamic_weights, dict):
+            for mid in model_ids:
+                raw = dynamic_weights.get(mid, [])
+                arr = np.asarray(raw, dtype=float).reshape(-1)
+                traces.append(
+                    {
+                        "model_id": str(mid),
+                        "series": [float(v) for v in arr.tolist()],
+                        "mean_weight": float(np.mean(arr)) if arr.size else 0.0,
+                        "weight_std": float(np.std(arr)) if arr.size else 0.0,
+                        "min_weight": float(np.min(arr)) if arr.size else 0.0,
+                        "max_weight": float(np.max(arr)) if arr.size else 0.0,
+                        "trend_slope": float(self._trend_slope(arr)),
+                    }
+                )
+
+        return {
+            "summary": {
+                "model_count": int(len(model_ids)),
+                "weight_entropy": float(entropy),
+                "weight_gini": float(gini),
+                "effective_model_count": float(effective),
+                "dominant_model": str(model_ids[int(np.argmax(online))]) if online.size else "",
+                "has_dynamic_weight_trace": bool(any(item.get("series") for item in traces)),
+            },
+            "weight_distribution": [
+                {
+                    "model_id": str(mid),
+                    "offline_weight": float(offline[i]),
+                    "online_weight": float(online[i]),
+                    "delta_weight": float(delta[i]),
+                }
+                for i, mid in enumerate(model_ids)
+            ],
+            "top_weight_shift_models": [
+                {
+                    "model_id": str(model_ids[int(i)]),
+                    "offline_weight": float(offline[int(i)]),
+                    "online_weight": float(online[int(i)]),
+                    "delta_weight": float(delta[int(i)]),
+                }
+                for i in (order[:k].tolist() if k > 0 else [])
+            ],
+            "visualization_payload": {
+                "bar_chart": [
+                    {
+                        "model_id": str(mid),
+                        "offline_weight": float(offline[i]),
+                        "online_weight": float(online[i]),
+                        "delta_weight": float(delta[i]),
+                    }
+                    for i, mid in enumerate(model_ids)
+                ],
+                "pie_chart": [
+                    {
+                        "label": str(mid),
+                        "value": float(online[i]),
+                    }
+                    for i, mid in enumerate(model_ids)
+                ],
+                "timeline_chart": traces,
+            },
+        }
+
+    def _submodel_analysis(self, context: dict[str, Any], true_values: list[float] | None, top_k: int) -> dict[str, Any]:
+        performance = self._submodel_performance_comparison(context, true_values)
+        stability = self._submodel_stability_analysis(context, true_values)
+        complementarity = self._submodel_complementarity_analysis(context, true_values, top_k=int(top_k))
+        weights = self._submodel_weight_visualization(context, top_k=int(top_k))
+        return {
+            "submodel_performance_comparison": performance,
+            "submodel_stability_analysis": stability,
+            "submodel_complementarity_analysis": complementarity,
+            "submodel_weight_visualization": weights,
+        }
+
     def _strategy_selection_explanation(self, context: dict[str, Any], true_values: list[float] | None) -> dict[str, Any]:
         selected = str(context.get("selected_strategy", ""))
         requested = str(context.get("requested_strategy", context.get("strategy", "")))
@@ -689,6 +1037,7 @@ class FusionLIMEAdapter(_BaseFusionAdapter):
         importance = np.mean(np.abs(raw), axis=0)
         weight_analysis = self._fusion_weight_analysis(built, int(top_k))
         contribution_analysis = self._submodel_contribution_analysis(built, node_indices, int(top_k))
+        submodel_analysis = self._submodel_analysis(built, true_values, int(top_k))
         strategy_explanation = self._strategy_selection_explanation(built, true_values)
         context_memory_bytes = self._array_bytes(
             np.asarray(built["matrix"], dtype=np.float32),
@@ -710,6 +1059,11 @@ class FusionLIMEAdapter(_BaseFusionAdapter):
             "global_feature_importance": [float(v) for v in importance.tolist()],
             "fusion_weight_analysis": weight_analysis,
             "submodel_contribution_analysis": contribution_analysis,
+            "submodel_analysis": submodel_analysis,
+            "submodel_performance_comparison": submodel_analysis["submodel_performance_comparison"],
+            "submodel_stability_analysis": submodel_analysis["submodel_stability_analysis"],
+            "submodel_complementarity_analysis": submodel_analysis["submodel_complementarity_analysis"],
+            "submodel_weight_visualization": submodel_analysis["submodel_weight_visualization"],
             "strategy_selection_explanation": strategy_explanation,
             "preprocess": dict(built["preprocess"]),
             "explainer": {
@@ -852,6 +1206,7 @@ class FusionSHAPAdapter(_BaseFusionAdapter):
         importance = np.mean(np.abs(arr), axis=0)
         weight_analysis = self._fusion_weight_analysis(built, int(top_k))
         contribution_analysis = self._submodel_contribution_analysis(built, node_indices, int(top_k))
+        submodel_analysis = self._submodel_analysis(built, true_values, int(top_k))
         strategy_explanation = self._strategy_selection_explanation(built, true_values)
         context_memory_bytes = self._array_bytes(
             np.asarray(built["matrix"], dtype=np.float32),
@@ -873,6 +1228,11 @@ class FusionSHAPAdapter(_BaseFusionAdapter):
             "global_feature_importance": [float(v) for v in importance.tolist()],
             "fusion_weight_analysis": weight_analysis,
             "submodel_contribution_analysis": contribution_analysis,
+            "submodel_analysis": submodel_analysis,
+            "submodel_performance_comparison": submodel_analysis["submodel_performance_comparison"],
+            "submodel_stability_analysis": submodel_analysis["submodel_stability_analysis"],
+            "submodel_complementarity_analysis": submodel_analysis["submodel_complementarity_analysis"],
+            "submodel_weight_visualization": submodel_analysis["submodel_weight_visualization"],
             "strategy_selection_explanation": strategy_explanation,
             "preprocess": dict(built["preprocess"]),
             "explainer": {
