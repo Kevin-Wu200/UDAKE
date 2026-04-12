@@ -236,6 +236,21 @@ class FusionCompareRequest(BaseModel):
     context: Optional[dict[str, list[float]]] = None
 
 
+class FusionStrategyRecommendRequest(BaseModel):
+    models: list[FusionModelInput] = Field(default_factory=list)
+    true_values: Optional[list[float]] = None
+    context: Optional[dict[str, list[float]]] = None
+    objective: str = Field(default="balanced", description="balanced/rmse/mae/r2/stability")
+
+
+class FusionStrategyEffectivenessRequest(BaseModel):
+    models: list[FusionModelInput] = Field(default_factory=list)
+    strategy: str = Field(default="dynamic")
+    true_values: Optional[list[float]] = None
+    context: Optional[dict[str, list[float]]] = None
+    baseline_strategy: str = Field(default="weighted_average")
+
+
 class FusionFeatureAnalysisRequest(BaseModel):
     models: list[FusionModelInput] = Field(default_factory=list)
     profile_id: Optional[str] = None
@@ -656,6 +671,36 @@ def compare_fusion_strategies(payload: FusionCompareRequest) -> dict:
         models=[m.model_dump() for m in payload.models],
         true_values=payload.true_values,
         context=payload.context,
+    )
+
+
+@router.post("/fusion/strategy-analysis")
+def analyze_fusion_strategies(payload: FusionCompareRequest) -> dict:
+    return service.analyze_fusion_strategies(
+        models=[m.model_dump() for m in payload.models],
+        true_values=payload.true_values,
+        context=payload.context,
+    )
+
+
+@router.post("/fusion/strategy-recommend")
+def recommend_fusion_strategy(payload: FusionStrategyRecommendRequest) -> dict:
+    return service.recommend_fusion_strategy(
+        models=[m.model_dump() for m in payload.models],
+        true_values=payload.true_values,
+        context=payload.context,
+        objective=payload.objective,
+    )
+
+
+@router.post("/fusion/strategy-effectiveness")
+def evaluate_fusion_strategy_effectiveness(payload: FusionStrategyEffectivenessRequest) -> dict:
+    return service.evaluate_fusion_strategy_effectiveness(
+        models=[m.model_dump() for m in payload.models],
+        strategy=payload.strategy,
+        true_values=payload.true_values,
+        context=payload.context,
+        baseline_strategy=payload.baseline_strategy,
     )
 
 

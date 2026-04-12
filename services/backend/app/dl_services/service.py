@@ -1225,6 +1225,48 @@ class DeepLearningService:
             context=context,
         )
 
+    def analyze_fusion_strategies(
+        self,
+        models: list[dict[str, Any]],
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+    ) -> dict[str, Any]:
+        return self.fusion_platform.strategy_analysis(
+            models=models,
+            true_values=true_values,
+            context=context,
+        )
+
+    def recommend_fusion_strategy(
+        self,
+        models: list[dict[str, Any]],
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+        objective: str = "balanced",
+    ) -> dict[str, Any]:
+        return self.fusion_platform.recommend_strategy(
+            models=models,
+            true_values=true_values,
+            context=context,
+            objective=objective,
+        )
+
+    def evaluate_fusion_strategy_effectiveness(
+        self,
+        models: list[dict[str, Any]],
+        strategy: str,
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+        baseline_strategy: str = "weighted_average",
+    ) -> dict[str, Any]:
+        return self.fusion_platform.evaluate_strategy_effectiveness(
+            models=models,
+            strategy=strategy,
+            true_values=true_values,
+            context=context,
+            baseline_strategy=baseline_strategy,
+        )
+
     def optimize_fusion_weights(
         self,
         models: list[dict[str, Any]],

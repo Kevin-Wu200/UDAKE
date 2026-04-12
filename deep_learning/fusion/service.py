@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
+import numpy as np
+
 from .adaptive import AdaptiveFusionSystem
 from .common import (
     AdaptiveLearningMode,
@@ -151,6 +153,129 @@ class FusionPlatformService:
         results = self.engine.compare_strategies(models=preds, true_values=true_values, context=context)
         self.monitor.record("compare_strategies", ok=True)
         return {k: self._serialize_result(v) for k, v in results.items()}
+
+    def strategy_analysis(
+        self,
+        models: list[dict[str, Any]],
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+    ) -> dict[str, Any]:
+        self._record_request("strategy_analysis")
+        preds = self._parse_predictions(models)
+        compared = self.engine.compare_strategies(models=preds, true_values=true_values, context=context)
+        serialized = {k: self._serialize_result(v) for k, v in compared.items()}
+        ranking = self._build_strategy_ranking(serialized, true_values=true_values)
+        self.monitor.record("strategy_analysis", ok=True)
+        return {
+            "strategies": serialized,
+            "analysis": {
+                "ranking": ranking,
+                "best_strategy": ranking[0]["strategy"] if ranking else "",
+                "has_ground_truth": bool(true_values is not None),
+            },
+        }
+
+    def recommend_strategy(
+        self,
+        models: list[dict[str, Any]],
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+        objective: str = "balanced",
+    ) -> dict[str, Any]:
+        self._record_request("recommend_strategy")
+        analysis = self.strategy_analysis(models=models, true_values=true_values, context=context)
+        ranking = list(analysis.get("analysis", {}).get("ranking", []))
+        if not ranking:
+            self.monitor.record("recommend_strategy", ok=True)
+            return {
+                "objective": objective,
+                "recommended_strategy": "",
+                "reason": "no_strategy_available",
+                "candidates": [],
+                "analysis": analysis.get("analysis", {}),
+            }
+
+        normalized_objective = str(objective or "balanced").strip().lower()
+        if normalized_objective not in {"balanced", "rmse", "mae", "r2", "stability"}:
+            normalized_objective = "balanced"
+
+        objective_rank = self._sort_ranking_by_objective(ranking, objective=normalized_objective)
+        recommended = objective_rank[0]
+        self.monitor.record("recommend_strategy", ok=True)
+        return {
+            "objective": normalized_objective,
+            "recommended_strategy": recommended["strategy"],
+            "reason": recommended.get("reason", ""),
+            "summary": {
+                "score": float(recommended.get("score", 0.0)),
+                "rmse": float(recommended.get("rmse", np.inf)),
+                "mae": float(recommended.get("mae", np.inf)),
+                "r2": float(recommended.get("r2", -np.inf)),
+                "mean_sigma": float(recommended.get("mean_sigma", 0.0)),
+                "ensemble_diversity": float(recommended.get("ensemble_diversity", 0.0)),
+            },
+            "candidates": objective_rank[:3],
+            "analysis": analysis.get("analysis", {}),
+        }
+
+    def evaluate_strategy_effectiveness(
+        self,
+        models: list[dict[str, Any]],
+        strategy: str,
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+        baseline_strategy: str = FusionStrategy.WEIGHTED_AVERAGE.value,
+    ) -> dict[str, Any]:
+        self._record_request("evaluate_strategy_effectiveness")
+        preds = self._parse_predictions(models)
+        target_cfg = FusionConfig(strategy=FusionStrategy(str(strategy).strip().lower() or FusionStrategy.WEIGHTED_AVERAGE.value))
+        baseline_cfg = FusionConfig(
+            strategy=FusionStrategy(str(baseline_strategy).strip().lower() or FusionStrategy.WEIGHTED_AVERAGE.value)
+        )
+
+        target = self.engine.fuse(models=preds, config=target_cfg, true_values=true_values, context=context)
+        baseline = self.engine.fuse(models=preds, config=baseline_cfg, true_values=true_values, context=context)
+
+        target_metrics = dict(target.metrics)
+        baseline_metrics = dict(baseline.metrics)
+        target_uncertainty = dict(target.diagnostics.get("uncertainty", {}))
+        baseline_uncertainty = dict(baseline.diagnostics.get("uncertainty", {}))
+        improvement_vs_baseline = self._effectiveness_delta(target_metrics, baseline_metrics)
+
+        target_rmse = float(target_metrics.get("rmse", np.inf))
+        baseline_rmse = float(baseline_metrics.get("rmse", np.inf))
+        target_sigma = float(target_uncertainty.get("mean_sigma", 0.0))
+        baseline_sigma = float(baseline_uncertainty.get("mean_sigma", 0.0))
+
+        score = 0.0
+        if np.isfinite(target_rmse) and np.isfinite(baseline_rmse):
+            score += float((baseline_rmse - target_rmse) / max(baseline_rmse, 1e-8) * 100.0)
+        if baseline_sigma > 0:
+            score += float((baseline_sigma - target_sigma) / baseline_sigma * 100.0) * 0.3
+
+        effectiveness_level = "weak"
+        if score >= 15.0:
+            effectiveness_level = "excellent"
+        elif score >= 6.0:
+            effectiveness_level = "good"
+        elif score >= 0.0:
+            effectiveness_level = "fair"
+
+        self.monitor.record("evaluate_strategy_effectiveness", ok=True)
+        return {
+            "target_strategy": target.strategy,
+            "baseline_strategy": baseline.strategy,
+            "target": self._serialize_result(target),
+            "baseline": self._serialize_result(baseline),
+            "effectiveness": {
+                "score": float(score),
+                "level": effectiveness_level,
+                "has_ground_truth": bool(true_values is not None),
+                "improvement_vs_baseline": improvement_vs_baseline,
+                "target_uncertainty": target_uncertainty,
+                "baseline_uncertainty": baseline_uncertainty,
+            },
+        }
 
     def optimize_weights(
         self,
@@ -316,6 +441,116 @@ class FusionPlatformService:
             "improvement": result.improvement,
             "diagnostics": result.diagnostics,
         }
+
+    def _build_strategy_ranking(
+        self,
+        strategies: dict[str, dict[str, Any]],
+        true_values: list[float] | None,
+    ) -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        metric_rows: list[tuple[float, float, float]] = []
+        uncertainty_rows: list[tuple[float, float]] = []
+        for name, payload in strategies.items():
+            metrics = dict(payload.get("metrics", {}))
+            diagnostics = dict(payload.get("diagnostics", {}))
+            uncertainty = dict(diagnostics.get("uncertainty", {}))
+            diversity = dict(diagnostics.get("diversity", {}))
+            rmse = float(metrics.get("rmse", np.inf))
+            mae = float(metrics.get("mae", np.inf))
+            r2 = float(metrics.get("r2", -np.inf))
+            mean_sigma = float(uncertainty.get("mean_sigma", 0.0))
+            ensemble_diversity = float(diversity.get("ensemble_diversity", 0.0))
+            rows.append(
+                {
+                    "strategy": str(name),
+                    "rmse": rmse,
+                    "mae": mae,
+                    "r2": r2,
+                    "mean_sigma": mean_sigma,
+                    "ensemble_diversity": ensemble_diversity,
+                }
+            )
+            if np.isfinite(rmse) and np.isfinite(mae) and np.isfinite(r2):
+                metric_rows.append((rmse, mae, r2))
+            uncertainty_rows.append((mean_sigma, ensemble_diversity))
+
+        rmse_best = min((v[0] for v in metric_rows), default=np.inf)
+        mae_best = min((v[1] for v in metric_rows), default=np.inf)
+        r2_best = max((v[2] for v in metric_rows), default=-np.inf)
+        sigma_best = min((v[0] for v in uncertainty_rows), default=0.0)
+        diversity_best = max((v[1] for v in uncertainty_rows), default=0.0)
+
+        for row in rows:
+            rmse_score = float(rmse_best / row["rmse"]) if np.isfinite(rmse_best) and row["rmse"] > 0 else 0.0
+            mae_score = float(mae_best / row["mae"]) if np.isfinite(mae_best) and row["mae"] > 0 else 0.0
+            if np.isfinite(r2_best):
+                r2_gap = max(0.0, r2_best - row["r2"])
+                r2_score = float(1.0 / (1.0 + r2_gap))
+            else:
+                r2_score = 0.0
+            sigma_score = float(1.0 / (1.0 + max(0.0, row["mean_sigma"] - sigma_best)))
+            diversity_score = float(0.0 if diversity_best <= 0 else row["ensemble_diversity"] / diversity_best)
+
+            if true_values is None:
+                score = 0.65 * sigma_score + 0.35 * diversity_score
+                reason = "uncertainty_and_diversity"
+            else:
+                score = 0.45 * rmse_score + 0.25 * mae_score + 0.2 * r2_score + 0.1 * sigma_score
+                reason = "error_metrics_and_uncertainty"
+            row["score"] = float(score)
+            row["reason"] = reason
+
+        rows.sort(key=lambda item: float(item.get("score", 0.0)), reverse=True)
+        return rows
+
+    def _sort_ranking_by_objective(self, ranking: list[dict[str, Any]], objective: str) -> list[dict[str, Any]]:
+        out = [dict(item) for item in ranking]
+        if objective == "rmse":
+            out.sort(key=lambda item: float(item.get("rmse", np.inf)))
+            for row in out:
+                row["reason"] = "lowest_rmse"
+            return out
+        if objective == "mae":
+            out.sort(key=lambda item: float(item.get("mae", np.inf)))
+            for row in out:
+                row["reason"] = "lowest_mae"
+            return out
+        if objective == "r2":
+            out.sort(key=lambda item: float(item.get("r2", -np.inf)), reverse=True)
+            for row in out:
+                row["reason"] = "highest_r2"
+            return out
+        if objective == "stability":
+            out.sort(
+                key=lambda item: (
+                    float(item.get("mean_sigma", np.inf)),
+                    -float(item.get("ensemble_diversity", 0.0)),
+                )
+            )
+            for row in out:
+                row["reason"] = "lowest_uncertainty_and_high_diversity"
+            return out
+        return out
+
+    def _effectiveness_delta(self, target: dict[str, float], baseline: dict[str, float]) -> dict[str, float]:
+        out: dict[str, float] = {}
+        target_rmse = float(target.get("rmse", np.inf))
+        baseline_rmse = float(baseline.get("rmse", np.inf))
+        if np.isfinite(target_rmse) and np.isfinite(baseline_rmse) and baseline_rmse > 0:
+            out["rmse_improvement_pct"] = float((baseline_rmse - target_rmse) / baseline_rmse * 100.0)
+        target_mae = float(target.get("mae", np.inf))
+        baseline_mae = float(baseline.get("mae", np.inf))
+        if np.isfinite(target_mae) and np.isfinite(baseline_mae) and baseline_mae > 0:
+            out["mae_improvement_pct"] = float((baseline_mae - target_mae) / baseline_mae * 100.0)
+        target_r2 = float(target.get("r2", -np.inf))
+        baseline_r2 = float(baseline.get("r2", -np.inf))
+        if np.isfinite(target_r2) and np.isfinite(baseline_r2):
+            out["r2_gain"] = float(target_r2 - baseline_r2)
+        target_max = float(target.get("max_error", np.inf))
+        baseline_max = float(baseline.get("max_error", np.inf))
+        if np.isfinite(target_max) and np.isfinite(baseline_max) and baseline_max > 0:
+            out["max_error_improvement_pct"] = float((baseline_max - target_max) / baseline_max * 100.0)
+        return out
 
     def _record_request(self, endpoint: str) -> None:
         # 入口占位，后续可扩展 tracing/span 打点。

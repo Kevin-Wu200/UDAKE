@@ -68,6 +68,45 @@ def test_fusion_api_routes() -> None:
     compare_payload = compare_resp.json()
     assert "weighted_average" in compare_payload
 
+    analysis_resp = client.post(
+        "/api/dl/fusion/strategy-analysis",
+        json={"models": _models(), "true_values": _true_values()},
+    )
+    assert analysis_resp.status_code == 200
+    analysis_payload = analysis_resp.json()
+    assert "strategies" in analysis_payload
+    assert "analysis" in analysis_payload
+    assert analysis_payload["analysis"]["best_strategy"] in analysis_payload["strategies"]
+
+    recommend_resp = client.post(
+        "/api/dl/fusion/strategy-recommend",
+        json={
+            "models": _models(),
+            "true_values": _true_values(),
+            "objective": "rmse",
+        },
+    )
+    assert recommend_resp.status_code == 200
+    recommend_payload = recommend_resp.json()
+    assert recommend_payload["objective"] == "rmse"
+    assert recommend_payload["recommended_strategy"] in analysis_payload["strategies"]
+    assert len(recommend_payload["candidates"]) >= 1
+
+    effectiveness_resp = client.post(
+        "/api/dl/fusion/strategy-effectiveness",
+        json={
+            "models": _models(),
+            "strategy": "dynamic",
+            "true_values": _true_values(),
+            "baseline_strategy": "weighted_average",
+        },
+    )
+    assert effectiveness_resp.status_code == 200
+    effectiveness_payload = effectiveness_resp.json()
+    assert effectiveness_payload["target_strategy"] == "dynamic"
+    assert effectiveness_payload["baseline_strategy"] == "weighted_average"
+    assert "effectiveness" in effectiveness_payload
+
     feature_resp = client.post(
         "/api/dl/fusion/feature-analysis",
         json={

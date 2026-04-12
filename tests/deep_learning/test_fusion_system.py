@@ -180,6 +180,48 @@ def test_fusion_platform_service_end_to_end(tmp_path: Path) -> None:
     assert status["requests"]["total"] >= 1
 
 
+def test_fusion_platform_strategy_analysis_recommend_and_effectiveness(tmp_path: Path) -> None:
+    service = FusionPlatformService(repository_dir=str(tmp_path / "repo"))
+    models = [
+        {
+            "model_id": m.model_id,
+            "predictions": m.predictions,
+            "variances": m.variances,
+        }
+        for m in _sample_models()
+    ]
+    y = _sample_true()
+
+    analysis = service.strategy_analysis(models=models, true_values=y, context={"difficulty": [1.0] * len(y)})
+    assert "strategies" in analysis
+    assert "analysis" in analysis
+    assert analysis["analysis"]["best_strategy"] in analysis["strategies"]
+    assert len(analysis["analysis"]["ranking"]) >= 1
+
+    recommendation = service.recommend_strategy(
+        models=models,
+        true_values=y,
+        context={"difficulty": [1.0] * len(y)},
+        objective="rmse",
+    )
+    assert recommendation["objective"] == "rmse"
+    assert recommendation["recommended_strategy"] in analysis["strategies"]
+    assert len(recommendation["candidates"]) >= 1
+
+    effectiveness = service.evaluate_strategy_effectiveness(
+        models=models,
+        strategy="dynamic",
+        true_values=y,
+        context={"difficulty": [1.0] * len(y)},
+        baseline_strategy="weighted_average",
+    )
+    assert effectiveness["target_strategy"] == "dynamic"
+    assert effectiveness["baseline_strategy"] == "weighted_average"
+    assert "effectiveness" in effectiveness
+    assert "improvement_vs_baseline" in effectiveness["effectiveness"]
+    assert effectiveness["effectiveness"]["level"] in {"excellent", "good", "fair", "weak"}
+
+
 def test_fusion_feature_analysis_design() -> None:
     engine = ModelFusionEngine()
     analyzer = FusionFeatureAnalyzer()
