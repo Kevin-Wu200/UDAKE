@@ -537,6 +537,37 @@ describe('SpatiotemporalExplainPanel', () => {
         panel.destroy();
     });
 
+    it('应渲染不确定性热力图/时间序列/空间分布组件', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        const visData = {
+            variance: [0.3, 0.5, 0.2, 0.8],
+            epistemic: [0.1, 0.2, 0.08, 0.5],
+            aleatoric: [0.2, 0.3, 0.12, 0.3]
+        };
+        const coords: Array<[number, number]> = [[120, 30], [120.1, 30.1], [120.2, 30.2], [120.3, 30.3]];
+        const series: number[][][] = [
+            [[1], [1.1], [1.2]],
+            [[1.2], [1.15], [1.1]]
+        ];
+
+        const heatmapHtml = (panel as any).renderUncertaintyHeatmapVisualization(visData, coords);
+        expect(heatmapHtml).toContain('uncertainty-heatmap-grid');
+        expect(heatmapHtml).toContain('总不确定性');
+
+        const timelineHtml = (panel as any).renderUncertaintyTimelineVisualization(visData, series);
+        expect(timelineHtml).toContain('uncertainty-timeline-list');
+        expect(timelineHtml).toContain('认知');
+
+        const spatialHtml = (panel as any).renderUncertaintySpatialDistributionVisualization(visData, coords);
+        expect(spatialHtml).toContain('uncertainty-spatial-list');
+        expect(spatialHtml).toContain('等级');
+
+        panel.destroy();
+    });
+
     it('应覆盖刷新空任务与后端校验告警分支', async () => {
         const api = createApiMock();
         api.getSpatiotemporalExplainMonitor.mockResolvedValue({});

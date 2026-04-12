@@ -2050,9 +2050,6 @@ export class SpatiotemporalExplainPanel {
         const errorTimeline = this.buildReconstructionTimelineRows(series, reconstruction.combined, threshold);
         const comparison = this.buildReconstructionCompareRows(reconstruction, threshold);
 
-        const heatmap = this.buildHeatmapRows(coordinates, result);
-        const timeline = this.buildTimelineRows(series);
-
         return `
             <div class="explain-result-grid">
                 <section class="result-card">
@@ -2115,32 +2112,18 @@ export class SpatiotemporalExplainPanel {
                 </section>
 
                 <section class="result-card">
-                    <h6>空间热力图（近似）</h6>
-                    <div class="heatmap-grid">
-                        ${heatmap.map((row) => {
-                            const opacity = Math.max(0.12, Math.min(1, row.intensity));
-                            return `
-                                <button class="heatmap-cell" type="button" aria-label="${row.label}" title="${row.label}" style="background: rgba(56, 189, 248, ${opacity});">
-                                    ${row.value.toFixed(2)}
-                                </button>
-                            `;
-                        }).join('')}
-                    </div>
+                    <h6>不确定性热力图</h6>
+                    ${this.renderUncertaintyHeatmapVisualization(uncertaintyView, coordinates)}
                 </section>
 
                 <section class="result-card">
-                    <h6>时间序列图（特征均值）</h6>
-                    <div class="timeline-list">
-                        ${timeline.map((row) => `
-                            <div class="timeline-item">
-                                <span>T${row.index}</span>
-                                <div class="timeline-track">
-                                    <div class="timeline-fill" style="width:${row.width}%"></div>
-                                </div>
-                                <span>${row.value.toFixed(3)}</span>
-                            </div>
-                        `).join('')}
-                    </div>
+                    <h6>不确定性时间序列图</h6>
+                    ${this.renderUncertaintyTimelineVisualization(uncertaintyView, series)}
+                </section>
+
+                <section class="result-card">
+                    <h6>不确定性空间分布图</h6>
+                    ${this.renderUncertaintySpatialDistributionVisualization(uncertaintyView, coordinates)}
                 </section>
 
                 <section class="result-card full-width">
@@ -3060,6 +3043,169 @@ export class SpatiotemporalExplainPanel {
                             </div>
                         `;
                     }).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    private renderUncertaintyHeatmapVisualization(
+        data: { variance: number[]; epistemic: number[]; aleatoric: number[] },
+        coords: Array<[number, number]>
+    ): string {
+        const variance = data.variance.filter((item) => Number.isFinite(item) && item >= 0);
+        if (!variance.length) {
+            return '<div class="status-message">暂无不确定性热力图数据</div>';
+        }
+        const maxVariance = Math.max(...variance, 1e-8);
+        const rows = variance.slice(0, 64).map((value, idx) => {
+            const intensity = Math.max(0.12, Math.min(1, value / maxVariance));
+            const coord = coords[idx];
+            const label = coord
+                ? `节点${idx + 1} (${coord[0]}, ${coord[1]})`
+                : `节点${idx + 1}`;
+            return {
+                value,
+                intensity,
+                label,
+                epistemic: Math.max(0, Number(data.epistemic[idx] ?? 0)),
+                aleatoric: Math.max(0, Number(data.aleatoric[idx] ?? 0))
+            };
+        });
+        return `
+            <div class="uncertainty-heatmap-panel">
+                <div class="heatmap-grid uncertainty-heatmap-grid">
+                    ${rows.map((item) => `
+                        <button
+                            class="heatmap-cell uncertainty-heatmap-cell"
+                            type="button"
+                            aria-label="${item.label}"
+                            title="${item.label} / 总不确定性 ${item.value.toFixed(4)} / 认知 ${item.epistemic.toFixed(4)} / 偶然 ${item.aleatoric.toFixed(4)}"
+                            style="background: rgba(220, 38, 38, ${item.intensity});"
+                        >
+                            ${item.value.toFixed(3)}
+                        </button>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    private renderUncertaintyTimelineVisualization(
+        data: { variance: number[]; epistemic: number[]; aleatoric: number[] },
+        series: number[][][]
+    ): string {
+        const baseVariance = data.variance.filter((item) => Number.isFinite(item) && item >= 0);
+        if (!baseVariance.length) {
+            return '<div class="status-message">暂无不确定性时间序列数据</div>';
+        }
+        const steps = Math.max(1, series[0]?.length || Math.min(24, baseVariance.length));
+        const timelineValues: Array<{ index: number; total: number; epistemic: number; aleatoric: number }> = [];
+        for (let step = 0; step < steps; step += 1) {
+            let total = 0;
+            let epistemic = 0;
+            let aleatoric = 0;
+            let count = 0;
+            for (let node = step; node < data.variance.length; node += steps) {
+                const variance = Math.max(0, Number(data.variance[node] ?? 0));
+                const epi = Math.max(0, Number(data.epistemic[node] ?? 0));
+                const alea = Math.max(0, Number(data.aleatoric[node] ?? 0));
+                total += variance;
+                epistemic += epi;
+                aleatoric += alea;
+                count += 1;
+            }
+            timelineValues.push({
+                index: step,
+                total: count ? total / count : 0,
+                epistemic: count ? epistemic / count : 0,
+                aleatoric: count ? aleatoric / count : 0
+            });
+        }
+        const maxTotal = Math.max(...timelineValues.map((item) => item.total), 1e-8);
+        return `
+            <div class="timeline-list uncertainty-timeline-list">
+                ${timelineValues.map((item) => {
+                    const width = Math.max(2, Math.round((item.total / maxTotal) * 100));
+                    return `
+                        <div class="timeline-item uncertainty-timeline-item">
+                            <span>T${item.index + 1}</span>
+                            <div class="timeline-track">
+                                <div class="timeline-fill uncertainty-timeline-fill" style="width:${width}%"></div>
+                            </div>
+                            <span>${item.total.toFixed(4)}</span>
+                            <span class="uncertainty-timeline-meta">认知 ${item.epistemic.toFixed(3)} / 偶然 ${item.aleatoric.toFixed(3)}</span>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    }
+
+    private renderUncertaintySpatialDistributionVisualization(
+        data: { variance: number[]; epistemic: number[]; aleatoric: number[] },
+        coords: Array<[number, number]>
+    ): string {
+        const total = data.variance.length;
+        if (!total) {
+            return '<div class="status-message">暂无不确定性空间分布数据</div>';
+        }
+        const centerX = coords.length ? coords.reduce((acc, item) => acc + Number(item[0] || 0), 0) / coords.length : 0;
+        const centerY = coords.length ? coords.reduce((acc, item) => acc + Number(item[1] || 0), 0) / coords.length : 0;
+        const distances = Array.from({ length: total }, (_, idx) => {
+            const coord = coords[idx];
+            if (!coord) {
+                return 0;
+            }
+            const dx = Number(coord[0] || 0) - centerX;
+            const dy = Number(coord[1] || 0) - centerY;
+            return Math.sqrt(dx * dx + dy * dy);
+        });
+        const maxDistance = Math.max(...distances, 1e-8);
+        const maxVariance = Math.max(...data.variance.map((item) => Math.max(0, Number(item || 0))), 1e-8);
+        const rows = Array.from({ length: total }, (_, idx) => {
+            const variance = Math.max(0, Number(data.variance[idx] ?? 0));
+            const epistemic = Math.max(0, Number(data.epistemic[idx] ?? 0));
+            const aleatoric = Math.max(0, Number(data.aleatoric[idx] ?? 0));
+            const distance = distances[idx] / maxDistance;
+            const uncertainty = variance / maxVariance;
+            const level = uncertainty >= 0.66 ? '高' : uncertainty >= 0.33 ? '中' : '低';
+            return {
+                idx,
+                variance,
+                epistemic,
+                aleatoric,
+                distance,
+                uncertainty,
+                level
+            };
+        })
+            .sort((a, b) => b.uncertainty - a.uncertainty)
+            .slice(0, 20);
+
+        return `
+            <div class="uncertainty-spatial-panel">
+                <div class="uncertainty-spatial-legend">
+                    <span>横轴：空间离中心距离（近 -> 远）</span>
+                    <span>纵轴：不确定性等级（低 -> 高）</span>
+                </div>
+                <div class="uncertainty-spatial-list">
+                    ${rows.map((item) => `
+                        <div class="uncertainty-spatial-item">
+                            <div class="uncertainty-spatial-meta">
+                                <span>节点 #${item.idx + 1}</span>
+                                <span>等级 ${item.level}</span>
+                            </div>
+                            <div class="uncertainty-spatial-track">
+                                <div class="uncertainty-spatial-distance" style="width:${Math.max(2, Math.round(item.distance * 100))}%"></div>
+                                <div class="uncertainty-spatial-uncertainty" style="width:${Math.max(2, Math.round(item.uncertainty * 100))}%"></div>
+                            </div>
+                            <div class="uncertainty-spatial-value">
+                                <span>总 ${item.variance.toFixed(4)}</span>
+                                <span>认知 ${item.epistemic.toFixed(4)}</span>
+                                <span>偶然 ${item.aleatoric.toFixed(4)}</span>
+                            </div>
+                        </div>
+                    `).join('')}
                 </div>
             </div>
         `;
