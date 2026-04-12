@@ -441,6 +441,15 @@ def test_service_fusion_workflow() -> None:
     assert "weighted_average" in compare
     assert "dynamic" in compare
 
+    feature_analysis = service.analyze_fusion_features(
+        models=models,
+        profile_id="demo_profile",
+        true_values=true_values,
+        context={"difficulty": [1.0] * len(true_values)},
+    )
+    assert feature_analysis["analysis"]["basic_features"]["model_count"] == len(models)
+    assert "weight_scheme" in feature_analysis["analysis"]
+
     optimize = service.optimize_fusion_weights(models=models, true_values=true_values, strategy="weighted_average")
     assert optimize["best_method"] is not None
 
@@ -520,6 +529,18 @@ def test_api_fusion_routes() -> None:
     )
     assert compare_resp.status_code == 200
     assert "weighted_average" in compare_resp.json()
+
+    feature_resp = client.post(
+        "/api/dl/fusion/feature-analysis",
+        json={
+            "models": models,
+            "profile_id": "api_profile",
+            "true_values": true_values,
+            "context": {"difficulty": [1.0] * len(true_values)},
+        },
+    )
+    assert feature_resp.status_code == 200
+    assert feature_resp.json()["analysis"]["basic_features"]["prediction_horizon"] == len(true_values)
 
     optimize_resp = client.post(
         "/api/dl/fusion/optimize",

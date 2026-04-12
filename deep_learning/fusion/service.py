@@ -17,6 +17,7 @@ from .common import (
 )
 from .engine import ModelFusionEngine
 from .evaluation import FusionEvaluator
+from .feature_analysis import FusionFeatureAnalyzer
 from .hybrid import HybridFusionBridge, HybridFusionMode, MultiModalFusion, MultiModalStrategy
 from .model_management import FusionModelManager
 
@@ -46,6 +47,7 @@ class FusionPlatformService:
         self.adaptive = AdaptiveFusionSystem(self.engine)
         self.hybrid = HybridFusionBridge()
         self.multimodal = MultiModalFusion()
+        self.feature_analyzer = FusionFeatureAnalyzer()
         self.model_manager = FusionModelManager(root_dir=repository_dir)
         self.monitor = ServiceMonitor()
 
@@ -209,6 +211,48 @@ class FusionPlatformService:
         )
         self.monitor.record("select_model", ok=True)
         return {"selected_model": selected}
+
+    def feature_analysis(
+        self,
+        models: list[dict[str, Any]],
+        profile_id: str | None = None,
+        strategy: str | None = None,
+        weight_method: str | None = None,
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+    ) -> dict[str, Any]:
+        self._record_request("feature_analysis")
+        preds = self._parse_predictions(models)
+        if profile_id and profile_id in self._profiles:
+            profile = self._profiles[profile_id]
+            cfg = FusionConfig(strategy=profile.strategy, weight_method=profile.weight_method)
+        else:
+            cfg = FusionConfig(
+                strategy=FusionStrategy(strategy or "dynamic"),
+                weight_method=WeightMethod(weight_method or "adaptive"),
+            )
+
+        payload = self.adaptive.online_fuse(models=preds, base_config=cfg, true_values=true_values, context=context)
+        result = self._serialize_result(payload["result"])
+        inference = {
+            "result": result,
+            "online_weights": payload["online_weights"],
+            "selected_strategy": payload["selected_strategy"],
+        }
+        analysis = self.feature_analyzer.analyze(
+            models=preds,
+            weights=result.get("weights", {}),
+            strategy=str(result.get("strategy", strategy or "weighted_average")),
+            weight_method=str(result.get("weight_method", weight_method or "adaptive")),
+            fused_predictions=[float(x) for x in result.get("fused_predictions", [])],
+            true_values=true_values,
+            diagnostics=result.get("diagnostics"),
+        )
+        self.monitor.record("feature_analysis", ok=True)
+        return {
+            "analysis": analysis,
+            "inference": inference,
+        }
 
     def model_registry_status(self) -> dict[str, Any]:
         return {

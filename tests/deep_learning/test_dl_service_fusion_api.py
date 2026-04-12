@@ -68,6 +68,22 @@ def test_fusion_api_routes() -> None:
     compare_payload = compare_resp.json()
     assert "weighted_average" in compare_payload
 
+    feature_resp = client.post(
+        "/api/dl/fusion/feature-analysis",
+        json={
+            "models": _models(),
+            "true_values": _true_values(),
+            "strategy": "dynamic",
+            "weight_method": "adaptive",
+            "context": {"difficulty": [1.0] * len(_true_values())},
+        },
+    )
+    assert feature_resp.status_code == 200
+    feature_payload = feature_resp.json()
+    assert "analysis" in feature_payload
+    assert feature_payload["analysis"]["basic_features"]["model_count"] == len(_models())
+    assert "feature_mapping" in feature_payload["analysis"]
+
     optimize_resp = client.post(
         "/api/dl/fusion/optimize",
         json={"models": _models(), "true_values": _true_values(), "strategy": "weighted_average"},

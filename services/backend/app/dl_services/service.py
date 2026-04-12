@@ -1276,6 +1276,24 @@ class DeepLearningService:
             input_score=input_score,
         )
 
+    def analyze_fusion_features(
+        self,
+        models: list[dict[str, Any]],
+        profile_id: str | None = None,
+        strategy: str | None = None,
+        weight_method: str | None = None,
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+    ) -> dict[str, Any]:
+        return self.fusion_platform.feature_analysis(
+            models=models,
+            profile_id=profile_id,
+            strategy=strategy,
+            weight_method=weight_method,
+            true_values=true_values,
+            context=context,
+        )
+
     def fusion_monitor_status(self) -> dict[str, Any]:
         return self.fusion_platform.monitor_status()
 

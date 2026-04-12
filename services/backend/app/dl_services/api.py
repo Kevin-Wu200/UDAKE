@@ -236,6 +236,15 @@ class FusionCompareRequest(BaseModel):
     context: Optional[dict[str, list[float]]] = None
 
 
+class FusionFeatureAnalysisRequest(BaseModel):
+    models: list[FusionModelInput] = Field(default_factory=list)
+    profile_id: Optional[str] = None
+    strategy: Optional[str] = None
+    weight_method: Optional[str] = None
+    true_values: Optional[list[float]] = None
+    context: Optional[dict[str, list[float]]] = None
+
+
 class FusionOptimizeRequest(BaseModel):
     models: list[FusionModelInput] = Field(default_factory=list)
     true_values: list[float] = Field(default_factory=list)
@@ -630,6 +639,18 @@ def predict_fusion(payload: FusionPredictRequest) -> dict:
 def compare_fusion_strategies(payload: FusionCompareRequest) -> dict:
     return service.compare_fusion_strategies(
         models=[m.model_dump() for m in payload.models],
+        true_values=payload.true_values,
+        context=payload.context,
+    )
+
+
+@router.post("/fusion/feature-analysis")
+def analyze_fusion_features(payload: FusionFeatureAnalysisRequest) -> dict:
+    return service.analyze_fusion_features(
+        models=[m.model_dump() for m in payload.models],
+        profile_id=payload.profile_id,
+        strategy=payload.strategy,
+        weight_method=payload.weight_method,
         true_values=payload.true_values,
         context=payload.context,
     )

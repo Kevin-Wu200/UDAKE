@@ -6,6 +6,7 @@ from deep_learning.fusion import (
     AdaptiveFusionSystem,
     AdaptiveLearningMode,
     FusionConfig,
+    FusionFeatureAnalyzer,
     FusionModelManager,
     FusionPlatformService,
     FusionStrategy,
@@ -177,3 +178,33 @@ def test_fusion_platform_service_end_to_end(tmp_path: Path) -> None:
 
     status = service.monitor_status()
     assert status["requests"]["total"] >= 1
+
+
+def test_fusion_feature_analysis_design() -> None:
+    engine = ModelFusionEngine()
+    analyzer = FusionFeatureAnalyzer()
+    models = _sample_models()
+    y = _sample_true()
+    result = engine.fuse(
+        models=models,
+        config=FusionConfig(strategy=FusionStrategy.DYNAMIC, weight_method=WeightMethod.ADAPTIVE),
+        true_values=y,
+        context={"difficulty": [1.0] * len(y)},
+    )
+    payload = analyzer.analyze(
+        models=models,
+        weights=result.weights,
+        strategy=result.strategy,
+        weight_method=result.weight_method,
+        fused_predictions=result.fused_predictions,
+        true_values=y,
+        diagnostics=result.diagnostics,
+    )
+    assert payload["basic_features"]["model_count"] == len(models)
+    assert payload["basic_features"]["prediction_horizon"] == len(y)
+    assert payload["weight_features"]["weight_method"] == result.weight_method
+    assert abs(sum(payload["weight_features"]["weights"].values()) - 1.0) < 1e-6
+    assert len(payload["model_contributions"]) == len(models)
+    assert "weight_scheme" in payload
+    assert "contribution_scheme" in payload
+    assert "strategy_features" in payload

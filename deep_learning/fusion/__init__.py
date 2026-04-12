@@ -15,6 +15,7 @@ from .common import (
 )
 from .engine import ModelFusionEngine
 from .evaluation import FusionEvaluator
+from .feature_analysis import FusionFeatureAnalyzer
 from .hybrid import HybridFusionBridge, MultiModalFusion
 from .model_management import FusionModelManager
 from .service import FusionPlatformService, fusion_platform_service
@@ -25,6 +26,7 @@ __all__ = [
     "AdaptiveLearningMode",
     "FusionConfig",
     "FusionEvaluator",
+    "FusionFeatureAnalyzer",
     "FusionModelManager",
     "FusionPlatformService",
     "FusionProfile",
