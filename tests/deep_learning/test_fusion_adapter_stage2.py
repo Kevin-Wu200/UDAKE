@@ -59,6 +59,14 @@ def _assert_stage2_payload(payload: dict) -> None:
     assert strategy["summary"]["weight_method"] != ""
     assert len(strategy["summary"]["reason_tags"]) >= 1
     assert "rmse" in strategy["evidence"]
+    assert "active_strategy_explanation" in strategy
+    assert "strategy_explanations" in strategy
+    explanations = strategy["strategy_explanations"]
+    assert {"weighted_average", "dynamic", "stacking", "bagging"} <= set(explanations.keys())
+    assert explanations["weighted_average"]["display_name"] == "加权平均策略"
+    assert explanations["dynamic"]["display_name"] == "动态权重策略"
+    assert explanations["stacking"]["display_name"] == "Stacking策略"
+    assert explanations["bagging"]["display_name"] == "Bagging策略"
 
     perf = payload["performance"]
     assert perf["sample_count"] >= 1
@@ -129,3 +137,21 @@ def test_fusion_lime_stage2_context_cache_hit_when_result_cache_miss() -> None:
     assert second["performance"]["cache_hit"] is False
     assert second["performance"]["context_cache_hit"] is True
     assert second["performance"]["context_cache_hits"] >= 1
+
+
+def test_fusion_lime_stage2_bagging_strategy_alias_explanation() -> None:
+    adapter = FusionLIMEAdapter(config=FusionExplanationConfig(lime_num_samples=100, max_explain_nodes=4, random_state=53))
+    out = adapter.explain(
+        models=_models(),
+        top_k=3,
+        max_explain_nodes=4,
+        num_samples=80,
+        strategy="bagging",
+        weight_method="adaptive",
+        true_values=_true_values(),
+    )
+    strategy = out["strategy_selection_explanation"]
+    assert strategy["summary"]["requested_strategy"] == "bagging"
+    assert strategy["summary"]["effective_strategy"] == "simple_average"
+    assert "bagging_alias_simple_average" in strategy["summary"]["reason_tags"]
+    assert strategy["active_strategy_explanation"]["strategy"] == "bagging"

@@ -137,6 +137,16 @@ class _BaseFusionAdapter:
         return normalized
 
     @staticmethod
+    def _resolve_strategy_alias(strategy: str | None) -> str | None:
+        if strategy is None:
+            return None
+        normalized = str(strategy).strip().lower()
+        aliases = {
+            "bagging": "simple_average",
+        }
+        return aliases.get(normalized, normalized)
+
+    @staticmethod
     def _validate_inputs(models: list[dict[str, Any]], true_values: list[float] | None = None) -> tuple[np.ndarray, list[str]]:
         if not models:
             raise ValueError("models cannot be empty")
@@ -167,10 +177,12 @@ class _BaseFusionAdapter:
     ) -> dict[str, Any]:
         normalized_models = self._normalize_models(models)
         matrix, model_ids = self._validate_inputs(normalized_models, true_values=true_values)
+        requested_strategy = None if strategy is None else str(strategy).strip().lower()
+        effective_strategy = self._resolve_strategy_alias(strategy)
         payload = fusion_platform_service.inference(
             models=normalized_models,
             profile_id=profile_id,
-            strategy=strategy,
+            strategy=effective_strategy,
             weight_method=weight_method,
             true_values=true_values,
             context=context,
@@ -202,6 +214,8 @@ class _BaseFusionAdapter:
             "weights": dict(result.get("weights", {})),
             "online_weights": dict(payload.get("online_weights", {})),
             "strategy": str(result.get("strategy", "")),
+            "requested_strategy": str(requested_strategy or result.get("strategy", "")),
+            "effective_strategy": str(effective_strategy or result.get("strategy", "")),
             "weight_method": str(result.get("weight_method", "")),
             "selected_strategy": str(payload.get("selected_strategy", "")),
             "metrics": dict(result.get("metrics", {})),
@@ -216,6 +230,11 @@ class _BaseFusionAdapter:
                 "model_count": int(matrix.shape[1]),
                 "model_ids": list(model_ids),
                 "has_true_values": bool(true_values is not None),
+                "requested_strategy": str(requested_strategy or result.get("strategy", strategy or "")),
+                "effective_strategy": str(effective_strategy or result.get("strategy", strategy or "")),
+                "strategy_alias_applied": bool(
+                    requested_strategy is not None and effective_strategy is not None and requested_strategy != effective_strategy
+                ),
                 "strategy": str(result.get("strategy", strategy or "")),
                 "weight_method": str(result.get("weight_method", weight_method or "")),
             },
@@ -400,7 +419,8 @@ class _BaseFusionAdapter:
 
     def _strategy_selection_explanation(self, context: dict[str, Any], true_values: list[float] | None) -> dict[str, Any]:
         selected = str(context.get("selected_strategy", ""))
-        requested = str(context.get("strategy", ""))
+        requested = str(context.get("requested_strategy", context.get("strategy", "")))
+        effective = str(context.get("effective_strategy", context.get("strategy", "")))
         metrics = dict(context.get("metrics", {}))
         diagnostics = dict(context.get("diagnostics", {}))
         fused = np.asarray(context.get("fused_predictions", []), dtype=float).reshape(-1)
@@ -425,10 +445,17 @@ class _BaseFusionAdapter:
             reason_tags.append("uncertainty_aware")
         if diagnostics:
             reason_tags.append("diagnostics_available")
+        if requested == "bagging":
+            reason_tags.append("bagging_alias_simple_average")
+
+        strategy_explanations = self._build_strategy_explanations(context, true_values)
+        active_strategy_key = "bagging" if requested == "bagging" else (selected or effective or requested or "weighted_average")
+        active_strategy = strategy_explanations.get(active_strategy_key, strategy_explanations.get(selected, {}))
 
         return {
             "summary": {
                 "requested_strategy": requested,
+                "effective_strategy": effective,
                 "selected_strategy": selected,
                 "weight_method": str(context.get("weight_method", "")),
                 "strategy_changed": bool(requested and selected and requested != selected),
@@ -450,6 +477,107 @@ class _BaseFusionAdapter:
                 "has_diversity": bool(diagnostics.get("diversity")),
                 "has_uncertainty": bool(diagnostics.get("uncertainty")),
             },
+            "active_strategy_explanation": active_strategy,
+            "strategy_explanations": strategy_explanations,
+        }
+
+    def _build_strategy_explanations(self, context: dict[str, Any], true_values: list[float] | None) -> dict[str, Any]:
+        return {
+            "weighted_average": self._explain_weighted_average_strategy(context),
+            "dynamic": self._explain_dynamic_strategy(context),
+            "stacking": self._explain_stacking_strategy(context, true_values),
+            "bagging": self._explain_bagging_strategy(context),
+        }
+
+    def _explain_weighted_average_strategy(self, context: dict[str, Any]) -> dict[str, Any]:
+        model_ids = list(context.get("model_ids", []))
+        online = self._ordered_weights(model_ids, dict(context.get("online_weights", {})))
+        if online.size == 0:
+            online = self._ordered_weights(model_ids, dict(context.get("weights", {})))
+        dominant_idx = int(np.argmax(online)) if online.size else 0
+        concentration = float(np.max(online)) if online.size else 0.0
+        return {
+            "strategy": "weighted_average",
+            "display_name": "加权平均策略",
+            "core_mechanism": "按模型权重线性加权，权重越高对融合输出影响越大。",
+            "formula": "y_hat = sum_i(w_i * y_i), 其中 sum_i(w_i)=1",
+            "evidence": {
+                "dominant_model": str(model_ids[dominant_idx]) if model_ids else "",
+                "dominant_weight": float(concentration),
+                "effective_model_count": float(1.0 / np.clip(np.sum(np.square(online)), EPS, None)) if online.size else 0.0,
+            },
+            "interpretation": "当 dominant_weight 较高时，说明融合结果更依赖单个高性能子模型。",
+        }
+
+    def _explain_dynamic_strategy(self, context: dict[str, Any]) -> dict[str, Any]:
+        diagnostics = dict(context.get("diagnostics", {}))
+        dynamic_weights = diagnostics.get("dynamic_weights", {})
+        summary: dict[str, dict[str, float]] = {}
+        major_switches = 0
+        if isinstance(dynamic_weights, dict) and dynamic_weights:
+            model_ids = [str(k) for k in dynamic_weights.keys()]
+            traces = [np.asarray(dynamic_weights.get(mid, []), dtype=float).reshape(-1) for mid in model_ids]
+            trace_len = min((arr.shape[0] for arr in traces if arr.size > 0), default=0)
+            if trace_len > 0:
+                stacked = np.vstack([arr[:trace_len] for arr in traces])
+                dominant = np.argmax(stacked, axis=0)
+                major_switches = int(np.sum(dominant[1:] != dominant[:-1])) if dominant.size > 1 else 0
+            for mid, arr in zip(model_ids, traces):
+                summary[mid] = {
+                    "mean_weight": float(np.mean(arr)) if arr.size else 0.0,
+                    "weight_std": float(np.std(arr)) if arr.size else 0.0,
+                    "weight_range": float(np.max(arr) - np.min(arr)) if arr.size else 0.0,
+                }
+
+        return {
+            "strategy": "dynamic",
+            "display_name": "动态权重策略",
+            "core_mechanism": "每个时刻根据局部可靠性与难度动态调整权重，提升非平稳场景鲁棒性。",
+            "formula": "w_i(t) = softmax(log(base_i) + log(reliability_i(t))/difficulty(t))",
+            "evidence": {
+                "has_dynamic_trace": bool(summary),
+                "dominant_model_switches": int(major_switches),
+                "per_model_weight_stats": summary,
+            },
+            "interpretation": "dominant_model_switches 越高，说明模型主导权切换越频繁，策略自适应程度越高。",
+        }
+
+    def _explain_stacking_strategy(self, context: dict[str, Any], true_values: list[float] | None) -> dict[str, Any]:
+        diagnostics = dict(context.get("diagnostics", {}))
+        learned = diagnostics.get("stacking_weights", {})
+        metrics = dict(context.get("metrics", {}))
+        has_truth = bool(context.get("preprocess", {}).get("has_true_values", False) or true_values is not None)
+        return {
+            "strategy": "stacking",
+            "display_name": "Stacking策略",
+            "core_mechanism": "通过元学习器学习子模型组合系数，利用监督信号优化融合误差。",
+            "formula": "y_hat = g(y_1, y_2, ..., y_n)，其中 g 由交叉验证训练得到",
+            "evidence": {
+                "has_ground_truth": bool(has_truth),
+                "has_learned_meta_weights": bool(isinstance(learned, dict) and len(learned) > 0),
+                "meta_weights": {str(k): float(v) for k, v in (learned.items() if isinstance(learned, dict) else [])},
+                "rmse": _safe_float(metrics.get("rmse"), 0.0),
+                "r2": _safe_float(metrics.get("r2"), 0.0),
+            },
+            "interpretation": "当 has_learned_meta_weights=True 时，说明已完成元学习拟合；否则通常退化为普通加权策略。",
+        }
+
+    def _explain_bagging_strategy(self, context: dict[str, Any]) -> dict[str, Any]:
+        matrix = np.asarray(context.get("matrix", []), dtype=float)
+        variances = np.asarray(context.get("fused_variances", []), dtype=float).reshape(-1)
+        disagreement = np.std(matrix, axis=1) if matrix.ndim == 2 and matrix.shape[1] > 0 else np.zeros((0,), dtype=float)
+        return {
+            "strategy": "bagging",
+            "display_name": "Bagging策略",
+            "core_mechanism": "通过多模型平均降低方差，强调集成稳定性。",
+            "formula": "y_hat = (1/M) * sum_i(y_i)",
+            "evidence": {
+                "ensemble_size": int(matrix.shape[1]) if matrix.ndim == 2 else 0,
+                "mean_model_disagreement": float(np.mean(disagreement)) if disagreement.size else 0.0,
+                "std_model_disagreement": float(np.std(disagreement)) if disagreement.size else 0.0,
+                "mean_fused_variance": float(np.mean(variances)) if variances.size else 0.0,
+            },
+            "interpretation": "模型分歧可被平均平滑时，Bagging可显著降低预测波动并提升稳定性。",
         }
 
 
