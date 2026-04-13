@@ -96,6 +96,74 @@ class AnomalyExplainRequest(BaseModel):
     max_explain_nodes: int = Field(default=8, ge=1, le=128)
     num_samples: Optional[int] = Field(default=None, ge=80, le=2000)
     nsamples: Optional[int] = Field(default=None, ge=40, le=2000)
+    threshold_method: str = Field(default="percentile", description="statistical/percentile/adaptive")
+    percentile: float = Field(default=95.0, ge=50.0, le=99.9)
+    k: float = Field(default=2.5, ge=1.0, le=6.0)
+    detection_window: int = Field(default=24, ge=1, le=720)
+    async_mode: bool = Field(default=False)
+    timeout_seconds: Optional[int] = Field(default=None, ge=30, le=7200)
+    priority: Optional[int] = Field(default=None, ge=0, le=9)
+    max_retries: int = Field(default=1, ge=0, le=3)
+
+
+class InterpolationExplainRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_type: str = Field(default="gnn", description="gnn/attention/residual")
+    samples: list[list[float]] = Field(default_factory=list, description="[[x, y, value], ...]")
+    queries: list[list[float]] = Field(default_factory=list, description="[[x, y], ...]")
+    method: str = Field(default="hybrid", description="lime/shap/hybrid")
+    top_k: int = Field(default=5, ge=1, le=20)
+    include_prediction: bool = Field(default=True)
+    interpolation_radius: float = Field(default=1.0, gt=0.0, le=100.0)
+    weight_function: str = Field(default="gaussian", description="gaussian/inverse_distance/exponential")
+    max_explain_nodes: int = Field(default=8, ge=1, le=128)
+    num_samples: Optional[int] = Field(default=None, ge=80, le=2000)
+    nsamples: Optional[int] = Field(default=None, ge=40, le=2000)
+    async_mode: bool = Field(default=False)
+    timeout_seconds: Optional[int] = Field(default=None, ge=30, le=7200)
+    priority: Optional[int] = Field(default=None, ge=0, le=9)
+    max_retries: int = Field(default=1, ge=0, le=3)
+
+
+class UncertaintyExplainRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_name: str = Field(default="bnn", description="bnn/mc_dropout/deep_ensemble/edl")
+    features: list[list[float]] = Field(default_factory=list)
+    method: str = Field(default="hybrid", description="lime/shap/hybrid")
+    top_k: int = Field(default=5, ge=1, le=20)
+    include_prediction: bool = Field(default=True)
+    confidence_interval: float = Field(default=0.95, ge=0.5, le=0.999)
+    prediction_interval: str = Field(default="normal", description="normal/bootstrap/quantile")
+    max_explain_nodes: int = Field(default=8, ge=1, le=128)
+    num_samples: Optional[int] = Field(default=None, ge=80, le=2000)
+    nsamples: Optional[int] = Field(default=None, ge=40, le=2000)
+    async_mode: bool = Field(default=False)
+    timeout_seconds: Optional[int] = Field(default=None, ge=30, le=7200)
+    priority: Optional[int] = Field(default=None, ge=0, le=9)
+    max_retries: int = Field(default=1, ge=0, le=3)
+
+
+class RLExplainRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
+    model_name: str = Field(default="ppo", description="ppo/dqn/a2c/a3c")
+    uncertainty_map: list[list[float]] = Field(default_factory=list, description="二维不确定性矩阵")
+    existing_points: list[list[float]] = Field(default_factory=list, description="已有采样点 [[x, y], ...]")
+    method: str = Field(default="hybrid", description="lime/shap/hybrid")
+    top_k: int = Field(default=5, ge=1, le=20)
+    include_prediction: bool = Field(default=True)
+    policy_state: str = Field(default="current", description="current/short_term/long_term")
+    reward_function: str = Field(default="hybrid", description="hybrid/uncertainty/coverage/cost")
+    n_recommendations: int = Field(default=10, ge=1, le=100)
+    max_explain_nodes: int = Field(default=8, ge=1, le=128)
+    num_samples: Optional[int] = Field(default=None, ge=80, le=2000)
+    nsamples: Optional[int] = Field(default=None, ge=40, le=2000)
+    async_mode: bool = Field(default=False)
+    timeout_seconds: Optional[int] = Field(default=None, ge=30, le=7200)
+    priority: Optional[int] = Field(default=None, ge=0, le=9)
+    max_retries: int = Field(default=1, ge=0, le=3)
 
 
 class AnomalyCacheManageRequest(BaseModel):
@@ -273,6 +341,12 @@ class FusionExplainRequest(BaseModel):
     weight_method: Optional[str] = None
     true_values: Optional[list[float]] = None
     context: Optional[dict[str, list[float]]] = None
+    fusion_weights: Optional[list[float]] = None
+    combination_mode: str = Field(default="adaptive", description="adaptive/weighted_sum/stacking/voting")
+    async_mode: bool = Field(default=False)
+    timeout_seconds: Optional[int] = Field(default=None, ge=30, le=7200)
+    priority: Optional[int] = Field(default=None, ge=0, le=9)
+    max_retries: int = Field(default=1, ge=0, le=3)
 
 
 class FusionBatchExplainItemRequest(BaseModel):
@@ -346,6 +420,50 @@ def _is_admin(x_explain_admin: Optional[str]) -> bool:
     return text in {"1", "true", "yes", "admin"}
 
 
+def _create_explain_task(
+    *,
+    scope: str,
+    payload: dict[str, Any],
+    x_user_id: Optional[str],
+    x_explain_token: Optional[str],
+    priority: Optional[int] = None,
+    timeout_seconds: Optional[int] = None,
+    max_retries: int = 1,
+) -> dict:
+    started = time.perf_counter()
+    user_id = _auth_user(x_user_id, x_explain_token)
+    task_payload = dict(payload)
+    task_payload["scope"] = scope
+    task_payload["max_retries"] = int(max_retries)
+    try:
+        task = explain_task_service.create_task(
+            owner_id=user_id,
+            payload=task_payload,
+            priority=priority,
+            timeout_seconds=timeout_seconds,
+        )
+        logger.info("创建 explain 任务成功 scope=%s task_id=%s user=%s", scope, task["task_id"], user_id)
+        return {
+            "task_id": task["task_id"],
+            "scope": scope,
+            "status": task["status"],
+            "created_at": task["created_at"],
+            "queue_size": task["queue_size"],
+            "remaining_per_minute": task["remaining_per_minute"],
+            "monitor": explain_task_service.queue_metrics(),
+            "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+        }
+    except ExplainPermissionError as exc:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc)) from exc
+    except ExplainRateLimitError as exc:
+        raise HTTPException(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.exception("创建 explain 任务失败 scope=%s user=%s: %s", scope, user_id, exc)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"创建任务失败: {exc}") from exc
+
+
 @router.get("/health")
 def dl_health() -> dict:
     return service.health()
@@ -374,6 +492,65 @@ def predict_spatial(payload: SpatialPredictRequest) -> dict:
         queries=payload.queries,
         blend_ratio=payload.blend_ratio,
     )
+
+
+@router.post("/interpolation/explain")
+def explain_interpolation(
+    payload: InterpolationExplainRequest,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+) -> dict:
+    if payload.async_mode:
+        return _create_explain_task(
+            scope="interpolation",
+            payload=payload.model_dump(exclude={"async_mode", "priority", "timeout_seconds"}),
+            x_user_id=x_user_id,
+            x_explain_token=x_explain_token,
+            priority=payload.priority,
+            timeout_seconds=payload.timeout_seconds,
+            max_retries=payload.max_retries,
+        )
+    return service.explain_interpolation(
+        model_type=payload.model_type,
+        samples=payload.samples,
+        queries=payload.queries,
+        method=payload.method,
+        top_k=payload.top_k,
+        include_prediction=payload.include_prediction,
+        interpolation_radius=payload.interpolation_radius,
+        weight_function=payload.weight_function,
+        max_explain_nodes=payload.max_explain_nodes,
+        num_samples=payload.num_samples,
+        nsamples=payload.nsamples,
+    )
+
+
+@router.get("/interpolation/explain/{task_id}")
+def get_interpolation_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    task = explain_task_service.get_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+    if task is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+    return task
+
+
+@router.post("/interpolation/explain/{task_id}/cancel")
+def cancel_interpolation_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    cancelled = explain_task_service.cancel_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+    if not cancelled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+    return {"task_id": task_id, "cancelled": True}
 
 
 @router.post("/anomaly/train")
@@ -410,7 +587,21 @@ def anomaly_realtime(payload: AnomalyRealtimeRequest) -> dict:
 
 
 @router.post("/anomaly/explain")
-def explain_anomaly(payload: AnomalyExplainRequest) -> dict:
+def explain_anomaly(
+    payload: AnomalyExplainRequest,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+) -> dict:
+    if payload.async_mode:
+        return _create_explain_task(
+            scope="anomaly",
+            payload=payload.model_dump(exclude={"async_mode", "priority", "timeout_seconds"}),
+            x_user_id=x_user_id,
+            x_explain_token=x_explain_token,
+            priority=payload.priority,
+            timeout_seconds=payload.timeout_seconds,
+            max_retries=payload.max_retries,
+        )
     return service.explain_anomaly(
         model_name=payload.model_name,
         coords=payload.coords,
@@ -421,7 +612,39 @@ def explain_anomaly(payload: AnomalyExplainRequest) -> dict:
         max_explain_nodes=payload.max_explain_nodes,
         num_samples=payload.num_samples,
         nsamples=payload.nsamples,
+        threshold_method=payload.threshold_method,
+        percentile=payload.percentile,
+        k=payload.k,
+        detection_window=payload.detection_window,
     )
+
+
+@router.get("/anomaly/explain/{task_id}")
+def get_anomaly_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    task = explain_task_service.get_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+    if task is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+    return task
+
+
+@router.post("/anomaly/explain/{task_id}/cancel")
+def cancel_anomaly_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    cancelled = explain_task_service.cancel_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+    if not cancelled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+    return {"task_id": task_id, "cancelled": True}
 
 
 @router.get("/anomaly/cache/metrics")
@@ -480,6 +703,124 @@ def recommend_sampling_rl(payload: SamplingRLPredictRequest) -> dict:
         fusion_strategy=payload.fusion_strategy,
         realtime=payload.realtime,
     )
+
+
+@router.post("/uncertainty/explain")
+def explain_uncertainty(
+    payload: UncertaintyExplainRequest,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+) -> dict:
+    if payload.async_mode:
+        return _create_explain_task(
+            scope="uncertainty",
+            payload=payload.model_dump(exclude={"async_mode", "priority", "timeout_seconds"}),
+            x_user_id=x_user_id,
+            x_explain_token=x_explain_token,
+            priority=payload.priority,
+            timeout_seconds=payload.timeout_seconds,
+            max_retries=payload.max_retries,
+        )
+    return service.explain_uncertainty(
+        model_name=payload.model_name,
+        features=payload.features,
+        method=payload.method,
+        top_k=payload.top_k,
+        include_prediction=payload.include_prediction,
+        confidence_interval=payload.confidence_interval,
+        prediction_interval=payload.prediction_interval,
+        max_explain_nodes=payload.max_explain_nodes,
+        num_samples=payload.num_samples,
+        nsamples=payload.nsamples,
+    )
+
+
+@router.get("/uncertainty/explain/{task_id}")
+def get_uncertainty_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    task = explain_task_service.get_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+    if task is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+    return task
+
+
+@router.post("/uncertainty/explain/{task_id}/cancel")
+def cancel_uncertainty_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    cancelled = explain_task_service.cancel_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+    if not cancelled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+    return {"task_id": task_id, "cancelled": True}
+
+
+@router.post("/rl/explain")
+def explain_rl(
+    payload: RLExplainRequest,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+) -> dict:
+    if payload.async_mode:
+        return _create_explain_task(
+            scope="rl",
+            payload=payload.model_dump(exclude={"async_mode", "priority", "timeout_seconds"}),
+            x_user_id=x_user_id,
+            x_explain_token=x_explain_token,
+            priority=payload.priority,
+            timeout_seconds=payload.timeout_seconds,
+            max_retries=payload.max_retries,
+        )
+    return service.explain_sampling_rl(
+        model_name=payload.model_name,
+        uncertainty_map=payload.uncertainty_map,
+        existing_points=payload.existing_points,
+        method=payload.method,
+        top_k=payload.top_k,
+        include_prediction=payload.include_prediction,
+        policy_state=payload.policy_state,
+        reward_function=payload.reward_function,
+        n_recommendations=payload.n_recommendations,
+        max_explain_nodes=payload.max_explain_nodes,
+        num_samples=payload.num_samples,
+        nsamples=payload.nsamples,
+    )
+
+
+@router.get("/rl/explain/{task_id}")
+def get_rl_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    task = explain_task_service.get_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+    if task is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+    return task
+
+
+@router.post("/rl/explain/{task_id}/cancel")
+def cancel_rl_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    cancelled = explain_task_service.cancel_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+    if not cancelled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+    return {"task_id": task_id, "cancelled": True}
 
 
 @router.post("/spatiotemporal/train")
@@ -736,7 +1077,21 @@ def analyze_fusion_features(payload: FusionFeatureAnalysisRequest) -> dict:
 
 
 @router.post("/fusion/explain")
-def explain_fusion(payload: FusionExplainRequest) -> dict:
+def explain_fusion(
+    payload: FusionExplainRequest,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+) -> dict:
+    if payload.async_mode:
+        return _create_explain_task(
+            scope="fusion",
+            payload=payload.model_dump(exclude={"async_mode", "priority", "timeout_seconds"}),
+            x_user_id=x_user_id,
+            x_explain_token=x_explain_token,
+            priority=payload.priority,
+            timeout_seconds=payload.timeout_seconds,
+            max_retries=payload.max_retries,
+        )
     return service.explain_fusion(
         models=[m.model_dump() for m in payload.models],
         method=payload.method,
@@ -750,7 +1105,37 @@ def explain_fusion(payload: FusionExplainRequest) -> dict:
         weight_method=payload.weight_method,
         true_values=payload.true_values,
         context=payload.context,
+        fusion_weights=payload.fusion_weights,
+        combination_mode=payload.combination_mode,
     )
+
+
+@router.get("/fusion/explain/{task_id}")
+def get_fusion_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    task = explain_task_service.get_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+    if task is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+    return task
+
+
+@router.post("/fusion/explain/{task_id}/cancel")
+def cancel_fusion_explain_task(
+    task_id: str,
+    x_user_id: Optional[str] = Header(default=None),
+    x_explain_token: Optional[str] = Header(default=None),
+    x_explain_admin: Optional[str] = Header(default=None),
+) -> dict:
+    user_id = _auth_user(x_user_id, x_explain_token)
+    cancelled = explain_task_service.cancel_task(task_id, owner_id=user_id, is_admin=_is_admin(x_explain_admin))
+    if not cancelled:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="任务不存在或已过期")
+    return {"task_id": task_id, "cancelled": True}
 
 
 @router.post("/fusion/explain-batch")

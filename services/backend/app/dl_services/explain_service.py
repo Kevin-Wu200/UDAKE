@@ -375,16 +375,94 @@ class SpatiotemporalExplainTaskService:
             self._slots.release()
 
     def _execute_explanation(self, payload: dict[str, Any]) -> dict[str, Any]:
-        return self.dl_service.explain_spatiotemporal(
-            model_type=str(payload.get("model_type", "st_transformer")),
-            coords=payload.get("coords", []),
-            series=payload.get("series", []),
-            pred_horizon=int(payload.get("pred_horizon", 6)),
-            method=str(payload.get("method", "hybrid")),
-            top_k=int(payload.get("top_k", 5)),
-            include_prediction=bool(payload.get("include_prediction", True)),
-            batch_size=min(self.max_batch_size, max(8, int(payload.get("batch_size", self.max_batch_size)))),
-        )
+        scope = str(payload.get("scope", "spatiotemporal"))
+        if scope == "spatiotemporal":
+            return self.dl_service.explain_spatiotemporal(
+                model_type=str(payload.get("model_type", "st_transformer")),
+                coords=payload.get("coords", []),
+                series=payload.get("series", []),
+                pred_horizon=int(payload.get("pred_horizon", 6)),
+                method=str(payload.get("method", "hybrid")),
+                top_k=int(payload.get("top_k", 5)),
+                include_prediction=bool(payload.get("include_prediction", True)),
+                batch_size=min(self.max_batch_size, max(8, int(payload.get("batch_size", self.max_batch_size)))),
+            )
+        if scope == "anomaly":
+            return self.dl_service.explain_anomaly(
+                model_name=str(payload.get("model_name", "vae")),
+                coords=payload.get("coords", []),
+                values=payload.get("values", []),
+                method=str(payload.get("method", "hybrid")),
+                top_k=int(payload.get("top_k", 5)),
+                include_prediction=bool(payload.get("include_prediction", True)),
+                max_explain_nodes=int(payload.get("max_explain_nodes", 8)),
+                num_samples=payload.get("num_samples"),
+                nsamples=payload.get("nsamples"),
+                threshold_method=str(payload.get("threshold_method", "percentile")),
+                percentile=float(payload.get("percentile", 95.0)),
+                k=float(payload.get("k", 2.5)),
+                detection_window=int(payload.get("detection_window", 24)),
+            )
+        if scope == "interpolation":
+            return self.dl_service.explain_interpolation(
+                model_type=str(payload.get("model_type", "gnn")),
+                samples=payload.get("samples", []),
+                queries=payload.get("queries", []),
+                method=str(payload.get("method", "hybrid")),
+                top_k=int(payload.get("top_k", 5)),
+                include_prediction=bool(payload.get("include_prediction", True)),
+                interpolation_radius=float(payload.get("interpolation_radius", 1.0)),
+                weight_function=str(payload.get("weight_function", "gaussian")),
+                max_explain_nodes=int(payload.get("max_explain_nodes", 8)),
+                num_samples=payload.get("num_samples"),
+                nsamples=payload.get("nsamples"),
+            )
+        if scope == "uncertainty":
+            return self.dl_service.explain_uncertainty(
+                model_name=str(payload.get("model_name", "bnn")),
+                features=payload.get("features", []),
+                method=str(payload.get("method", "hybrid")),
+                top_k=int(payload.get("top_k", 5)),
+                include_prediction=bool(payload.get("include_prediction", True)),
+                max_explain_nodes=int(payload.get("max_explain_nodes", 8)),
+                num_samples=payload.get("num_samples"),
+                nsamples=payload.get("nsamples"),
+                confidence_interval=float(payload.get("confidence_interval", 0.95)),
+                prediction_interval=str(payload.get("prediction_interval", "normal")),
+            )
+        if scope == "fusion":
+            return self.dl_service.explain_fusion(
+                models=payload.get("models", []),
+                method=str(payload.get("method", "hybrid")),
+                top_k=int(payload.get("top_k", 5)),
+                include_prediction=bool(payload.get("include_prediction", True)),
+                max_explain_nodes=int(payload.get("max_explain_nodes", 8)),
+                num_samples=payload.get("num_samples"),
+                nsamples=payload.get("nsamples"),
+                profile_id=payload.get("profile_id"),
+                strategy=payload.get("strategy"),
+                weight_method=payload.get("weight_method"),
+                true_values=payload.get("true_values"),
+                context=payload.get("context"),
+                fusion_weights=payload.get("fusion_weights"),
+                combination_mode=str(payload.get("combination_mode", "adaptive")),
+            )
+        if scope == "rl":
+            return self.dl_service.explain_sampling_rl(
+                model_name=str(payload.get("model_name", "ppo")),
+                uncertainty_map=payload.get("uncertainty_map", []),
+                existing_points=payload.get("existing_points"),
+                method=str(payload.get("method", "hybrid")),
+                top_k=int(payload.get("top_k", 5)),
+                include_prediction=bool(payload.get("include_prediction", True)),
+                max_explain_nodes=int(payload.get("max_explain_nodes", 8)),
+                num_samples=payload.get("num_samples"),
+                nsamples=payload.get("nsamples"),
+                policy_state=str(payload.get("policy_state", "current")),
+                reward_function=str(payload.get("reward_function", "hybrid")),
+                n_recommendations=int(payload.get("n_recommendations", 10)),
+            )
+        raise ValueError(f"unsupported explain scope: {scope}")
 
     def _normalize_priority(self, priority: Optional[int]) -> int:
         if priority is None:

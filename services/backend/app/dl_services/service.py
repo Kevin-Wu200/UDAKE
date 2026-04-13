@@ -21,14 +21,26 @@ from deep_learning.models import AttentionKrigingModel, GNNKrigingModel, ModelRe
 from deep_learning.models.sampling_rl import SamplingRLIntegrator
 from deep_learning.models.spatial_interpolation import SpatialInterpolationIntegrator
 from deep_learning.models.spatiotemporal import SpatioTemporalSystemIntegrator, SpatioTemporalTrainingConfig
+from deep_learning.models.uncertainty import (
+    BayesianNeuralRegressor,
+    DeepEnsembleRegressor,
+    EDLClassifier,
+    EDLConfig,
+    MCDropoutConfig,
+    MCDropoutRegressor,
+)
 from deep_learning.training import LightningTrainer, SpatialTrainingConfig, TrainingConfig, train_spatial_model
 from deep_learning.utils.device import DeviceManager
 from deep_learning.utils.monitoring import AlertManager, AlertRule, MetricMonitor, SystemResourceMonitor
+from .a2c_rl_explainer import A2CLIMEAdapter, A2CSHAPAdapter
 from .anomaly_cache import AnomalyModelCache
 from .anomaly_features import AnomalyFeatureRegistry
 from .attention_kriging_explainer import AttentionKrigingLIMEAdapter, AttentionKrigingSHAPAdapter
 from .bnn_explainer import BNNLIMEAdapter, BNNSHAPAdapter
 from .contrastive_anomaly_explainer import ContrastiveLimeAdapter, ContrastiveShapAdapter
+from .deep_ensemble_explainer import DeepEnsembleLIMEAdapter, DeepEnsembleSHAPAdapter
+from .dqn_rl_explainer import DQNLIMEAdapter, DQNSHAPAdapter
+from .edl_explainer import EDLLIMEAdapter, EDLSHAPAdapter
 from .fusion_explainer import FusionLIMEAdapter, FusionSHAPAdapter
 from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
 from .gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter
@@ -36,6 +48,7 @@ from .gnn_kriging_explainer import GNNKrigingLIMEAdapter, GNNKrigingSHAPAdapter
 from .lime_explainer import SpatiotemporalLIMEExplainer
 from .mc_dropout_explainer import MCDropoutLIMEAdapter, MCDropoutSHAPAdapter
 from .parallel_runtime import ParallelExecutionManager, ParallelTask
+from .ppo_rl_explainer import PPOLIMEAdapter, PPOSHAPAdapter
 from .residual_kriging_explainer import ResidualKrigingLIMEAdapter, ResidualKrigingSHAPAdapter
 from .shap_explainer import SpatiotemporalSHAPExplainer
 from .vae_anomaly_explainer import VAEAnomalyLIMEAdapter, VAEAnomalySHAPAdapter
@@ -116,8 +129,19 @@ class DeepLearningService:
         self.bnn_shap_adapter = BNNSHAPAdapter()
         self.mc_dropout_lime_adapter = MCDropoutLIMEAdapter()
         self.mc_dropout_shap_adapter = MCDropoutSHAPAdapter()
+        self.deep_ensemble_lime_adapter = DeepEnsembleLIMEAdapter()
+        self.deep_ensemble_shap_adapter = DeepEnsembleSHAPAdapter()
+        self.edl_lime_adapter = EDLLIMEAdapter()
+        self.edl_shap_adapter = EDLSHAPAdapter()
+        self.ppo_lime_adapter = PPOLIMEAdapter()
+        self.ppo_shap_adapter = PPOSHAPAdapter()
+        self.dqn_lime_adapter = DQNLIMEAdapter()
+        self.dqn_shap_adapter = DQNSHAPAdapter()
+        self.a2c_lime_adapter = A2CLIMEAdapter()
+        self.a2c_shap_adapter = A2CSHAPAdapter()
         self.fusion_lime_adapter = FusionLIMEAdapter()
         self.fusion_shap_adapter = FusionSHAPAdapter()
+        self._uncertainty_models: dict[str, Any] = {}
         cache_file = os.path.join(tempfile.gettempdir(), f"udake_anomaly_cache_{os.getpid()}.json")
         self.anomaly_cache = AnomalyModelCache(
             cache_size=256,
@@ -280,6 +304,74 @@ class DeepLearningService:
             raise ValueError("uncertainty_map size must be >= 4x4")
         return np.clip(arr, 1e-6, 1.0)
 
+    def _validate_feature_matrix(self, features: list[list[float]]) -> np.ndarray:
+        arr = np.asarray(features, dtype=float)
+        if arr.ndim != 2:
+            raise ValueError("features must be 2D matrix")
+        if arr.shape[0] < 4:
+            raise ValueError("at least 4 feature rows are required")
+        if arr.shape[1] < 2:
+            raise ValueError("at least 2 feature columns are required")
+        return arr
+
+    def _get_or_create_uncertainty_model(self, model_name: str, in_dim: int) -> Any:
+        if in_dim <= 0:
+            raise ValueError("invalid feature dimension")
+        key = f"{model_name}:{int(in_dim)}"
+        model = self._uncertainty_models.get(key)
+        if model is not None:
+            return model
+
+        if model_name == "bnn":
+            model = BayesianNeuralRegressor(in_dim=int(in_dim), hidden_dim=32, seed=42)
+        elif model_name == "mc_dropout":
+            model = MCDropoutRegressor(MCDropoutConfig(in_dim=int(in_dim), hidden_dim=32, seed=42))
+        elif model_name == "deep_ensemble":
+            model = DeepEnsembleRegressor(in_dim=int(in_dim), n_members=3, seed=42)
+        elif model_name == "edl":
+            model = EDLClassifier(EDLConfig(in_dim=int(in_dim), num_classes=3, hidden_dim=32, seed=42))
+        else:
+            raise ValueError("model_name must be one of bnn/mc_dropout/deep_ensemble/edl")
+        self._uncertainty_models[key] = model
+        return model
+
+    @staticmethod
+    def _build_rl_observations(
+        uncertainty_map: np.ndarray,
+        existing_points: np.ndarray | None = None,
+        budget: int = 20,
+    ) -> list[dict[str, np.ndarray]]:
+        arr = np.asarray(uncertainty_map, dtype=float)
+        h, w = arr.shape
+        sampled = np.zeros((h, w), dtype=float)
+        sampled_values = np.zeros((h, w), dtype=float)
+
+        existing = np.asarray(existing_points, dtype=float) if existing_points is not None else np.zeros((0, 2), dtype=float)
+        if existing.ndim == 2 and existing.shape[1] == 2 and len(existing) > 0:
+            for point in existing:
+                x = float(np.clip(point[0], 0.0, 1.0))
+                y = float(np.clip(point[1], 0.0, 1.0))
+                col = int(np.clip(round(x * max(1, w - 1)), 0, max(0, w - 1)))
+                row = int(np.clip(round(y * max(1, h - 1)), 0, max(0, h - 1)))
+                sampled[row, col] = 1.0
+                sampled_values[row, col] = float(arr[row, col])
+
+        xx, yy = np.meshgrid(np.linspace(0.0, 1.0, w), np.linspace(0.0, 1.0, h))
+        spatial = np.stack([xx, yy, arr, sampled], axis=0)
+        boundary_info = np.array(
+            [0.0, 1.0, 0.0, 1.0, max(0.0, 1.0 - len(existing) / max(1, budget)), 0.0],
+            dtype=float,
+        )
+        return [
+            {
+                "sampling_distribution": sampled.copy(),
+                "uncertainty_map": arr.copy(),
+                "sampled_values": sampled_values.copy(),
+                "spatial_features": spatial.copy(),
+                "boundary_info": boundary_info.copy(),
+            }
+        ]
+
     def _validate_spatiotemporal_inputs(
         self,
         coords: list[list[float]],
@@ -386,6 +478,134 @@ class DeepLearningService:
             "optimization": optimize,
             "resource": self.resource_monitor.collect(),
         }
+
+    def explain_sampling_rl(
+        self,
+        *,
+        model_name: str,
+        uncertainty_map: list[list[float]],
+        existing_points: list[list[float]] | None = None,
+        method: str = "hybrid",
+        top_k: int = 5,
+        include_prediction: bool = True,
+        max_explain_nodes: int = 8,
+        num_samples: int | None = None,
+        nsamples: int | None = None,
+        policy_state: str = "current",
+        reward_function: str = "hybrid",
+        n_recommendations: int = 10,
+    ) -> dict[str, Any]:
+        if method not in {"lime", "shap", "hybrid"}:
+            raise ValueError("method must be one of lime/shap/hybrid")
+        if policy_state not in {"current", "short_term", "long_term"}:
+            raise ValueError("policy_state must be one of current/short_term/long_term")
+        if reward_function not in {"hybrid", "uncertainty", "coverage", "cost"}:
+            raise ValueError("reward_function must be one of hybrid/uncertainty/coverage/cost")
+
+        arr = self._validate_uncertainty_map(uncertainty_map)
+        points = np.asarray(existing_points, dtype=float) if existing_points else np.zeros((0, 2), dtype=float)
+        integrator = self._get_sampling_rl_integrator(model_name)
+        if integrator.agent is None:
+            integrator.train(arr, existing_points=points, episodes=15, budget=max(10, n_recommendations * 2))
+        if integrator.agent is None:
+            raise RuntimeError("rl model unavailable")
+
+        observations = self._build_rl_observations(arr, points, budget=max(10, n_recommendations * 2))
+        model = integrator.agent
+
+        lime_result: dict[str, Any] | None = None
+        shap_result: dict[str, Any] | None = None
+        if model_name == "ppo":
+            if method in {"lime", "hybrid"}:
+                lime_result = self.ppo_lime_adapter.explain(
+                    model=model,
+                    observations=observations,
+                    top_k=top_k,
+                    max_explain_nodes=max_explain_nodes,
+                    num_samples=num_samples,
+                )
+            if method in {"shap", "hybrid"}:
+                shap_result = self.ppo_shap_adapter.explain(
+                    model=model,
+                    observations=observations,
+                    top_k=top_k,
+                    max_explain_nodes=max_explain_nodes,
+                    nsamples=nsamples,
+                )
+        elif model_name == "dqn":
+            if method in {"lime", "hybrid"}:
+                lime_result = self.dqn_lime_adapter.explain(
+                    model=model,
+                    observations=observations,
+                    top_k=top_k,
+                    max_explain_nodes=max_explain_nodes,
+                    num_samples=num_samples,
+                )
+            if method in {"shap", "hybrid"}:
+                shap_result = self.dqn_shap_adapter.explain(
+                    model=model,
+                    observations=observations,
+                    top_k=top_k,
+                    max_explain_nodes=max_explain_nodes,
+                    nsamples=nsamples,
+                )
+        else:
+            if method in {"lime", "hybrid"}:
+                lime_result = self.a2c_lime_adapter.explain(
+                    model=model,
+                    observations=observations,
+                    top_k=top_k,
+                    max_explain_nodes=max_explain_nodes,
+                    num_samples=num_samples,
+                )
+            if method in {"shap", "hybrid"}:
+                shap_result = self.a2c_shap_adapter.explain(
+                    model=model,
+                    observations=observations,
+                    top_k=top_k,
+                    max_explain_nodes=max_explain_nodes,
+                    nsamples=nsamples,
+                )
+
+        top_features: list[dict[str, Any]] = []
+        if method == "lime" and lime_result is not None:
+            top_features = list(lime_result.get("summary", {}).get("top_features", []))
+        elif method == "shap" and shap_result is not None:
+            top_features = list(shap_result.get("summary", {}).get("top_features", []))
+        elif method == "hybrid":
+            if shap_result is not None:
+                top_features = list(shap_result.get("summary", {}).get("top_features", []))
+            if not top_features and lime_result is not None:
+                top_features = list(lime_result.get("summary", {}).get("top_features", []))
+
+        result: dict[str, Any] = {
+            "model_name": model_name,
+            "summary": {
+                "method": method,
+                "top_features": top_features,
+                "max_explain_nodes": int(max_explain_nodes),
+                "policy_state": policy_state,
+                "reward_function": reward_function,
+            },
+            "policy_state": {
+                "mode": policy_state,
+                "observation_count": int(len(observations)),
+            },
+        }
+        if lime_result is not None:
+            result["lime"] = lime_result
+        if shap_result is not None:
+            result["shap"] = shap_result
+        if include_prediction:
+            result["prediction"] = self.recommend_sampling_rl(
+                model_name=model_name,
+                uncertainty_map=uncertainty_map,
+                existing_points=existing_points,
+                n_recommendations=n_recommendations,
+                fusion_strategy="hybrid",
+                realtime=True,
+            )
+        return result
 
     def train_anomaly_model(
         self,
@@ -527,11 +747,17 @@ class DeepLearningService:
         num_samples: int | None = None,
         nsamples: int | None = None,
         max_explain_nodes: int = 8,
+        threshold_method: str = "percentile",
+        percentile: float = 95.0,
+        k: float = 2.5,
+        detection_window: int = 24,
     ) -> dict[str, Any]:
         if model_name not in {"vae", "gcae", "gan", "contrastive"}:
             raise ValueError("model_name must be one of vae/gcae/gan/contrastive")
         if method not in {"lime", "shap", "hybrid"}:
             raise ValueError("method must be one of lime/shap/hybrid")
+        if threshold_method not in {"statistical", "percentile", "adaptive"}:
+            raise ValueError("threshold_method must be one of statistical/percentile/adaptive")
 
         c, v = self._validate_coords_values(coords, values)
         model = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
@@ -639,6 +865,12 @@ class DeepLearningService:
                 "feature_count": int(feature_analysis["feature_count"]),
             },
             "feature_analysis": feature_analysis,
+            "anomaly_params": {
+                "threshold_method": threshold_method,
+                "percentile": float(percentile),
+                "k": float(k),
+                "detection_window": int(max(1, detection_window)),
+            },
         }
         if lime_result is not None:
             result["lime"] = lime_result
@@ -646,11 +878,23 @@ class DeepLearningService:
             result["shap"] = shap_result
         if include_prediction:
             try:
-                pred = model.predict(c, v, threshold_method="percentile", percentile=95.0, k=2.5)
+                pred = model.predict(
+                    c,
+                    v,
+                    threshold_method=threshold_method,
+                    percentile=float(percentile),
+                    k=float(k),
+                )
             except Exception:
                 self.train_anomaly_model(model_name, coords, values, epochs=15)
                 model = self._get_or_train_anomaly_model(model_name, coords, values, epochs=15)
-                pred = model.predict(c, v, threshold_method="percentile", percentile=95.0, k=2.5)
+                pred = model.predict(
+                    c,
+                    v,
+                    threshold_method=threshold_method,
+                    percentile=float(percentile),
+                    k=float(k),
+                )
             result["prediction"] = pred
         self.anomaly_cache.set("explanation", explain_cache_key, result)
         self.metric_monitor.log(f"{model_name}_explain_cache_hit", 0.0)
@@ -774,6 +1018,107 @@ class DeepLearningService:
             "source": fused.source,
             "resource": self.resource_monitor.collect(),
         }
+
+    def explain_interpolation(
+        self,
+        *,
+        model_type: str,
+        samples: list[list[float]],
+        queries: list[list[float]],
+        method: str = "hybrid",
+        top_k: int = 5,
+        include_prediction: bool = True,
+        interpolation_radius: float = 1.0,
+        weight_function: str = "gaussian",
+        num_samples: int | None = None,
+        nsamples: int | None = None,
+        max_explain_nodes: int = 8,
+    ) -> dict[str, Any]:
+        if model_type not in {"gnn", "attention", "residual"}:
+            raise ValueError("model_type must be one of gnn/attention/residual")
+        if method not in {"lime", "shap", "hybrid"}:
+            raise ValueError("method must be one of lime/shap/hybrid")
+        if weight_function not in {"gaussian", "inverse_distance", "exponential"}:
+            raise ValueError("weight_function must be one of gaussian/inverse_distance/exponential")
+
+        sample_coords, sample_values = self._to_spatial_arrays(samples)
+        query_coords = np.asarray(queries, dtype=float)
+        if query_coords.ndim != 2 or query_coords.shape[1] != 2:
+            raise ValueError("queries must be [[x, y], ...]")
+
+        if model_type == "gnn":
+            model = self.registry.create("gnn_kriging")
+            lime_adapter = self.gnn_kriging_lime_adapter
+            shap_adapter = self.gnn_kriging_shap_adapter
+        elif model_type == "attention":
+            model = self.registry.create("attention_kriging")
+            lime_adapter = self.attention_kriging_lime_adapter
+            shap_adapter = self.attention_kriging_shap_adapter
+        else:
+            model = self.registry.create("residual_kriging")
+            lime_adapter = self.residual_kriging_lime_adapter
+            shap_adapter = self.residual_kriging_shap_adapter
+
+        lime_result: dict[str, Any] | None = None
+        if method in {"lime", "hybrid"}:
+            lime_result = lime_adapter.explain(
+                model=model,
+                sample_coords=sample_coords,
+                sample_values=sample_values,
+                query_coords=query_coords,
+                top_k=top_k,
+                num_samples=num_samples,
+                max_explain_nodes=max_explain_nodes,
+            )
+        shap_result: dict[str, Any] | None = None
+        if method in {"shap", "hybrid"}:
+            shap_result = shap_adapter.explain(
+                model=model,
+                sample_coords=sample_coords,
+                sample_values=sample_values,
+                query_coords=query_coords,
+                top_k=top_k,
+                nsamples=nsamples,
+                max_explain_nodes=max_explain_nodes,
+            )
+
+        top_features: list[dict[str, Any]] = []
+        if method == "lime" and lime_result is not None:
+            top_features = list(lime_result.get("summary", {}).get("top_features", []))
+        elif method == "shap" and shap_result is not None:
+            top_features = list(shap_result.get("summary", {}).get("top_features", []))
+        elif method == "hybrid":
+            if shap_result is not None:
+                top_features = list(shap_result.get("summary", {}).get("top_features", []))
+            if not top_features and lime_result is not None:
+                top_features = list(lime_result.get("summary", {}).get("top_features", []))
+
+        result: dict[str, Any] = {
+            "model_type": model_type,
+            "summary": {
+                "method": method,
+                "top_features": top_features,
+                "max_explain_nodes": int(max_explain_nodes),
+                "interpolation_radius": float(interpolation_radius),
+                "weight_function": weight_function,
+            },
+            "interpolation_params": {
+                "radius": float(interpolation_radius),
+                "weight_function": weight_function,
+            },
+        }
+        if lime_result is not None:
+            result["lime"] = lime_result
+        if shap_result is not None:
+            result["shap"] = shap_result
+        if include_prediction:
+            result["prediction"] = self.predict_spatial(
+                model_type=model_type,
+                samples=samples,
+                queries=queries,
+                blend_ratio=0.6,
+            )
+        return result
 
     def train_spatiotemporal_model(
         self,
@@ -1170,6 +1515,125 @@ class DeepLearningService:
         }
         return result
 
+    def explain_uncertainty(
+        self,
+        *,
+        model_name: str,
+        features: list[list[float]],
+        method: str = "hybrid",
+        top_k: int = 5,
+        include_prediction: bool = True,
+        max_explain_nodes: int = 8,
+        num_samples: int | None = None,
+        nsamples: int | None = None,
+        confidence_interval: float = 0.95,
+        prediction_interval: str = "normal",
+    ) -> dict[str, Any]:
+        if method not in {"lime", "shap", "hybrid"}:
+            raise ValueError("method must be one of lime/shap/hybrid")
+        if prediction_interval not in {"normal", "bootstrap", "quantile"}:
+            raise ValueError("prediction_interval must be one of normal/bootstrap/quantile")
+
+        x = self._validate_feature_matrix(features)
+        model = self._get_or_create_uncertainty_model(model_name, int(x.shape[1]))
+        if model_name == "deep_ensemble" and not list(getattr(model, "active_member_ids", [])):
+            pseudo_target = np.mean(x, axis=1)
+            model.fit(x, pseudo_target, epochs=30)
+
+        if model_name == "bnn":
+            lime_adapter = self.bnn_lime_adapter
+            shap_adapter = self.bnn_shap_adapter
+        elif model_name == "mc_dropout":
+            lime_adapter = self.mc_dropout_lime_adapter
+            shap_adapter = self.mc_dropout_shap_adapter
+        elif model_name == "deep_ensemble":
+            lime_adapter = self.deep_ensemble_lime_adapter
+            shap_adapter = self.deep_ensemble_shap_adapter
+        elif model_name == "edl":
+            lime_adapter = self.edl_lime_adapter
+            shap_adapter = self.edl_shap_adapter
+        else:
+            raise ValueError("model_name must be one of bnn/mc_dropout/deep_ensemble/edl")
+
+        lime_result: dict[str, Any] | None = None
+        shap_result: dict[str, Any] | None = None
+        if method in {"lime", "hybrid"}:
+            lime_result = lime_adapter.explain(
+                model=model,
+                features=x,
+                top_k=top_k,
+                max_explain_nodes=max_explain_nodes,
+                num_samples=num_samples,
+            )
+        if method in {"shap", "hybrid"}:
+            shap_result = shap_adapter.explain(
+                model=model,
+                features=x,
+                top_k=top_k,
+                max_explain_nodes=max_explain_nodes,
+                nsamples=nsamples,
+            )
+
+        top_features: list[dict[str, Any]] = []
+        if method == "lime" and lime_result is not None:
+            top_features = list(lime_result.get("summary", {}).get("top_features", []))
+        elif method == "shap" and shap_result is not None:
+            top_features = list(shap_result.get("summary", {}).get("top_features", []))
+        elif method == "hybrid":
+            if shap_result is not None:
+                top_features = list(shap_result.get("summary", {}).get("top_features", []))
+            if not top_features and lime_result is not None:
+                top_features = list(lime_result.get("summary", {}).get("top_features", []))
+
+        result: dict[str, Any] = {
+            "model_name": model_name,
+            "summary": {
+                "method": method,
+                "top_features": top_features,
+                "max_explain_nodes": int(max_explain_nodes),
+                "feature_dim": int(x.shape[1]),
+                "confidence_interval": float(confidence_interval),
+                "prediction_interval": prediction_interval,
+            },
+            "interval_config": {
+                "confidence_interval": float(confidence_interval),
+                "prediction_interval": prediction_interval,
+            },
+        }
+        if lime_result is not None:
+            result["lime"] = lime_result
+        if shap_result is not None:
+            result["shap"] = shap_result
+        if include_prediction:
+            if model_name == "bnn":
+                prediction = model.predict_bnn(
+                    x,
+                    num_samples=max(24, int(num_samples or 80)),
+                    confidence=float(confidence_interval),
+                    use_training_stats=True,
+                )
+            elif model_name == "mc_dropout":
+                prediction = model.predict_mc_dropout(
+                    x,
+                    t=max(24, int(num_samples or 50)),
+                    confidence=float(confidence_interval),
+                    use_training_stats=True,
+                )
+            elif model_name == "deep_ensemble":
+                prediction = model.predict_deep_ensemble(
+                    x,
+                    confidence=float(confidence_interval),
+                    use_training_stats=True,
+                )
+            else:
+                prediction = model.predict_edl(
+                    x,
+                    confidence=float(confidence_interval),
+                    use_training_stats=True,
+                )
+            result["prediction"] = prediction
+        return result
+
     def train_fusion_profile(
         self,
         profile_id: str,
@@ -1363,9 +1827,13 @@ class DeepLearningService:
         weight_method: str | None = None,
         true_values: list[float] | None = None,
         context: dict[str, list[float]] | None = None,
+        fusion_weights: list[float] | None = None,
+        combination_mode: str = "adaptive",
     ) -> dict[str, Any]:
         if method not in {"lime", "shap", "hybrid"}:
             raise ValueError("method must be one of lime/shap/hybrid")
+        if combination_mode not in {"adaptive", "weighted_sum", "stacking", "voting"}:
+            raise ValueError("combination_mode must be one of adaptive/weighted_sum/stacking/voting")
 
         lime_result: dict[str, Any] | None = None
         if method in {"lime", "hybrid"}:
@@ -1411,6 +1879,8 @@ class DeepLearningService:
                 "method": method,
                 "top_features": top_features,
                 "max_explain_nodes": int(max_explain_nodes),
+                "combination_mode": combination_mode,
+                "fusion_weights": [float(w) for w in (fusion_weights or [])],
             }
         }
         if lime_result is not None:
