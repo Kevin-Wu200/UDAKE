@@ -905,4 +905,77 @@ describe('SpatiotemporalExplainPanel', () => {
 
         panel.destroy();
     });
+
+    it('应支持模型类型选择、图标描述与历史记录', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        const category = host.querySelector('#dl-explain-model-category') as HTMLSelectElement;
+        const model = host.querySelector('#dl-explain-model') as HTMLSelectElement;
+        expect(category).toBeTruthy();
+        expect(model).toBeTruthy();
+
+        category.value = 'fusion';
+        category.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushPromises();
+
+        model.value = 'stacking';
+        model.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushPromises();
+
+        expect(host.querySelector('#dl-explain-model-meta')?.textContent).toContain('融合模型');
+        expect(host.querySelector('#dl-explain-model-meta')?.textContent).toContain('[STK]');
+        expect(host.querySelector('#dl-explain-model-history')?.textContent).toContain('融合模型');
+        expect(window.localStorage.getItem('dl-explain-model-history')).toContain('stacking');
+
+        panel.destroy();
+    });
+
+    it('应渲染模型专属解释页面并支持交互参数调整', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        api.createSpatiotemporalExplainTask.mockResolvedValue({ task_id: 'task-model-page' });
+        api.getSpatiotemporalExplainTask.mockResolvedValue({
+            task_id: 'task-model-page',
+            status: 'completed',
+            result: {
+                method: 'hybrid',
+                lime: {
+                    visualization: { feature_importance_list: [{ feature: 'f1', value: 0.3 }] },
+                    anomaly_score_explanation: {
+                        key_anomaly_nodes: [0, 2, 3],
+                        node_scores: { '0': 0.92, '2': 0.77, '3': 0.61 }
+                    }
+                },
+                shap: {
+                    visualization: { feature_ranking: [{ feature: 'f1', value: 0.2 }] }
+                },
+                summary: {}
+            }
+        });
+
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+        (host.querySelector('#dl-explain-submit') as HTMLButtonElement).click();
+        await flushPromises();
+
+        expect(host.querySelector('.model-specific-panel')?.textContent).toContain('异常检测解释页面');
+        expect(host.querySelector('#dl-model-anomaly-threshold')).toBeTruthy();
+
+        const threshold = host.querySelector('#dl-model-anomaly-threshold') as HTMLInputElement;
+        threshold.value = '0.90';
+        threshold.dispatchEvent(new Event('input', { bubbles: true }));
+        await flushPromises();
+        expect(host.querySelector('.model-specific-panel')?.textContent).toContain('0.90');
+
+        const category = host.querySelector('#dl-explain-model-category') as HTMLSelectElement;
+        category.value = 'uncertainty';
+        category.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushPromises();
+
+        expect(host.querySelector('#dl-model-confidence-level')).toBeTruthy();
+        expect(host.querySelector('.model-specific-panel')?.textContent).toContain('不确定性解释页面');
+
+        panel.destroy();
+    });
 });

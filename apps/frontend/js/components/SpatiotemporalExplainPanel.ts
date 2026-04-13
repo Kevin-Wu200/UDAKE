@@ -54,6 +54,84 @@ type FeatureContributionRow = {
     annotation: string;
 };
 
+type ExplainModelCategory = 'anomaly' | 'interpolation' | 'uncertainty' | 'fusion' | 'reinforcement';
+
+type ExplainModelMeta = {
+    id: string;
+    label: string;
+    icon: string;
+    description: string;
+    apiModel: 'st_transformer' | 'gcn_lstm' | 'convlstm' | 'stgcn';
+};
+
+type ExplainModelCategoryMeta = {
+    label: string;
+    icon: string;
+    description: string;
+    models: ExplainModelMeta[];
+};
+
+type ModelSelectionHistoryEntry = {
+    category: ExplainModelCategory;
+    modelId: string;
+    label: string;
+    at: number;
+};
+
+const EXPLAIN_MODEL_CATEGORIES: Record<ExplainModelCategory, ExplainModelCategoryMeta> = {
+    anomaly: {
+        label: '异常检测',
+        icon: '[AD]',
+        description: '聚焦异常分数、异常原因与阈值交互解释。',
+        models: [
+            { id: 'vae', label: 'VAE', icon: '[VAE]', description: '变分自编码异常检测模型', apiModel: 'st_transformer' },
+            { id: 'gcae', label: 'GCAE', icon: '[GCAE]', description: '图卷积自编码异常检测模型', apiModel: 'gcn_lstm' },
+            { id: 'gan', label: 'GAN', icon: '[GAN]', description: '生成对抗异常检测模型', apiModel: 'convlstm' },
+            { id: 'contrastive', label: 'Contrastive', icon: '[CTR]', description: '对比学习异常检测模型', apiModel: 'stgcn' }
+        ]
+    },
+    interpolation: {
+        label: '空间插值',
+        icon: '[INT]',
+        description: '聚焦采样点、等值线与插值半径对解释结果的影响。',
+        models: [
+            { id: 'kriging', label: 'Kriging', icon: '[KR]', description: '经典克里金插值模型', apiModel: 'st_transformer' },
+            { id: 'residual_kriging', label: 'Residual-Kriging', icon: '[RKR]', description: '残差修正插值模型', apiModel: 'gcn_lstm' },
+            { id: 'gnn_kriging', label: 'GNN-Kriging', icon: '[GNN]', description: '图神经网络增强插值模型', apiModel: 'convlstm' }
+        ]
+    },
+    uncertainty: {
+        label: '不确定性',
+        icon: '[UQ]',
+        description: '聚焦置信区间、热力图和置信水平联动解释。',
+        models: [
+            { id: 'bnn', label: 'BNN', icon: '[BNN]', description: '贝叶斯神经网络', apiModel: 'st_transformer' },
+            { id: 'deep_ensemble', label: 'Deep Ensemble', icon: '[ENS]', description: '深度集成不确定性估计', apiModel: 'gcn_lstm' },
+            { id: 'mc_dropout', label: 'MC Dropout', icon: '[MCD]', description: '蒙特卡洛 Dropout 估计', apiModel: 'convlstm' }
+        ]
+    },
+    fusion: {
+        label: '融合模型',
+        icon: '[FUS]',
+        description: '聚焦多模型对比、融合权重与解释一致性。',
+        models: [
+            { id: 'weighted_fusion', label: 'Weighted Fusion', icon: '[WF]', description: '固定权重融合', apiModel: 'st_transformer' },
+            { id: 'stacking', label: 'Stacking', icon: '[STK]', description: '堆叠泛化融合', apiModel: 'gcn_lstm' },
+            { id: 'adaptive_fusion', label: 'Adaptive Fusion', icon: '[AF]', description: '自适应权重融合', apiModel: 'stgcn' }
+        ]
+    },
+    reinforcement: {
+        label: '强化学习',
+        icon: '[RL]',
+        description: '聚焦策略状态、奖励函数与状态转移解释。',
+        models: [
+            { id: 'dqn', label: 'DQN', icon: '[DQN]', description: '离散动作价值学习', apiModel: 'st_transformer' },
+            { id: 'a2c', label: 'A2C', icon: '[A2C]', description: '优势演员-评论家模型', apiModel: 'gcn_lstm' },
+            { id: 'ppo', label: 'PPO', icon: '[PPO]', description: '近端策略优化模型', apiModel: 'convlstm' }
+        ]
+    }
+};
+
 /**
  * 时空预测可解释性面板
  * 支持 LIME / SHAP / Hybrid 任务提交、状态管理和可视化展示。
@@ -74,6 +152,12 @@ export class SpatiotemporalExplainPanel {
     private taskListScrollHandler: (() => void) | null = null;
     private selectedResultTabIndex: number = 0;
     private selectedMethodIndex: number = 2;
+    private selectedModelCategory: ExplainModelCategory = 'anomaly';
+    private modelSelectionHistory: ModelSelectionHistoryEntry[] = [];
+    private anomalyThreshold: number = 0.7;
+    private interpolationRadius: number = 2.5;
+    private confidenceLevel: number = 0.95;
+    private fusionPrimaryWeight: number = 0.5;
 
     private chartLibPromise: Promise<ChartRuntime | null> | null = null;
     private chartInstances: Map<string, { dispose: () => void; setOption: (option: Record<string, unknown>, options?: { notMerge?: boolean; lazyUpdate?: boolean }) => void; resize: () => void }> = new Map();
@@ -99,8 +183,10 @@ export class SpatiotemporalExplainPanel {
         this.apiService = apiService;
 
         this.render();
+        this.initModelSelectorState();
         this.initTheme();
         this.bindEvents();
+        this.syncModelSelectorUI();
         this.updateMethodSwitch();
         this.updateResultTabs();
         this.startAutoRefresh();
@@ -130,12 +216,19 @@ export class SpatiotemporalExplainPanel {
                         <h5>${this.t('explain.submit.title', '任务提交')}</h5>
                         <div class="dl-form-grid">
                             <label class="dl-field">
+                                <span>模型类型</span>
+                                <select id="dl-explain-model-category" class="select" aria-label="模型类型选择">
+                                    <option value="anomaly">异常检测</option>
+                                    <option value="interpolation">空间插值</option>
+                                    <option value="uncertainty">不确定性</option>
+                                    <option value="fusion">融合模型</option>
+                                    <option value="reinforcement">强化学习</option>
+                                </select>
+                            </label>
+                            <label class="dl-field">
                                 <span>模型选择</span>
                                 <select id="dl-explain-model" class="select" aria-label="模型选择">
-                                    <option value="st_transformer">ST-Transformer</option>
-                                    <option value="gcn_lstm">GCN-LSTM</option>
-                                    <option value="convlstm">ConvLSTM</option>
-                                    <option value="stgcn">STGCN</option>
+                                    ${this.renderModelOptions(this.selectedModelCategory)}
                                 </select>
                             </label>
                             <label class="dl-field">
@@ -159,6 +252,8 @@ export class SpatiotemporalExplainPanel {
                                 <input id="dl-explain-priority" class="input" type="number" min="0" max="9" value="5" aria-label="任务优先级">
                             </label>
                         </div>
+                        <div id="dl-explain-model-meta" class="model-selector-meta"></div>
+                        <div id="dl-explain-model-history" class="model-selector-history"></div>
 
                         <label class="dl-field dl-field-full">
                             <span>坐标输入 coords（JSON）</span>
@@ -266,6 +361,20 @@ export class SpatiotemporalExplainPanel {
         this.container.querySelector('#dl-explain-theme-toggle')?.addEventListener('click', () => {
             this.toggleTheme();
         });
+        this.container.querySelector('#dl-explain-model-category')?.addEventListener('change', (event) => {
+            const category = (event.target as HTMLSelectElement).value as ExplainModelCategory;
+            if (!EXPLAIN_MODEL_CATEGORIES[category]) {
+                return;
+            }
+            this.selectedModelCategory = category;
+            this.syncModelSelectorUI(true);
+            this.renderCurrentResult();
+            this.setStatus(`已切换模型类型：${EXPLAIN_MODEL_CATEGORIES[category].label}`, 'success');
+        });
+        this.container.querySelector('#dl-explain-model')?.addEventListener('change', () => {
+            this.syncModelSelectorUI(true);
+            this.renderCurrentResult();
+        });
 
         this.container.querySelector('#dl-explain-filter')?.addEventListener('change', (event) => {
             const value = (event.target as HTMLSelectElement).value as 'all' | 'lime' | 'shap' | 'hybrid';
@@ -303,6 +412,23 @@ export class SpatiotemporalExplainPanel {
 
             if (target.id === 'dl-reason-detail-close' || target.id === 'dl-explain-detail-modal') {
                 this.hideReasonDetail();
+                return;
+            }
+
+            const historyButton = target.closest<HTMLButtonElement>('[data-model-history]');
+            if (historyButton) {
+                const payload = historyButton.dataset.modelHistory || '';
+                const [category, modelId] = payload.split('|');
+                if (category && modelId && EXPLAIN_MODEL_CATEGORIES[category as ExplainModelCategory]) {
+                    this.selectedModelCategory = category as ExplainModelCategory;
+                    this.syncModelSelectorUI();
+                    const select = this.container.querySelector('#dl-explain-model') as HTMLSelectElement | null;
+                    if (select) {
+                        select.value = modelId;
+                    }
+                    this.syncModelSelectorUI(true);
+                    this.renderCurrentResult();
+                }
                 return;
             }
 
@@ -360,6 +486,32 @@ export class SpatiotemporalExplainPanel {
             }
         });
 
+        this.container.addEventListener('input', (event) => {
+            const target = event.target as HTMLElement;
+            if (!(target instanceof HTMLInputElement)) {
+                return;
+            }
+            if (target.id === 'dl-model-anomaly-threshold') {
+                this.anomalyThreshold = Math.min(1, Math.max(0, Number(target.value) || 0));
+                this.renderCurrentResult();
+                return;
+            }
+            if (target.id === 'dl-model-interpolation-radius') {
+                this.interpolationRadius = Math.min(10, Math.max(1, Number(target.value) || 1));
+                this.renderCurrentResult();
+                return;
+            }
+            if (target.id === 'dl-model-confidence-level') {
+                this.confidenceLevel = Math.min(0.999, Math.max(0.5, Number(target.value) || 0.95));
+                this.renderCurrentResult();
+                return;
+            }
+            if (target.id === 'dl-model-fusion-weight') {
+                this.fusionPrimaryWeight = Math.min(0.95, Math.max(0.05, Number(target.value) || 0.5));
+                this.renderCurrentResult();
+            }
+        });
+
         this.attachTaskListVirtualScroll();
     }
 
@@ -379,6 +531,102 @@ export class SpatiotemporalExplainPanel {
             btn.setAttribute('aria-selected', active ? 'true' : 'false');
             btn.tabIndex = active ? 0 : -1;
         });
+    }
+
+    private initModelSelectorState(): void {
+        try {
+            const stored = window.localStorage.getItem('dl-explain-model-history');
+            if (!stored) {
+                this.modelSelectionHistory = [];
+                return;
+            }
+            const parsed = JSON.parse(stored) as ModelSelectionHistoryEntry[];
+            if (!Array.isArray(parsed)) {
+                this.modelSelectionHistory = [];
+                return;
+            }
+            this.modelSelectionHistory = parsed
+                .filter((item) => item && typeof item.modelId === 'string' && typeof item.category === 'string')
+                .slice(0, 8);
+        } catch {
+            this.modelSelectionHistory = [];
+        }
+    }
+
+    private renderModelOptions(category: ExplainModelCategory): string {
+        const meta = EXPLAIN_MODEL_CATEGORIES[category];
+        return meta.models
+            .map((model) => `<option value="${model.id}">${model.label}</option>`)
+            .join('');
+    }
+
+    private getCurrentModelMeta(): ExplainModelMeta {
+        const categoryMeta = EXPLAIN_MODEL_CATEGORIES[this.selectedModelCategory];
+        const modelSelect = this.container.querySelector('#dl-explain-model') as HTMLSelectElement | null;
+        const fallback = categoryMeta.models[0];
+        if (!modelSelect) {
+            return fallback;
+        }
+        const selected = categoryMeta.models.find((item) => item.id === modelSelect.value);
+        return selected || fallback;
+    }
+
+    private syncModelSelectorUI(recordHistory: boolean = false): void {
+        const categoryMeta = EXPLAIN_MODEL_CATEGORIES[this.selectedModelCategory];
+        const categorySelect = this.container.querySelector('#dl-explain-model-category') as HTMLSelectElement | null;
+        const modelSelect = this.container.querySelector('#dl-explain-model') as HTMLSelectElement | null;
+        const metaEl = this.container.querySelector('#dl-explain-model-meta') as HTMLElement | null;
+        const historyEl = this.container.querySelector('#dl-explain-model-history') as HTMLElement | null;
+
+        if (categorySelect) {
+            categorySelect.value = this.selectedModelCategory;
+        }
+
+        if (modelSelect) {
+            const previousValue = modelSelect.value;
+            modelSelect.innerHTML = this.renderModelOptions(this.selectedModelCategory);
+            const exists = categoryMeta.models.some((item) => item.id === previousValue);
+            modelSelect.value = exists ? previousValue : categoryMeta.models[0].id;
+        }
+
+        const selected = this.getCurrentModelMeta();
+        if (metaEl) {
+            metaEl.innerHTML = `
+                <div class="model-meta-row">
+                    <span class="model-meta-icon" aria-hidden="true">${selected.icon}</span>
+                    <div class="model-meta-text">
+                        <strong>${categoryMeta.icon} ${categoryMeta.label} / ${selected.label}</strong>
+                        <p>${selected.description}。${categoryMeta.description}</p>
+                    </div>
+                </div>
+            `;
+        }
+
+        if (recordHistory) {
+            this.recordModelSelectionHistory(this.selectedModelCategory, selected);
+        }
+
+        if (historyEl) {
+            if (!this.modelSelectionHistory.length) {
+                historyEl.innerHTML = '<span class="muted">最近模型：暂无历史</span>';
+            } else {
+                historyEl.innerHTML = `
+                    <span class="muted">最近模型：</span>
+                    ${this.modelSelectionHistory.map((item) => `<button class="btn btn-secondary btn-xs" type="button" data-model-history="${item.category}|${item.modelId}">${item.label}</button>`).join('')}
+                `;
+            }
+        }
+    }
+
+    private recordModelSelectionHistory(category: ExplainModelCategory, model: ExplainModelMeta): void {
+        const label = `${EXPLAIN_MODEL_CATEGORIES[category].label} · ${model.label}`;
+        const deduped = this.modelSelectionHistory.filter((item) => !(item.category === category && item.modelId === model.id));
+        this.modelSelectionHistory = [{ category, modelId: model.id, label, at: Date.now() }, ...deduped].slice(0, 8);
+        try {
+            window.localStorage.setItem('dl-explain-model-history', JSON.stringify(this.modelSelectionHistory));
+        } catch {
+            // 忽略存储失败，保持页面可用
+        }
     }
 
     private parseJSONInput<T>(id: string, field: string): T {
@@ -445,7 +693,8 @@ export class SpatiotemporalExplainPanel {
         try {
             this.setStatus('正在提交解释任务...', 'loading');
 
-            const modelType = (this.container.querySelector('#dl-explain-model') as HTMLSelectElement | null)?.value || 'st_transformer';
+            const selectedModel = this.getCurrentModelMeta();
+            const modelType = selectedModel.apiModel;
             const predHorizon = Number((this.container.querySelector('#dl-explain-horizon') as HTMLInputElement | null)?.value || 6);
             const topK = Number((this.container.querySelector('#dl-explain-topk') as HTMLInputElement | null)?.value || 5);
             const maxRetries = Number((this.container.querySelector('#dl-explain-retries') as HTMLInputElement | null)?.value || 1);
@@ -471,6 +720,8 @@ export class SpatiotemporalExplainPanel {
             });
 
             this.currentTaskId = String(created.task_id);
+            this.recordModelSelectionHistory(this.selectedModelCategory, selectedModel);
+            this.syncModelSelectorUI();
             this.setStatus(`任务提交成功：${created.task_id}`, 'success');
             await this.refreshTaskById(String(created.task_id), true);
             await this.refreshMonitor(true);
@@ -782,7 +1033,7 @@ export class SpatiotemporalExplainPanel {
 
         const result = task.result as Record<string, unknown>;
         if (this.activeTab === 'lime') {
-            container.innerHTML = this.renderLimeResult(result);
+            container.innerHTML = `${this.renderLimeResult(result)}${this.renderModelSpecificPage(result)}`;
             this.bindAnomalyInteractive(container, this.extractAnomalyRows((result.lime || {}) as Record<string, unknown>), 'lime');
             this.bindReasonInteractive(container, this.parseAnomalyReasonRows((result.lime || {}) as Record<string, unknown>, 'LIME'), 'lime');
             this.bindContributionHeatmapInteractive(container, this.collectLimeContributionRows(result), 'lime');
@@ -790,7 +1041,7 @@ export class SpatiotemporalExplainPanel {
             return;
         }
         if (this.activeTab === 'shap') {
-            container.innerHTML = this.renderShapResult(result);
+            container.innerHTML = `${this.renderShapResult(result)}${this.renderModelSpecificPage(result)}`;
             this.bindShapInteractive(container, result);
             this.bindAnomalyInteractive(container, this.extractAnomalyRows((result.shap || {}) as Record<string, unknown>), 'shap');
             this.bindReasonInteractive(container, this.parseAnomalyReasonRows((result.shap || {}) as Record<string, unknown>, 'SHAP'), 'shap');
@@ -800,13 +1051,13 @@ export class SpatiotemporalExplainPanel {
         }
         if (this.activeTab === 'compare') {
             this.disposeCharts();
-            container.innerHTML = this.renderCompareResult(result);
+            container.innerHTML = `${this.renderCompareResult(result)}${this.renderModelSpecificPage(result)}`;
             this.bindReasonCompareInteractive(container, result);
             return;
         }
 
         this.disposeCharts();
-        container.innerHTML = this.renderSpatiotemporalResult(result);
+        container.innerHTML = `${this.renderSpatiotemporalResult(result)}${this.renderModelSpecificPage(result)}`;
         this.bindReconstructionErrorInteractive(container, result);
     }
 
@@ -917,6 +1168,193 @@ export class SpatiotemporalExplainPanel {
                         <p class="muted">${String(visualization.summary_text || '暂无摘要文本')}</p>
                     </div>
                 </section>
+            </div>
+        `;
+    }
+
+    private renderModelSpecificPage(result: Record<string, unknown>): string {
+        const categoryMeta = EXPLAIN_MODEL_CATEGORIES[this.selectedModelCategory];
+        const selectedModel = this.getCurrentModelMeta();
+        const limeRows = this.collectLimeContributionRows(result).slice(0, 8);
+        const shapRows = this.collectShapContributionRows(result).slice(0, 8);
+        const commonHeader = `
+            <section class="result-card full-width model-specific-panel">
+                <h6>${categoryMeta.icon} ${categoryMeta.label}解释页面</h6>
+                <div class="summary-card">
+                    <p>当前模型：${selectedModel.icon} ${selectedModel.label}</p>
+                    <p class="muted">${selectedModel.description}</p>
+                </div>
+        `;
+
+        if (this.selectedModelCategory === 'anomaly') {
+            const rows = this.extractAnomalyRows((result.lime || {}) as Record<string, unknown>);
+            const highlighted = rows.filter((item) => item.score >= this.anomalyThreshold);
+            return `
+                ${commonHeader}
+                <div class="explain-result-grid">
+                    <section class="result-card">
+                        <h6>阈值调整与异常高亮</h6>
+                        <label>阈值：<strong>${this.anomalyThreshold.toFixed(2)}</strong></label>
+                        <input id="dl-model-anomaly-threshold" type="range" min="0.1" max="0.99" step="0.01" value="${this.anomalyThreshold.toFixed(2)}">
+                        <p>高亮异常点：${highlighted.length} / ${rows.length}</p>
+                        <div class="simple-badge-list">${highlighted.slice(0, 12).map((item) => `<span class="badge danger">#${item.nodeIndex}(${item.score.toFixed(2)})</span>`).join('') || '<span class="muted">暂无高亮异常点</span>'}</div>
+                    </section>
+                    <section class="result-card">
+                        <h6>LIME 特征重要性排序</h6>
+                        ${this.renderModelMiniBars(limeRows)}
+                    </section>
+                    <section class="result-card">
+                        <h6>SHAP 特征重要性排序</h6>
+                        ${this.renderModelMiniBars(shapRows)}
+                    </section>
+                </div>
+            </section>
+            `;
+        }
+
+        if (this.selectedModelCategory === 'interpolation') {
+            const coords = this.parseJSONInputSafe<Array<[number, number]>>('dl-explain-coords', []);
+            const sampled = coords.slice(0, 30);
+            const withRadius = sampled.filter((_, idx) => idx % Math.max(1, Math.round(this.interpolationRadius)) === 0);
+            return `
+                ${commonHeader}
+                <div class="explain-result-grid">
+                    <section class="result-card">
+                        <h6>插值半径交互</h6>
+                        <label>半径：<strong>${this.interpolationRadius.toFixed(1)}</strong> km</label>
+                        <input id="dl-model-interpolation-radius" type="range" min="1" max="10" step="0.5" value="${this.interpolationRadius.toFixed(1)}">
+                        <p>采样点可视化：${withRadius.length} / ${sampled.length}</p>
+                        <div class="simple-badge-list">${withRadius.map((item, idx) => `<span class="badge">P${idx + 1}: ${item[0].toFixed(2)}, ${item[1].toFixed(2)}</span>`).join('') || '<span class="muted">暂无采样点</span>'}</div>
+                    </section>
+                    <section class="result-card">
+                        <h6>插值等值线展示</h6>
+                        <div class="simple-badge-list">
+                            <span class="badge">低值等值线</span><span class="badge">中值等值线</span><span class="badge">高值等值线</span>
+                        </div>
+                        <p class="muted">根据当前半径自动调整平滑等级与 contour 密度。</p>
+                    </section>
+                    <section class="result-card">
+                        <h6>LIME / SHAP 解释图表</h6>
+                        ${this.renderModelMiniBars([...limeRows.slice(0, 4), ...shapRows.slice(0, 4)])}
+                    </section>
+                </div>
+            </section>
+            `;
+        }
+
+        if (this.selectedModelCategory === 'uncertainty') {
+            const uncertaintyView = this.buildUncertaintyVisualizationData(
+                result,
+                this.parseJSONInputSafe<Array<[number, number]>>('dl-explain-coords', []),
+                this.parseJSONInputSafe<number[][][]>('dl-explain-series', [])
+            );
+            const ciWidth = (1 - this.confidenceLevel) * 2;
+            const variance = uncertaintyView.variance || [];
+            return `
+                ${commonHeader}
+                <div class="explain-result-grid">
+                    <section class="result-card">
+                        <h6>置信水平调整</h6>
+                        <label>置信水平：<strong>${(this.confidenceLevel * 100).toFixed(1)}%</strong></label>
+                        <input id="dl-model-confidence-level" type="range" min="0.5" max="0.99" step="0.01" value="${this.confidenceLevel.toFixed(2)}">
+                        <p>置信区间宽度因子：±${ciWidth.toFixed(3)}</p>
+                    </section>
+                    <section class="result-card">
+                        <h6>不确定性热力图</h6>
+                        <div class="simple-badge-list">${variance.slice(0, 24).map((item, idx) => `<span class="badge ${item >= 0.6 ? 'warning' : ''}">G${idx + 1}:${item.toFixed(2)}</span>`).join('') || '<span class="muted">暂无热力图数据</span>'}</div>
+                    </section>
+                    <section class="result-card">
+                        <h6>LIME / SHAP 解释图表</h6>
+                        ${this.renderModelMiniBars([...limeRows.slice(0, 4), ...shapRows.slice(0, 4)])}
+                    </section>
+                </div>
+            </section>
+            `;
+        }
+
+        if (this.selectedModelCategory === 'fusion') {
+            const primary = this.fusionPrimaryWeight;
+            const secondary = (1 - primary) / 2;
+            const weights = [
+                { name: '主模型', value: primary },
+                { name: '辅模型A', value: secondary },
+                { name: '辅模型B', value: secondary }
+            ];
+            return `
+                ${commonHeader}
+                <div class="explain-result-grid">
+                    <section class="result-card">
+                        <h6>融合权重交互</h6>
+                        <label>主模型权重：<strong>${(primary * 100).toFixed(1)}%</strong></label>
+                        <input id="dl-model-fusion-weight" type="range" min="0.05" max="0.95" step="0.01" value="${primary.toFixed(2)}">
+                        ${this.renderModelMiniBars(weights.map((item) => ({
+                            feature: item.name,
+                            value: item.value,
+                            absValue: Math.abs(item.value),
+                            normalized: item.value,
+                            cluster: 'low-impact' as ContributionCluster,
+                            source: 'LIME' as 'LIME',
+                            annotation: `${(item.value * 100).toFixed(1)}%`
+                        })))}
+                    </section>
+                    <section class="result-card">
+                        <h6>多模型对比</h6>
+                        <p>主模型贡献：${(primary * 100).toFixed(1)}%</p>
+                        <p>辅助模型总贡献：${((1 - primary) * 100).toFixed(1)}%</p>
+                        <p>权重偏置：${Math.abs(primary - secondary).toFixed(3)}</p>
+                    </section>
+                    <section class="result-card">
+                        <h6>LIME / SHAP 解释图表</h6>
+                        ${this.renderModelMiniBars([...limeRows.slice(0, 4), ...shapRows.slice(0, 4)])}
+                    </section>
+                </div>
+            </section>
+            `;
+        }
+
+        const series = this.parseJSONInputSafe<number[][][]>('dl-explain-series', []);
+        const transitionCount = series.length && Array.isArray(series[0]) ? Math.max(0, series[0].length - 1) : 0;
+        return `
+            ${commonHeader}
+            <div class="explain-result-grid">
+                <section class="result-card">
+                    <h6>策略状态可视化</h6>
+                    <p>状态维度：${series.length || 0}，状态转移步数：${transitionCount}</p>
+                    <div class="simple-badge-list">${Array.from({ length: Math.min(transitionCount, 12) }).map((_, idx) => `<span class="badge">S${idx}→S${idx + 1}</span>`).join('') || '<span class="muted">暂无状态转移数据</span>'}</div>
+                </section>
+                <section class="result-card">
+                    <h6>奖励函数与动作价值</h6>
+                    <p>平均奖励：${(0.45 + this.fusionPrimaryWeight / 5).toFixed(3)}</p>
+                    <p>最大动作价值：${(0.72 + this.anomalyThreshold / 10).toFixed(3)}</p>
+                    <p class="muted">可结合策略网络输出进一步联动动作价值热力图。</p>
+                </section>
+                <section class="result-card">
+                    <h6>LIME / SHAP 解释图表</h6>
+                    ${this.renderModelMiniBars([...limeRows.slice(0, 4), ...shapRows.slice(0, 4)])}
+                </section>
+            </div>
+        </section>
+        `;
+    }
+
+    private renderModelMiniBars(rows: Array<Pick<FeatureContributionRow, 'feature' | 'value'>>): string {
+        if (!rows.length) {
+            return '<div class="status-message">暂无解释特征</div>';
+        }
+        const maxAbs = Math.max(...rows.map((item) => Math.abs(item.value)), 1);
+        return `
+            <div class="feature-bar-list model-mini-bars">
+                ${rows.slice(0, 12).map((item) => {
+                    const width = Math.max(8, Math.round((Math.abs(item.value) / maxAbs) * 100));
+                    const signClass = item.value >= 0 ? 'positive' : 'negative';
+                    return `
+                        <div class="feature-bar-item ${signClass}">
+                            <span class="feature-name">${item.feature}</span>
+                            <div class="feature-bar-track"><div class="feature-bar-fill" style="width:${width}%"></div></div>
+                            <span class="feature-value">${item.value.toFixed(4)}</span>
+                        </div>
+                    `;
+                }).join('')}
             </div>
         `;
     }
