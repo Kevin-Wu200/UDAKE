@@ -32,6 +32,7 @@ from .api_versioning import (
     CURRENT_API_VERSION,
     DEPRECATED_API_VERSIONS,
 )
+from .api_response import unified_api_response_middleware
 from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 分布式计算接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口, 数据质量接口, 数据安全接口, GPU加速接口, 数据反馈接口, 主动学习接口, 用户验证与自评估接口, 移动端GPS接口, 历史对比与趋势分析接口, 智能工作流接口, 时空克里金接口
 from .api.app_download_api import router as download_router
 from .api.admin_api import router as admin_router
@@ -142,6 +143,12 @@ app.mount("/android_downloads", StaticFiles(directory=str(settings.ANDROID_APK_D
 async def api_version_middleware(request: Request, call_next):
     """统一处理 API 版本解析、兼容重写与废弃告警。"""
     return await api_versioning_middleware(request, call_next)
+
+
+@app.middleware("http")
+async def api_response_format_middleware(request: Request, call_next):
+    """统一处理 API v2 响应包装与请求元数据。"""
+    return await unified_api_response_middleware(request, call_next)
 
 
 # 注册路由

@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import logging
 import time
+from functools import lru_cache
 from typing import Any, Optional
 
 from fastapi import APIRouter, Header, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..config import settings
+from ..schemas.api_extension_models import ExplainModelType, GenericModelExplainRequest
 from .explain_service import (
     ExplainPermissionError,
     ExplainRateLimitError,
@@ -21,6 +23,113 @@ router = APIRouter(prefix="/dl", tags=["深度学习"])
 service = DeepLearningService()
 explain_task_service = SpatiotemporalExplainTaskService(settings=settings, dl_service=service)
 logger = logging.getLogger(__name__)
+
+_SUPPORTED_MODEL_TYPES = tuple(item.value for item in ExplainModelType)
+
+
+def _dispatch_anomaly(payload: GenericModelExplainRequest) -> dict[str, Any]:
+    data = payload.payload
+    return service.explain_anomaly(
+        model_name=payload.model_name or "vae",
+        coords=data.get("coords") or [],
+        values=data.get("values") or [],
+        method=payload.method,
+        top_k=payload.top_k,
+        include_prediction=payload.include_prediction,
+        max_explain_nodes=payload.max_explain_nodes,
+        num_samples=payload.num_samples,
+        nsamples=payload.nsamples,
+        threshold_method=data.get("threshold_method", "percentile"),
+        percentile=float(data.get("percentile", 95.0)),
+        k=float(data.get("k", 2.5)),
+        detection_window=int(data.get("detection_window", 24)),
+    )
+
+
+def _dispatch_interpolation(payload: GenericModelExplainRequest) -> dict[str, Any]:
+    data = payload.payload
+    return service.explain_interpolation(
+        model_type=payload.model_name or "gnn",
+        samples=data.get("samples") or [],
+        queries=data.get("queries") or [],
+        method=payload.method,
+        top_k=payload.top_k,
+        include_prediction=payload.include_prediction,
+        interpolation_radius=float(data.get("interpolation_radius", 1.0)),
+        weight_function=data.get("weight_function", "gaussian"),
+        max_explain_nodes=payload.max_explain_nodes,
+        num_samples=payload.num_samples,
+        nsamples=payload.nsamples,
+    )
+
+
+def _dispatch_uncertainty(payload: GenericModelExplainRequest) -> dict[str, Any]:
+    data = payload.payload
+    return service.explain_uncertainty(
+        model_name=payload.model_name or "bnn",
+        features=data.get("features") or [],
+        method=payload.method,
+        top_k=payload.top_k,
+        include_prediction=payload.include_prediction,
+        max_explain_nodes=payload.max_explain_nodes,
+        num_samples=payload.num_samples,
+        nsamples=payload.nsamples,
+        confidence_interval=float(data.get("confidence_interval", 0.95)),
+        prediction_interval=data.get("prediction_interval", "normal"),
+    )
+
+
+def _dispatch_fusion(payload: GenericModelExplainRequest) -> dict[str, Any]:
+    data = payload.payload
+    return service.explain_fusion(
+        models=data.get("models") or [],
+        method=payload.method,
+        top_k=payload.top_k,
+        include_prediction=payload.include_prediction,
+        num_samples=payload.num_samples,
+        nsamples=payload.nsamples,
+        max_explain_nodes=payload.max_explain_nodes,
+        profile_id=data.get("profile_id"),
+        strategy=data.get("strategy"),
+        weight_method=data.get("weight_method"),
+        true_values=data.get("true_values"),
+        context=data.get("context"),
+        fusion_weights=data.get("fusion_weights"),
+        combination_mode=data.get("combination_mode", "adaptive"),
+    )
+
+
+def _dispatch_rl(payload: GenericModelExplainRequest) -> dict[str, Any]:
+    data = payload.payload
+    return service.explain_sampling_rl(
+        model_name=payload.model_name or "ppo",
+        uncertainty_map=data.get("uncertainty_map") or [],
+        existing_points=data.get("existing_points") or [],
+        method=payload.method,
+        top_k=payload.top_k,
+        include_prediction=payload.include_prediction,
+        policy_state=data.get("policy_state", "current"),
+        reward_function=data.get("reward_function", "hybrid"),
+        n_recommendations=int(data.get("n_recommendations", 10)),
+        max_explain_nodes=payload.max_explain_nodes,
+        num_samples=payload.num_samples,
+        nsamples=payload.nsamples,
+    )
+
+
+@lru_cache(maxsize=16)
+def _resolve_model_router(model_type: str):
+    route_map = {
+        ExplainModelType.ANOMALY.value: _dispatch_anomaly,
+        ExplainModelType.INTERPOLATION.value: _dispatch_interpolation,
+        ExplainModelType.UNCERTAINTY.value: _dispatch_uncertainty,
+        ExplainModelType.FUSION.value: _dispatch_fusion,
+        ExplainModelType.RL.value: _dispatch_rl,
+    }
+    handler = route_map.get(model_type)
+    if handler is None:
+        raise ValueError(f"无效模型类型: {model_type}，支持类型: {', '.join(_SUPPORTED_MODEL_TYPES)}")
+    return handler
 
 
 class TrainRequest(BaseModel):
@@ -467,6 +576,38 @@ def _create_explain_task(
 @router.get("/health")
 def dl_health() -> dict:
     return service.health()
+
+
+@router.get("/models/router/stats")
+def model_router_stats() -> dict:
+    info = _resolve_model_router.cache_info()
+    return {
+        "hits": info.hits,
+        "misses": info.misses,
+        "maxsize": info.maxsize,
+        "currsize": info.currsize,
+        "supported_model_types": list(_SUPPORTED_MODEL_TYPES),
+    }
+
+
+@router.post("/models/explain")
+def explain_by_model_type(payload: GenericModelExplainRequest) -> dict:
+    try:
+        handler = _resolve_model_router(payload.model_type.value)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    try:
+        return handler(payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("通用模型路由执行失败 model_type=%s: %s", payload.model_type.value, exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"模型路由执行失败: {exc}",
+        ) from exc
 
 
 @router.post("/train-demo")
