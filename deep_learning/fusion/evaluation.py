@@ -20,8 +20,21 @@ class BootstrapStability:
 class FusionEvaluator:
     """融合效果评估器。"""
 
-    def evaluate_model_metrics(self, models: list[ModelPrediction], true_values: list[float] | None) -> list[ModelMetric]:
-        matrix = ensure_prediction_matrix(models)
+    def _resolve_matrix(self, models: list[ModelPrediction], prediction_matrix: np.ndarray | None = None) -> np.ndarray:
+        if prediction_matrix is None:
+            return ensure_prediction_matrix(models)
+        matrix = np.asarray(prediction_matrix, dtype=float)
+        if matrix.ndim != 2 or matrix.shape[0] != len(models):
+            raise ValueError("prediction_matrix 维度与模型数量不一致")
+        return matrix
+
+    def evaluate_model_metrics(
+        self,
+        models: list[ModelPrediction],
+        true_values: list[float] | None,
+        prediction_matrix: np.ndarray | None = None,
+    ) -> list[ModelMetric]:
+        matrix = self._resolve_matrix(models, prediction_matrix=prediction_matrix)
         if true_values is None:
             return [
                 ModelMetric(
@@ -156,8 +169,8 @@ class FusionEvaluator:
         stability = float(1.0 / (1.0 + std / (mean + EPS)))
         return BootstrapStability(rmse_mean=mean, rmse_std=std, stability_score=stability)
 
-    def diversity_metrics(self, models: list[ModelPrediction]) -> dict[str, float]:
-        matrix = ensure_prediction_matrix(models)
+    def diversity_metrics(self, models: list[ModelPrediction], prediction_matrix: np.ndarray | None = None) -> dict[str, float]:
+        matrix = self._resolve_matrix(models, prediction_matrix=prediction_matrix)
         n_models = matrix.shape[0]
         if n_models <= 1:
             return {"correlation_diversity": 0.0, "prediction_spread": 0.0, "ensemble_diversity": 0.0}

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+from collections import OrderedDict
+import threading
 
 import numpy as np
 
@@ -11,6 +13,28 @@ from .common import AdaptiveLearningMode, EPS, ModelMetric, WeightMethod, normal
 
 class FusionWeightCalculator:
     """支持多种权重策略与自适应学习。"""
+
+    def __init__(self, cache_size: int = 128) -> None:
+        self._cache_size = max(8, int(cache_size))
+        self._lock = threading.Lock()
+        self._cache: "OrderedDict[tuple, dict[str, float]]" = OrderedDict()
+        self._cache_hits = 0
+        self._cache_misses = 0
+        self._last_cache_hit = False
+
+    @property
+    def last_cache_hit(self) -> bool:
+        return bool(self._last_cache_hit)
+
+    def cache_metrics(self) -> dict[str, float | int]:
+        with self._lock:
+            total = self._cache_hits + self._cache_misses
+            return {
+                "hits": int(self._cache_hits),
+                "misses": int(self._cache_misses),
+                "hit_rate": float(self._cache_hits / max(1, total)),
+                "size": int(len(self._cache)),
+            }
 
     def calculate(
         self,
@@ -26,6 +50,33 @@ class FusionWeightCalculator:
     ) -> dict[str, float]:
         if not metrics:
             return {}
+
+        cache_key = (
+            method.value,
+            adaptive_mode.value,
+            int(n_folds),
+            float(min_weight),
+            float(max_weight),
+            bool(normalize),
+            bool(smoothing),
+            float(smoothing_factor),
+            tuple(
+                (
+                    m.model_id,
+                    round(float(m.rmse), 12),
+                    round(float(m.mae), 12),
+                    round(float(m.r2), 12),
+                    round(float(m.mape), 12),
+                    round(float(m.stability), 12),
+                    round(float(m.uncertainty), 12),
+                )
+                for m in metrics
+            ),
+        )
+        cached = self._cache_get(cache_key)
+        if cached is not None:
+            self._last_cache_hit = True
+            return dict(cached)
 
         handlers = {
             WeightMethod.EQUAL: self._equal,
@@ -47,7 +98,26 @@ class FusionWeightCalculator:
             smoothing=smoothing,
             smoothing_factor=smoothing_factor,
         )
+        self._cache_set(cache_key, adjusted)
+        self._last_cache_hit = False
         return adjusted
+
+    def _cache_get(self, key: tuple) -> dict[str, float] | None:
+        with self._lock:
+            cached = self._cache.get(key)
+            if cached is None:
+                self._cache_misses += 1
+                return None
+            self._cache_hits += 1
+            self._cache.move_to_end(key)
+            return dict(cached)
+
+    def _cache_set(self, key: tuple, value: dict[str, float]) -> None:
+        with self._lock:
+            self._cache[key] = dict(value)
+            self._cache.move_to_end(key)
+            while len(self._cache) > self._cache_size:
+                self._cache.popitem(last=False)
 
     def _equal(self, metrics: list[ModelMetric]) -> dict[str, float]:
         w = 1.0 / len(metrics)
