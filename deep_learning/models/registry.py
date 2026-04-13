@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 import pickle
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -20,20 +20,159 @@ class ModelMetadata:
     metrics: dict[str, float]
 
 
+@dataclass
+class ModelRegistration:
+    """注册表条目。"""
+
+    name: str
+    builder: Callable[..., Any]
+    metadata: dict[str, Any] = field(default_factory=dict)
+    tags: set[str] = field(default_factory=set)
+    registered_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+
 class ModelRegistry:
     def __init__(self) -> None:
         self._builders: dict[str, Callable[..., Any]] = {}
+        self._entries: dict[str, ModelRegistration] = {}
+        self._events: list[Callable[[dict[str, Any]], None]] = []
 
-    def register(self, name: str, builder: Callable[..., Any]) -> None:
-        self._builders[name] = builder
+    @staticmethod
+    def _normalize_name(name: str) -> str:
+        normalized = (name or "").strip()
+        if not normalized:
+            raise ValueError("模型名称不能为空")
+        return normalized
+
+    @staticmethod
+    def _validate_builder(builder: Callable[..., Any]) -> None:
+        if not callable(builder):
+            raise TypeError("builder 必须是可调用对象")
+
+    def register(
+        self,
+        name: str,
+        builder: Callable[..., Any],
+        *,
+        metadata: dict[str, Any] | None = None,
+        tags: set[str] | list[str] | tuple[str, ...] | None = None,
+        overwrite: bool = True,
+    ) -> None:
+        normalized_name = self._normalize_name(name)
+        self._validate_builder(builder)
+
+        if not overwrite and normalized_name in self._entries:
+            raise ValueError(f"模型已存在且禁止覆盖: {normalized_name}")
+
+        now = datetime.now(timezone.utc).isoformat()
+        previous = self._entries.get(normalized_name)
+        registered_at = previous.registered_at if previous is not None else now
+
+        entry = ModelRegistration(
+            name=normalized_name,
+            builder=builder,
+            metadata=dict(metadata or {}),
+            tags={str(tag) for tag in (tags or set()) if str(tag).strip()},
+            registered_at=registered_at,
+            updated_at=now,
+        )
+        self._builders[normalized_name] = builder
+        self._entries[normalized_name] = entry
+
+        self._emit(
+            "model_updated" if previous is not None else "model_registered",
+            {
+                "name": normalized_name,
+                "metadata": dict(entry.metadata),
+                "tags": sorted(entry.tags),
+                "registered_at": entry.registered_at,
+                "updated_at": entry.updated_at,
+            },
+        )
+
+    def unregister(self, name: str) -> None:
+        normalized_name = self._normalize_name(name)
+        if normalized_name not in self._entries:
+            raise KeyError(f"模型未注册: {normalized_name}")
+        del self._entries[normalized_name]
+        if normalized_name in self._builders:
+            del self._builders[normalized_name]
+
+        self._emit(
+            "model_unregistered",
+            {
+                "name": normalized_name,
+                "unregistered_at": datetime.now(timezone.utc).isoformat(),
+            },
+        )
 
     def create(self, name: str, **kwargs: Any) -> Any:
-        if name not in self._builders:
-            raise KeyError(f"模型未注册: {name}")
-        return self._builders[name](**kwargs)
+        normalized_name = self._normalize_name(name)
+        if normalized_name not in self._builders:
+            raise KeyError(f"模型未注册: {normalized_name}")
+        return self._builders[normalized_name](**kwargs)
+
+    def get_metadata(self, name: str) -> dict[str, Any]:
+        normalized_name = self._normalize_name(name)
+        if normalized_name not in self._entries:
+            raise KeyError(f"模型未注册: {normalized_name}")
+        return dict(self._entries[normalized_name].metadata)
 
     def list_models(self) -> list[str]:
         return sorted(self._builders.keys())
+
+    def query(
+        self,
+        *,
+        framework: str | None = None,
+        tags: set[str] | list[str] | tuple[str, ...] | None = None,
+    ) -> list[str]:
+        framework_filter = (framework or "").strip().lower()
+        tag_filter = {str(t).strip() for t in (tags or set()) if str(t).strip()}
+
+        names: list[str] = []
+        for name, entry in self._entries.items():
+            item_framework = str(entry.metadata.get("framework", "")).strip().lower()
+            if framework_filter and item_framework != framework_filter:
+                continue
+            if tag_filter and not tag_filter.issubset(entry.tags):
+                continue
+            names.append(name)
+        return sorted(names)
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "count": len(self._entries),
+            "models": [
+                {
+                    "name": entry.name,
+                    "metadata": dict(entry.metadata),
+                    "tags": sorted(entry.tags),
+                    "registered_at": entry.registered_at,
+                    "updated_at": entry.updated_at,
+                }
+                for entry in sorted(self._entries.values(), key=lambda x: x.name)
+            ],
+        }
+
+    def register_event_handler(self, handler: Callable[[dict[str, Any]], None]) -> None:
+        if not callable(handler):
+            raise TypeError("handler 必须是可调用对象")
+        self._events.append(handler)
+
+    def _emit(self, event: str, payload: dict[str, Any]) -> None:
+        item = {
+            "event": event,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "payload": payload,
+        }
+        for handler in list(self._events):
+            try:
+                handler(item)
+            except Exception:
+                # 事件回调不应阻断主流程。
+                continue
 
 
 class ModelVersioning:
