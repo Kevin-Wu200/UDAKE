@@ -78,6 +78,18 @@ type ModelSelectionHistoryEntry = {
     at: number;
 };
 
+type ExplainLayoutMode = 'auto' | 'single' | 'dual';
+type CompareLayoutMode = 'side' | 'stack';
+type TaskTimeFilter = 'all' | '24h' | '7d' | '30d';
+type TaskSortOrder = 'updated_desc' | 'updated_asc' | 'progress_desc';
+
+type TaskViewMeta = {
+    method: ExplainMethod;
+    modelCategory: ExplainModelCategory;
+    modelId: string;
+    createdAt: number;
+};
+
 const EXPLAIN_MODEL_CATEGORIES: Record<ExplainModelCategory, ExplainModelCategoryMeta> = {
     anomaly: {
         label: '异常检测',
@@ -158,6 +170,16 @@ export class SpatiotemporalExplainPanel {
     private interpolationRadius: number = 2.5;
     private confidenceLevel: number = 0.95;
     private fusionPrimaryWeight: number = 0.5;
+    private taskViewMeta: Map<string, TaskViewMeta> = new Map();
+    private taskModelFilter: 'all' | ExplainModelCategory = 'all';
+    private taskTimeFilter: TaskTimeFilter = 'all';
+    private taskSortOrder: TaskSortOrder = 'updated_desc';
+    private taskKeywordFilter: string = '';
+    private advancedFilterOnlyCompleted: boolean = false;
+    private modelSwitchConfirmEnabled: boolean = true;
+    private layoutMode: ExplainLayoutMode = 'auto';
+    private compareLayoutMode: CompareLayoutMode = 'side';
+    private navHistory: string[] = [];
 
     private chartLibPromise: Promise<ChartRuntime | null> | null = null;
     private chartInstances: Map<string, { dispose: () => void; setOption: (option: Record<string, unknown>, options?: { notMerge?: boolean; lazyUpdate?: boolean }) => void; resize: () => void }> = new Map();
@@ -184,11 +206,16 @@ export class SpatiotemporalExplainPanel {
 
         this.render();
         this.initModelSelectorState();
+        this.initPanelPreferences();
         this.initTheme();
         this.bindEvents();
         this.syncModelSelectorUI();
         this.updateMethodSwitch();
         this.updateResultTabs();
+        this.applyLayoutMode();
+        this.applyCompareLayoutMode();
+        this.updateBreadcrumb();
+        this.updateNavHistoryUI();
         this.startAutoRefresh();
         this.startPerformanceMonitor();
         void this.refreshMonitor(true);
@@ -203,6 +230,20 @@ export class SpatiotemporalExplainPanel {
                         <button id="dl-explain-theme-toggle" class="btn btn-secondary explain-theme-toggle" type="button" aria-pressed="false" aria-label="切换暗黑模式">暗黑模式</button>
                     </div>
                     <p>${this.t('explain.panel.subtitle', '提交时空解释任务，查看 LIME / SHAP 可视化与对比分析')}</p>
+                    <nav class="explain-breadcrumb" aria-label="面包屑导航">
+                        <span class="crumb">可解释性</span>
+                        <span class="crumb-sep">/</span>
+                        <span class="crumb">前端面板扩展</span>
+                        <span class="crumb-sep">/</span>
+                        <span id="dl-explain-crumb-current" class="crumb current">任务提交</span>
+                    </nav>
+                    <div class="explain-quick-nav">
+                        <button class="btn btn-secondary btn-xs" type="button" data-nav-target="submit">任务提交</button>
+                        <button class="btn btn-secondary btn-xs" type="button" data-nav-target="task">任务列表</button>
+                        <button class="btn btn-secondary btn-xs" type="button" data-nav-target="result">结果展示</button>
+                        <button class="btn btn-secondary btn-xs" type="button" data-nav-target="back">返回上一步</button>
+                    </div>
+                    <div id="dl-explain-nav-history" class="explain-nav-history muted"></div>
                 </div>
 
                 <div class="explain-method-switch" role="tablist" aria-label="${this.t('explain.method.switchAria', '解释方法切换')}">
@@ -212,7 +253,7 @@ export class SpatiotemporalExplainPanel {
                 </div>
 
                 <div class="explain-layout-grid">
-                    <section class="explain-submit-panel">
+                    <section class="explain-submit-panel" data-section="submit">
                         <h5>${this.t('explain.submit.title', '任务提交')}</h5>
                         <div class="dl-form-grid">
                             <label class="dl-field">
@@ -254,6 +295,10 @@ export class SpatiotemporalExplainPanel {
                         </div>
                         <div id="dl-explain-model-meta" class="model-selector-meta"></div>
                         <div id="dl-explain-model-history" class="model-selector-history"></div>
+                        <label class="checkbox-label explain-switch-confirm">
+                            <input id="dl-explain-switch-confirm" type="checkbox" checked>
+                            模型切换二次确认
+                        </label>
 
                         <label class="dl-field dl-field-full">
                             <span>坐标输入 coords（JSON）</span>
@@ -274,7 +319,7 @@ export class SpatiotemporalExplainPanel {
                         <div id="dl-explain-guide" class="explain-guide">快捷键：<code>Ctrl/Cmd + Enter</code> 提交任务，<code>Ctrl/Cmd + R</code> 刷新任务。</div>
                     </section>
 
-                    <section class="explain-task-panel">
+                    <section class="explain-task-panel" data-section="task">
                         <div class="explain-task-header">
                             <h5>${this.t('explain.task.title', '任务状态')}</h5>
                             <div class="explain-task-tools">
@@ -284,6 +329,30 @@ export class SpatiotemporalExplainPanel {
                                     <option value="shap">SHAP</option>
                                     <option value="hybrid">Hybrid</option>
                                 </select>
+                                <select id="dl-explain-model-filter" class="select" aria-label="按模型类型筛选">
+                                    <option value="all">全部模型类型</option>
+                                    <option value="anomaly">异常检测</option>
+                                    <option value="interpolation">空间插值</option>
+                                    <option value="uncertainty">不确定性</option>
+                                    <option value="fusion">融合模型</option>
+                                    <option value="reinforcement">强化学习</option>
+                                </select>
+                                <select id="dl-explain-time-filter" class="select" aria-label="按时间范围筛选">
+                                    <option value="all">全部时间</option>
+                                    <option value="24h">最近24小时</option>
+                                    <option value="7d">最近7天</option>
+                                    <option value="30d">最近30天</option>
+                                </select>
+                                <select id="dl-explain-sort" class="select" aria-label="筛选结果排序">
+                                    <option value="updated_desc">最近更新时间</option>
+                                    <option value="updated_asc">最早更新时间</option>
+                                    <option value="progress_desc">进度高到低</option>
+                                </select>
+                                <input id="dl-explain-task-search" class="input" type="text" placeholder="任务ID/模型关键字">
+                                <label class="checkbox-label">
+                                    <input id="dl-explain-advanced-completed" type="checkbox">
+                                    仅完成任务
+                                </label>
                                 <label class="checkbox-label">
                                     <input id="dl-explain-auto-refresh" type="checkbox" checked>
                                     自动刷新
@@ -295,7 +364,7 @@ export class SpatiotemporalExplainPanel {
                     </section>
                 </div>
 
-                <section class="explain-result-panel">
+                <section class="explain-result-panel" data-section="result">
                     <div class="explain-result-header">
                         <h5>${this.t('explain.result.title', '解释结果展示')}</h5>
                         <div class="explain-result-tools">
@@ -306,6 +375,15 @@ export class SpatiotemporalExplainPanel {
                                 <button class="btn btn-secondary" type="button" role="tab" aria-selected="false" tabindex="-1" data-result-tab="spatiotemporal">${this.t('explain.result.tab.spatiotemporal', '时空视图')}</button>
                             </div>
                             <div class="explain-export-tools">
+                                <select id="dl-explain-layout-mode" class="select" aria-label="网格布局切换">
+                                    <option value="auto">自适应布局</option>
+                                    <option value="single">单列布局</option>
+                                    <option value="dual">双列布局</option>
+                                </select>
+                                <select id="dl-explain-compare-layout" class="select" aria-label="并排展示模式">
+                                    <option value="side">并排展示</option>
+                                    <option value="stack">堆叠展示</option>
+                                </select>
                                 <select id="dl-explain-export-format" class="select" aria-label="导出格式">
                                     <option value="json">JSON</option>
                                     <option value="csv">CSV</option>
@@ -362,23 +440,65 @@ export class SpatiotemporalExplainPanel {
             this.toggleTheme();
         });
         this.container.querySelector('#dl-explain-model-category')?.addEventListener('change', (event) => {
+            const select = event.target as HTMLSelectElement;
             const category = (event.target as HTMLSelectElement).value as ExplainModelCategory;
             if (!EXPLAIN_MODEL_CATEGORIES[category]) {
+                return;
+            }
+            if (!this.confirmModelSwitch()) {
+                select.value = this.selectedModelCategory;
                 return;
             }
             this.selectedModelCategory = category;
             this.syncModelSelectorUI(true);
             this.renderCurrentResult();
+            this.playSwitchAnimation();
             this.setStatus(`已切换模型类型：${EXPLAIN_MODEL_CATEGORIES[category].label}`, 'success');
         });
-        this.container.querySelector('#dl-explain-model')?.addEventListener('change', () => {
+        this.container.querySelector('#dl-explain-model')?.addEventListener('change', (event) => {
+            if (!this.confirmModelSwitch()) {
+                const select = event.target as HTMLSelectElement;
+                const current = this.getCurrentModelMeta();
+                select.value = current.id;
+                return;
+            }
             this.syncModelSelectorUI(true);
             this.renderCurrentResult();
+            this.playSwitchAnimation();
+        });
+        this.container.querySelector('#dl-explain-switch-confirm')?.addEventListener('change', (event) => {
+            this.modelSwitchConfirmEnabled = (event.target as HTMLInputElement).checked;
+            this.persistPanelPreferences();
         });
 
         this.container.querySelector('#dl-explain-filter')?.addEventListener('change', (event) => {
             const value = (event.target as HTMLSelectElement).value as 'all' | 'lime' | 'shap' | 'hybrid';
             this.filterMethod = value;
+            this.renderedTaskCount = this.taskBatchSize;
+            this.renderTaskList();
+        });
+        this.container.querySelector('#dl-explain-model-filter')?.addEventListener('change', (event) => {
+            this.taskModelFilter = (event.target as HTMLSelectElement).value as 'all' | ExplainModelCategory;
+            this.renderedTaskCount = this.taskBatchSize;
+            this.renderTaskList();
+        });
+        this.container.querySelector('#dl-explain-time-filter')?.addEventListener('change', (event) => {
+            this.taskTimeFilter = (event.target as HTMLSelectElement).value as TaskTimeFilter;
+            this.renderedTaskCount = this.taskBatchSize;
+            this.renderTaskList();
+        });
+        this.container.querySelector('#dl-explain-sort')?.addEventListener('change', (event) => {
+            this.taskSortOrder = (event.target as HTMLSelectElement).value as TaskSortOrder;
+            this.renderTaskList();
+        });
+        this.container.querySelector('#dl-explain-task-search')?.addEventListener('input', this.createDebounced(() => {
+            const input = this.container.querySelector<HTMLInputElement>('#dl-explain-task-search');
+            this.taskKeywordFilter = String(input?.value || '').trim().toLowerCase();
+            this.renderedTaskCount = this.taskBatchSize;
+            this.renderTaskList();
+        }, 120));
+        this.container.querySelector('#dl-explain-advanced-completed')?.addEventListener('change', (event) => {
+            this.advancedFilterOnlyCompleted = (event.target as HTMLInputElement).checked;
             this.renderedTaskCount = this.taskBatchSize;
             this.renderTaskList();
         });
@@ -398,11 +518,31 @@ export class SpatiotemporalExplainPanel {
                 this.selectedResultTabIndex = ['lime', 'shap', 'compare', 'spatiotemporal'].indexOf(this.activeTab);
                 this.updateResultTabs();
                 this.renderCurrentResult();
+                this.updateBreadcrumb();
             });
+        });
+        this.container.querySelector('#dl-explain-layout-mode')?.addEventListener('change', (event) => {
+            this.layoutMode = (event.target as HTMLSelectElement).value as ExplainLayoutMode;
+            this.applyLayoutMode();
+            this.persistPanelPreferences();
+        });
+        this.container.querySelector('#dl-explain-compare-layout')?.addEventListener('change', (event) => {
+            this.compareLayoutMode = (event.target as HTMLSelectElement).value as CompareLayoutMode;
+            this.applyCompareLayoutMode();
+            this.persistPanelPreferences();
+            if (this.activeTab === 'compare') {
+                this.renderCurrentResult();
+            }
         });
 
         this.container.addEventListener('click', (event) => {
             const target = event.target as HTMLElement;
+            const navButton = target.closest<HTMLButtonElement>('[data-nav-target]');
+            if (navButton) {
+                const navTarget = navButton.dataset.navTarget || '';
+                this.navigateToSection(navTarget);
+                return;
+            }
             const detailTrigger = target.closest<HTMLButtonElement>('[data-reason-detail]');
             if (detailTrigger) {
                 const payload = detailTrigger.dataset.reasonDetail || '';
@@ -428,6 +568,7 @@ export class SpatiotemporalExplainPanel {
                     }
                     this.syncModelSelectorUI(true);
                     this.renderCurrentResult();
+                    this.playSwitchAnimation();
                 }
                 return;
             }
@@ -550,6 +691,181 @@ export class SpatiotemporalExplainPanel {
                 .slice(0, 8);
         } catch {
             this.modelSelectionHistory = [];
+        }
+    }
+
+    private initPanelPreferences(): void {
+        try {
+            const stored = window.localStorage.getItem('dl-explain-panel-preferences');
+            if (!stored) {
+                return;
+            }
+            const pref = JSON.parse(stored) as Record<string, unknown>;
+            if (pref.switchConfirm === false) {
+                this.modelSwitchConfirmEnabled = false;
+            }
+            if (pref.layoutMode === 'auto' || pref.layoutMode === 'single' || pref.layoutMode === 'dual') {
+                this.layoutMode = pref.layoutMode;
+            }
+            if (pref.compareLayoutMode === 'side' || pref.compareLayoutMode === 'stack') {
+                this.compareLayoutMode = pref.compareLayoutMode;
+            }
+        } catch {
+            // 忽略偏好读取失败
+        }
+        const switchConfirm = this.container.querySelector('#dl-explain-switch-confirm') as HTMLInputElement | null;
+        if (switchConfirm) {
+            switchConfirm.checked = this.modelSwitchConfirmEnabled;
+        }
+        const layoutSelect = this.container.querySelector('#dl-explain-layout-mode') as HTMLSelectElement | null;
+        if (layoutSelect) {
+            layoutSelect.value = this.layoutMode;
+        }
+        const compareSelect = this.container.querySelector('#dl-explain-compare-layout') as HTMLSelectElement | null;
+        if (compareSelect) {
+            compareSelect.value = this.compareLayoutMode;
+        }
+    }
+
+    private persistPanelPreferences(): void {
+        try {
+            window.localStorage.setItem('dl-explain-panel-preferences', JSON.stringify({
+                switchConfirm: this.modelSwitchConfirmEnabled,
+                layoutMode: this.layoutMode,
+                compareLayoutMode: this.compareLayoutMode
+            }));
+        } catch {
+            // 忽略存储失败
+        }
+    }
+
+    private applyLayoutMode(): void {
+        const panel = this.container.querySelector('.explain-panel');
+        if (!panel) {
+            return;
+        }
+        panel.classList.remove('result-layout-auto', 'result-layout-single', 'result-layout-dual');
+        panel.classList.add(`result-layout-${this.layoutMode}`);
+        const layoutSelect = this.container.querySelector('#dl-explain-layout-mode') as HTMLSelectElement | null;
+        if (layoutSelect) {
+            layoutSelect.value = this.layoutMode;
+        }
+    }
+
+    private applyCompareLayoutMode(): void {
+        const panel = this.container.querySelector('.explain-panel');
+        if (!panel) {
+            return;
+        }
+        panel.classList.remove('compare-layout-side', 'compare-layout-stack');
+        panel.classList.add(`compare-layout-${this.compareLayoutMode}`);
+        const compareSelect = this.container.querySelector('#dl-explain-compare-layout') as HTMLSelectElement | null;
+        if (compareSelect) {
+            compareSelect.value = this.compareLayoutMode;
+        }
+    }
+
+    private confirmModelSwitch(): boolean {
+        if (!this.modelSwitchConfirmEnabled) {
+            return true;
+        }
+        if (!this.currentTaskId) {
+            return true;
+        }
+        const currentTask = this.getCurrentTask();
+        if (!currentTask || currentTask.status !== 'completed') {
+            return true;
+        }
+        if (typeof window.confirm !== 'function') {
+            return true;
+        }
+        try {
+            return window.confirm('切换模型后将保留当前输入与任务列表，但会切换解释页面上下文，确认继续？');
+        } catch {
+            return true;
+        }
+    }
+
+    private playSwitchAnimation(): void {
+        const panel = this.container.querySelector('.explain-panel');
+        if (!panel) {
+            return;
+        }
+        panel.classList.remove('switch-animating');
+        // 强制回流，确保重复切换时动画可重触发
+        void panel.getBoundingClientRect();
+        panel.classList.add('switch-animating');
+        window.setTimeout(() => {
+            panel.classList.remove('switch-animating');
+        }, 260);
+    }
+
+    private updateBreadcrumb(): void {
+        const crumb = this.container.querySelector('#dl-explain-crumb-current') as HTMLElement | null;
+        if (!crumb) {
+            return;
+        }
+        if (!this.currentTaskId) {
+            crumb.textContent = '任务提交';
+            return;
+        }
+        const section = this.activeTab === 'lime'
+            ? 'LIME 结果'
+            : this.activeTab === 'shap'
+                ? 'SHAP 结果'
+                : this.activeTab === 'compare'
+                    ? '模型对比'
+                    : '时空视图';
+        crumb.textContent = section;
+    }
+
+    private updateNavHistoryUI(): void {
+        const historyEl = this.container.querySelector('#dl-explain-nav-history') as HTMLElement | null;
+        if (!historyEl) {
+            return;
+        }
+        if (!this.navHistory.length) {
+            historyEl.textContent = '访问历史：暂无';
+            return;
+        }
+        historyEl.textContent = `访问历史：${this.navHistory.slice(-4).join(' -> ')}`;
+    }
+
+    private navigateToSection(target: string): void {
+        if (target === 'back') {
+            if (this.navHistory.length <= 1) {
+                this.setStatus('暂无可返回的导航历史', 'warning');
+                return;
+            }
+            this.navHistory.pop();
+            const prev = this.navHistory.pop() || '';
+            if (!prev) {
+                return;
+            }
+            this.navigateToSection(prev);
+            return;
+        }
+        const sectionEl = this.container.querySelector(`[data-section="${target}"]`) as HTMLElement | null;
+        if (!sectionEl) {
+            return;
+        }
+        this.navHistory.push(target);
+        this.updateNavHistoryUI();
+        if (typeof sectionEl.scrollIntoView === 'function') {
+            sectionEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+        if (target === 'result') {
+            this.updateBreadcrumb();
+        } else if (target === 'task') {
+            const crumb = this.container.querySelector('#dl-explain-crumb-current') as HTMLElement | null;
+            if (crumb) {
+                crumb.textContent = '任务状态';
+            }
+        } else {
+            const crumb = this.container.querySelector('#dl-explain-crumb-current') as HTMLElement | null;
+            if (crumb) {
+                crumb.textContent = '任务提交';
+            }
         }
     }
 
@@ -720,8 +1036,15 @@ export class SpatiotemporalExplainPanel {
             });
 
             this.currentTaskId = String(created.task_id);
+            this.taskViewMeta.set(this.currentTaskId, {
+                method: this.selectedMethod,
+                modelCategory: this.selectedModelCategory,
+                modelId: selectedModel.id,
+                createdAt: Date.now()
+            });
             this.recordModelSelectionHistory(this.selectedModelCategory, selectedModel);
             this.syncModelSelectorUI();
+            this.playSwitchAnimation();
             this.setStatus(`任务提交成功：${created.task_id}`, 'success');
             await this.refreshTaskById(String(created.task_id), true);
             await this.refreshMonitor(true);
@@ -770,10 +1093,66 @@ export class SpatiotemporalExplainPanel {
 
     private sortTasks(): void {
         this.tasks.sort((a, b) => {
-            const timeA = new Date(a.updated_at || a.created_at || 0).getTime();
-            const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
+            const timeA = this.getTaskTimestamp(a);
+            const timeB = this.getTaskTimestamp(b);
             return timeB - timeA;
         });
+    }
+
+    private getTaskTimestamp(task: ExplainTask): number {
+        return new Date(task.updated_at || task.created_at || 0).getTime();
+    }
+
+    private getTaskMeta(task: ExplainTask): TaskViewMeta | null {
+        return this.taskViewMeta.get(task.task_id) || null;
+    }
+
+    private passesTaskAdvancedFilter(task: ExplainTask): boolean {
+        const meta = this.getTaskMeta(task);
+        if (this.filterMethod !== 'all' && this.detectMethodFromTask(task) !== this.filterMethod) {
+            return false;
+        }
+        if (this.taskModelFilter !== 'all') {
+            if (!meta || meta.modelCategory !== this.taskModelFilter) {
+                return false;
+            }
+        }
+        if (this.advancedFilterOnlyCompleted && task.status !== 'completed') {
+            return false;
+        }
+        if (this.taskTimeFilter !== 'all') {
+            const now = Date.now();
+            const ageMs = now - this.getTaskTimestamp(task);
+            const limitMs = this.taskTimeFilter === '24h'
+                ? 24 * 60 * 60 * 1000
+                : this.taskTimeFilter === '7d'
+                    ? 7 * 24 * 60 * 60 * 1000
+                    : 30 * 24 * 60 * 60 * 1000;
+            if (!Number.isFinite(ageMs) || ageMs > limitMs) {
+                return false;
+            }
+        }
+        if (this.taskKeywordFilter) {
+            const text = `${task.task_id} ${(meta?.modelId || '')} ${EXPLAIN_MODEL_CATEGORIES[meta?.modelCategory || 'anomaly'].label}`.toLowerCase();
+            if (!text.includes(this.taskKeywordFilter)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private sortTaskRows(tasks: ExplainTask[]): ExplainTask[] {
+        const rows = [...tasks];
+        if (this.taskSortOrder === 'updated_asc') {
+            rows.sort((a, b) => this.getTaskTimestamp(a) - this.getTaskTimestamp(b));
+            return rows;
+        }
+        if (this.taskSortOrder === 'progress_desc') {
+            rows.sort((a, b) => this.progressPercent(b) - this.progressPercent(a));
+            return rows;
+        }
+        rows.sort((a, b) => this.getTaskTimestamp(b) - this.getTaskTimestamp(a));
+        return rows;
     }
 
     private statusIcon(status: ExplainStatus): string {
@@ -844,9 +1223,7 @@ export class SpatiotemporalExplainPanel {
             return;
         }
 
-        const filtered = this.filterMethod === 'all'
-            ? this.tasks
-            : this.tasks.filter(task => this.detectMethodFromTask(task) === this.filterMethod);
+        const filtered = this.sortTaskRows(this.tasks.filter((task) => this.passesTaskAdvancedFilter(task)));
 
         if (filtered.length === 0) {
             list.innerHTML = `<div class="status-message">${this.t('explain.status.noTask', '暂无任务')}</div>`;
@@ -864,6 +1241,7 @@ export class SpatiotemporalExplainPanel {
                         <span class="task-id" title="${task.task_id}">${task.task_id.slice(0, 12)}...</span>
                         <span class="task-method">${method}</span>
                         <span class="task-status">${this.statusLabel(task.status)}</span>
+                        <span class="task-model-tag">${this.getTaskMeta(task)?.modelId || 'unknown'}</span>
                     </div>
                     <div class="explain-task-progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${progress}">
                         <div class="explain-task-progress-fill" style="width:${progress}%"></div>
@@ -974,6 +1352,7 @@ export class SpatiotemporalExplainPanel {
         await this.refreshTaskById(taskId, true);
         this.renderTaskList();
         this.renderCurrentResult();
+        this.updateBreadcrumb();
     }
 
     private async cancelTask(taskId: string): Promise<void> {
@@ -995,6 +1374,7 @@ export class SpatiotemporalExplainPanel {
                 this.currentTaskId = this.tasks[0]?.task_id || null;
             }
             this.taskCache.delete(taskId);
+            this.taskViewMeta.delete(taskId);
             this.renderTaskList();
             this.renderCurrentResult();
             await this.refreshMonitor(true);
@@ -1197,7 +1577,7 @@ export class SpatiotemporalExplainPanel {
                         <label>阈值：<strong>${this.anomalyThreshold.toFixed(2)}</strong></label>
                         <input id="dl-model-anomaly-threshold" type="range" min="0.1" max="0.99" step="0.01" value="${this.anomalyThreshold.toFixed(2)}">
                         <p>高亮异常点：${highlighted.length} / ${rows.length}</p>
-                        <div class="simple-badge-list">${highlighted.slice(0, 12).map((item) => `<span class="badge danger">#${item.nodeIndex}(${item.score.toFixed(2)})</span>`).join('') || '<span class="muted">暂无高亮异常点</span>'}</div>
+                        <div class="simple-badge-list">${highlighted.slice(0, 12).map((item) => `<span class="badge danger">#${item.node}(${item.score.toFixed(2)})</span>`).join('') || '<span class="muted">暂无高亮异常点</span>'}</div>
                     </section>
                     <section class="result-card">
                         <h6>LIME 特征重要性排序</h6>
@@ -2414,12 +2794,25 @@ export class SpatiotemporalExplainPanel {
         if (!compared.length) {
             return '<div class="status-message">需要 Hybrid 或至少两个方法结果才能对比。</div>';
         }
+        const meanDiff = compared.reduce((acc, item) => acc + item.diff, 0) / Math.max(1, compared.length);
+        const maxDiff = Math.max(...compared.map((item) => item.diff), 0);
+        const highlightCount = compared.filter((item) => item.diff > 0.15).length;
+        const compareClass = this.compareLayoutMode === 'side' ? 'compare-dual-columns' : 'compare-stack-columns';
 
         return `
             <div class="explain-result-grid">
                 <section class="result-card full-width">
+                    <h6>对比指标摘要</h6>
+                    <div class="summary-card compare-metrics">
+                        <p>平均绝对差异：${meanDiff.toFixed(4)}</p>
+                        <p>最大差异：${maxDiff.toFixed(4)}</p>
+                        <p>差异高亮数量：${highlightCount}/${compared.length}</p>
+                        <p>展示模式：${this.compareLayoutMode === 'side' ? '并排' : '堆叠'}</p>
+                    </div>
+                </section>
+                <section class="result-card full-width">
                     <h6>LIME vs SHAP 特征重要性对比图</h6>
-                    <div class="compare-chart-list">
+                    <div class="compare-chart-list ${compareClass}">
                         ${compared.map((row) => {
                             const maxVal = Math.max(1e-6, Math.max(Math.abs(row.lime), Math.abs(row.shap)));
                             const limePct = Math.round((Math.abs(row.lime) / maxVal) * 100);
@@ -2816,6 +3209,7 @@ export class SpatiotemporalExplainPanel {
         this.activeTab = tabs[this.selectedResultTabIndex];
         this.updateResultTabs();
         this.renderCurrentResult();
+        this.updateBreadcrumb();
         const activeButton = this.container.querySelector<HTMLButtonElement>(`[data-result-tab="${this.activeTab}"]`);
         activeButton?.focus();
     }

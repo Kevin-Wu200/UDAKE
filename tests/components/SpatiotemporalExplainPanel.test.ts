@@ -978,4 +978,63 @@ describe('SpatiotemporalExplainPanel', () => {
 
         panel.destroy();
     });
+
+    it('应支持高级筛选（模型类型/完成状态/排序）', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        (panel as any).tasks = [
+            { task_id: 'a-1', status: 'completed', progress: 0.2, updated_at: '2026-04-12T10:00:00Z', result: { method: 'lime' } },
+            { task_id: 'b-1', status: 'running', progress: 0.9, updated_at: '2026-04-12T11:00:00Z', result: { method: 'hybrid' } },
+            { task_id: 'c-1', status: 'completed', progress: 0.7, updated_at: '2026-04-10T11:00:00Z', result: { method: 'shap' } }
+        ];
+        (panel as any).taskViewMeta.set('a-1', { method: 'lime', modelCategory: 'fusion', modelId: 'stacking', createdAt: Date.now() });
+        (panel as any).taskViewMeta.set('b-1', { method: 'hybrid', modelCategory: 'anomaly', modelId: 'vae', createdAt: Date.now() });
+        (panel as any).taskViewMeta.set('c-1', { method: 'shap', modelCategory: 'fusion', modelId: 'adaptive_fusion', createdAt: Date.now() });
+        (panel as any).renderedTaskCount = 20;
+        (panel as any).renderTaskList();
+
+        const modelFilter = host.querySelector('#dl-explain-model-filter') as HTMLSelectElement;
+        modelFilter.value = 'fusion';
+        modelFilter.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushPromises();
+        expect(host.querySelectorAll('.explain-task-item').length).toBe(2);
+
+        const onlyCompleted = host.querySelector('#dl-explain-advanced-completed') as HTMLInputElement;
+        onlyCompleted.checked = true;
+        onlyCompleted.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushPromises();
+        expect(host.querySelectorAll('.explain-task-item').length).toBe(2);
+
+        const sort = host.querySelector('#dl-explain-sort') as HTMLSelectElement;
+        sort.value = 'progress_desc';
+        sort.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushPromises();
+        expect(host.querySelector('.explain-task-item .task-id')?.textContent).toContain('c-1');
+
+        panel.destroy();
+    });
+
+    it('应支持布局与切换确认偏好持久化', async () => {
+        const api = createApiMock();
+        api.getSpatiotemporalExplainMonitor.mockResolvedValue({});
+        const panel = new SpatiotemporalExplainPanel(host, api as any);
+
+        const layout = host.querySelector('#dl-explain-layout-mode') as HTMLSelectElement;
+        layout.value = 'single';
+        layout.dispatchEvent(new Event('change', { bubbles: true }));
+        const compareLayout = host.querySelector('#dl-explain-compare-layout') as HTMLSelectElement;
+        compareLayout.value = 'stack';
+        compareLayout.dispatchEvent(new Event('change', { bubbles: true }));
+        const switchConfirm = host.querySelector('#dl-explain-switch-confirm') as HTMLInputElement;
+        switchConfirm.checked = false;
+        switchConfirm.dispatchEvent(new Event('change', { bubbles: true }));
+
+        expect(host.querySelector('.explain-panel')?.classList.contains('result-layout-single')).toBe(true);
+        expect(host.querySelector('.explain-panel')?.classList.contains('compare-layout-stack')).toBe(true);
+        expect(window.localStorage.getItem('dl-explain-panel-preferences')).toContain('"switchConfirm":false');
+
+        panel.destroy();
+    });
 });
