@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from collections import Counter, OrderedDict
 import csv
 from contextlib import contextmanager
 from copy import deepcopy
@@ -450,6 +451,9 @@ class FrameworkErrorCode(StrEnum):
     ADAPTER_LOAD_FAILED = "FWK_2001"
     ADAPTER_CREATE_FAILED = "FWK_2002"
     DATA_VALIDATE_FAILED = "FWK_3001"
+    METADATA_VALIDATE_FAILED = "FWK_4001"
+    METADATA_SYNC_FAILED = "FWK_4002"
+    LOG_CONFIG_FAILED = "FWK_5001"
     EXECUTION_FAILED = "FWK_9001"
 
 
@@ -858,6 +862,9 @@ class UnifiedErrorHandler:
             ("FWK_2001", "适配器加载失败", "检查模块路径和导入依赖"),
             ("FWK_2002", "适配器创建失败", "检查构造参数"),
             ("FWK_3001", "数据校验失败", "检查输入数据范围"),
+            ("FWK_4001", "元数据校验失败", "检查必填字段和字段类型"),
+            ("FWK_4002", "元数据同步失败", "检查同步源和冲突策略"),
+            ("FWK_5001", "日志配置失败", "检查日志级别和格式化配置"),
             ("FWK_9001", "执行失败", "检查运行时依赖和状态"),
         ]
         lines = [
@@ -932,3 +939,674 @@ class UnifiedErrorHandler:
                 callback(event)
             except Exception:
                 logger.exception("错误通知回调执行失败: %s", event.event_id)
+
+
+@dataclass(frozen=True)
+class AdapterFactoryRegistration:
+    key: str
+    adapter_cls: type[UnifiedAdapterBase]
+    singleton: bool = False
+    cacheable: bool = True
+    default_kwargs: dict[str, Any] = field(default_factory=dict)
+    validator: Callable[[dict[str, Any]], tuple[bool, str]] | None = None
+
+
+@dataclass
+class AdapterFactoryLifecycle:
+    instance_id: str
+    key: str
+    created_at: str
+    updated_at: str
+    status: str
+    source: str
+    hit_count: int = 0
+
+
+class UnifiedAdapterFactory:
+    """适配器工厂：注册、创建、缓存、单例与生命周期管理。"""
+
+    def __init__(self, *, max_cache_size: int = 64) -> None:
+        self.max_cache_size = max(1, int(max_cache_size))
+        self._registry: dict[str, AdapterFactoryRegistration] = {}
+        self._instance_cache: "OrderedDict[str, UnifiedAdapterBase]" = OrderedDict()
+        self._singletons: dict[str, UnifiedAdapterBase] = {}
+        self._lifecycle: dict[str, AdapterFactoryLifecycle] = {}
+        self._lock = RLock()
+
+    def register(
+        self,
+        key: str,
+        adapter_cls: type[UnifiedAdapterBase],
+        *,
+        singleton: bool = False,
+        cacheable: bool = True,
+        default_kwargs: dict[str, Any] | None = None,
+        validator: Callable[[dict[str, Any]], tuple[bool, str]] | None = None,
+    ) -> None:
+        normalized_key = self._normalize_key(key)
+        if not inspect.isclass(adapter_cls) or not issubclass(adapter_cls, UnifiedAdapterBase):
+            raise UnifiedAdapterError(
+                f"适配器类型非法: {adapter_cls}",
+                code=FrameworkErrorCode.ADAPTER_LOAD_FAILED,
+                context={"key": normalized_key},
+            )
+        with self._lock:
+            self._registry[normalized_key] = AdapterFactoryRegistration(
+                key=normalized_key,
+                adapter_cls=adapter_cls,
+                singleton=bool(singleton),
+                cacheable=bool(cacheable),
+                default_kwargs=dict(default_kwargs or {}),
+                validator=validator,
+            )
+
+    def unregister(self, key: str) -> None:
+        normalized_key = self._normalize_key(key)
+        with self._lock:
+            self.release(normalized_key)
+            self._registry.pop(normalized_key, None)
+
+    def create(
+        self,
+        key: str,
+        *,
+        singleton: bool | None = None,
+        use_cache: bool = True,
+        **kwargs: Any,
+    ) -> UnifiedAdapterBase:
+        normalized_key = self._normalize_key(key)
+        with self._lock:
+            registration = self._registry.get(normalized_key)
+            if registration is None:
+                raise UnifiedAdapterError(
+                    f"适配器未注册: {normalized_key}",
+                    code=FrameworkErrorCode.ADAPTER_LOAD_FAILED,
+                    context={"key": normalized_key},
+                )
+
+            params = dict(registration.default_kwargs)
+            params.update(kwargs)
+            self._validate_create_params(registration, params)
+
+            use_singleton = registration.singleton if singleton is None else bool(singleton)
+            if use_singleton and normalized_key in self._singletons:
+                instance = self._singletons[normalized_key]
+                self._touch_lifecycle(instance, source="singleton")
+                return instance
+
+            cache_key = self._build_cache_key(normalized_key, params)
+            if use_cache and registration.cacheable and cache_key in self._instance_cache:
+                instance = self._instance_cache[cache_key]
+                self._instance_cache.move_to_end(cache_key)
+                self._touch_lifecycle(instance, source="cache")
+                return instance
+
+            try:
+                instance = registration.adapter_cls(**params)
+                self._invoke_on_create(instance)
+            except Exception as exc:
+                raise UnifiedAdapterError(
+                    "适配器创建失败",
+                    code=FrameworkErrorCode.ADAPTER_CREATE_FAILED,
+                    context={"key": normalized_key, "params": params},
+                    recoverable=True,
+                ) from exc
+
+            self._record_lifecycle(instance, key=normalized_key, source="create")
+            if use_singleton:
+                self._singletons[normalized_key] = instance
+            elif use_cache and registration.cacheable:
+                self._cache_instance(cache_key, instance)
+            return instance
+
+    def release(self, key: str, *, instance: UnifiedAdapterBase | None = None) -> int:
+        """释放单个适配器键关联实例，或释放给定实例。"""
+        normalized_key = self._normalize_key(key)
+        released: list[UnifiedAdapterBase] = []
+        with self._lock:
+            if instance is not None:
+                released.append(instance)
+            else:
+                if normalized_key in self._singletons:
+                    released.append(self._singletons.pop(normalized_key))
+                for cache_key in [k for k in self._instance_cache if k.startswith(f"{normalized_key}::")]:
+                    released.append(self._instance_cache.pop(cache_key))
+            for obj in released:
+                self._invoke_on_destroy(obj)
+                self._mark_lifecycle_destroyed(obj)
+        return len(released)
+
+    def shutdown(self) -> int:
+        """释放所有实例。"""
+        released = 0
+        with self._lock:
+            for instance in list(self._singletons.values()):
+                self._invoke_on_destroy(instance)
+                self._mark_lifecycle_destroyed(instance)
+                released += 1
+            self._singletons.clear()
+            for instance in list(self._instance_cache.values()):
+                self._invoke_on_destroy(instance)
+                self._mark_lifecycle_destroyed(instance)
+                released += 1
+            self._instance_cache.clear()
+        return released
+
+    def status(self) -> dict[str, Any]:
+        with self._lock:
+            return {
+                "registered": sorted(self._registry.keys()),
+                "singletons": sorted(self._singletons.keys()),
+                "cache_size": len(self._instance_cache),
+                "lifecycle": [asdict(item) for item in self._lifecycle.values()],
+            }
+
+    @staticmethod
+    def _normalize_key(key: str) -> str:
+        normalized = str(key).strip()
+        if not normalized:
+            raise UnifiedAdapterError(
+                "适配器 key 不能为空",
+                code=FrameworkErrorCode.ADAPTER_CREATE_FAILED,
+                recoverable=True,
+            )
+        return normalized
+
+    def _validate_create_params(self, registration: AdapterFactoryRegistration, params: dict[str, Any]) -> None:
+        cls = registration.adapter_cls
+        signature = inspect.signature(cls.__init__)
+        parameters = [item for name, item in signature.parameters.items() if name != "self"]
+        accepts_kwargs = any(item.kind == inspect.Parameter.VAR_KEYWORD for item in parameters)
+        accepted_names = {item.name for item in parameters}
+        required = {
+            item.name
+            for item in parameters
+            if item.default is inspect._empty
+            and item.kind
+            in {
+                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                inspect.Parameter.KEYWORD_ONLY,
+            }
+        }
+        missing = sorted(name for name in required if name not in params)
+        unknown = sorted(name for name in params if name not in accepted_names) if not accepts_kwargs else []
+        if missing or unknown:
+            raise UnifiedAdapterError(
+                "创建参数校验失败",
+                code=FrameworkErrorCode.ADAPTER_CREATE_FAILED,
+                context={"missing": missing, "unknown": unknown, "key": registration.key},
+                recoverable=True,
+            )
+        if registration.validator is not None:
+            ok, reason = registration.validator(dict(params))
+            if not ok:
+                raise UnifiedAdapterError(
+                    f"创建参数校验失败: {reason}",
+                    code=FrameworkErrorCode.ADAPTER_CREATE_FAILED,
+                    context={"key": registration.key, "params": params},
+                    recoverable=True,
+                )
+
+    @staticmethod
+    def _build_cache_key(key: str, params: dict[str, Any]) -> str:
+        payload = json.dumps(params, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
+        digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()
+        return f"{key}::{digest}"
+
+    def _cache_instance(self, cache_key: str, instance: UnifiedAdapterBase) -> None:
+        self._instance_cache[cache_key] = instance
+        self._instance_cache.move_to_end(cache_key)
+        while len(self._instance_cache) > self.max_cache_size:
+            _, evicted = self._instance_cache.popitem(last=False)
+            self._invoke_on_destroy(evicted)
+            self._mark_lifecycle_destroyed(evicted)
+
+    def _record_lifecycle(self, instance: UnifiedAdapterBase, *, key: str, source: str) -> None:
+        now = datetime.now(timezone.utc).isoformat()
+        item = AdapterFactoryLifecycle(
+            instance_id=self._instance_id(instance),
+            key=key,
+            created_at=now,
+            updated_at=now,
+            status="active",
+            source=source,
+            hit_count=0,
+        )
+        self._lifecycle[item.instance_id] = item
+
+    def _touch_lifecycle(self, instance: UnifiedAdapterBase, *, source: str) -> None:
+        ident = self._instance_id(instance)
+        item = self._lifecycle.get(ident)
+        if item is None:
+            self._record_lifecycle(instance, key="unknown", source=source)
+            return
+        item.updated_at = datetime.now(timezone.utc).isoformat()
+        item.hit_count += 1
+        item.source = source
+
+    def _mark_lifecycle_destroyed(self, instance: UnifiedAdapterBase) -> None:
+        ident = self._instance_id(instance)
+        item = self._lifecycle.get(ident)
+        if item is None:
+            return
+        item.status = "destroyed"
+        item.updated_at = datetime.now(timezone.utc).isoformat()
+
+    @staticmethod
+    def _instance_id(instance: UnifiedAdapterBase) -> str:
+        return hex(id(instance))
+
+    @staticmethod
+    def _invoke_on_create(instance: UnifiedAdapterBase) -> None:
+        callback = getattr(instance, "on_create", None)
+        if callable(callback):
+            callback()
+
+    @staticmethod
+    def _invoke_on_destroy(instance: UnifiedAdapterBase) -> None:
+        for name in ("on_destroy", "close", "stop"):
+            callback = getattr(instance, name, None)
+            if callable(callback):
+                callback()
+                return
+
+
+@dataclass
+class ModelMetadataRecord:
+    record_id: str
+    model_name: str
+    model_type: str
+    framework: str
+    version: str
+    tags: list[str] = field(default_factory=list)
+    status: str = "active"
+    checksum: str = ""
+    created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    updated_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    extra: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ModelMetadataVersion:
+    record_id: str
+    revision: int
+    checksum: str
+    created_at: str
+    note: str
+    snapshot: dict[str, Any]
+
+
+class ModelMetadataStore:
+    """模型元数据管理：字段规范、持久化、查询、版本、同步与导出。"""
+
+    def __init__(self, *, store_path: str | Path) -> None:
+        self.store_path = Path(store_path)
+        self._lock = RLock()
+        self._records: dict[str, ModelMetadataRecord] = {}
+        self._history: dict[str, list[ModelMetadataVersion]] = {}
+        self._load()
+
+    @staticmethod
+    def field_spec() -> dict[str, str]:
+        return {
+            "record_id": "唯一标识，默认 model_name:version",
+            "model_name": "模型名称，必填",
+            "model_type": "模型类型，必填",
+            "framework": "训练框架，必填",
+            "version": "版本号，必填",
+            "tags": "标签列表，可选",
+            "status": "状态，如 active/deprecated",
+            "checksum": "元数据快照校验和",
+            "created_at": "首次创建时间(UTC ISO8601)",
+            "updated_at": "最近更新时间(UTC ISO8601)",
+            "extra": "扩展字段对象",
+        }
+
+    def upsert(self, payload: dict[str, Any], *, note: str = "upsert", persist: bool = True) -> dict[str, Any]:
+        with self._lock:
+            record = self._normalize_record(payload)
+            previous = self._records.get(record.record_id)
+            if previous is not None:
+                record.created_at = previous.created_at
+            self._records[record.record_id] = record
+            self._record_version(record, note=note)
+            if persist:
+                self._persist()
+            return asdict(record)
+
+    def get(self, record_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            item = self._records.get(str(record_id))
+            return asdict(item) if item is not None else None
+
+    def query(
+        self,
+        *,
+        model_name: str | None = None,
+        model_type: str | None = None,
+        framework: str | None = None,
+        tags: set[str] | list[str] | tuple[str, ...] | None = None,
+        status: str | None = None,
+    ) -> list[dict[str, Any]]:
+        with self._lock:
+            name_kw = str(model_name or "").strip().lower()
+            type_kw = str(model_type or "").strip().lower()
+            framework_kw = str(framework or "").strip().lower()
+            status_kw = str(status or "").strip().lower()
+            tag_filter = {str(tag).strip().lower() for tag in (tags or set()) if str(tag).strip()}
+            result: list[dict[str, Any]] = []
+            for item in self._records.values():
+                if name_kw and name_kw not in item.model_name.lower():
+                    continue
+                if type_kw and type_kw != item.model_type.lower():
+                    continue
+                if framework_kw and framework_kw != item.framework.lower():
+                    continue
+                if status_kw and status_kw != item.status.lower():
+                    continue
+                item_tags = {str(tag).lower() for tag in item.tags}
+                if tag_filter and not tag_filter.issubset(item_tags):
+                    continue
+                result.append(asdict(item))
+            result.sort(key=lambda x: (x["model_name"], x["version"], x["record_id"]))
+            return result
+
+    def versions(self, record_id: str) -> list[dict[str, Any]]:
+        with self._lock:
+            history = self._history.get(str(record_id), [])
+            return [asdict(item) for item in history]
+
+    def sync_from(self, source: ModelMetadataStore | Iterable[dict[str, Any]], *, note: str = "sync") -> dict[str, int]:
+        with self._lock:
+            if isinstance(source, ModelMetadataStore):
+                source_items = source.query()
+            else:
+                source_items = [dict(item) for item in source]
+            inserted = 0
+            updated = 0
+            for item in source_items:
+                normalized = self._normalize_record(item)
+                existed = normalized.record_id in self._records
+                self._records[normalized.record_id] = normalized
+                self._record_version(normalized, note=note)
+                if existed:
+                    updated += 1
+                else:
+                    inserted += 1
+            self._persist()
+            return {"inserted": inserted, "updated": updated}
+
+    def export(self, target_path: str | Path) -> Path:
+        with self._lock:
+            path = Path(target_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            rows = [asdict(item) for item in self._records.values()]
+            suffix = path.suffix.lower()
+            if suffix == ".csv":
+                keys = [
+                    "record_id",
+                    "model_name",
+                    "model_type",
+                    "framework",
+                    "version",
+                    "status",
+                    "checksum",
+                    "created_at",
+                    "updated_at",
+                    "tags",
+                    "extra",
+                ]
+                with path.open("w", encoding="utf-8", newline="") as fp:
+                    writer = csv.DictWriter(fp, fieldnames=keys)
+                    writer.writeheader()
+                    for row in rows:
+                        writer.writerow(
+                            {
+                                **row,
+                                "tags": ",".join(row.get("tags", [])),
+                                "extra": json.dumps(row.get("extra", {}), ensure_ascii=False, sort_keys=True),
+                            }
+                        )
+            else:
+                path.write_text(json.dumps(rows, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+            return path
+
+    def _normalize_record(self, payload: dict[str, Any]) -> ModelMetadataRecord:
+        model_name = str(payload.get("model_name", "")).strip()
+        model_type = str(payload.get("model_type", "")).strip()
+        framework_name = str(payload.get("framework", "")).strip()
+        version = str(payload.get("version", "")).strip()
+        if not all([model_name, model_type, framework_name, version]):
+            raise UnifiedFrameworkError(
+                "元数据缺少必填字段",
+                code=FrameworkErrorCode.METADATA_VALIDATE_FAILED,
+                context={"payload_keys": sorted(payload.keys())},
+                recoverable=True,
+            )
+        record_id = str(payload.get("record_id") or f"{model_name}:{version}")
+        status = str(payload.get("status") or "active").strip() or "active"
+        tags = [str(item).strip() for item in payload.get("tags", []) if str(item).strip()]
+        extra = payload.get("extra", {})
+        if not isinstance(extra, dict):
+            raise UnifiedFrameworkError(
+                "元数据 extra 字段必须为对象",
+                code=FrameworkErrorCode.METADATA_VALIDATE_FAILED,
+                context={"record_id": record_id},
+                recoverable=True,
+            )
+        created_at = str(payload.get("created_at") or datetime.now(timezone.utc).isoformat())
+        updated_at = datetime.now(timezone.utc).isoformat()
+        checksum = str(payload.get("checksum") or self._checksum(payload))
+        return ModelMetadataRecord(
+            record_id=record_id,
+            model_name=model_name,
+            model_type=model_type,
+            framework=framework_name,
+            version=version,
+            tags=tags,
+            status=status,
+            checksum=checksum,
+            created_at=created_at,
+            updated_at=updated_at,
+            extra=dict(extra),
+        )
+
+    def _record_version(self, record: ModelMetadataRecord, *, note: str) -> None:
+        history = self._history.setdefault(record.record_id, [])
+        snapshot = asdict(record)
+        revision = len(history) + 1
+        history.append(
+            ModelMetadataVersion(
+                record_id=record.record_id,
+                revision=revision,
+                checksum=record.checksum,
+                created_at=datetime.now(timezone.utc).isoformat(),
+                note=note,
+                snapshot=snapshot,
+            )
+        )
+
+    @staticmethod
+    def _checksum(payload: dict[str, Any]) -> str:
+        raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, default=str, separators=(",", ":"))
+        return hashlib.sha256(raw.encode("utf-8")).hexdigest()
+
+    def _persist(self) -> None:
+        payload = {
+            "records": [asdict(item) for item in self._records.values()],
+            "history": {key: [asdict(version) for version in versions] for key, versions in self._history.items()},
+        }
+        self.store_path.parent.mkdir(parents=True, exist_ok=True)
+        self.store_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True),
+            encoding="utf-8",
+        )
+
+    def _load(self) -> None:
+        if not self.store_path.exists():
+            return
+        raw = json.loads(self.store_path.read_text(encoding="utf-8") or "{}")
+        records = raw.get("records", [])
+        history = raw.get("history", {})
+        for item in records:
+            record = ModelMetadataRecord(**item)
+            self._records[record.record_id] = record
+        for record_id, versions in history.items():
+            self._history[record_id] = [ModelMetadataVersion(**version) for version in versions]
+
+
+class UnifiedLogFormatter(logging.Formatter):
+    """统一日志格式化器，支持文本与 JSON 两种输出。"""
+
+    def __init__(self, *, json_format: bool = False, timefmt: str | None = None) -> None:
+        super().__init__(datefmt=timefmt)
+        self.json_format = bool(json_format)
+
+    def format(self, record: logging.LogRecord) -> str:
+        timestamp = datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat()
+        context = getattr(record, "context", {})
+        if not isinstance(context, dict):
+            context = {"raw_context": str(context)}
+        payload = {
+            "timestamp": timestamp,
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "context": context,
+        }
+        if self.json_format:
+            return json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        context_text = ", ".join(f"{k}={v}" for k, v in sorted(context.items())) if context else "-"
+        return (
+            f"{payload['timestamp']} | {payload['level']} | {payload['logger']} | "
+            f"{payload['message']} | context: {context_text}"
+        )
+
+
+class UnifiedLogger:
+    """统一日志：规范格式、级别、上下文、过滤与聚合。"""
+
+    def __init__(
+        self,
+        name: str = "unified_framework",
+        *,
+        level: str = "INFO",
+        json_format: bool = False,
+    ) -> None:
+        self.logger = logging.getLogger(name)
+        self.logger.propagate = False
+        self._events: list[dict[str, Any]] = []
+        self._context_stack: list[dict[str, Any]] = []
+        self._lock = RLock()
+        formatter = UnifiedLogFormatter(json_format=json_format)
+        if not self.logger.handlers:
+            handler = logging.StreamHandler()
+            handler.setFormatter(formatter)
+            self.logger.addHandler(handler)
+        else:
+            for handler in self.logger.handlers:
+                handler.setFormatter(formatter)
+        self.set_level(level)
+
+    def set_level(self, level: str) -> None:
+        normalized = str(level or "").strip().upper()
+        if normalized not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+            raise UnifiedFrameworkError(
+                f"非法日志级别: {level}",
+                code=FrameworkErrorCode.LOG_CONFIG_FAILED,
+                recoverable=True,
+            )
+        self.logger.setLevel(getattr(logging, normalized))
+
+    @contextmanager
+    def bind_context(self, **context: Any):
+        with self._lock:
+            self._context_stack.append({k: v for k, v in context.items()})
+        try:
+            yield
+        finally:
+            with self._lock:
+                if self._context_stack:
+                    self._context_stack.pop()
+
+    def log(self, level: str, message: str, **context: Any) -> dict[str, Any]:
+        normalized = str(level).strip().upper()
+        if normalized not in {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}:
+            normalized = "INFO"
+        merged_context = self._merged_context(extra=context)
+        event = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "level": normalized,
+            "logger": self.logger.name,
+            "message": str(message),
+            "context": merged_context,
+        }
+        with self._lock:
+            self._events.append(event)
+        self.logger.log(getattr(logging, normalized), str(message), extra={"context": merged_context})
+        return dict(event)
+
+    def query(
+        self,
+        *,
+        level: str | None = None,
+        contains: str | None = None,
+        context_filters: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        level_kw = str(level or "").strip().upper()
+        message_kw = str(contains or "").strip().lower()
+        filters = dict(context_filters or {})
+        with self._lock:
+            result: list[dict[str, Any]] = []
+            for event in self._events:
+                if level_kw and event["level"] != level_kw:
+                    continue
+                if message_kw and message_kw not in str(event["message"]).lower():
+                    continue
+                context = dict(event.get("context", {}))
+                if any(context.get(k) != v for k, v in filters.items()):
+                    continue
+                result.append(dict(event))
+            return result
+
+    def aggregate(self, *, by: str = "level") -> dict[str, int]:
+        with self._lock:
+            if by == "context_key":
+                counter: Counter[str] = Counter()
+                for event in self._events:
+                    for key in dict(event.get("context", {})).keys():
+                        counter[str(key)] += 1
+                return dict(counter)
+            counter = Counter(str(event.get(by, "unknown")) for event in self._events)
+            return dict(counter)
+
+    @staticmethod
+    def generate_usage_guide() -> str:
+        return "\n".join(
+            [
+                "# 统一日志使用指南",
+                "",
+                "## 日志格式规范",
+                "- 标准字段: `timestamp`, `level`, `logger`, `message`, `context`。",
+                "- 支持文本与 JSON 输出，JSON 适合日志采集系统。",
+                "",
+                "## 日志级别管理",
+                "- 使用 `set_level` 在运行时动态切换级别。",
+                "",
+                "## 上下文与过滤",
+                "- 使用 `bind_context` 绑定请求级上下文。",
+                "- 使用 `query` 按级别、关键字、上下文字段过滤。",
+                "",
+                "## 聚合分析",
+                "- 使用 `aggregate(by='level')` 统计级别分布。",
+                "- 使用 `aggregate(by='context_key')` 统计上下文字段覆盖率。",
+            ]
+        )
+
+    def _merged_context(self, *, extra: dict[str, Any]) -> dict[str, Any]:
+        with self._lock:
+            merged: dict[str, Any] = {}
+            for item in self._context_stack:
+                merged.update(item)
+            merged.update(extra)
+            return merged
