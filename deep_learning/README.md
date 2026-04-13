@@ -71,6 +71,7 @@ python3 deep_learning/inference/run_spatiotemporal_inference.py --model gcn_lstm
 ## 阶段7快速命令
 
 ```bash
+python3 deep_learning/examples/fusion_adapter_usage_demo.py
 python3 -m pytest tests/deep_learning/test_fusion_system.py -q
 python3 -m pytest tests/deep_learning/test_dl_service_fusion_api.py -q
 ```
