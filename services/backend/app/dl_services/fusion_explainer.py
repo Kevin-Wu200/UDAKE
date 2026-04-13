@@ -26,6 +26,8 @@ class FusionExplanationConfig:
     max_explain_nodes: int = 8
     cache_size: int = 16
     random_state: int = 42
+    max_background_size: int = 24
+    dynamic_trace_limit: int = 96
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -40,9 +42,12 @@ class _BaseFusionAdapter:
         self.config = config or FusionExplanationConfig()
         self._lock = threading.Lock()
         self._result_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._batch_result_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
         self._context_cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
         self._cache_hits = 0
         self._cache_misses = 0
+        self._batch_cache_hits = 0
+        self._batch_cache_misses = 0
         self._context_cache_hits = 0
         self._context_cache_misses = 0
 
@@ -83,6 +88,70 @@ class _BaseFusionAdapter:
             while len(self._result_cache) > max(1, int(self.config.cache_size)):
                 self._result_cache.popitem(last=False)
 
+    def _batch_cache_get(self, key: str) -> Optional[dict[str, Any]]:
+        with self._lock:
+            cached = self._batch_result_cache.get(key)
+            if cached is None:
+                self._batch_cache_misses += 1
+                return None
+            self._batch_cache_hits += 1
+            self._batch_result_cache.move_to_end(key)
+            return copy.deepcopy(cached)
+
+    def _batch_cache_set(self, key: str, value: dict[str, Any]) -> None:
+        with self._lock:
+            self._batch_result_cache[key] = copy.deepcopy(value)
+            self._batch_result_cache.move_to_end(key)
+            while len(self._batch_result_cache) > max(1, int(self.config.cache_size)):
+                self._batch_result_cache.popitem(last=False)
+
+    def _compact_dynamic_weights(self, diagnostics: dict[str, Any]) -> dict[str, Any]:
+        copied = dict(diagnostics)
+        raw = copied.get("dynamic_weights")
+        if not isinstance(raw, dict):
+            return copied
+        compacted: dict[str, list[float]] = {}
+        cap = max(8, int(self.config.dynamic_trace_limit))
+        for mid, values in raw.items():
+            arr = np.asarray(values, dtype=float).reshape(-1)
+            if arr.size > cap:
+                idx = np.linspace(0, arr.size - 1, cap, dtype=int)
+                arr = arr[idx]
+            compacted[str(mid)] = [float(v) for v in arr.tolist()]
+        copied["dynamic_weights"] = compacted
+        return copied
+
+    def _ensure_context_runtime_fields(self, context: dict[str, Any]) -> dict[str, Any]:
+        restored = copy.deepcopy(context)
+        matrix = np.asarray(restored.get("matrix", []), dtype=np.float32)
+        fused_predictions = np.asarray(restored.get("fused_predictions", []), dtype=np.float32).reshape(-1)
+        baseline = np.asarray(restored.get("baseline", []), dtype=np.float32).reshape(-1)
+        surrogate_coef = np.asarray(restored.get("surrogate_coef", []), dtype=np.float32).reshape(-1)
+        centered_matrix = np.asarray(restored.get("centered_matrix", []), dtype=np.float32)
+        if centered_matrix.shape != matrix.shape:
+            centered_matrix = matrix - baseline.reshape(1, -1)
+        background = np.asarray(restored.get("background", []), dtype=np.float32)
+        cap = max(8, int(self.config.max_background_size))
+        if background.ndim == 2 and background.shape[0] > cap:
+            idx = np.linspace(0, background.shape[0] - 1, cap, dtype=int)
+            background = background[idx]
+
+        restored["matrix"] = matrix
+        restored["fused_predictions"] = fused_predictions
+        restored["fused_variances"] = np.asarray(restored.get("fused_variances", []), dtype=np.float32).reshape(-1)
+        restored["baseline"] = baseline
+        restored["surrogate_coef"] = surrogate_coef
+        restored["centered_matrix"] = centered_matrix
+        restored["background"] = background
+        restored["diagnostics"] = self._compact_dynamic_weights(dict(restored.get("diagnostics", {})))
+
+        surrogate = restored.get("surrogate")
+        if surrogate is None:
+            surrogate = Ridge(alpha=1.0, random_state=int(self.config.random_state))
+            surrogate.fit(matrix.astype(float), fused_predictions.astype(float))
+        restored["surrogate"] = surrogate
+        return restored
+
     def _context_cache_get(self, key: str) -> Optional[dict[str, Any]]:
         with self._lock:
             cached = self._context_cache.get(key)
@@ -91,11 +160,14 @@ class _BaseFusionAdapter:
                 return None
             self._context_cache_hits += 1
             self._context_cache.move_to_end(key)
-            return copy.deepcopy(cached)
+            restored = copy.deepcopy(cached)
+        return self._ensure_context_runtime_fields(restored)
 
     def _context_cache_set(self, key: str, value: dict[str, Any]) -> None:
+        compacted = self._ensure_context_runtime_fields(value)
+        compacted["surrogate"] = None
         with self._lock:
-            self._context_cache[key] = copy.deepcopy(value)
+            self._context_cache[key] = copy.deepcopy(compacted)
             self._context_cache.move_to_end(key)
             while len(self._context_cache) > max(1, int(self.config.cache_size)):
                 self._context_cache.popitem(last=False)
@@ -103,11 +175,15 @@ class _BaseFusionAdapter:
     def _cache_metrics(self) -> dict[str, float | int]:
         with self._lock:
             total = self._cache_hits + self._cache_misses
+            batch_total = self._batch_cache_hits + self._batch_cache_misses
             ctx_total = self._context_cache_hits + self._context_cache_misses
             return {
                 "result_cache_hits": int(self._cache_hits),
                 "result_cache_misses": int(self._cache_misses),
                 "result_cache_hit_rate": float(self._cache_hits / max(1, total)),
+                "batch_result_cache_hits": int(self._batch_cache_hits),
+                "batch_result_cache_misses": int(self._batch_cache_misses),
+                "batch_result_cache_hit_rate": float(self._batch_cache_hits / max(1, batch_total)),
                 "context_cache_hits": int(self._context_cache_hits),
                 "context_cache_misses": int(self._context_cache_misses),
                 "context_cache_hit_rate": float(self._context_cache_hits / max(1, ctx_total)),
@@ -119,6 +195,14 @@ class _BaseFusionAdapter:
         for arr in arrays:
             total += int(np.asarray(arr).nbytes)
         return int(total)
+
+    @staticmethod
+    def _batch_item(items: list[Any] | None, idx: int, default: Any = None) -> Any:
+        if items is None:
+            return default
+        if 0 <= int(idx) < len(items):
+            return items[int(idx)]
+        return default
 
     @staticmethod
     def _normalize_models(models: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -177,6 +261,7 @@ class _BaseFusionAdapter:
     ) -> dict[str, Any]:
         normalized_models = self._normalize_models(models)
         matrix, model_ids = self._validate_inputs(normalized_models, true_values=true_values)
+        matrix = np.asarray(matrix, dtype=np.float32)
         requested_strategy = None if strategy is None else str(strategy).strip().lower()
         effective_strategy = self._resolve_strategy_alias(strategy)
         payload = fusion_platform_service.inference(
@@ -188,24 +273,25 @@ class _BaseFusionAdapter:
             context=context,
         )
         result = payload["result"]
-        fused_predictions = np.asarray(result.get("fused_predictions", []), dtype=float).reshape(-1)
+        fused_predictions = np.asarray(result.get("fused_predictions", []), dtype=np.float32).reshape(-1)
         if fused_predictions.shape[0] != matrix.shape[0]:
             raise ValueError("fusion prediction length mismatch")
 
         fused_variances = result.get("fused_variances")
         if fused_variances is None:
-            variances = np.var(matrix, axis=1)
+            variances = np.var(matrix, axis=1).astype(np.float32)
         else:
-            variances = np.asarray(fused_variances, dtype=float).reshape(-1)
+            variances = np.asarray(fused_variances, dtype=np.float32).reshape(-1)
             if variances.shape[0] != matrix.shape[0]:
-                variances = np.var(matrix, axis=1)
+                variances = np.var(matrix, axis=1).astype(np.float32)
 
         surrogate = Ridge(alpha=1.0, random_state=int(self.config.random_state))
         surrogate.fit(matrix, fused_predictions)
-        baseline = np.mean(matrix, axis=0)
-        surrogate_coef = np.asarray(surrogate.coef_, dtype=float).reshape(-1)
-        centered_matrix = matrix - np.asarray(baseline, dtype=float).reshape(1, -1)
-        background = matrix if matrix.shape[0] <= 32 else matrix[np.linspace(0, matrix.shape[0] - 1, 32, dtype=int)]
+        baseline = np.asarray(np.mean(matrix, axis=0), dtype=np.float32).reshape(-1)
+        surrogate_coef = np.asarray(surrogate.coef_, dtype=np.float32).reshape(-1)
+        centered_matrix = (matrix - baseline.reshape(1, -1)).astype(np.float32)
+        bg_cap = max(8, int(self.config.max_background_size))
+        background = matrix if matrix.shape[0] <= bg_cap else matrix[np.linspace(0, matrix.shape[0] - 1, bg_cap, dtype=int)]
         return {
             "matrix": matrix,
             "model_ids": model_ids,
@@ -221,10 +307,10 @@ class _BaseFusionAdapter:
             "metrics": dict(result.get("metrics", {})),
             "diagnostics": dict(result.get("diagnostics", {})),
             "surrogate": surrogate,
-            "baseline": np.asarray(baseline, dtype=float),
+            "baseline": baseline,
             "surrogate_coef": surrogate_coef,
-            "centered_matrix": np.asarray(centered_matrix, dtype=float),
-            "background": np.asarray(background, dtype=float),
+            "centered_matrix": np.asarray(centered_matrix, dtype=np.float32),
+            "background": np.asarray(background, dtype=np.float32),
             "preprocess": {
                 "sample_count": int(matrix.shape[0]),
                 "model_count": int(matrix.shape[1]),
@@ -1278,6 +1364,10 @@ class FusionLIMEAdapter(_BaseFusionAdapter):
             np.asarray(built["fused_variances"], dtype=np.float32),
             np.asarray(built["background"], dtype=np.float32),
         )
+        estimated_raw_context_memory_bytes = int(context_memory_bytes * 2)
+        context_memory_saved_ratio = float(
+            max(0.0, min(1.0, 1.0 - (context_memory_bytes / max(1, estimated_raw_context_memory_bytes))))
+        )
         result_memory_bytes = self._array_bytes(np.asarray(raw, dtype=np.float32))
         result: dict[str, Any] = {
             "summary": {
@@ -1314,6 +1404,8 @@ class FusionLIMEAdapter(_BaseFusionAdapter):
                 "sample_count": int(np.asarray(built["matrix"]).shape[0]),
                 "feature_dim": int(np.asarray(built["matrix"]).shape[1]) if np.asarray(built["matrix"]).ndim == 2 else 0,
                 "context_memory_bytes": int(context_memory_bytes),
+                "estimated_raw_context_memory_bytes": int(estimated_raw_context_memory_bytes),
+                "context_memory_saved_ratio": float(context_memory_saved_ratio),
                 "result_memory_bytes": int(result_memory_bytes),
                 "latency_target_ms": 2500.0,
                 "meets_latency_target": float((time.perf_counter() - started) * 1000.0) < 2500.0,
@@ -1322,6 +1414,90 @@ class FusionLIMEAdapter(_BaseFusionAdapter):
         }
         self._cache_set(cache_key, result)
         return result
+
+    def explain_batch(
+        self,
+        *,
+        models_batch: list[list[dict[str, Any]]],
+        top_k: int = 5,
+        max_explain_nodes: int | None = None,
+        num_samples: int | None = None,
+        profile_id: str | None = None,
+        strategy: str | None = None,
+        weight_method: str | None = None,
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+        profile_id_batch: list[str | None] | None = None,
+        strategy_batch: list[str | None] | None = None,
+        weight_method_batch: list[str | None] | None = None,
+        true_values_batch: list[list[float] | None] | None = None,
+        context_batch: list[dict[str, list[float]] | None] | None = None,
+    ) -> dict[str, Any]:
+        started = time.perf_counter()
+        batch_key = self._stable_hash(
+            {
+                "method": "lime_batch",
+                "models_batch": [self._normalize_models(m) for m in models_batch],
+                "top_k": int(top_k),
+                "max_explain_nodes": int(max_explain_nodes or self.config.max_explain_nodes),
+                "num_samples": int(num_samples or self.config.lime_num_samples),
+                "profile_id": profile_id,
+                "strategy": strategy,
+                "weight_method": weight_method,
+                "true_values": true_values,
+                "context": context or {},
+                "profile_id_batch": profile_id_batch or [],
+                "strategy_batch": strategy_batch or [],
+                "weight_method_batch": weight_method_batch or [],
+                "true_values_batch": true_values_batch or [],
+                "context_batch": context_batch or [],
+            }
+        )
+        cached = self._batch_cache_get(batch_key)
+        if cached is not None:
+            cached["performance"] = {
+                **dict(cached.get("performance", {})),
+                "batch_cache_hit": True,
+                "duration_ms": float((time.perf_counter() - started) * 1000.0),
+                **self._cache_metrics(),
+            }
+            return cached
+
+        results: list[dict[str, Any]] = []
+        cache_hit_count = 0
+        for idx, models in enumerate(models_batch):
+            out = self.explain(
+                models=models,
+                top_k=top_k,
+                max_explain_nodes=max_explain_nodes,
+                num_samples=num_samples,
+                profile_id=self._batch_item(profile_id_batch, idx, profile_id),
+                strategy=self._batch_item(strategy_batch, idx, strategy),
+                weight_method=self._batch_item(weight_method_batch, idx, weight_method),
+                true_values=self._batch_item(true_values_batch, idx, true_values),
+                context=self._batch_item(context_batch, idx, context),
+            )
+            cache_hit_count += int(bool(out.get("performance", {}).get("cache_hit", False)))
+            results.append({"batch_index": int(idx), "result": out})
+
+        total = max(1, len(results))
+        payload = {
+            "summary": {
+                "method": "lime",
+                "batch_size": int(len(results)),
+                "cache_hit_count": int(cache_hit_count),
+                "cache_hit_ratio": float(cache_hit_count / total),
+            },
+            "items": results,
+            "performance": {
+                "batch_cache_hit": False,
+                "duration_ms": float((time.perf_counter() - started) * 1000.0),
+                "avg_duration_ms": float(((time.perf_counter() - started) * 1000.0) / total),
+                **self._cache_metrics(),
+            },
+        }
+        self._batch_cache_set(batch_key, payload)
+        return payload
 
 
 class FusionSHAPAdapter(_BaseFusionAdapter):
@@ -1450,6 +1626,10 @@ class FusionSHAPAdapter(_BaseFusionAdapter):
             np.asarray(built["fused_variances"], dtype=np.float32),
             np.asarray(built["background"], dtype=np.float32),
         )
+        estimated_raw_context_memory_bytes = int(context_memory_bytes * 2)
+        context_memory_saved_ratio = float(
+            max(0.0, min(1.0, 1.0 - (context_memory_bytes / max(1, estimated_raw_context_memory_bytes))))
+        )
         result_memory_bytes = self._array_bytes(np.asarray(arr, dtype=np.float32))
         result: dict[str, Any] = {
             "summary": {
@@ -1488,6 +1668,8 @@ class FusionSHAPAdapter(_BaseFusionAdapter):
                 "sample_count": int(np.asarray(built["matrix"]).shape[0]),
                 "feature_dim": int(np.asarray(built["matrix"]).shape[1]) if np.asarray(built["matrix"]).ndim == 2 else 0,
                 "context_memory_bytes": int(context_memory_bytes),
+                "estimated_raw_context_memory_bytes": int(estimated_raw_context_memory_bytes),
+                "context_memory_saved_ratio": float(context_memory_saved_ratio),
                 "result_memory_bytes": int(result_memory_bytes),
                 "batch_shap_size": int(len(node_indices)),
                 "latency_target_ms": 2500.0,
@@ -1497,3 +1679,87 @@ class FusionSHAPAdapter(_BaseFusionAdapter):
         }
         self._cache_set(cache_key, result)
         return result
+
+    def explain_batch(
+        self,
+        *,
+        models_batch: list[list[dict[str, Any]]],
+        top_k: int = 5,
+        max_explain_nodes: int | None = None,
+        nsamples: int | None = None,
+        profile_id: str | None = None,
+        strategy: str | None = None,
+        weight_method: str | None = None,
+        true_values: list[float] | None = None,
+        context: dict[str, list[float]] | None = None,
+        profile_id_batch: list[str | None] | None = None,
+        strategy_batch: list[str | None] | None = None,
+        weight_method_batch: list[str | None] | None = None,
+        true_values_batch: list[list[float] | None] | None = None,
+        context_batch: list[dict[str, list[float]] | None] | None = None,
+    ) -> dict[str, Any]:
+        started = time.perf_counter()
+        batch_key = self._stable_hash(
+            {
+                "method": "shap_batch",
+                "models_batch": [self._normalize_models(m) for m in models_batch],
+                "top_k": int(top_k),
+                "max_explain_nodes": int(max_explain_nodes or self.config.max_explain_nodes),
+                "nsamples": int(nsamples or self.config.shap_nsamples),
+                "profile_id": profile_id,
+                "strategy": strategy,
+                "weight_method": weight_method,
+                "true_values": true_values,
+                "context": context or {},
+                "profile_id_batch": profile_id_batch or [],
+                "strategy_batch": strategy_batch or [],
+                "weight_method_batch": weight_method_batch or [],
+                "true_values_batch": true_values_batch or [],
+                "context_batch": context_batch or [],
+            }
+        )
+        cached = self._batch_cache_get(batch_key)
+        if cached is not None:
+            cached["performance"] = {
+                **dict(cached.get("performance", {})),
+                "batch_cache_hit": True,
+                "duration_ms": float((time.perf_counter() - started) * 1000.0),
+                **self._cache_metrics(),
+            }
+            return cached
+
+        results: list[dict[str, Any]] = []
+        cache_hit_count = 0
+        for idx, models in enumerate(models_batch):
+            out = self.explain(
+                models=models,
+                top_k=top_k,
+                max_explain_nodes=max_explain_nodes,
+                nsamples=nsamples,
+                profile_id=self._batch_item(profile_id_batch, idx, profile_id),
+                strategy=self._batch_item(strategy_batch, idx, strategy),
+                weight_method=self._batch_item(weight_method_batch, idx, weight_method),
+                true_values=self._batch_item(true_values_batch, idx, true_values),
+                context=self._batch_item(context_batch, idx, context),
+            )
+            cache_hit_count += int(bool(out.get("performance", {}).get("cache_hit", False)))
+            results.append({"batch_index": int(idx), "result": out})
+
+        total = max(1, len(results))
+        payload = {
+            "summary": {
+                "method": "shap",
+                "batch_size": int(len(results)),
+                "cache_hit_count": int(cache_hit_count),
+                "cache_hit_ratio": float(cache_hit_count / total),
+            },
+            "items": results,
+            "performance": {
+                "batch_cache_hit": False,
+                "duration_ms": float((time.perf_counter() - started) * 1000.0),
+                "avg_duration_ms": float(((time.perf_counter() - started) * 1000.0) / total),
+                **self._cache_metrics(),
+            },
+        }
+        self._batch_cache_set(batch_key, payload)
+        return payload

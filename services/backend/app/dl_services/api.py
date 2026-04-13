@@ -275,6 +275,25 @@ class FusionExplainRequest(BaseModel):
     context: Optional[dict[str, list[float]]] = None
 
 
+class FusionBatchExplainItemRequest(BaseModel):
+    models: list[FusionModelInput] = Field(default_factory=list)
+    profile_id: Optional[str] = None
+    strategy: Optional[str] = None
+    weight_method: Optional[str] = None
+    true_values: Optional[list[float]] = None
+    context: Optional[dict[str, list[float]]] = None
+
+
+class FusionBatchExplainRequest(BaseModel):
+    requests: list[FusionBatchExplainItemRequest] = Field(default_factory=list)
+    method: str = Field(default="hybrid", description="lime/shap/hybrid")
+    top_k: int = Field(default=5, ge=1, le=20)
+    include_prediction: bool = Field(default=False)
+    num_samples: Optional[int] = Field(default=None, ge=80, le=2000)
+    nsamples: Optional[int] = Field(default=None, ge=40, le=2000)
+    max_explain_nodes: int = Field(default=8, ge=1, le=128)
+
+
 class FusionOptimizeRequest(BaseModel):
     models: list[FusionModelInput] = Field(default_factory=list)
     true_values: list[float] = Field(default_factory=list)
@@ -731,6 +750,29 @@ def explain_fusion(payload: FusionExplainRequest) -> dict:
         weight_method=payload.weight_method,
         true_values=payload.true_values,
         context=payload.context,
+    )
+
+
+@router.post("/fusion/explain-batch")
+def explain_fusion_batch(payload: FusionBatchExplainRequest) -> dict:
+    return service.explain_fusion_batch(
+        requests=[
+            {
+                "models": [m.model_dump() for m in item.models],
+                "profile_id": item.profile_id,
+                "strategy": item.strategy,
+                "weight_method": item.weight_method,
+                "true_values": item.true_values,
+                "context": item.context,
+            }
+            for item in payload.requests
+        ],
+        method=payload.method,
+        top_k=payload.top_k,
+        include_prediction=payload.include_prediction,
+        num_samples=payload.num_samples,
+        nsamples=payload.nsamples,
+        max_explain_nodes=payload.max_explain_nodes,
     )
 
 

@@ -1427,3 +1427,103 @@ class DeepLearningService:
                 context=context,
             )
         return result
+
+    def explain_fusion_batch(
+        self,
+        *,
+        requests: list[dict[str, Any]],
+        method: str = "hybrid",
+        top_k: int = 5,
+        include_prediction: bool = False,
+        num_samples: int | None = None,
+        nsamples: int | None = None,
+        max_explain_nodes: int = 8,
+    ) -> dict[str, Any]:
+        if method not in {"lime", "shap", "hybrid"}:
+            raise ValueError("method must be one of lime/shap/hybrid")
+
+        if not requests:
+            return {
+                "summary": {
+                    "method": method,
+                    "batch_size": 0,
+                    "cache_hit_count": 0,
+                    "cache_hit_ratio": 0.0,
+                },
+                "items": [],
+            }
+
+        models_batch = [list(item.get("models", [])) for item in requests]
+        profile_id_batch = [item.get("profile_id") for item in requests]
+        strategy_batch = [item.get("strategy") for item in requests]
+        weight_method_batch = [item.get("weight_method") for item in requests]
+        true_values_batch = [item.get("true_values") for item in requests]
+        context_batch = [item.get("context") for item in requests]
+
+        lime_batch: dict[str, Any] | None = None
+        shap_batch: dict[str, Any] | None = None
+        if method in {"lime", "hybrid"}:
+            lime_batch = self.fusion_lime_adapter.explain_batch(
+                models_batch=models_batch,
+                top_k=top_k,
+                max_explain_nodes=max_explain_nodes,
+                num_samples=num_samples,
+                profile_id_batch=profile_id_batch,
+                strategy_batch=strategy_batch,
+                weight_method_batch=weight_method_batch,
+                true_values_batch=true_values_batch,
+                context_batch=context_batch,
+            )
+        if method in {"shap", "hybrid"}:
+            shap_batch = self.fusion_shap_adapter.explain_batch(
+                models_batch=models_batch,
+                top_k=top_k,
+                max_explain_nodes=max_explain_nodes,
+                nsamples=nsamples,
+                profile_id_batch=profile_id_batch,
+                strategy_batch=strategy_batch,
+                weight_method_batch=weight_method_batch,
+                true_values_batch=true_values_batch,
+                context_batch=context_batch,
+            )
+
+        items: list[dict[str, Any]] = []
+        cache_hit_count = 0
+        for idx in range(len(requests)):
+            row: dict[str, Any] = {"batch_index": int(idx)}
+            if lime_batch is not None:
+                lime_item = lime_batch.get("items", [])[idx]["result"]
+                row["lime"] = lime_item
+                cache_hit_count += int(bool(lime_item.get("performance", {}).get("cache_hit", False)))
+            if shap_batch is not None:
+                shap_item = shap_batch.get("items", [])[idx]["result"]
+                row["shap"] = shap_item
+                cache_hit_count += int(bool(shap_item.get("performance", {}).get("cache_hit", False)))
+            if include_prediction:
+                req = requests[idx]
+                row["prediction"] = self.predict_fusion(
+                    models=list(req.get("models", [])),
+                    profile_id=req.get("profile_id"),
+                    strategy=req.get("strategy"),
+                    weight_method=req.get("weight_method"),
+                    true_values=req.get("true_values"),
+                    context=req.get("context"),
+                )
+            items.append(row)
+
+        total = max(1, len(items) * (2 if method == "hybrid" else 1))
+        payload: dict[str, Any] = {
+            "summary": {
+                "method": method,
+                "batch_size": int(len(items)),
+                "cache_hit_count": int(cache_hit_count),
+                "cache_hit_ratio": float(cache_hit_count / total),
+                "max_explain_nodes": int(max_explain_nodes),
+            },
+            "items": items,
+        }
+        if lime_batch is not None:
+            payload["lime_batch"] = lime_batch
+        if shap_batch is not None:
+            payload["shap_batch"] = shap_batch
+        return payload
