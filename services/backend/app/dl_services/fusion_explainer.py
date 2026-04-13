@@ -28,6 +28,7 @@ class FusionExplanationConfig:
     random_state: int = 42
     max_background_size: int = 24
     dynamic_trace_limit: int = 96
+    management_history_limit: int = 120
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:
@@ -50,6 +51,7 @@ class _BaseFusionAdapter:
         self._batch_cache_misses = 0
         self._context_cache_hits = 0
         self._context_cache_misses = 0
+        self._management_history: list[dict[str, Any]] = []
 
     @staticmethod
     def _load_lime_tabular() -> Any:
@@ -1053,6 +1055,201 @@ class _BaseFusionAdapter:
             "global_alternative_pool": global_candidates[:3],
         }
 
+    def _model_auto_replacement(
+        self,
+        contribution_ranking: dict[str, Any],
+        selection_recommendation: dict[str, Any],
+        alternative_solutions: dict[str, Any],
+        performance: dict[str, Any],
+        stability: dict[str, Any],
+    ) -> dict[str, Any]:
+        ranked = {str(item.get("model_id", "")): item for item in list(contribution_ranking.get("ranking", []))}
+        replace_rows = list(selection_recommendation.get("replacement_candidates", []))
+        replacement_plans = list(alternative_solutions.get("replacement_plans", []))
+        perf_rows = {str(item.get("model_id", "")): item for item in list(performance.get("ranking", []))}
+        stability_rows = {str(item.get("model_id", "")): item for item in list(stability.get("ranking", []))}
+
+        actions: list[dict[str, Any]] = []
+        for target in replace_rows:
+            target_id = str(target.get("model_id", ""))
+            if target_id == "":
+                continue
+            target_score = float(_safe_float(target.get("contribution_score"), 0.0))
+            matched_plan = next((item for item in replacement_plans if str(item.get("target_model_id", "")) == target_id), None)
+            alternatives = list(matched_plan.get("alternatives", [])) if isinstance(matched_plan, dict) else []
+            if not alternatives:
+                continue
+            best_alt = alternatives[0]
+            cand_id = str(best_alt.get("model_id", ""))
+            cand_score = float(_safe_float(best_alt.get("contribution_score"), 0.0))
+            score_gain = float(max(0.0, cand_score - target_score))
+
+            target_perf = float(_safe_float(perf_rows.get(target_id, {}).get("score"), 0.0))
+            cand_perf = float(_safe_float(perf_rows.get(cand_id, {}).get("score"), 0.0))
+            target_stability = float(_safe_float(stability_rows.get(target_id, {}).get("overall_stability"), 0.0))
+            cand_stability = float(_safe_float(stability_rows.get(cand_id, {}).get("overall_stability"), 0.0))
+            perf_gain = float(max(0.0, cand_perf - target_perf))
+            stability_gain = float(max(0.0, cand_stability - target_stability))
+
+            risk_raw = float(np.clip(1.0 - (0.65 * score_gain + 0.20 * perf_gain + 0.15 * stability_gain), 0.0, 1.0))
+            risk_level = "low" if risk_raw <= 0.35 else ("medium" if risk_raw <= 0.65 else "high")
+            if score_gain >= 0.10 and risk_level == "low":
+                action = "replace_now"
+            elif score_gain >= 0.05:
+                action = "shadow_deploy"
+            else:
+                action = "observe_only"
+            actions.append(
+                {
+                    "target_model_id": target_id,
+                    "candidate_model_id": cand_id,
+                    "target_contribution_score": target_score,
+                    "candidate_contribution_score": cand_score,
+                    "expected_score_gain": score_gain,
+                    "performance_gain": perf_gain,
+                    "stability_gain": stability_gain,
+                    "risk_score": risk_raw,
+                    "risk_level": risk_level,
+                    "recommended_action": action,
+                }
+            )
+
+        actions.sort(key=lambda item: float(item.get("expected_score_gain", 0.0)), reverse=True)
+        replace_now = [item for item in actions if str(item.get("recommended_action")) == "replace_now"]
+        return {
+            "summary": {
+                "candidate_count": int(len(actions)),
+                "replace_now_count": int(len(replace_now)),
+                "shadow_deploy_count": int(sum(1 for item in actions if str(item.get("recommended_action")) == "shadow_deploy")),
+                "observe_only_count": int(sum(1 for item in actions if str(item.get("recommended_action")) == "observe_only")),
+                "expected_mean_gain": float(np.mean([float(item.get("expected_score_gain", 0.0)) for item in actions])) if actions else 0.0,
+            },
+            "actions": actions,
+        }
+
+    def _history_snapshot(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return copy.deepcopy(self._management_history)
+
+    def _append_management_history(
+        self,
+        *,
+        context: dict[str, Any],
+        contribution_ranking: dict[str, Any],
+        auto_replacement: dict[str, Any],
+        effect_prediction: dict[str, Any],
+    ) -> None:
+        metrics = dict(context.get("metrics", {}))
+        ranking = list(contribution_ranking.get("ranking", []))
+        actions = list(auto_replacement.get("actions", []))
+        record = {
+            "timestamp": float(time.time()),
+            "selected_strategy": str(context.get("selected_strategy", "")),
+            "requested_strategy": str(context.get("requested_strategy", context.get("strategy", ""))),
+            "top_contributor": str(ranking[0].get("model_id", "")) if ranking else "",
+            "top_contribution_score": float(_safe_float(ranking[0].get("contribution_score"), 0.0)) if ranking else 0.0,
+            "auto_replacement_actions": actions,
+            "metrics": {
+                "rmse": float(_safe_float(metrics.get("rmse"), 0.0)),
+                "mae": float(_safe_float(metrics.get("mae"), 0.0)),
+                "r2": float(_safe_float(metrics.get("r2"), 0.0)),
+            },
+            "effect_prediction": {
+                "expected_improvement_pct": float(
+                    _safe_float(effect_prediction.get("summary", {}).get("expected_improvement_pct"), 0.0)
+                ),
+                "predicted_rmse": float(_safe_float(effect_prediction.get("summary", {}).get("predicted_rmse"), 0.0)),
+                "confidence": float(_safe_float(effect_prediction.get("summary", {}).get("confidence"), 0.0)),
+            },
+        }
+        with self._lock:
+            self._management_history.append(record)
+            limit = max(10, int(self.config.management_history_limit))
+            if len(self._management_history) > limit:
+                self._management_history = self._management_history[-limit:]
+
+    def _fusion_history_record(self) -> dict[str, Any]:
+        history = self._history_snapshot()
+        recent = history[-10:]
+        expected = np.asarray([_safe_float(item.get("effect_prediction", {}).get("expected_improvement_pct"), 0.0) for item in history], dtype=float)
+        return {
+            "summary": {
+                "history_count": int(len(history)),
+                "auto_replacement_event_count": int(
+                    sum(1 for item in history if len(list(item.get("auto_replacement_actions", []))) > 0)
+                ),
+                "replace_now_event_count": int(
+                    sum(
+                        1
+                        for item in history
+                        for row in list(item.get("auto_replacement_actions", []))
+                        if str(row.get("recommended_action", "")) == "replace_now"
+                    )
+                ),
+                "latest_selected_strategy": str(recent[-1].get("selected_strategy", "")) if recent else "",
+                "mean_expected_improvement_pct": float(np.mean(expected)) if expected.size else 0.0,
+            },
+            "recent_records": recent,
+        }
+
+    def _fusion_effect_prediction(
+        self,
+        context: dict[str, Any],
+        auto_replacement: dict[str, Any],
+        history_snapshot: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        metrics = dict(context.get("metrics", {}))
+        actions = list(auto_replacement.get("actions", []))
+        gains = np.asarray([float(_safe_float(item.get("expected_score_gain"), 0.0)) for item in actions], dtype=float)
+        current_gain = float(np.mean(gains)) if gains.size else 0.0
+
+        hist_improvements = np.asarray(
+            [
+                float(_safe_float(item.get("effect_prediction", {}).get("expected_improvement_pct"), 0.0))
+                for item in history_snapshot
+            ],
+            dtype=float,
+        )
+        history_gain = float(np.mean(hist_improvements)) if hist_improvements.size else 0.0
+        expected_improvement_pct = float(np.clip(100.0 * (0.10 * current_gain) + 0.30 * history_gain, -5.0, 35.0))
+
+        baseline_rmse = float(_safe_float(metrics.get("rmse"), 0.0))
+        if baseline_rmse <= 0.0:
+            hist_rmse = np.asarray(
+                [float(_safe_float(item.get("metrics", {}).get("rmse"), 0.0)) for item in history_snapshot],
+                dtype=float,
+            )
+            hist_rmse = hist_rmse[hist_rmse > 0]
+            baseline_rmse = float(np.mean(hist_rmse)) if hist_rmse.size else 0.0
+        predicted_rmse = float(max(0.0, baseline_rmse * (1.0 - expected_improvement_pct / 100.0))) if baseline_rmse > 0 else 0.0
+        confidence = float(np.clip(0.45 + 0.03 * len(history_snapshot) + 0.8 * min(0.2, current_gain), 0.35, 0.95))
+
+        level = "neutral"
+        if expected_improvement_pct >= 10.0:
+            level = "high"
+        elif expected_improvement_pct >= 3.0:
+            level = "medium"
+        elif expected_improvement_pct <= -1.0:
+            level = "negative"
+        recommended_action = "keep_current"
+        if level in {"high", "medium"} and len(actions) > 0:
+            recommended_action = "apply_auto_replacement"
+        return {
+            "summary": {
+                "expected_improvement_pct": expected_improvement_pct,
+                "baseline_rmse": float(baseline_rmse),
+                "predicted_rmse": predicted_rmse,
+                "confidence": confidence,
+                "level": level,
+                "recommended_action": recommended_action,
+            },
+            "drivers": {
+                "current_replacement_gain": current_gain,
+                "history_mean_improvement_pct": history_gain,
+                "candidate_action_count": int(len(actions)),
+            },
+        }
+
     def _submodel_analysis(self, context: dict[str, Any], true_values: list[float] | None, top_k: int) -> dict[str, Any]:
         performance = self._submodel_performance_comparison(context, true_values)
         stability = self._submodel_stability_analysis(context, true_values)
@@ -1074,6 +1271,26 @@ class _BaseFusionAdapter:
             selection_recommendation=selection_recommendation,
             complementarity=complementarity,
         )
+        auto_replacement = self._model_auto_replacement(
+            contribution_ranking=contribution_ranking,
+            selection_recommendation=selection_recommendation,
+            alternative_solutions=alternative_solutions,
+            performance=performance,
+            stability=stability,
+        )
+        history_snapshot = self._history_snapshot()
+        effect_prediction = self._fusion_effect_prediction(
+            context=context,
+            auto_replacement=auto_replacement,
+            history_snapshot=history_snapshot,
+        )
+        self._append_management_history(
+            context=context,
+            contribution_ranking=contribution_ranking,
+            auto_replacement=auto_replacement,
+            effect_prediction=effect_prediction,
+        )
+        history_record = self._fusion_history_record()
         return {
             "submodel_performance_comparison": performance,
             "submodel_stability_analysis": stability,
@@ -1082,6 +1299,9 @@ class _BaseFusionAdapter:
             "submodel_contribution_ranking": contribution_ranking,
             "submodel_selection_recommendation": selection_recommendation,
             "submodel_alternative_solutions": alternative_solutions,
+            "model_auto_replacement": auto_replacement,
+            "fusion_history_record": history_record,
+            "fusion_effect_prediction": effect_prediction,
         }
 
     def _strategy_selection_explanation(self, context: dict[str, Any], true_values: list[float] | None) -> dict[str, Any]:
@@ -1390,6 +1610,9 @@ class FusionLIMEAdapter(_BaseFusionAdapter):
             "submodel_contribution_ranking": submodel_analysis["submodel_contribution_ranking"],
             "submodel_selection_recommendation": submodel_analysis["submodel_selection_recommendation"],
             "submodel_alternative_solutions": submodel_analysis["submodel_alternative_solutions"],
+            "model_auto_replacement": submodel_analysis["model_auto_replacement"],
+            "fusion_history_record": submodel_analysis["fusion_history_record"],
+            "fusion_effect_prediction": submodel_analysis["fusion_effect_prediction"],
             "strategy_selection_explanation": strategy_explanation,
             "preprocess": dict(built["preprocess"]),
             "explainer": {
@@ -1652,6 +1875,9 @@ class FusionSHAPAdapter(_BaseFusionAdapter):
             "submodel_contribution_ranking": submodel_analysis["submodel_contribution_ranking"],
             "submodel_selection_recommendation": submodel_analysis["submodel_selection_recommendation"],
             "submodel_alternative_solutions": submodel_analysis["submodel_alternative_solutions"],
+            "model_auto_replacement": submodel_analysis["model_auto_replacement"],
+            "fusion_history_record": submodel_analysis["fusion_history_record"],
+            "fusion_effect_prediction": submodel_analysis["fusion_effect_prediction"],
             "strategy_selection_explanation": strategy_explanation,
             "preprocess": dict(built["preprocess"]),
             "explainer": {
