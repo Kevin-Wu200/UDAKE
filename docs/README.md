@@ -24,6 +24,8 @@ UDAKE（Uncertainty-Driven Adaptive Kriging Engine）是一个智能不确定性
 | [测试报告.md](测试报告.md) | 后端API测试、集成测试、兼容性测试、覆盖率 |
 | [技术文档.md](技术文档.md) | 功能模块、类型系统、缓存系统、手势功能 |
 | [更新日志.md](更新日志.md) | 版本更新记录 |
+| [archive/项目代码归档说明.md](archive/项目代码归档说明.md) | 项目收尾归档流程、分支/标签/备份规范 |
+| [archive/代码目录结构总览.md](archive/代码目录结构总览.md) | 顶层目录职责与归档目录约束 |
 
 ### 扩展模块文档
 
