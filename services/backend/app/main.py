@@ -37,6 +37,7 @@ from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任
 from .api.app_download_api import router as download_router
 from .api.admin_api import router as admin_router
 from .api.auth_api import router as auth_router
+from .api.product_keys_api import router as product_keys_router
 from .api.company_management_api import router as company_management_router
 from .api.devices_api import router as devices_router
 from .services.mobile_gps_service import mobile_gps_service
@@ -193,6 +194,7 @@ app.include_router(GPU加速接口.router, prefix="/api", tags=["GPU加速"])
 app.include_router(移动端GPS接口.router, tags=["移动端GPS"])
 app.include_router(download_router, prefix="/api", tags=["下载"])
 app.include_router(auth_router, prefix="/api", tags=["认证"])
+app.include_router(product_keys_router, prefix="/api", tags=["密钥"])
 app.include_router(devices_router, prefix="/api", tags=["设备管理"])
 app.include_router(company_management_router, prefix="/api", tags=["企业管理"])
 app.include_router(admin_router, prefix="/api", tags=["管理员后台"])

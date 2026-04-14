@@ -103,13 +103,6 @@ export interface ISamplingRecommendationPanel {
     updateUIText(): void;
 }
 
-/** 新手引导接口 */
-export interface IOnboardingGuide {
-    autoStart(): void;
-    start(): void;
-    reset(): void;
-}
-
 /** 偏好设置接口 */
 export interface IPreferencesPanel {
     show(): void;

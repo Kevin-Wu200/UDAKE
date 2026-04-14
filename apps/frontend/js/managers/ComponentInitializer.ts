@@ -10,7 +10,6 @@ import { SamplingRecommendationPanel } from '../components/SamplingRecommendatio
 import { EnhancedSamplingRecommendationPanel } from '../components/EnhancedSamplingRecommendationPanel.js';
 import { InteractiveSamplingMarkers } from '../components/InteractiveSamplingMarkers.js';
 import { SamplingStrategySelector } from '../components/SamplingStrategySelector.js';
-import { OnboardingGuide } from '../components/OnboardingGuide.js';
 import { QuickActionBar } from '../components/QuickActionBar.js';
 import { SmartWizardEngine } from '../components/SmartWizardEngine.js';
 import { SmartRecommendationEngine } from '../components/SmartRecommendationEngine.js';
@@ -44,7 +43,6 @@ import {
     IProject,
     ISamplingComponent,
     ISamplingRecommendationPanel,
-    IOnboardingGuide,
     IPreferencesPanel,
     IFeedbackCollector,
     IAPIService,
@@ -79,7 +77,6 @@ export interface ComponentRegistry {
     settingsPanel: SettingsPanel;
     preferencesPanel: IPreferencesPanel | null;
     feedbackCollector: IFeedbackCollector | null;
-    onboardingGuide: IOnboardingGuide;
     quickActionBar: QuickActionBar | null;
     wizardEngine: SmartWizardEngine | null;
     recommendationEngine: SmartRecommendationEngine | null;
@@ -425,11 +422,6 @@ export class ComponentInitializer {
     private async initializeAdvancedComponents(): Promise<void> {
         console.log('[ComponentInitializer] 初始化高级功能组件...');
 
-        // 初始化新手引导
-        const onboardingGuide = new OnboardingGuide();
-        onboardingGuide.autoStart();
-        this.components.set('onboardingGuide', onboardingGuide);
-
         const mapContainer = document.querySelector('.map-container') as HTMLElement | null;
         const headerQuickActionContainer = document.querySelector('#header-quick-action-container') as HTMLElement | null;
         if (mapContainer) {
@@ -559,7 +551,6 @@ export class ComponentInitializer {
             settingsPanel: this.components.get('settingsPanel'),
             preferencesPanel: this.components.get('preferencesPanel'),
             feedbackCollector: this.components.get('feedbackCollector'),
-            onboardingGuide: this.components.get('onboardingGuide'),
             quickActionBar: this.components.get('quickActionBar'),
             wizardEngine: this.components.get('wizardEngine'),
             recommendationEngine: this.components.get('recommendationEngine'),

@@ -1,0 +1,70 @@
+.user-info-display {
+    position: fixed;
+    top: 76px;
+    right: 18px;
+    width: min(90vw, 320px);
+    background: #ffffff;
+    border: 1px solid #dbe4f0;
+    border-radius: 14px;
+    box-shadow: 0 14px 26px rgba(15, 23, 42, 0.14);
+    padding: 14px;
+    z-index: 1000000;
+}
+
+.user-info-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    color: #334155;
+}
+
+.user-info-row strong {
+    color: #0f172a;
+    text-align: right;
+}
+
+.key-status.active {
+    color: #15803d;
+}
+
+.key-status.expired {
+    color: #dc2626;
+}
+
+.user-info-progress {
+    height: 8px;
+    background: #e2e8f0;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+
+.user-info-progress .bar {
+    height: 100%;
+    background: linear-gradient(90deg, #16a34a, #22c55e);
+}
+
+.user-info-detail-btn {
+    width: 100%;
+    margin-top: 10px;
+}
+
+.user-info-empty {
+    font-size: 13px;
+    color: #64748b;
+}
+
+.user-info-detail-modal .user-detail-content {
+    margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+    .user-info-display {
+        top: 66px;
+        right: 12px;
+        left: 12px;
+        width: auto;
+    }
+}

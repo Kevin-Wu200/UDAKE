@@ -134,11 +134,11 @@ function getDefaultActions(): QuickActionItem[] {
             shortcut: { key: '9', ctrl: true, shift: true }
         },
         {
-            id: 'show-guide',
-            label: '新手引导',
-            icon: '✨',
-            description: '重新打开新手引导',
-            command: 'show-guide',
+            id: 'account-info',
+            label: '账户信息',
+            icon: '👤',
+            description: '查看当前账户和密钥状态',
+            command: 'show-account-info',
             category: 'guide',
             defaultVisible: true,
             shortcut: { key: '0', ctrl: true, shift: true }

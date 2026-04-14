@@ -33,6 +33,10 @@ import { StartupDegradationView, type StartupDegradationLevel } from './componen
 import { LaunchProgressManager } from './utils/LaunchProgressManager.js';
 import { FeedbackCollector } from './components/FeedbackCollector.js';
 import { PreferencesPanel } from './components/PreferencesPanel.js';
+import { LoginModal } from './components/LoginModal.js';
+import { KeyActivationModal } from './components/KeyActivationModal.js';
+import { UserInfoDisplay } from './components/UserInfoDisplay.js';
+import { UserInfoDetailModal } from './components/UserInfoDetailModal.js';
 import { StartupManager } from './utils/StartupManager.js';
 import { ResourceOptimizationManager } from './config/ResourceOptimizationConfig.js';
 import { LanguageSwitcher, languageSwitcherStyles } from './components/LanguageSwitcher.js';
@@ -43,6 +47,9 @@ import { AppConfig } from './config/AppConfig.js';
 import { MapConfig } from './config/map.config.js';
 import { SkeletonLoader } from './utils/SkeletonLoader.js';
 import { ComputationService } from './services/ComputationService.js';
+import { AuthService } from './services/AuthService.js';
+import { ProductKeyService } from './services/ProductKeyService.js';
+import { TokenRefresher } from './services/TokenRefresher.js';
 import type { Kriging3DPanel } from './components/Kriging3DPanel.js';
 import type { DeepLearningPanel } from './components/DeepLearningPanel.js';
 import type { FrontendIntegrationHub } from './components/FrontendIntegrationHub.js';
@@ -240,6 +247,13 @@ class App {
     private languageSwitcher: LanguageSwitcher | null = null;
     private accessibilityManager: AccessibilityManager | null = null;
     private lastAnnouncedProgressBucket: number = -1;
+    private authService: AuthService;
+    private productKeyService: ProductKeyService;
+    private tokenRefresher: TokenRefresher;
+    private loginModal: LoginModal | null = null;
+    private keyActivationModal: KeyActivationModal | null = null;
+    private userInfoDisplay: UserInfoDisplay | null = null;
+    private userInfoDetailModal: UserInfoDetailModal | null = null;
 
     // 工具
     private computationService: ComputationService;
@@ -262,6 +276,12 @@ class App {
         this.stateBridge = createStateBridge(this.stateManager);
         this.stateBridge.start();
         this.computationService = ComputationService.getInstance();
+        this.authService = new AuthService();
+        this.productKeyService = new ProductKeyService(this.authService);
+        this.tokenRefresher = new TokenRefresher(this.authService);
+        this.tokenRefresher.startStorageSync(() => {
+            void this.handleAuthSessionInvalid();
+        });
 
         I18n.onChange(() => {
             this.updateUIText();
@@ -456,10 +476,8 @@ class App {
             // 隐藏启动画面
             await this.hideAllSplashLayers();
 
-            // 启动画面完全隐藏后再触发新手引导，避免与动画重叠
             if (this.splashScreenHidden) {
-                const components = this.componentInitializer.getComponentRegistry();
-                components.onboardingGuide.autoStart();
+                await this.startAuthFlow();
             }
 
             LoadingManager.hide();
@@ -878,13 +896,7 @@ class App {
 
         // 设置按钮
         this.eventBinder.bindBySelector('#settings-btn', 'click', () => {
-            components.settingsPanel.toggle();
-        });
-
-        // 再次查看引导按钮
-        this.eventBinder.bindBySelector('#show-guide-btn', 'click', () => {
-            components.onboardingGuide.reset();
-            components.onboardingGuide.start();
+            this.showUserInfoDisplay();
         });
 
         // 文件上传相关
@@ -901,6 +913,93 @@ class App {
 
         // 监听自定义事件
         this.bindCustomEvents();
+    }
+
+    private async startAuthFlow(): Promise<void> {
+        this.userInfoDisplay?.unmount();
+        const accessToken = this.authService.getAccessToken();
+        if (!accessToken) {
+            this.showLoginModal();
+            return;
+        }
+
+        try {
+            await this.tokenRefresher.ensureValidAccessToken();
+            const { productKeyInfo } = await this.authService.getCurrentUser();
+            if (productKeyInfo && productKeyInfo.status === 'active') {
+                this.loginModal?.hide();
+                this.keyActivationModal?.hide();
+                return;
+            }
+            this.showKeyActivationModal();
+        } catch {
+            this.authService.clearSession();
+            this.showLoginModal();
+        }
+    }
+
+    private showLoginModal(): void {
+        this.keyActivationModal?.hide();
+        if (!this.loginModal) {
+            this.loginModal = new LoginModal({
+                authService: this.authService,
+                onLoginSuccess: async () => {
+                    this.showKeyActivationModal();
+                },
+            });
+        }
+        this.loginModal.show();
+    }
+
+    private showKeyActivationModal(): void {
+        this.loginModal?.hide();
+        if (!this.keyActivationModal) {
+            this.keyActivationModal = new KeyActivationModal({
+                productKeyService: this.productKeyService,
+                onActivated: async () => {
+                    await this.authService.getCurrentUser();
+                    this.userInfoDisplay?.render();
+                    this.userInfoDetailModal?.hide();
+                },
+            });
+        }
+        void this.keyActivationModal.show();
+    }
+
+    private showUserInfoDisplay(): void {
+        if (!this.userInfoDisplay) {
+            this.userInfoDisplay = new UserInfoDisplay({
+                authService: this.authService,
+                onShowDetail: () => this.showUserInfoDetailModal(),
+            });
+        }
+        this.userInfoDisplay.toggle(document.body);
+    }
+
+    private showUserInfoDetailModal(): void {
+        if (!this.userInfoDetailModal) {
+            this.userInfoDetailModal = new UserInfoDetailModal({
+                authService: this.authService,
+                onLogout: async () => {
+                    await this.handleLogoutAndRelogin();
+                },
+            });
+        }
+        this.userInfoDetailModal.show();
+    }
+
+    private async handleLogoutAndRelogin(): Promise<void> {
+        this.userInfoDisplay?.unmount();
+        this.userInfoDetailModal?.hide();
+        this.loginModal?.hide();
+        this.keyActivationModal?.hide();
+        await this.startAuthFlow();
+    }
+
+    private async handleAuthSessionInvalid(): Promise<void> {
+        this.userInfoDisplay?.unmount();
+        this.userInfoDetailModal?.hide();
+        await this.startAuthFlow();
     }
 
     private initializeLanguageSwitcher(): void {
@@ -1216,9 +1315,8 @@ class App {
                 }
                 break;
             }
-            case 'show-guide':
-                components.onboardingGuide.reset();
-                components.onboardingGuide.start();
+            case 'show-account-info':
+                this.showUserInfoDisplay();
                 break;
             case 'history-undo':
                 void HistoryManager.undo();

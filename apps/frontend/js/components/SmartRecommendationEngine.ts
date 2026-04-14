@@ -276,7 +276,7 @@ export class SmartRecommendationEngine {
     }
 
     private getBeginnerActions(): string[] {
-        return ['wizard-import-data', 'wizard-interpolation', 'show-guide'];
+        return ['wizard-import-data', 'wizard-interpolation', 'account-info'];
     }
 
     private getContextScore(actionId: string, context: string[]): number {

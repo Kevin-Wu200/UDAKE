@@ -83,6 +83,22 @@ class ChangeEmailVerifyRequest(BaseModel):
     code: str = Field(..., min_length=4, max_length=16)
 
 
+def _find_user_product_key(service: Any, user_id: int) -> Optional[Dict[str, Any]]:
+    registry = getattr(service, "product_keys", None)
+    records = getattr(registry, "_keys", {}) if registry else {}
+    for record in records.values():
+        if getattr(record, "user_id", None) == user_id and getattr(record, "status", None) == "active":
+            return {
+                "product_key": record.product_key,
+                "key_type": record.key_type,
+                "status": record.status,
+                "total_quota": record.total_quota,
+                "used_count": record.used_count,
+                "expires_at": None,
+            }
+    return None
+
+
 def _csrf_manager() -> CSRFManager:
     service = get_auth_service()
     return CSRFManager(
@@ -181,6 +197,34 @@ def refresh(payload: RefreshRequest):
     try:
         access_token = service.refresh_access_token(payload.refresh_token)
         return _ok("Token刷新成功", {"access_token": access_token})
+    except JWTValidationError as exc:
+        raise _fail(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
+
+
+@router.get("/me")
+def get_current_user(request: Request):
+    service = get_auth_service()
+    token = _extract_bearer_token(request)
+    try:
+        payload = service.jwt.verify_token(token, expected_type="access", check_blacklist=True)
+        user_id = int(payload["user_id"])
+        user = service._users_by_id.get(user_id)  # noqa: SLF001
+        if not user:
+            raise _fail(status.HTTP_404_NOT_FOUND, "用户不存在")
+
+        username = user.email.split("@", 1)[0] if "@" in user.email else user.email
+        product_key_info = _find_user_product_key(service, user_id)
+        return _ok(
+            "获取用户信息成功",
+            {
+                "id": user.id,
+                "username": username,
+                "email": user.email,
+                "role": user.role,
+                "product_key_id": getattr(user, "product_key_id", None),
+                "product_key_info": product_key_info,
+            },
+        )
     except JWTValidationError as exc:
         raise _fail(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
 
