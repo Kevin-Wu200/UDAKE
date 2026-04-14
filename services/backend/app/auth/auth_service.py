@@ -128,6 +128,25 @@ class AuthService:
         self._password_histories: Dict[int, List[PasswordHistoryEntry]] = {}
         self._email_change_requests: Dict[int, EmailChangeRequestEntry] = {}
         self.audit_logs: List[Dict[str, Any]] = []
+        self._super_admin_emails = self._parse_super_admin_emails()
+
+    def _parse_super_admin_emails(self) -> set[str]:
+        raw = os.getenv("AUTH_SUPER_ADMIN_EMAILS", "1447954419@qq.com")
+        emails: set[str] = set()
+        for item in str(raw).split(","):
+            normalized = item.strip().lower()
+            if normalized and "@" in normalized:
+                emails.add(normalized)
+        return emails
+
+    def _apply_super_admin_role_if_needed(self, user: AuthUser) -> None:
+        if user.email not in self._super_admin_emails:
+            return
+        user.role = "super_admin"
+        if "admin" not in user.permissions:
+            user.permissions.append("admin")
+        if "super_admin" not in user.permissions:
+            user.permissions.append("super_admin")
 
     def _normalize_email(self, email: str) -> str:
         return ensure_safe_text(email, max_len=320, reject_sql=True).lower()
@@ -611,6 +630,7 @@ class AuthService:
                 permissions=permissions,
                 status="active",
             )
+            self._apply_super_admin_role_if_needed(user)
             self._users_by_email[normalized_email] = user
             self._users_by_id[user_id] = user
             record.status = "active"
@@ -682,6 +702,8 @@ class AuthService:
                 user_agent=user_agent,
             )
             raise ValueError("邮箱或密码错误")
+        with self._lock:
+            self._apply_super_admin_role_if_needed(user)
 
         info = device_info or {}
         normalized_ua = str(user_agent or info.get("user_agent") or "")
