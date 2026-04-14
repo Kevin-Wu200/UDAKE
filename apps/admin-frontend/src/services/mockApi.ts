@@ -5,6 +5,7 @@ import type {
   KeyStatus,
   KeyType,
   ProductKey,
+  ProductKeyCreateForm,
   UserItem,
   UserRole
 } from '../types/admin';
@@ -43,25 +44,58 @@ function randomKey(prefix: string): string {
   return `${prefix}-${chunk()}-${chunk()}-${chunk()}`;
 }
 
+function getQuotaByType(type: KeyType) {
+  if (type === 'enterprise_trial') {
+    return 500;
+  }
+  if (type === 'enterprise_standard') {
+    return 1000;
+  }
+  if (type === 'personal_trial') {
+    return 100;
+  }
+  return 300;
+}
+
+function isEnterpriseType(type: KeyType) {
+  return type === 'enterprise_trial' || type === 'enterprise_standard';
+}
+
 let productKeyAutoId = 1;
 let userAutoId = 1;
 let logAutoId = 1;
 
-let productKeys: ProductKey[] = Array.from({ length: 52 }, (_, index) => {
-  const typePool: KeyType[] = ['trial', 'standard', 'enterprise'];
-  const statusPool: KeyStatus[] = ['unused', 'active', 'disabled'];
-  const type = typePool[index % typePool.length];
+let productKeys: ProductKey[] = Array.from({ length: 72 }, (_, index) => {
+  const typePool: KeyType[] = ['personal_trial', 'personal_standard', 'enterprise_trial', 'enterprise_standard'];
+  const statusPool: KeyStatus[] = ['unused', 'active', 'disabled', 'expired'];
+  const keyType = typePool[index % typePool.length];
   const status = statusPool[index % statusPool.length];
-  const usageCount = status === 'unused' ? 0 : (index * 2 + 3) % 40;
+  const totalQuota = getQuotaByType(keyType);
+  const usedCount = status === 'unused' ? 0 : Math.min(totalQuota, (index * 13) % (totalQuota + 1));
+  const companyId = isEnterpriseType(keyType) ? (index % 6) + 1 : undefined;
+  const userId = status !== 'unused' ? (index % 18) + 1000 : undefined;
 
   return {
     id: productKeyAutoId++,
-    key: randomKey('UDAKE'),
-    type,
+    product_key: randomKey('UDAKE'),
+    key_type: keyType,
+    key_sub_type: keyType.startsWith('personal') ? 'personal' : 'enterprise',
     status,
-    usageCount,
-    enterpriseName: `企业${(index % 9) + 1}`,
-    createdAt: daysAgo(index)
+    total_quota: totalQuota,
+    used_count: usedCount,
+    user_id: userId,
+    company_id: companyId,
+    assigned_at: userId ? daysAgo((index % 12) + 1) : undefined,
+    expires_at: status === 'expired' ? daysAgo(index % 8) : undefined,
+    metadata: {
+      generation_seed: `seed_${10000 + index}`,
+      enterprise_name: companyId ? `企业${companyId}` : undefined,
+      assigned_user_name: userId ? `user_${userId}` : undefined,
+      assigned_by: userId ? 'super_admin' : undefined,
+      notes: index % 5 === 0 ? '自动生成样例' : undefined
+    },
+    created_at: daysAgo(index),
+    updated_at: daysAgo(Math.max(0, index - 1))
   };
 });
 
@@ -146,6 +180,8 @@ export async function fetchProductKeys(params: {
   type?: KeyType;
   status?: KeyStatus;
   keyword?: string;
+  company_id?: number;
+  assigned?: boolean;
 }) {
   await delay();
   const keyword = (params.keyword ?? '').trim().toLowerCase();
@@ -153,41 +189,65 @@ export async function fetchProductKeys(params: {
   let filtered = [...productKeys].sort((a, b) => b.id - a.id);
 
   if (params.type) {
-    filtered = filtered.filter((item) => item.type === params.type);
+    filtered = filtered.filter((item) => item.key_type === params.type);
   }
   if (params.status) {
     filtered = filtered.filter((item) => item.status === params.status);
   }
+  if (typeof params.company_id === 'number') {
+    filtered = filtered.filter((item) => item.company_id === params.company_id);
+  }
+  if (typeof params.assigned === 'boolean') {
+    filtered = filtered.filter((item) => params.assigned ? Boolean(item.user_id) : !item.user_id);
+  }
   if (keyword) {
     filtered = filtered.filter(
       (item) =>
-        item.key.toLowerCase().includes(keyword) || item.enterpriseName.toLowerCase().includes(keyword)
+        item.product_key.toLowerCase().includes(keyword) ||
+        (item.metadata?.enterprise_name ?? '').toLowerCase().includes(keyword) ||
+        String(item.user_id ?? '').includes(keyword)
     );
   }
 
   return paginate(filtered, params.page, params.pageSize);
 }
 
-export async function createProductKeys(payload: {
-  type: KeyType;
-  quantity: number;
-  enterpriseName: string;
-}) {
+export async function fetchProductKeyStats() {
+  await delay(120);
+  const total = productKeys.length;
+  const active = productKeys.filter((item) => item.status === 'active').length;
+  const unused = productKeys.filter((item) => item.status === 'unused').length;
+  return { total, active, unused };
+}
+
+export async function createProductKeys(payload: ProductKeyCreateForm) {
   await delay();
   const created: ProductKey[] = [];
-  for (let i = 0; i < payload.quantity; i += 1) {
-    created.push({
+  for (let i = 0; i < payload.count; i += 1) {
+    const keyType = payload.type;
+    const key = {
       id: productKeyAutoId++,
-      key: randomKey('UDAKE'),
-      type: payload.type,
-      status: 'unused',
-      usageCount: 0,
-      enterpriseName: payload.enterpriseName,
-      createdAt: formatDate(new Date())
-    });
+      product_key: randomKey('UDAKE'),
+      key_type: keyType,
+      key_sub_type: keyType.startsWith('personal') ? 'personal' : 'enterprise',
+      status: 'unused' as KeyStatus,
+      total_quota: getQuotaByType(keyType),
+      used_count: 0,
+      user_id: payload.user_id,
+      company_id: payload.company_id,
+      assigned_at: payload.user_id ? formatDate(new Date()) : undefined,
+      metadata: {
+        ...payload.metadata,
+        enterprise_name: payload.metadata?.enterprise_name || (payload.company_id ? `企业${payload.company_id}` : undefined),
+        assigned_user_name: payload.user_id ? `user_${payload.user_id}` : undefined
+      },
+      created_at: formatDate(new Date()),
+      updated_at: formatDate(new Date())
+    };
+    created.push(key);
   }
   productKeys = [...created, ...productKeys];
-  pushAudit('create_key', `批量生成 ${payload.quantity} 条密钥`);
+  pushAudit('create_key', `创建密钥 ${payload.count} 条`);
   return created;
 }
 
@@ -205,17 +265,21 @@ export async function importProductKeys(rawText: string) {
   };
 
   for (const line of lines) {
-    const [keyText, typeText, statusText, enterpriseText] = line.split(',').map((cell) => cell.trim());
-    const key = keyText || '';
-    const type = (typeText || 'standard') as KeyType;
+    const [productKeyText, typeText, statusText, companyIdText, enterpriseNameText] = line
+      .split(',')
+      .map((cell) => cell.trim());
+
+    const productKey = productKeyText || '';
+    const keyType = (typeText || 'personal_standard') as KeyType;
     const status = (statusText || 'unused') as KeyStatus;
-    const enterpriseName = enterpriseText || '未命名企业';
+    const companyId = companyIdText ? Number(companyIdText) : undefined;
+    const enterpriseName = enterpriseNameText || (companyId ? `企业${companyId}` : undefined);
 
-    const validType = ['trial', 'standard', 'enterprise'].includes(type);
-    const validStatus = ['unused', 'active', 'disabled'].includes(status);
-    const duplicated = productKeys.some((item) => item.key === key);
+    const validType = ['personal_trial', 'personal_standard', 'enterprise_trial', 'enterprise_standard'].includes(keyType);
+    const validStatus = ['unused', 'active', 'disabled', 'expired'].includes(status);
+    const duplicated = productKeys.some((item) => item.product_key === productKey);
 
-    if (!key || !validType || !validStatus || duplicated) {
+    if (!productKey || !validType || !validStatus || duplicated) {
       result.failedCount += 1;
       result.failedLines.push(line);
       continue;
@@ -223,12 +287,19 @@ export async function importProductKeys(rawText: string) {
 
     productKeys.unshift({
       id: productKeyAutoId++,
-      key,
-      type,
+      product_key: productKey,
+      key_type: keyType,
+      key_sub_type: keyType.startsWith('personal') ? 'personal' : 'enterprise',
       status,
-      usageCount: status === 'unused' ? 0 : 1,
-      enterpriseName,
-      createdAt: formatDate(new Date())
+      total_quota: getQuotaByType(keyType),
+      used_count: status === 'unused' ? 0 : 1,
+      company_id: companyId,
+      metadata: {
+        enterprise_name: enterpriseName,
+        notes: '批量导入'
+      },
+      created_at: formatDate(new Date()),
+      updated_at: formatDate(new Date())
     });
     result.successCount += 1;
   }
@@ -241,13 +312,24 @@ export async function updateProductKey(
   id: number,
   payload: {
     status: KeyStatus;
-    enterpriseName: string;
+    notes?: string;
   }
 ) {
   await delay();
-  productKeys = productKeys.map((item) =>
-    item.id === id ? { ...item, status: payload.status, enterpriseName: payload.enterpriseName } : item
-  );
+  productKeys = productKeys.map((item) => {
+    if (item.id !== id) {
+      return item;
+    }
+    return {
+      ...item,
+      status: payload.status,
+      metadata: {
+        ...item.metadata,
+        notes: payload.notes ?? item.metadata?.notes
+      },
+      updated_at: formatDate(new Date())
+    };
+  });
   pushAudit('update_user', `更新密钥 #${id}`);
 }
 
@@ -255,6 +337,110 @@ export async function deleteProductKey(id: number) {
   await delay();
   productKeys = productKeys.filter((item) => item.id !== id);
   pushAudit('delete_key', `删除密钥 #${id}`);
+}
+
+export async function previewCompanyKeys(payload: { type: KeyType; count: number }) {
+  await delay(100);
+  const sampleCount = Math.min(Math.max(payload.count, 1), 5);
+  const prefix = payload.type === 'enterprise_trial' ? 'TRIAL' : 'STD';
+  return Array.from({ length: sampleCount }, () => randomKey(`UDAKE-${prefix}`));
+}
+
+export async function fetchCompanyKeys(params: {
+  page: number;
+  pageSize: number;
+  company_id: number;
+  type?: KeyType;
+  assigned?: boolean;
+}) {
+  return fetchProductKeys({
+    page: params.page,
+    pageSize: params.pageSize,
+    company_id: params.company_id,
+    type: params.type,
+    assigned: params.assigned
+  });
+}
+
+export async function fetchCompanyKeyStats(companyId: number) {
+  await delay(100);
+  const current = productKeys.filter((item) => item.company_id === companyId);
+  const totalKeys = current.length;
+  const activeKeys = current.filter((item) => item.status === 'active').length;
+  const assignedKeys = current.filter((item) => Boolean(item.user_id)).length;
+  const availableKeys = current.filter((item) => !item.user_id && item.status !== 'disabled' && item.status !== 'expired').length;
+  return {
+    totalKeys,
+    activeKeys,
+    assignedKeys,
+    availableKeys
+  };
+}
+
+export async function batchGenerateCompanyKeys(payload: {
+  company_id: number;
+  type: Extract<KeyType, 'enterprise_trial' | 'enterprise_standard'>;
+  count: number;
+}) {
+  return createProductKeys({
+    type: payload.type,
+    count: payload.count,
+    company_id: payload.company_id,
+    metadata: {
+      enterprise_name: `企业${payload.company_id}`,
+      notes: '企业管理员批量生成'
+    }
+  });
+}
+
+export async function fetchCompanyUsers(companyId: number) {
+  await delay(120);
+  return Array.from({ length: 8 }, (_, index) => ({
+    id: companyId * 1000 + index + 1,
+    name: `company_${companyId}_user_${index + 1}`
+  }));
+}
+
+export async function assignCompanyKey(id: number, user: { user_id: number; user_name: string; operator: string }) {
+  await delay();
+  productKeys = productKeys.map((item) => {
+    if (item.id !== id) {
+      return item;
+    }
+    return {
+      ...item,
+      user_id: user.user_id,
+      assigned_at: formatDate(new Date()),
+      metadata: {
+        ...item.metadata,
+        assigned_user_name: user.user_name,
+        assigned_by: user.operator
+      },
+      updated_at: formatDate(new Date())
+    };
+  });
+  pushAudit('update_user', `分配密钥 #${id} 给 ${user.user_name}`, user.operator);
+}
+
+export async function revokeCompanyKey(id: number, operator: string) {
+  await delay();
+  productKeys = productKeys.map((item) => {
+    if (item.id !== id) {
+      return item;
+    }
+    return {
+      ...item,
+      user_id: undefined,
+      assigned_at: undefined,
+      metadata: {
+        ...item.metadata,
+        assigned_user_name: undefined,
+        assigned_by: operator
+      },
+      updated_at: formatDate(new Date())
+    };
+  });
+  pushAudit('update_user', `撤销密钥 #${id} 分配`, operator);
 }
 
 export async function fetchUsers(params: {

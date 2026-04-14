@@ -12,9 +12,13 @@
           <el-icon><Histogram /></el-icon>
           <span>{{ t('dashboard') }}</span>
         </el-menu-item>
-        <el-menu-item index="/product-keys">
+        <el-menu-item v-if="!authStore.isCompanyAdmin" index="/product-keys">
           <el-icon><Key /></el-icon>
           <span>{{ t('productKeys') }}</span>
+        </el-menu-item>
+        <el-menu-item v-else index="/company/product-keys">
+          <el-icon><Key /></el-icon>
+          <span>{{ t('companyProductKeys') }}</span>
         </el-menu-item>
         <el-menu-item index="/workflows">
           <el-icon><Operation /></el-icon>

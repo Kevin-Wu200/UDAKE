@@ -1,14 +1,41 @@
-export type KeyType = 'trial' | 'standard' | 'enterprise';
-export type KeyStatus = 'unused' | 'active' | 'disabled';
+export type KeyType =
+  | 'personal_trial'
+  | 'personal_standard'
+  | 'enterprise_trial'
+  | 'enterprise_standard';
+export type KeyStatus = 'unused' | 'active' | 'disabled' | 'expired';
+
+export interface ProductKeyMetadata {
+  generation_seed?: string;
+  enterprise_name?: string;
+  assigned_by?: string;
+  notes?: string;
+  assigned_user_name?: string;
+}
 
 export interface ProductKey {
   id: number;
-  key: string;
-  type: KeyType;
+  product_key: string;
+  key_type: KeyType;
+  key_sub_type: string;
   status: KeyStatus;
-  usageCount: number;
-  enterpriseName: string;
-  createdAt: string;
+  total_quota: number;
+  used_count: number;
+  user_id?: number;
+  company_id?: number;
+  assigned_at?: string;
+  expires_at?: string;
+  metadata?: ProductKeyMetadata;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductKeyCreateForm {
+  type: KeyType;
+  count: number;
+  user_id?: number;
+  company_id?: number;
+  metadata?: ProductKeyMetadata;
 }
 
 export type UserRole = 'admin' | 'auditor' | 'viewer';

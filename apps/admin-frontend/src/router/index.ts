@@ -4,6 +4,7 @@ import { isAdminRole, useAuthStore } from '../stores/auth';
 const LoginView = () => import('../views/LoginView.vue');
 const DashboardView = () => import('../views/DashboardView.vue');
 const ProductKeysView = () => import('../views/ProductKeysView.vue');
+const CompanyProductKeysView = () => import('../views/CompanyProductKeysView.vue');
 const UsersView = () => import('../views/UsersView.vue');
 const AuditLogsView = () => import('../views/AuditLogsView.vue');
 const WorkflowListView = () => import('../views/workflow/WorkflowList.vue');
@@ -114,7 +115,25 @@ const router = createRouter({
           path: '/product-keys',
           name: 'product-keys',
           component: ProductKeysView,
-          meta: { title: '产品密钥管理', titleKey: 'productKeys', breadcrumbKey: 'productKeys' }
+          meta: {
+            title: '产品密钥管理',
+            titleKey: 'productKeys',
+            breadcrumbKey: 'productKeys',
+            requiredRoles: ['super_admin', 'admin']
+          }
+        },
+        {
+          path: '/company/product-keys',
+          name: 'company-product-keys',
+          component: CompanyProductKeysView,
+          meta: {
+            title: '企业密钥管理',
+            titleKey: 'companyProductKeys',
+            breadcrumbKey: 'companyProductKeys',
+            requiresAuth: true,
+            roles: ['company_admin'],
+            requiredRoles: ['company_admin']
+          }
         },
         {
           path: '/workflows',

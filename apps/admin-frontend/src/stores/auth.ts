@@ -63,7 +63,17 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     isLoggedIn: (state) => Boolean(state.accessToken),
     isLegacyAdminSession: (state) => Boolean(state.accessToken && !state.refreshToken && !state.user),
-    hasAdminAccess: (state) => Boolean(state.accessToken && (state.user ? isAdminRole(state.user.role) : true))
+    hasAdminAccess: (state) => Boolean(state.accessToken && (state.user ? isAdminRole(state.user.role) : true)),
+    isSuperAdmin: (state) => Boolean(state.accessToken && (state.user ? state.user.role === 'super_admin' : true)),
+    isCompanyAdmin: (state) => Boolean(state.user?.role === 'company_admin'),
+    currentCompany: (state) => {
+      const userId = state.user?.userId ?? 1;
+      const prefix = state.user?.email?.split('@')[0] || '默认';
+      return {
+        id: userId,
+        name: `${prefix}企业`
+      };
+    }
   },
   actions: {
     setUser(user: AuthUser | null) {
