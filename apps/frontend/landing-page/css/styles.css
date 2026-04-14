@@ -177,14 +177,17 @@ a {
   transition:
     transform var(--transition-base),
     box-shadow var(--transition-base),
-    border-color var(--transition-base);
+    border-color var(--transition-base),
+    background var(--transition-base);
   cursor: pointer;
+  min-height: 290px;
 }
 
 .feature-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-7px);
   border-color: rgba(0, 122, 255, 0.35);
-  box-shadow: 0 18px 30px -18px rgba(0, 122, 255, 0.35);
+  box-shadow: 0 26px 34px -20px rgba(0, 122, 255, 0.38);
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
 }
 
 .feature-card:focus-visible {
@@ -192,15 +195,51 @@ a {
   outline-offset: 2px;
 }
 
+.feature-icon-wrap {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 122, 255, 0.1);
+  color: var(--color-primary);
+  margin-bottom: 12px;
+}
+
+.feature-icon {
+  width: 22px;
+  height: 22px;
+  stroke-width: 2.2;
+}
+
 .feature-card h3 {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 18px;
 }
 
-.feature-card p {
+.feature-subtitle {
+  margin: 6px 0 10px;
+  color: var(--color-primary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.feature-desc {
   margin: 0;
   color: var(--color-text-sub);
   font-size: 14px;
+}
+
+.feature-highlights {
+  margin: 14px 0 0;
+  padding: 0 0 0 18px;
+  color: #515158;
+  font-size: 13px;
+}
+
+.feature-highlights li + li {
+  margin-top: 6px;
 }
 
 .downloads-sub {
@@ -410,5 +449,19 @@ body.page-transitioning {
   .download-grid,
   .contact-list {
     grid-template-columns: 1fr;
+  }
+
+  .feature-card {
+    min-height: auto;
+    padding: 18px;
+  }
+
+  .feature-icon-wrap {
+    width: 40px;
+    height: 40px;
+  }
+
+  .feature-highlights {
+    margin-top: 10px;
   }
 }

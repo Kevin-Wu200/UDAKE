@@ -24,188 +24,166 @@
         items: {
           interpolation: {
             title: "空间插值模块",
-            desc: "支持克里金、反距离加权等多种插值方法，实时预测结果可视化。",
+            subtitle: "高精度空间面构建",
+            desc: "融合地统计学与机器学习方法，支持从稀疏样本快速生成连续空间分布并可视化输出。",
+            highlights: ["支持克里金、IDW、样条等方法", "预测结果支持热力图与等值面展示"],
           },
           uncertainty: {
             title: "不确定性分析模块",
-            desc: "方差估计与置信区间计算，不确定性分级可视化。",
+            subtitle: "可量化置信度评估",
+            desc: "围绕方差与置信区间构建不确定性地图，帮助团队快速识别高风险区域与决策边界。",
+            highlights: ["方差场与置信区间联动展示", "不确定性等级自动分区"],
           },
           sampling: {
             title: "采样优化模块",
-            desc: "自适应采样策略，高不确定性区域自动识别。",
+            subtitle: "采样预算更高效",
+            desc: "根据不确定性热点与信息增益自动推荐新增采样点，在有限资源下提升采样覆盖效率。",
+            highlights: ["自动推荐新增点位", "支持约束下的采样路径规划"],
           },
           optimization: {
             title: "多目标优化模块",
-            desc: "帕累托前沿分析，多约束条件下的最优决策。",
+            subtitle: "冲突目标平衡决策",
+            desc: "在成本、时效、风险等多目标约束下进行 Pareto 优化，提供可解释的候选决策方案。",
+            highlights: ["可视化 Pareto 解集", "支持鲁棒性与敏感性评估"],
           },
           realtime: {
             title: "实时插值模块",
-            desc: "WebSocket 实时数据更新，动态采样点推荐。",
+            subtitle: "动态更新空间态势",
+            desc: "基于实时数据流进行增量插值计算，让空间预测与告警结果随现场状态持续更新。",
+            highlights: ["支持 WebSocket 数据接入", "秒级刷新预测与热点预警"],
           },
           deepLearning: {
             title: "深度学习模块",
-            desc: "神经网络辅助插值，GPU 加速计算。",
+            subtitle: "复杂模式自动学习",
+            desc: "引入神经网络建模复杂非线性空间关系，配合 GPU 加速提升训练与推理效率。",
+            highlights: ["支持 CNN/RNN/GNN 扩展", "模型版本可追踪对比"],
           },
           anomaly: {
             title: "异常检测模块",
-            desc: "自动识别数据异常，智能数据清洗。",
+            subtitle: "数据质量智能守门",
+            desc: "自动识别异常点、突变段与可疑模式，减少脏数据传播，保障后续分析链路稳定。",
+            highlights: ["时空异常联合识别", "支持人工复核闭环"],
           },
           risk: {
             title: "风险评估模块",
-            desc: "多维度风险指数计算，决策阈值建议。",
+            subtitle: "风险指数与预警闭环",
+            desc: "融合预测结果与业务阈值生成多维风险指数，支撑风险分级、预警与应对策略制定。",
+            highlights: ["多维指标综合评分", "阈值模板灵活配置"],
           },
         },
       },
       pages: {
         common: {
-          introTitle: "功能介绍",
-          techTitle: "技术特点",
-          valueTitle: "业务价值",
+          overviewTitle: "模块概述",
+          coreTitle: "核心功能",
+          useCasesTitle: "适用场景",
+          ctaDocs: "查看文档",
+          ctaStart: "开始使用",
           backHome: "返回首页",
         },
         interpolation: {
           metaTitle: "UDAKE - 空间插值模块",
           heroTitle: "空间插值模块",
-          heroSubtitle:
-            "融合地统计学与机器学习算法，实现高精度空间预测与结果可视化。",
-          intro:
-            "空间插值模块面向稀疏采样场景，支持快速构建连续空间分布，适用于环境监测、资源评估与城市治理。",
-          tech: [
-            "支持克里金、IDW 与样条等算法灵活切换",
-            "支持栅格化输出与等值面可视化",
-            "与实时数据流联动，动态更新预测结果",
+          heroSubtitle: "融合地统计学与机器学习，实现高精度空间预测与可视化输出。",
+          overview:
+            "空间插值模块面向稀疏采样和监测点不足的业务场景，可快速构建连续空间分布，支持环境治理、资源评估与城市管理等任务。",
+          coreFeatures: [
+            "支持克里金、反距离加权、样条等多种插值算法切换",
+            "支持栅格热力图、等值面与分级专题图输出",
+            "可与实时数据流联动，动态更新预测结果",
           ],
-          value: [
-            "减少高成本外业采样工作量",
-            "提升空间决策结果的可解释性",
-            "为后续风险评估提供连续输入数据",
-          ],
+          useCases: ["污染物浓度空间估算", "地下水位连续面重建", "城市热岛分布分析", "土壤属性快速制图"],
         },
         uncertainty: {
           metaTitle: "UDAKE - 不确定性分析模块",
           heroTitle: "不确定性分析模块",
-          heroSubtitle:
-            "对预测结果进行置信度量化，帮助团队明确高风险区域与决策边界。",
-          intro:
-            "不确定性分析模块可对模型结果进行方差、置信区间与分级评估，降低“只看均值”导致的判断偏差。",
-          tech: [
-            "提供方差场与置信区间联合展示",
-            "支持不确定性分级地图输出",
-            "支持模型对比下的不确定性敏感度分析",
+          heroSubtitle: "把模型置信度可视化，让风险边界更清晰、决策更稳健。",
+          overview:
+            "不确定性分析模块针对“只看均值”带来的判断偏差，提供方差、置信区间与分级评估能力，帮助团队理解结果可靠性。",
+          coreFeatures: [
+            "方差场与置信区间结果联动展示",
+            "支持不确定性等级分区与阈值高亮",
+            "支持不同模型结果的不确定性对比分析",
           ],
-          value: [
-            "提升方案评估的稳健性",
-            "提前识别高风险决策区域",
-            "为采样优化与风险评估提供依据",
-          ],
+          useCases: ["高风险区域优先排查", "监测方案可靠性评审", "应急决策边界设定"],
         },
         sampling: {
           metaTitle: "UDAKE - 采样优化模块",
           heroTitle: "采样优化模块",
-          heroSubtitle:
-            "基于不确定性热点自动推荐采样点位，持续优化数据采集策略。",
-          intro:
-            "采样优化模块结合当前数据分布与模型不确定性，输出最具信息增益的新采样建议。",
-          tech: [
+          heroSubtitle: "基于信息增益推荐采样点位，持续提升数据价值密度。",
+          overview:
+            "采样优化模块结合数据分布与模型不确定性，自动识别高价值补样位置，帮助团队在预算和时效约束下提升采样效率。",
+          coreFeatures: [
             "支持自适应采样与批量点位推荐",
-            "内置覆盖度与信息增益联合指标",
-            "支持约束条件下的可执行采样路径规划",
+            "内置信息增益与覆盖度联合评分机制",
+            "支持约束条件下的可执行路径规划",
           ],
-          value: [
-            "在有限预算下提升采样效率",
-            "缩短模型收敛周期",
-            "形成可迭代的闭环采样机制",
-          ],
+          useCases: ["环境监测网络加密", "野外调查路线优化", "长期监测站点迭代布局"],
         },
         optimization: {
           metaTitle: "UDAKE - 多目标优化模块",
           heroTitle: "多目标优化模块",
-          heroSubtitle:
-            "在成本、时效、风险等多目标之间寻找平衡解，支撑复杂场景决策。",
-          intro:
-            "多目标优化模块通过帕累托前沿分析，帮助团队在冲突目标之间快速筛选可行方案。",
-          tech: [
+          heroSubtitle: "在成本、时效与风险之间找到平衡解，支撑复杂场景决策。",
+          overview:
+            "多目标优化模块通过 Pareto 前沿分析生成候选方案集，让业务团队在冲突目标间快速筛选可执行决策。",
+          coreFeatures: [
             "支持多目标函数与多约束条件配置",
-            "提供帕累托解集可视化分析",
-            "支持方案敏感性与鲁棒性评估",
+            "支持 Pareto 解集可视化与方案对比",
+            "支持敏感性与鲁棒性评估",
           ],
-          value: [
-            "降低拍脑袋决策带来的风险",
-            "提升资源分配与调度效率",
-            "为管理层提供可量化决策依据",
-          ],
+          useCases: ["项目资源配置优化", "多约束调度策略制定", "政策方案组合评估"],
         },
         realtime: {
           metaTitle: "UDAKE - 实时插值模块",
           heroTitle: "实时插值模块",
-          heroSubtitle:
-            "通过实时数据流驱动动态插值，快速响应现场变化并持续更新空间结果。",
-          intro:
-            "实时插值模块适用于在线监测场景，可在数据到达后秒级刷新预测与预警结果。",
-          tech: [
-            "支持 WebSocket 数据流接入",
+          heroSubtitle: "流式数据驱动动态插值，快速响应现场变化。",
+          overview:
+            "实时插值模块适用于在线监测和应急响应场景，数据到达后即可触发局部更新，让预测结果和预警状态保持实时同步。",
+          coreFeatures: [
+            "支持 WebSocket 数据流接入与订阅",
             "支持增量更新与局部重计算机制",
-            "支持在线告警阈值与动态热区识别",
+            "支持热点识别与阈值告警联动",
           ],
-          value: [
-            "提升异常事件响应速度",
-            "降低数据延迟带来的决策偏差",
-            "让业务监控从静态报表走向实时态势",
-          ],
+          useCases: ["在线空气质量监控", "突发污染事件追踪", "生产现场动态风险看板"],
         },
         deepLearning: {
           metaTitle: "UDAKE - 深度学习模块",
           heroTitle: "深度学习模块",
-          heroSubtitle:
-            "利用神经网络学习复杂空间模式，提升非线性场景下的预测性能。",
-          intro:
-            "深度学习模块支持多种神经网络模型与训练策略，适用于高维特征、多源异构数据场景。",
-          tech: [
-            "支持 CNN、RNN 与图网络等模型扩展",
+          heroSubtitle: "利用神经网络学习复杂空间模式，提升非线性场景预测性能。",
+          overview:
+            "深度学习模块支持多种网络结构和训练策略，可处理高维、多源、异构数据，为复杂场景提供更强的表达能力。",
+          coreFeatures: [
+            "支持 CNN、RNN、GNN 等模型扩展",
             "支持 GPU 加速训练与推理",
             "支持模型版本管理与效果对比",
           ],
-          value: [
-            "提升复杂场景预测精度",
-            "增强模型泛化能力",
-            "缩短从实验到部署的交付周期",
-          ],
+          useCases: ["高维环境变量联合建模", "多源遥感数据融合预测", "复杂地质体性质反演"],
         },
         anomaly: {
           metaTitle: "UDAKE - 异常检测模块",
           heroTitle: "异常检测模块",
-          heroSubtitle:
-            "自动识别异常点与异常模式，提升数据质量并降低误判风险。",
-          intro:
-            "异常检测模块可在数据入库和分析阶段及时发现离群值、突变点和可疑模式。",
-          tech: [
+          heroSubtitle: "自动识别异常点与异常模式，提升数据质量与告警准确率。",
+          overview:
+            "异常检测模块可在数据接入和分析阶段识别离群值、突变点与可疑模式，减少异常传播对业务判断的影响。",
+          coreFeatures: [
             "支持统计规则与机器学习联合检测",
-            "支持时空异常联动识别",
+            "支持时空异常模式关联识别",
             "支持异常标签回写与人工复核闭环",
           ],
-          value: [
-            "减少脏数据对模型的干扰",
-            "提高业务告警的准确率",
-            "支撑高质量数据治理体系",
-          ],
+          useCases: ["传感器故障点筛查", "异常排放事件定位", "生产数据质量巡检"],
         },
         risk: {
           metaTitle: "UDAKE - 风险评估模块",
           heroTitle: "风险评估模块",
-          heroSubtitle:
-            "构建多维风险指数与预警机制，帮助团队提前制定应对策略。",
-          intro:
-            "风险评估模块将预测结果、不确定性与业务阈值融合，输出可执行的风险分级建议。",
-          tech: [
+          heroSubtitle: "构建多维风险指数与预警机制，推动风险治理前置化。",
+          overview:
+            "风险评估模块将预测结果、不确定性指标与业务阈值融合，输出风险等级与应对建议，支撑部门协同决策。",
+          coreFeatures: [
             "支持多维指标归一化与综合评分",
-            "支持风险阈值与场景模板配置",
+            "支持风险阈值模板化配置",
             "支持时序风险趋势分析与预警通知",
           ],
-          value: [
-            "提升风险识别的前瞻性",
-            "推动应急资源精准投放",
-            "将复杂分析结果转化为可执行策略",
-          ],
+          useCases: ["区域风险分级管控", "应急资源精准投放", "日常风险态势监测"],
         },
       },
       download: {
@@ -252,187 +230,206 @@
         items: {
           interpolation: {
             title: "Spatial Interpolation",
-            desc: "Support for Kriging, IDW, and other interpolation methods with real-time visualization.",
+            subtitle: "High-Precision Surface Modeling",
+            desc: "Blend geostatistics and ML methods to generate continuous spatial surfaces from sparse samples with visual outputs.",
+            highlights: ["Switch across Kriging, IDW, and spline methods", "Render heatmaps and contours in seconds"],
           },
           uncertainty: {
             title: "Uncertainty Analysis",
-            desc: "Variance estimation, confidence interval calculation, and uncertainty-level visualization.",
+            subtitle: "Quantified Confidence Insights",
+            desc: "Build variance and confidence maps to reveal high-risk regions and make decision boundaries explicit.",
+            highlights: ["Linked variance and confidence-interval views", "Automatic uncertainty zoning"],
           },
           sampling: {
             title: "Sampling Optimization",
-            desc: "Adaptive sampling strategies and automatic high-uncertainty region detection.",
+            subtitle: "Higher ROI per Sample",
+            desc: "Recommend new sampling points from uncertainty hotspots and information gain scores under practical constraints.",
+            highlights: ["Automatic next-point recommendation", "Constraint-aware route planning"],
           },
           optimization: {
             title: "Multi-Objective Optimization",
-            desc: "Pareto-front analysis and optimal decisions under multiple constraints.",
+            subtitle: "Balance Competing Targets",
+            desc: "Optimize trade-offs among cost, timeliness, and risk with interpretable Pareto-optimal plan candidates.",
+            highlights: ["Visualized Pareto solution sets", "Sensitivity and robustness evaluation"],
           },
           realtime: {
             title: "Real-Time Interpolation",
-            desc: "WebSocket-driven real-time updates and dynamic sampling-point recommendation.",
+            subtitle: "Live Spatial Situation Updates",
+            desc: "Run incremental interpolation on streaming data so predictions and alerts keep pace with changing field conditions.",
+            highlights: ["WebSocket stream integration", "Second-level refresh for forecasts and alerts"],
           },
           deepLearning: {
             title: "Deep Learning",
-            desc: "Neural-network-assisted interpolation with GPU acceleration.",
+            subtitle: "Learn Complex Patterns",
+            desc: "Use neural networks to model nonlinear spatial relationships and accelerate training/inference with GPU support.",
+            highlights: ["Extensible CNN/RNN/GNN architectures", "Versioned model comparison"],
           },
           anomaly: {
             title: "Anomaly Detection",
-            desc: "Automatic anomaly identification and intelligent data cleaning.",
+            subtitle: "Smart Data Quality Guard",
+            desc: "Automatically detect outliers, abrupt shifts, and suspicious patterns to keep downstream analytics reliable.",
+            highlights: ["Spatiotemporal anomaly linkage", "Human-in-the-loop review workflow"],
           },
           risk: {
             title: "Risk Assessment",
-            desc: "Multi-dimensional risk index calculation and decision-threshold suggestions.",
+            subtitle: "Closed-Loop Risk Alerts",
+            desc: "Fuse predictions and business thresholds into multidimensional risk indices for grading and response planning.",
+            highlights: ["Composite scoring across multiple metrics", "Flexible threshold templates"],
           },
         },
       },
       pages: {
         common: {
-          introTitle: "Overview",
-          techTitle: "Technical Highlights",
-          valueTitle: "Business Value",
+          overviewTitle: "Module Overview",
+          coreTitle: "Core Capabilities",
+          useCasesTitle: "Use Cases",
+          ctaDocs: "View Docs",
+          ctaStart: "Start Using",
           backHome: "Back to Home",
         },
         interpolation: {
           metaTitle: "UDAKE - Spatial Interpolation",
           heroTitle: "Spatial Interpolation Module",
           heroSubtitle:
-            "Combine geostatistics and ML to deliver high-accuracy spatial prediction and visualization.",
-          intro:
-            "The spatial interpolation module is designed for sparse sampling scenarios, enabling continuous surface estimation for environmental monitoring and planning.",
-          tech: [
-            "Switch between Kriging, IDW, and spline methods",
-            "Generate raster outputs and contour visualizations",
-            "Update interpolation results with streaming inputs",
+            "Combine geostatistics and ML for high-accuracy spatial prediction and visual outputs.",
+          overview:
+            "Designed for sparse monitoring scenarios, this module reconstructs continuous spatial surfaces for environmental governance, resource assessment, and urban operations.",
+          coreFeatures: [
+            "Switch among Kriging, IDW, and spline interpolation methods",
+            "Output heatmaps, contours, and classified thematic maps",
+            "Update predictions dynamically with streaming inputs",
           ],
-          value: [
-            "Reduce expensive field sampling efforts",
-            "Improve interpretability of spatial decisions",
-            "Provide continuous inputs for risk modeling",
+          useCases: [
+            "Pollutant concentration estimation",
+            "Groundwater surface reconstruction",
+            "Urban heat-island mapping",
+            "Rapid soil-property mapping",
           ],
         },
         uncertainty: {
           metaTitle: "UDAKE - Uncertainty Analysis",
           heroTitle: "Uncertainty Analysis Module",
           heroSubtitle:
-            "Quantify confidence and identify high-risk decision areas with transparent uncertainty metrics.",
-          intro:
-            "This module evaluates variance, confidence intervals, and uncertainty grading to avoid decision bias from mean-only outputs.",
-          tech: [
-            "Joint display of variance maps and confidence intervals",
-            "Export uncertainty-level zoning maps",
-            "Sensitivity comparison across model candidates",
+            "Visualize model confidence to clarify risk boundaries and improve decision robustness.",
+          overview:
+            "This module addresses mean-only bias by offering variance, confidence-interval, and uncertainty-grade analytics.",
+          coreFeatures: [
+            "Linked display of variance maps and confidence intervals",
+            "Automatic uncertainty zoning with threshold highlights",
+            "Cross-model uncertainty comparison",
           ],
-          value: [
-            "Strengthen decision robustness",
-            "Identify high-risk regions early",
-            "Support sampling and risk strategies",
+          useCases: [
+            "Priority screening of high-risk regions",
+            "Reliability review of monitoring plans",
+            "Emergency decision boundary setup",
           ],
         },
         sampling: {
           metaTitle: "UDAKE - Sampling Optimization",
           heroTitle: "Sampling Optimization Module",
           heroSubtitle:
-            "Recommend next sampling points from uncertainty hotspots to improve data acquisition efficiency.",
-          intro:
-            "The module combines current data distribution and model uncertainty to suggest new points with the highest information gain.",
-          tech: [
-            "Adaptive sampling and batch recommendation",
-            "Coverage and information-gain co-optimization",
+            "Recommend sampling points by information gain to continuously improve data value density.",
+          overview:
+            "By combining current distribution and uncertainty hotspots, this module suggests high-value new samples under budget and schedule constraints.",
+          coreFeatures: [
+            "Adaptive sampling and batch point recommendation",
+            "Joint scoring of information gain and spatial coverage",
             "Constraint-aware executable route planning",
           ],
-          value: [
-            "Increase sampling efficiency under budget limits",
-            "Shorten model convergence cycles",
-            "Enable closed-loop iterative sampling",
+          useCases: [
+            "Monitoring-network densification",
+            "Field-survey route optimization",
+            "Long-term station layout iteration",
           ],
         },
         optimization: {
           metaTitle: "UDAKE - Multi-Objective Optimization",
           heroTitle: "Multi-Objective Optimization Module",
           heroSubtitle:
-            "Balance cost, timeliness, and risk across competing objectives for complex decision scenarios.",
-          intro:
-            "Using Pareto frontier analysis, this module helps teams select feasible plans quickly under conflicting objectives.",
-          tech: [
+            "Find balanced solutions across cost, timeliness, and risk in complex planning scenarios.",
+          overview:
+            "Using Pareto-front analysis, this module produces candidate solution sets for fast selection under competing objectives.",
+          coreFeatures: [
             "Configure multiple objectives and constraints",
-            "Visualize Pareto solution sets",
+            "Visualize Pareto sets and compare alternatives",
             "Run sensitivity and robustness assessments",
           ],
-          value: [
-            "Reduce subjective decision risk",
-            "Improve resource allocation efficiency",
-            "Deliver quantifiable options for leadership",
+          useCases: [
+            "Resource allocation optimization",
+            "Constraint-heavy scheduling strategy",
+            "Policy portfolio evaluation",
           ],
         },
         realtime: {
           metaTitle: "UDAKE - Real-Time Interpolation",
           heroTitle: "Real-Time Interpolation Module",
           heroSubtitle:
-            "Drive dynamic interpolation with streaming data for fast response to field changes.",
-          intro:
-            "This module targets online monitoring scenarios and refreshes predictions and alerts within seconds of data arrival.",
-          tech: [
-            "Integrate WebSocket data streams",
-            "Use incremental updates and local recomputation",
-            "Support dynamic hotspot and threshold alerts",
+            "Streaming data drives dynamic interpolation for rapid response to field changes.",
+          overview:
+            "Built for online monitoring and emergency response, this module triggers local updates as soon as new data arrives.",
+          coreFeatures: [
+            "WebSocket stream ingestion and subscription",
+            "Incremental update with local recomputation",
+            "Hotspot detection with threshold-based alerts",
           ],
-          value: [
-            "Improve incident response speed",
-            "Reduce latency-induced decision bias",
-            "Upgrade monitoring from static reporting to live awareness",
+          useCases: [
+            "Online air-quality surveillance",
+            "Incident pollution tracking",
+            "Live operational risk dashboard",
           ],
         },
         deepLearning: {
           metaTitle: "UDAKE - Deep Learning",
           heroTitle: "Deep Learning Module",
           heroSubtitle:
-            "Leverage neural networks to capture complex spatial patterns in nonlinear environments.",
-          intro:
-            "The deep learning module supports multiple architectures and training strategies for high-dimensional and multi-source data.",
-          tech: [
-            "Extend with CNN, RNN, and graph neural networks",
-            "Accelerate training and inference on GPU",
-            "Compare model versions with reproducible tracking",
+            "Leverage neural networks to model complex nonlinear spatial patterns.",
+          overview:
+            "This module supports multiple architectures and training strategies for high-dimensional, multi-source, and heterogeneous datasets.",
+          coreFeatures: [
+            "Extend with CNN, RNN, and GNN models",
+            "Accelerate training and inference with GPU",
+            "Track model versions and benchmark results",
           ],
-          value: [
-            "Improve prediction accuracy in complex scenarios",
-            "Enhance model generalization",
-            "Shorten the path from experiment to deployment",
+          useCases: [
+            "Multivariate environmental modeling",
+            "Remote-sensing data fusion prediction",
+            "Complex geological inversion tasks",
           ],
         },
         anomaly: {
           metaTitle: "UDAKE - Anomaly Detection",
           heroTitle: "Anomaly Detection Module",
           heroSubtitle:
-            "Detect abnormal points and patterns automatically to improve data quality and alert precision.",
-          intro:
-            "This module identifies outliers, abrupt changes, and suspicious patterns during both ingestion and analysis stages.",
-          tech: [
-            "Combine statistical rules with ML-based detection",
-            "Recognize spatiotemporal anomaly patterns",
-            "Enable label feedback and human review loop",
+            "Automatically detect abnormal points and patterns to improve data quality and alert precision.",
+          overview:
+            "This module catches outliers, abrupt changes, and suspicious patterns during ingestion and analysis to prevent quality drift.",
+          coreFeatures: [
+            "Hybrid statistical-rule and ML detection",
+            "Spatiotemporal anomaly pattern linkage",
+            "Label feedback and human review loop",
           ],
-          value: [
-            "Reduce model interference from noisy data",
-            "Improve business alert precision",
-            "Support scalable data quality governance",
+          useCases: [
+            "Sensor fault screening",
+            "Abnormal discharge localization",
+            "Production data quality inspection",
           ],
         },
         risk: {
           metaTitle: "UDAKE - Risk Assessment",
           heroTitle: "Risk Assessment Module",
           heroSubtitle:
-            "Build multidimensional risk indices and early warning rules for proactive response planning.",
-          intro:
-            "The module fuses prediction outputs, uncertainty metrics, and business thresholds into actionable risk grades.",
-          tech: [
+            "Build multidimensional risk indices and warning mechanisms for proactive governance.",
+          overview:
+            "The module fuses prediction outputs, uncertainty metrics, and business thresholds into risk grades and response suggestions.",
+          coreFeatures: [
             "Normalize multi-metric inputs for composite scoring",
-            "Configure risk thresholds and scenario templates",
-            "Analyze risk trends over time with warning notifications",
+            "Configure threshold templates by scenario",
+            "Analyze temporal risk trends with warning notifications",
           ],
-          value: [
-            "Improve forward-looking risk visibility",
-            "Enable precise emergency resource allocation",
-            "Translate complex analytics into executable actions",
+          useCases: [
+            "Regional risk zoning and control",
+            "Targeted emergency resource allocation",
+            "Routine risk situation monitoring",
           ],
         },
       },

@@ -269,10 +269,18 @@
     });
   }
 
+  function renderIcons() {
+    if (!window.lucide || typeof window.lucide.createIcons !== "function") {
+      return;
+    }
+    window.lucide.createIcons();
+  }
+
   function bootstrap() {
     if (window.UDAKEI18N) {
       window.UDAKEI18N.init();
     }
+    renderIcons();
 
     bindLanguageAction();
     bindHeroAction();
@@ -286,6 +294,8 @@
       routeByHashOnHome();
       window.addEventListener("hashchange", routeByHashOnHome);
     }
+
+    window.addEventListener("udake-language-change", renderIcons);
   }
 
   if (document.readyState === "loading") {
