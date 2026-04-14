@@ -1,0 +1,1152 @@
+{
+  "meta": {
+    "generatedAt": "2026-04-14T02:57:20.159Z",
+    "projectRoot": "/Users/wuchenkai/UDAKE",
+    "scanRoots": [
+      "deep_learning",
+      "realtime_interpolation",
+      "multi_objective_optimization",
+      "adaptive_sampling",
+      "services",
+      "apps",
+      "tests",
+      "configs",
+      "deployment"
+    ]
+  },
+  "summary": {
+    "scannedFiles": 3541,
+    "categories": {
+      "core": {
+        "files": 393,
+        "findings": 0
+      },
+      "api": {
+        "files": 2169,
+        "findings": 28
+      },
+      "frontend": {
+        "files": 740,
+        "findings": 672
+      },
+      "tests": {
+        "files": 172,
+        "findings": 67
+      },
+      "config": {
+        "files": 65,
+        "findings": 1
+      },
+      "other": {
+        "files": 2,
+        "findings": 0
+      }
+    },
+    "severity": {
+      "critical": 50,
+      "high": 16,
+      "medium": 3,
+      "low": 699
+    }
+  },
+  "findings": [
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 24,
+      "sample": [
+        "password=\"StrongPass123\"",
+        "password=\"StrongPass123\"",
+        "password=\"StrongPass123\"",
+        "password=\"NewStrongPass123\"",
+        "password=\"NewStrongPass123\""
+      ],
+      "file": "services/backend/tests/test_auth_core_module.py"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 5,
+      "sample": [
+        "apiKey: 'test-geoscene-key'",
+        "apiKey: 'test-amap-key'",
+        "apiKey: 'test-tianditu-key'",
+        "apiKey: 'test-amap-key'",
+        "apiKey: 'test-tianditu-key'"
+      ],
+      "file": "tests/config-api.test.js"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 3,
+      "sample": [
+        "token=\"invite-token-001\"",
+        "token=\"share-token-001\"",
+        "token=\"invalid-invite-token\""
+      ],
+      "file": "services/backend/tests/test_auth_db_design.py"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 3,
+      "sample": [
+        "API_KEY:\"2f3f114aa5671425aa3c52f707d741c5\"",
+        "API_KEY:\"2f3f114aa5671425aa3c52f707d741c5\"",
+        "API_KEY:\"2f3f114aa5671425aa3c52f707d741c5\""
+      ],
+      "file": "apps/frontend/dist/assets/components-MpYTv3DF.js"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 3,
+      "sample": [
+        "apiKey: 'YOUR_GEOSCENE_API_KEY_HERE'",
+        "apiKey: 'YOUR_AMAP_API_KEY_HERE'",
+        "apiKey: 'YOUR_TIANDITU_API_KEY_HERE'"
+      ],
+      "file": "apps/frontend/js/config/AppConfig.ts"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 2,
+      "sample": [
+        "Token=\"UnexpectedToken\"",
+        "Token:\"UnexpectedToken\""
+      ],
+      "file": "apps/frontend/dist/assets/map-geoscene-D3NqRpXK.js"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 2,
+      "sample": [
+        "token: 'mock-access-token'",
+        "token: 'mock-refresh-token'"
+      ],
+      "file": "tests/e2e/auth-workflow.admin.test.ts"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 2,
+      "sample": [
+        "apiKey = 'abcd1234abcd1234'",
+        "token = \"abc123abc123abc123\""
+      ],
+      "file": "tests/qa-phase1-audit.test.ts"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 1,
+      "sample": [
+        "API_KEY:\"2f3f114aa5671425aa3c52f707d741c5\""
+      ],
+      "file": "apps/frontend/dist/assets/map-amap-BYcK5Ez0.js"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 1,
+      "sample": [
+        "API_KEY:\"YOUR_GEOSCENE_API_KEY_HERE\""
+      ],
+      "file": "apps/frontend/dist/assets/map-core-DiGklMqT.js"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 1,
+      "sample": [
+        "API_KEY: \"YOUR_GEOSCENE_API_KEY_HERE\""
+      ],
+      "file": "apps/frontend/js/config/geoscene.config.js"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 1,
+      "sample": [
+        "token=\"internal-token\""
+      ],
+      "file": "tests/deep_learning/test_dl_service_integration.py"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 1,
+      "sample": [
+        "token=\"internal-token\""
+      ],
+      "file": "tests/deep_learning/test_fusion_system.py"
+    },
+    {
+      "id": "hardcoded_secret_like",
+      "level": "critical",
+      "reason": "疑似硬编码敏感信息",
+      "count": 1,
+      "sample": [
+        "token: 'secret-token'"
+      ],
+      "file": "tests/logger-runtime.test.ts"
+    },
+    {
+      "id": "new_function",
+      "level": "high",
+      "reason": "动态代码执行存在安全风险",
+      "count": 12,
+      "sample": [
+        "new Function(",
+        "new Function(",
+        "new Function(",
+        "new Function(",
+        "new Function("
+      ],
+      "file": "apps/frontend/dist/assets/map-geoscene-D3NqRpXK.js"
+    },
+    {
+      "id": "dangerous_eval",
+      "level": "high",
+      "reason": "可能导致代码注入风险",
+      "count": 1,
+      "sample": [
+        "eval("
+      ],
+      "file": "services/backend/app/data_quality/rule_engine.py"
+    },
+    {
+      "id": "new_function",
+      "level": "high",
+      "reason": "动态代码执行存在安全风险",
+      "count": 1,
+      "sample": [
+        "new Function("
+      ],
+      "file": "apps/frontend/dist/assets/echarts-CgYYBBj9.js"
+    },
+    {
+      "id": "new_function",
+      "level": "high",
+      "reason": "动态代码执行存在安全风险",
+      "count": 1,
+      "sample": [
+        "new Function("
+      ],
+      "file": "apps/frontend/js/core/PluginManager.ts"
+    },
+    {
+      "id": "dangerous_eval",
+      "level": "high",
+      "reason": "可能导致代码注入风险",
+      "count": 1,
+      "sample": [
+        "eval("
+      ],
+      "file": "tests/qa-phase1-audit.test.ts"
+    },
+    {
+      "id": "todo_fixme",
+      "level": "medium",
+      "reason": "遗留待办或临时实现标记",
+      "count": 2,
+      "sample": [
+        "TODO",
+        "TODO"
+      ],
+      "file": "tests/qa-phase1-audit.test.ts"
+    },
+    {
+      "id": "todo_fixme",
+      "level": "medium",
+      "reason": "遗留待办或临时实现标记",
+      "count": 1,
+      "sample": [
+        "TODO"
+      ],
+      "file": "apps/frontend/dist/assets/map-geoscene-D3NqRpXK.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 107,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/dist/assets/map-geoscene-D3NqRpXK.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 40,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/dist/assets/index-DqioKn0w.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 37,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/主程序.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 32,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/dist/assets/core-components-BWaeVeTI.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 32,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/dist/assets/map-amap-BYcK5Ez0.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 29,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/DataImportModal.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 28,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/dist/assets/managers-CnfZVo_C.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 27,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/config/amap.config.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 25,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/dist/assets/map-core-DiGklMqT.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 24,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "tests/performance-benchmark.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 23,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/managers/ComponentInitializer.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 22,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/utils/MapEngineTestHelper.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 19,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/managers/TaskManager.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 17,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/adapters/GeoSceneAdapter.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 15,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/managers/TaskExecutors.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 15,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "tests/cache-performance.test.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 13,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/core/PluginMarket.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 11,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/dist/assets/components-MpYTv3DF.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 11,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/dist/assets/startup-_YpSAyS-.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 11,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/TaskManager集成示例.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 11,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/位置服务集成示例.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 10,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/core/PluginManager.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 9,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/dist/assets/位置服务集成示例-CON9mQ6h.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 9,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/RealtimeInterpolation.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 7,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/RealtimeMapUpdater.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 7,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/map/core/AMapEngine.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 6,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/RealtimeAlertManager.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 6,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/utils/StartupManager.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 5,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/adapters/AMapAdapter.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 5,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/OfflineManager.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 5,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/core/ServiceRegistry.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 5,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/managers/MapManager.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 5,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/utils/OfflineManager.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 5,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "tests/e2e/workflow.test.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 5,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "tests/route-planning.test.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 4,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/utils/ErrorMonitor.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 4,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/地图引擎集成.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 3,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/dist/assets/utils-UruassJD.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 3,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/config/ResourceOptimizationConfig.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 3,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/services/WebSocketService.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 3,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/utils/PerformanceMonitor.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 3,
+      "sample": [
+        "console.log(",
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/任务轮询.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 2,
+      "sample": [
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/dist/assets/sampling-CDV3wW_X.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 2,
+      "sample": [
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/IndustrySelector.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 2,
+      "sample": [
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/LocationCenterButton.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 2,
+      "sample": [
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/MapEngineSwitcher.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 2,
+      "sample": [
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/UncertaintyHeatmapAnimation.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 2,
+      "sample": [
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/core/EventBus.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 2,
+      "sample": [
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/managers/TaskQueue.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 2,
+      "sample": [
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/store/Store.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 2,
+      "sample": [
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/utils/LaunchProgressManager.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 2,
+      "sample": [
+        "console.log(",
+        "console.log("
+      ],
+      "file": "apps/frontend/js/utils/cache/TwoLevelCache.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/CacheManagementPanel.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/FeedbackCollector.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/RealtimeControlPanel.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/TaskManagementPanel.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/TrackVisualization.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/components/ZoomControl.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/config/geoscene.config.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/managers/TaskStorage.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/map/core/GeoSceneEngine.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/map/core/MockMapEngine.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/sampling/FreeSampling.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/sampling/RegionSampling.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/services/ParameterConfigManager.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "apps/frontend/js/services/UnitManager.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "tests/e2e/support/stability.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "tests/location-service.test.js"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "tests/qa-phase1-audit.test.ts"
+    },
+    {
+      "id": "debug_console",
+      "level": "low",
+      "reason": "调试日志可能影响可观测性与信息暴露控制",
+      "count": 1,
+      "sample": [
+        "console.log("
+      ],
+      "file": "configs/playwright.global-setup.ts"
+    }
+  ]
+}
