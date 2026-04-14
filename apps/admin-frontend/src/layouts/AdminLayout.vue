@@ -175,11 +175,33 @@ const onLogout = () => {
   color: #dbe8f4;
   border-radius: 8px;
   margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.menu :deep(.el-sub-menu__title) {
+  color: #dbe8f4;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.menu :deep(.el-sub-menu .el-menu-item) {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.menu :deep(.el-menu-item:hover) {
+  color: #f8fbff;
+  background: rgba(231, 240, 255, 0.14);
+  font-weight: 500;
 }
 
 .menu :deep(.el-menu-item.is-active) {
   color: #102a43;
   background: #e7f0ff;
+  font-weight: 500;
 }
 
 .content-wrap {

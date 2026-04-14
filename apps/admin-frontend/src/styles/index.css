@@ -11,7 +11,7 @@
 
 body {
   margin: 0;
-  font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  font-family: 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', 'Source Han Sans SC', sans-serif;
   background: var(--page-bg);
   color: #0f172a;
 }

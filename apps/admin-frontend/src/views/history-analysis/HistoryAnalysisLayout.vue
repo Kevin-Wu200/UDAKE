@@ -199,6 +199,16 @@ watch(
 
 .hint {
   color: #64748b;
-  font-size: 13px;
+  font-size: 14px;
+}
+
+.history-analysis-layout :deep(.section-header h3) {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.history-analysis-layout :deep(.section-header p) {
+  font-size: 14px;
+  font-weight: 400;
 }
 </style>
