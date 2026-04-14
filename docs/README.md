@@ -25,6 +25,17 @@ UDAKE（Uncertainty-Driven Adaptive Kriging Engine）是一个智能不确定性
 | [技术文档.md](技术文档.md) | 功能模块、类型系统、缓存系统、手势功能 |
 | [更新日志.md](更新日志.md) | 版本更新记录 |
 
+### 扩展模块文档
+
+| 模块 | 说明 |
+|------|------|
+| [深度学习模块](../deep_learning/README.md) | 空间插值神经网络、异常检测、强化学习采样优化、不确定性量化、模型融合 |
+| [多目标优化系统](../multi_objective_optimization/README.md) | 多目标优化采样系统（NSGA-II算法） |
+| [实时插值系统](../realtime_interpolation/README.md) | 增量式实时克里金插值系统 |
+| [自适应采样](../adaptive_sampling/) | 自适应采样策略和优化算法 |
+| [AI扩展模块](../ai_extension/) | 趋势识别、异常检测、误差预测、采样优化建议 |
+| [不确定性仪表板](../uncertainty_dashboard/) | 不确定性分级、风险指数计算、决策阈值分析 |
+
 ## 技术栈
 
 ### 后端
