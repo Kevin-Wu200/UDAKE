@@ -1,0 +1,50 @@
+autoscaling:
+  workload: udake-backend
+  namespace: production
+  min_replicas: 2
+  max_replicas: 12
+
+  metrics:
+    cpu_utilization_percent:
+      target: 65
+      scale_up_threshold: 75
+      scale_down_threshold: 45
+      evaluation_window: 5m
+
+    memory_utilization_percent:
+      target: 70
+      scale_up_threshold: 80
+      scale_down_threshold: 55
+      evaluation_window: 5m
+
+    requests_per_second:
+      target_per_pod: 120
+      scale_up_threshold: 150
+      scale_down_threshold: 80
+      evaluation_window: 3m
+
+  scale_up_rules:
+    stabilization_window: 60s
+    step_policies:
+      - type: Percent
+        value: 100
+        period_seconds: 60
+      - type: Pods
+        value: 3
+        period_seconds: 60
+
+  scale_down_rules:
+    stabilization_window: 300s
+    step_policies:
+      - type: Percent
+        value: 30
+        period_seconds: 60
+      - type: Pods
+        value: 1
+        period_seconds: 60
+
+  safeguards:
+    cooldown_after_scale_up: 120s
+    cooldown_after_scale_down: 300s
+    block_scale_down_when_error_rate_over_percent: 2
+    block_scale_down_when_p95_latency_over_seconds: 1.5

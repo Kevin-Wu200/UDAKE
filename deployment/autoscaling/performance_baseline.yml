@@ -1,0 +1,40 @@
+performance_baseline:
+  service: udake-backend
+  update_cycle: weekly
+
+  indicators:
+    - name: api_p95_latency_seconds
+      target: 1.2
+      warning: 1.5
+      critical: 2.0
+    - name: api_p99_latency_seconds
+      target: 2.0
+      warning: 2.5
+      critical: 3.5
+    - name: request_success_rate
+      target: 0.995
+      warning: 0.99
+      critical: 0.97
+    - name: error_rate_5xx
+      target: 0.005
+      warning: 0.01
+      critical: 0.02
+    - name: cpu_utilization_percent
+      target: 60
+      warning: 75
+      critical: 85
+    - name: memory_utilization_percent
+      target: 65
+      warning: 80
+      critical: 90
+
+  anomaly_detection:
+    method: moving_average
+    baseline_window: 7d
+    detection_window: 30m
+    allowed_deviation_percent: 20
+
+  alerting:
+    enabled: true
+    route: oncall-platform
+    reevaluate_every: 2m

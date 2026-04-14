@@ -1,0 +1,27 @@
+backup_policy:
+  schedule:
+    full_backup: "0 2 * * *"
+    incremental_backup: "*/15 * * * *"
+    config_backup: "30 2 * * *"
+    log_backup: "0 */6 * * *"
+
+  retention:
+    local_days: 7
+    remote_days: 90
+    monthly_archive_months: 12
+
+  targets:
+    data:
+      enabled: true
+      path: deployment/spatiotemporal_kriging/backups/postgres
+    config:
+      enabled: true
+      path: deployment/spatiotemporal_kriging/backups/config
+    logs:
+      enabled: true
+      path: deployment/spatiotemporal_kriging/backups/logs
+
+  integrity:
+    checksum_algorithm: sha256
+    verify_after_backup: true
+    verify_before_restore: true
