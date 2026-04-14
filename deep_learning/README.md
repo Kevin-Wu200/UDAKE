@@ -59,6 +59,7 @@ python3 deep_learning/examples/rl_adapter_usage_demo.py
 ```bash
 python3 deep_learning/examples/uncertainty_training_demo.py
 python3 deep_learning/examples/uncertainty_inference_demo.py
+python3 deep_learning/examples/uncertainty_feature_analysis_demo.py
 ```
 
 ## 阶段6快速命令
@@ -74,4 +75,17 @@ python3 deep_learning/inference/run_spatiotemporal_inference.py --model gcn_lstm
 python3 deep_learning/examples/fusion_adapter_usage_demo.py
 python3 -m pytest tests/deep_learning/test_fusion_system.py -q
 python3 -m pytest tests/deep_learning/test_dl_service_fusion_api.py -q
+```
+
+## 通用框架示例集合
+
+```bash
+python3 deep_learning/examples/anomaly_inference_demo.py
+python3 deep_learning/examples/spatial_interpolation_adapter_usage_demo.py
+python3 deep_learning/examples/uncertainty_inference_demo.py
+python3 deep_learning/examples/fusion_adapter_usage_demo.py
+python3 deep_learning/examples/rl_adapter_usage_demo.py
+python3 deep_learning/examples/anomaly_multi_model_comparison_demo.py
+python3 deep_learning/examples/advanced_usage_demo.py
+python3 deep_learning/examples/verify_usage_examples.py
 ```
