@@ -9,6 +9,7 @@ const USER_INFO_KEY = 'udake_user_info';
 const LOGIN_USER_KEY = 'admin_login_user';
 const LEGACY_ADMIN_ACCESS_TOKEN_KEY = 'admin_access_token';
 const VALIDATE_CACHE_MS = 60_000;
+const ADMIN_ALLOWED_ROLES = ['company_admin', 'super_admin', 'admin'] as const;
 
 interface RefreshResponse {
   access_token: string;
@@ -44,6 +45,10 @@ function normalizeUser(payload: UserSessionPayload): AuthUser {
   };
 }
 
+export function isAdminRole(role: string | null | undefined): boolean {
+  return typeof role === 'string' && ADMIN_ALLOWED_ROLES.includes(role as (typeof ADMIN_ALLOWED_ROLES)[number]);
+}
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     accessToken: getInitialAccessToken(),
@@ -57,7 +62,8 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     isLoggedIn: (state) => Boolean(state.accessToken),
-    isLegacyAdminSession: (state) => Boolean(state.accessToken && !state.refreshToken && !state.user)
+    isLegacyAdminSession: (state) => Boolean(state.accessToken && !state.refreshToken && !state.user),
+    hasAdminAccess: (state) => Boolean(state.accessToken && (state.user ? isAdminRole(state.user.role) : true))
   },
   actions: {
     setUser(user: AuthUser | null) {

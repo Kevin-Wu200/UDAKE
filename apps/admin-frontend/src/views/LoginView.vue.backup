@@ -4,8 +4,8 @@
       <h1>{{ t('appTitle') }}</h1>
       <p class="sub-title">管理员后台登录</p>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
-        <el-form-item :label="t('email')" prop="email">
-          <el-input v-model="form.email" :placeholder="t('email')" />
+        <el-form-item :label="t('username')" prop="username">
+          <el-input v-model="form.username" :placeholder="t('username')" />
         </el-form-item>
         <el-form-item :label="t('password')" prop="password">
           <el-input
@@ -13,7 +13,6 @@
             type="password"
             show-password
             :placeholder="t('password')"
-            @keyup.enter="onSubmit"
           />
         </el-form-item>
         <div class="row">
@@ -32,20 +31,15 @@ import type { FormInstance, FormRules } from 'element-plus';
 import { reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
-import { isAdminRole, useAuthStore } from '../stores/auth';
-import { loginUser } from '../services/userAuthApi';
+import { useAuthStore } from '../stores/auth';
+import { loginApi } from '../services/mockApi';
 import { useI18nText } from '../i18n/useI18n';
-import { decodeRememberPassword, encodeRememberPassword } from '../utils/auth';
 
 interface LoginForm {
-  email: string;
+  username: string;
   password: string;
   rememberPassword: boolean;
 }
-
-const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-const REMEMBER_EMAIL_KEY = 'admin_remember_email';
-const REMEMBER_PASSWORD_KEY = 'admin_remember_password';
 
 const route = useRoute();
 const router = useRouter();
@@ -54,33 +48,17 @@ const { t } = useI18nText();
 
 const formRef = ref<FormInstance>();
 const submitting = ref(false);
-const rememberedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY) ?? '';
-const rememberedPasswordRaw = localStorage.getItem(REMEMBER_PASSWORD_KEY) ?? '';
+const rememberedName = localStorage.getItem('admin_remember_name') ?? '';
 
 const form = reactive<LoginForm>({
-  email: rememberedEmail,
-  password: decodeRememberPassword(rememberedPasswordRaw),
-  rememberPassword: Boolean(rememberedEmail && rememberedPasswordRaw)
+  username: rememberedName,
+  password: '',
+  rememberPassword: Boolean(rememberedName)
 });
 
 const rules: FormRules<LoginForm> = {
-  email: [
-    { required: true, message: t('requiredEmail'), trigger: 'blur' },
-    { type: 'email', message: t('invalidEmail'), trigger: ['blur', 'change'] }
-  ],
-  password: [
-    { required: true, message: t('requiredPassword'), trigger: 'blur' },
-    {
-      validator: (_rule, value: string, callback) => {
-        if (!value || PASSWORD_PATTERN.test(value)) {
-          callback();
-          return;
-        }
-        callback(new Error(t('invalidPasswordStrength')));
-      },
-      trigger: ['blur', 'change']
-    }
-  ]
+  username: [{ required: true, message: t('requiredUsername'), trigger: 'blur' }],
+  password: [{ required: true, message: t('requiredPassword'), trigger: 'blur' }]
 };
 
 const onSubmit = async () => {
@@ -91,23 +69,18 @@ const onSubmit = async () => {
   try {
     await formRef.value.validate();
     submitting.value = true;
-    const session = await loginUser(form.email.trim().toLowerCase(), form.password);
-    if (!isAdminRole(session.user.role)) {
-      throw new Error(t('adminRoleRequired'));
-    }
-    authStore.applyUserSession(session);
+    const res = await loginApi(form.username, form.password);
+    authStore.login(form.username, res.accessToken);
 
     if (form.rememberPassword) {
-      localStorage.setItem(REMEMBER_EMAIL_KEY, form.email.trim().toLowerCase());
-      localStorage.setItem(REMEMBER_PASSWORD_KEY, encodeRememberPassword(form.password));
+      localStorage.setItem('admin_remember_name', form.username);
     } else {
-      localStorage.removeItem(REMEMBER_EMAIL_KEY);
-      localStorage.removeItem(REMEMBER_PASSWORD_KEY);
+      localStorage.removeItem('admin_remember_name');
     }
 
     ElMessage.success(t('loginSuccess'));
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard';
-    await router.replace(redirect);
+    router.push(redirect);
   } catch (error) {
     if (error instanceof Error) {
       ElMessage.error(error.message);

@@ -567,13 +567,24 @@ class AuthService:
         user_agent: Optional[str] = None,
     ) -> Dict[str, Any]:
         normalized_email = self._normalize_email(email)
+        normalized_product_key = product_key.strip().upper()
+        bootstrap_key_alias = str(getattr(self, "_bootstrap_product_key_alias", "") or "").strip().upper()
+        bootstrap_key_canonical = str(getattr(self, "_bootstrap_product_key", "") or "").strip().upper()
+        validate_product_key = product_key
+        use_bootstrap_admin_role = False
+        if bootstrap_key_alias and bootstrap_key_canonical and normalized_product_key == bootstrap_key_alias:
+            validate_product_key = bootstrap_key_canonical
+            use_bootstrap_admin_role = True
+        elif bootstrap_key_canonical and normalized_product_key == bootstrap_key_canonical:
+            use_bootstrap_admin_role = True
+
         self.validate_email(normalized_email)
         self.validate_password_strength(password)
         self._ensure_ip_allowed(ip_address=ip_address)
         self._ensure_rate_limit(identity=normalized_email, action="register")
 
         try:
-            record = self.product_keys.validate_key(product_key, require_unused=True)
+            record = self.product_keys.validate_key(validate_product_key, require_unused=True)
         except ProductKeyValidationError as exc:
             self._audit(
                 operation="register",
@@ -590,12 +601,14 @@ class AuthService:
 
             user_id = self._next_user_id
             self._next_user_id += 1
+            role = "admin" if use_bootstrap_admin_role else "user"
+            permissions = ["read", "write", "admin"] if use_bootstrap_admin_role else ["read"]
             user = AuthUser(
                 id=user_id,
                 email=normalized_email,
                 password_hash=hash_password(password),
-                role="user",
-                permissions=["read"],
+                role=role,
+                permissions=permissions,
                 status="active",
             )
             self._users_by_email[normalized_email] = user
@@ -612,11 +625,17 @@ class AuthService:
         self._audit(
             operation="register",
             user_id=user.id,
-            details={"action": "register", "email": normalized_email, "result": "success"},
+            details={
+                "action": "register",
+                "email": normalized_email,
+                "result": "success",
+                "role": user.role,
+                "used_bootstrap_key": use_bootstrap_admin_role,
+            },
             ip_address=ip_address,
             user_agent=user_agent,
         )
-        return {"user_id": user.id, "email": user.email, "verification_code": code}
+        return {"user_id": user.id, "email": user.email, "role": user.role, "verification_code": code}
 
     def login(
         self,
@@ -1224,6 +1243,8 @@ def get_auth_service() -> AuthService:
 
                 bootstrap_seed = os.getenv("AUTH_BOOTSTRAP_PRODUCT_KEY", "UDAKE-DEFAULT-PRODUCT-KEY")
                 bootstrap_record = service.product_keys.generate_key(bootstrap_seed)
+                service._bootstrap_product_key_alias = bootstrap_seed.strip().upper()
+                service._bootstrap_product_key = bootstrap_record.product_key
                 cache.set_with_jitter(
                     "auth:warmup:product_keys",
                     {"keys": [bootstrap_record.product_key], "count": 1},

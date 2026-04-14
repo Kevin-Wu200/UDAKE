@@ -1,5 +1,5 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
-import { useAuthStore } from '../stores/auth';
+import { isAdminRole, useAuthStore } from '../stores/auth';
 
 const LoginView = () => import('../views/LoginView.vue');
 const DashboardView = () => import('../views/DashboardView.vue');
@@ -101,7 +101,7 @@ const router = createRouter({
     {
       path: '/',
       component: AdminLayout,
-      meta: { requiresAuth: true },
+      meta: { requiresAuth: true, requiredRoles: ADMIN_ALLOWED_ROLES },
       redirect: '/dashboard',
       children: [
         {
@@ -258,13 +258,14 @@ router.beforeEach(async (to) => {
   const requiresAdminAuth = Boolean(to.meta.requiresAuth);
   const requiresUserAuth = Boolean(to.meta.requiresUserAuth);
   const userGuestOnly = Boolean(to.meta.userGuestOnly);
+  const hasAdminAccess = authStore.isLegacyAdminSession || isAdminRole(authStore.user?.role);
 
   if (to.path === '/login' && loggedIn) {
-    return authStore.user ? '/user/devices' : '/dashboard';
+    return hasAdminAccess ? '/dashboard' : '/user/devices';
   }
 
   if (userGuestOnly && loggedIn) {
-    return authStore.user ? '/user/devices' : '/dashboard';
+    return hasAdminAccess ? '/dashboard' : '/user/devices';
   }
 
   if ((requiresAdminAuth || requiresUserAuth) && !loggedIn) {
