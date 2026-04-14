@@ -275,7 +275,7 @@ class AuthService:
         except Exception as exc:
             logger.warning("IP封禁提醒邮件发送失败 ip=%s err=%s", ip_address, exc)
 
-    def add_product_key(self, product_key: str, *, key_type: str = "personal") -> ProductKeyRecord:
+    def add_product_key(self, product_key: str, *, key_type: str = "personal_standard") -> ProductKeyRecord:
         record = ProductKeyRecord(product_key=product_key, key_type=key_type, status="unused")
         self.product_keys.register_key(record)
         return record

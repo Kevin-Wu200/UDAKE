@@ -22,7 +22,16 @@ from sqlalchemy import String, cast, func, or_
 from sqlalchemy.orm import Session
 
 from ..auth import JWTValidationError, ProductKeyRegistry, SensitiveDataCipher, get_auth_service, hash_password
-from ..auth_db.models import AuditLog, Company, PasswordHistory, ProductKey, User, UserDevice
+from ..auth_db.models import (
+    AuditLog,
+    Company,
+    PasswordHistory,
+    ProductKey,
+    ProductKeyStatus,
+    ProductKeyType,
+    User,
+    UserDevice,
+)
 from ..auth_db.session import get_auth_db_session
 from ..config import settings
 
@@ -30,9 +39,12 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin")
 
-PRODUCT_KEY_TYPE_TO_DB = {"personal": "personal", "company": "enterprise"}
-PRODUCT_KEY_TYPE_FROM_DB = {"personal": "personal", "enterprise": "company"}
-VALID_PRODUCT_KEY_STATUS = {"unused", "active", "revoked", "expired", "available"}
+PRODUCT_KEY_TYPES = {item.value for item in ProductKeyType}
+ENTERPRISE_PRODUCT_KEY_TYPES = {
+    ProductKeyType.ENTERPRISE_TRIAL.value,
+    ProductKeyType.ENTERPRISE_STANDARD.value,
+}
+VALID_PRODUCT_KEY_STATUS = {item.value for item in ProductKeyStatus}
 VALID_USER_STATUS = {"active", "disabled"}
 AUDIT_EXPORT_LIMIT = 10_000
 STATS_CACHE_TTL_SECONDS = 3600
@@ -60,7 +72,10 @@ _product_key_cipher = SensitiveDataCipher(settings.AUTH_ENCRYPTION_KEY or os.get
 
 
 class ProductKeyCreateRequest(BaseModel):
-    type: Literal["personal", "company"] = Field(..., description="密钥类型")
+    type: Literal["personal_trial", "personal_standard", "enterprise_trial", "enterprise_standard"] = Field(
+        ...,
+        description="密钥类型",
+    )
     count: int = Field(..., ge=1, le=1000, description="生成数量")
     company_name: Optional[str] = Field(default=None, max_length=128)
 
@@ -72,7 +87,7 @@ class ProductKeyUpdateRequest(BaseModel):
 
 class ProductKeyBatchImportRequest(BaseModel):
     keys: List[str] = Field(..., min_length=1, max_length=5000)
-    type: Literal["personal", "company"] = Field(...)
+    type: Literal["personal_trial", "personal_standard", "enterprise_trial", "enterprise_standard"] = Field(...)
     duplicate_action: Literal["skip", "overwrite"] = Field(default="skip")
     company_name: Optional[str] = Field(default=None, max_length=128)
 
@@ -193,7 +208,8 @@ def _serialize_product_key(item: ProductKey, company_name: Optional[str] = None)
     return {
         "id": item.id,
         "product_key": item.product_key,
-        "type": PRODUCT_KEY_TYPE_FROM_DB.get(item.key_type, item.key_type),
+        "type": item.key_type,
+        "sub_type": item.key_sub_type,
         "status": item.status,
         "company_id": item.company_id,
         "company_name": company_name,
@@ -202,6 +218,9 @@ def _serialize_product_key(item: ProductKey, company_name: Optional[str] = None)
         "signature": item.signature,
         "encrypted": bool(item.product_key_ciphertext),
         "issued_at": _to_iso(item.issued_at),
+        "assigned_at": _to_iso(item.assigned_at),
+        "last_used_at": _to_iso(item.last_used_at),
+        "expires_at": _to_iso(item.expires_at),
         "created_at": _to_iso(item.created_at),
         "updated_at": _to_iso(item.updated_at),
     }
@@ -260,6 +279,10 @@ def _normalize_product_key(raw: str) -> str:
 
 def _make_seed(index: int, operator_id: int) -> str:
     return f"admin:{operator_id}:{index}:{time.time_ns()}:{uuid.uuid4().hex}"
+
+
+def _resolve_key_sub_type(key_type: str) -> str:
+    return "trial" if key_type.endswith("_trial") else "standard"
 
 
 def _rsa_sign_pkcs1_v15_sha256(message: bytes) -> str:
@@ -388,10 +411,10 @@ def create_product_keys(
     db: Session = Depends(get_auth_db_session),
 ):
     current_user = _require_super_admin_user(request, db)
-    db_type = PRODUCT_KEY_TYPE_TO_DB[payload.type]
+    db_type = payload.type
 
     company: Optional[Company] = None
-    if payload.type == "company":
+    if db_type in ENTERPRISE_PRODUCT_KEY_TYPES:
         if not payload.company_name or not payload.company_name.strip():
             raise _fail(status.HTTP_400_BAD_REQUEST, "企业密钥必须提供 company_name")
         company = _resolve_or_create_company(db, payload.company_name)
@@ -411,7 +434,7 @@ def create_product_keys(
             continue
 
         signature = None
-        if db_type == "enterprise":
+        if db_type in ENTERPRISE_PRODUCT_KEY_TYPES:
             signature = _rsa_sign_pkcs1_v15_sha256(normalized_key.encode("ascii"))
 
         item = ProductKey(
@@ -420,9 +443,11 @@ def create_product_keys(
             product_key=normalized_key,
             product_key_ciphertext=_product_key_cipher.encrypt(normalized_key),
             key_type=db_type,
+            key_sub_type=_resolve_key_sub_type(db_type),
+            generation_seed=seed,
             status="unused",
             company_id=company.id if company else None,
-            total_quota=1,
+            total_quota=ProductKey.get_default_quota(db_type),
             used_count=0,
             signature=signature,
         )
@@ -476,9 +501,12 @@ def list_product_keys(
 
     if type:
         normalized_type = type.strip().lower()
-        if normalized_type not in PRODUCT_KEY_TYPE_TO_DB:
-            raise _fail(status.HTTP_400_BAD_REQUEST, "type 仅支持 personal/company")
-        query = query.filter(ProductKey.key_type == PRODUCT_KEY_TYPE_TO_DB[normalized_type])
+        if normalized_type not in PRODUCT_KEY_TYPES:
+            raise _fail(
+                status.HTTP_400_BAD_REQUEST,
+                "type 仅支持 personal_trial/personal_standard/enterprise_trial/enterprise_standard",
+            )
+        query = query.filter(ProductKey.key_type == normalized_type)
 
     if status_value:
         normalized_status = status_value.strip().lower()
@@ -588,10 +616,10 @@ def batch_import_product_keys(
     db: Session = Depends(get_auth_db_session),
 ):
     current_user = _require_super_admin_user(request, db)
-    db_type = PRODUCT_KEY_TYPE_TO_DB[payload.type]
+    db_type = payload.type
 
     company: Optional[Company] = None
-    if payload.type == "company":
+    if db_type in ENTERPRISE_PRODUCT_KEY_TYPES:
         if not payload.company_name or not payload.company_name.strip():
             raise _fail(status.HTTP_400_BAD_REQUEST, "企业密钥导入必须提供 company_name")
         company = _resolve_or_create_company(db, payload.company_name)
@@ -639,10 +667,14 @@ def batch_import_product_keys(
                 continue
 
             existing.key_type = db_type
+            existing.key_sub_type = _resolve_key_sub_type(db_type)
             existing.company_id = company.id if company else None
             existing.product_key_ciphertext = _product_key_cipher.encrypt(normalized_key)
-            if db_type == "enterprise":
+            existing.total_quota = ProductKey.get_default_quota(db_type)
+            if db_type in ENTERPRISE_PRODUCT_KEY_TYPES:
                 existing.signature = _rsa_sign_pkcs1_v15_sha256(normalized_key.encode("ascii"))
+            else:
+                existing.signature = None
             overwrite_count += 1
             success_count += 1
             continue
@@ -653,11 +685,16 @@ def batch_import_product_keys(
             product_key=normalized_key,
             product_key_ciphertext=_product_key_cipher.encrypt(normalized_key),
             key_type=db_type,
+            key_sub_type=_resolve_key_sub_type(db_type),
             status="unused",
             company_id=company.id if company else None,
-            total_quota=1,
+            total_quota=ProductKey.get_default_quota(db_type),
             used_count=0,
-            signature=_rsa_sign_pkcs1_v15_sha256(normalized_key.encode("ascii")) if db_type == "enterprise" else None,
+            signature=(
+                _rsa_sign_pkcs1_v15_sha256(normalized_key.encode("ascii"))
+                if db_type in ENTERPRISE_PRODUCT_KEY_TYPES
+                else None
+            ),
         )
         db.add(item)
         inserted_in_batch.add(normalized_key)
@@ -1073,7 +1110,7 @@ def _build_stats_payload(db: Session) -> Dict[str, Any]:
     total_keys = int(db.query(func.count(ProductKey.id)).scalar() or 0)
     used_keys = int(
         db.query(func.count(ProductKey.id))
-        .filter(or_(ProductKey.status.in_(["active", "revoked", "expired"]), ProductKey.used_count > 0))
+        .filter(or_(ProductKey.status.in_(["active", "disabled", "expired"]), ProductKey.used_count > 0))
         .scalar()
         or 0
     )

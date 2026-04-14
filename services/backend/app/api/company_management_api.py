@@ -253,7 +253,7 @@ def delete_company_user(
             released_quota = current_used - next_used
             product_key.used_count = next_used
             if next_used == 0:
-                product_key.status = "available"
+                product_key.status = "unused"
             target_user.product_key_id = None
 
         next_audit_id = (db.query(func.max(AuditLog.id)).scalar() or 0) + 1

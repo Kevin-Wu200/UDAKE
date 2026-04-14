@@ -100,10 +100,11 @@ def test_crud_and_transaction_flow(sqlite_engine):
                     id=1,
                     user_id=user.id,
                     product_key="PK-ALICE-001",
-                    key_type="personal",
+                    key_type="personal_standard",
+                    key_sub_type="standard",
                     status="active",
                     company_id=company.id,
-                    total_quota=10,
+                    total_quota=ProductKey.get_default_quota("personal_standard"),
                     used_count=1,
                     expires_at=now + timedelta(days=30),
                 ),
@@ -166,6 +167,10 @@ def test_crud_and_transaction_flow(sqlite_engine):
         stored_user.status = "disabled"
         session.commit()
         assert session.query(User).filter_by(status="disabled").count() == 1
+        assert ProductKey.get_default_quota("personal_trial") == 10
+        assert ProductKey.get_default_quota("personal_standard") == 100
+        assert ProductKey.get_default_quota("enterprise_trial") == 500
+        assert ProductKey.get_default_quota("enterprise_standard") == 1000
 
     with Session(sqlite_engine) as session:
         session.add(

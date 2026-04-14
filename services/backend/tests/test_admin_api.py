@@ -70,19 +70,21 @@ def admin_client(monkeypatch: pytest.MonkeyPatch):
             id=101,
             user_id=1,
             product_key="ABC-DEFG-HIJK-LMNO",
-            key_type="personal",
+            key_type="personal_standard",
+            key_sub_type="standard",
             status="unused",
-            total_quota=1,
+            total_quota=100,
             used_count=0,
         )
         key_used = ProductKey(
             id=102,
             user_id=2,
             product_key="QWE-RTYU-IOPA-SDFG",
-            key_type="enterprise",
+            key_type="enterprise_standard",
+            key_sub_type="standard",
             status="active",
             company_id=1,
-            total_quota=10,
+            total_quota=1000,
             used_count=1,
             signature="sig",
         )
@@ -143,20 +145,20 @@ def test_admin_product_key_crud_and_batch(admin_client):
 
     create_resp = client.post(
         "/api/admin/product-keys",
-        json={"type": "company", "count": 2, "company_name": "企业A"},
+        json={"type": "enterprise_standard", "count": 2, "company_name": "企业A"},
         headers=_auth_header(tokens["super_admin"]),
     )
     assert create_resp.status_code == 200, create_resp.text
     create_data = create_resp.json()["data"]
     assert create_data["count"] == 2
-    assert all(item["type"] == "company" for item in create_data["keys"])
+    assert all(item["type"] == "enterprise_standard" for item in create_data["keys"])
     assert all(item["signature"] for item in create_data["keys"])
 
     key_id_1 = create_data["keys"][0]["id"]
     key_id_2 = create_data["keys"][1]["id"]
 
     list_resp = client.get(
-        "/api/admin/product-keys?page=1&page_size=50&type=company",
+        "/api/admin/product-keys?page=1&page_size=50&type=enterprise_standard",
         headers=_auth_header(tokens["super_admin"]),
     )
     assert list_resp.status_code == 200, list_resp.text
@@ -164,11 +166,11 @@ def test_admin_product_key_crud_and_batch(admin_client):
 
     update_resp = client.put(
         f"/api/admin/product-keys/{key_id_1}",
-        json={"status": "revoked"},
+        json={"status": "disabled"},
         headers=_auth_header(tokens["super_admin"]),
     )
     assert update_resp.status_code == 200, update_resp.text
-    assert update_resp.json()["data"]["key"]["status"] == "revoked"
+    assert update_resp.json()["data"]["key"]["status"] == "disabled"
 
     delete_resp = client.delete(
         f"/api/admin/product-keys/{key_id_2}",
@@ -180,7 +182,7 @@ def test_admin_product_key_crud_and_batch(admin_client):
     valid_key = registry.generate_key("batch-import-1").product_key
     batch_resp = client.post(
         "/api/admin/product-keys/batch",
-        json={"keys": [valid_key, valid_key, "BAD-KEY"], "type": "personal", "duplicate_action": "skip"},
+        json={"keys": [valid_key, valid_key, "BAD-KEY"], "type": "personal_standard", "duplicate_action": "skip"},
         headers=_auth_header(tokens["super_admin"]),
     )
     assert batch_resp.status_code == 200, batch_resp.text

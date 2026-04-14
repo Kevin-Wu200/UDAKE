@@ -22,7 +22,7 @@ class ProductKeyValidationError(ValueError):
 class ProductKeyRecord:
     product_key: str
     status: str = "unused"
-    key_type: str = "personal"
+    key_type: str = "personal_standard"
     signature: Optional[str] = None
     metadata: Optional[dict] = None
 
@@ -193,7 +193,7 @@ class ProductKeyRegistry:
     def get_record(self, product_key: str) -> Optional[ProductKeyRecord]:
         return self._keys.get(_normalize_key(product_key))
 
-    def generate_key(self, seed: str, *, key_type: str = "personal") -> ProductKeyRecord:
+    def generate_key(self, seed: str, *, key_type: str = "personal_standard") -> ProductKeyRecord:
         digest = hashlib.sha256(seed.encode("utf-8")).digest()
         body = _base36_chars_from_digest(digest, 9)
         checksum = _expected_checksum_char(body + "0")
@@ -241,7 +241,7 @@ class ProductKeyRegistry:
         if require_unused and record.status != "unused":
             raise ProductKeyValidationError(f"product key status invalid: {record.status}")
 
-        if record.key_type == "enterprise":
+        if str(record.key_type).startswith("enterprise"):
             if not record.signature:
                 raise ProductKeyValidationError("enterprise key missing signature")
             if not enterprise_public_key_pem:

@@ -89,7 +89,8 @@ def company_client(monkeypatch: pytest.MonkeyPatch):
             user_id=member_1.id,
             company_id=company_a.id,
             product_key="PK-ENT-A-001",
-            key_type="enterprise",
+            key_type="enterprise_standard",
+            key_sub_type="standard",
             status="active",
             total_quota=10,
             used_count=1,
@@ -158,7 +159,7 @@ def test_delete_company_user_soft_delete_release_quota_and_audit(company_client)
 
         product_key = db.query(ProductKey).filter(ProductKey.id == 101).one()
         assert product_key.used_count == 0
-        assert product_key.status == "available"
+        assert product_key.status == "unused"
 
         audit = (
             db.query(AuditLog)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from enum import Enum
 from typing import Any, Dict, Optional
 
 from sqlalchemy import (
@@ -14,6 +16,7 @@ from sqlalchemy import (
     Index,
     Integer,
     String,
+    Text,
     UniqueConstraint,
     func,
     text,
@@ -106,6 +109,20 @@ class User(Base):
     )
 
 
+class ProductKeyType(str, Enum):
+    PERSONAL_TRIAL = "personal_trial"
+    PERSONAL_STANDARD = "personal_standard"
+    ENTERPRISE_TRIAL = "enterprise_trial"
+    ENTERPRISE_STANDARD = "enterprise_standard"
+
+
+class ProductKeyStatus(str, Enum):
+    UNUSED = "unused"
+    ACTIVE = "active"
+    DISABLED = "disabled"
+    EXPIRED = "expired"
+
+
 class ProductKey(Base):
     __tablename__ = "product_keys"
 
@@ -116,6 +133,9 @@ class ProductKey(Base):
     product_key: Mapped[str] = mapped_column(String(128), nullable=False)
     product_key_ciphertext: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     key_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    key_sub_type: Mapped[str] = mapped_column(String(30), nullable=False, server_default=text("'standard'"))
+    generation_seed: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    key_metadata: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'unused'"))
     company_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
@@ -124,8 +144,10 @@ class ProductKey(Base):
     used_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     signature: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     issued_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    assigned_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     activated_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
-    expires_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     revoked_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[Any] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -137,14 +159,27 @@ class ProductKey(Base):
     company = relationship("Company", back_populates="product_keys")
     user = relationship("User", back_populates="product_keys")
 
+    @classmethod
+    def get_default_quota(cls, key_type: str) -> int:
+        quota_map = {
+            ProductKeyType.PERSONAL_TRIAL.value: 10,
+            ProductKeyType.PERSONAL_STANDARD.value: 100,
+            ProductKeyType.ENTERPRISE_TRIAL.value: 500,
+            ProductKeyType.ENTERPRISE_STANDARD.value: 1000,
+        }
+        return quota_map.get(key_type, 1)
+
     __table_args__ = (
-        UniqueConstraint("product_key", name="uq_product_keys_key"),
         CheckConstraint(
-            "key_type IN ('personal', 'enterprise')",
+            "key_type IN ('personal_trial', 'personal_standard', 'enterprise_trial', 'enterprise_standard')",
             name="ck_product_keys_type_enum",
         ),
         CheckConstraint(
-            "status IN ('unused', 'active', 'revoked', 'expired', 'available')",
+            "key_sub_type IN ('trial', 'standard')",
+            name="ck_product_keys_sub_type_enum",
+        ),
+        CheckConstraint(
+            "status IN ('unused', 'active', 'disabled', 'expired')",
             name="ck_product_keys_status_enum",
         ),
         CheckConstraint("total_quota >= 0", name="ck_product_keys_total_quota_non_negative"),
@@ -153,6 +188,10 @@ class ProductKey(Base):
         Index("ix_product_keys_status", "status"),
         Index("ix_product_keys_company_id", "company_id"),
         Index("ix_product_keys_ciphertext", "product_key_ciphertext"),
+        Index("idx_product_keys_type_status", "key_type", "status"),
+        Index("idx_product_keys_company_status", "company_id", "status"),
+        Index("idx_product_keys_user_status", "user_id", "status"),
+        Index("uq_product_keys_key", "product_key", unique=True),
     )
 
 
