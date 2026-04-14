@@ -1,0 +1,13 @@
+# 生产数据库连接配置模板
+engine: postgresql
+host: postgres
+port: 5432
+database: udake_kriging
+username: udake
+ssl_mode: disable
+pool:
+  min_size: 5
+  max_size: 30
+  max_overflow: 10
+  recycle_seconds: 1800
+  connect_timeout_seconds: 10

@@ -1,0 +1,11 @@
+# 日志级别与输出配置模板
+level: INFO
+format: json
+output:
+  app_log: /var/log/udake/backend.log
+  access_log: /var/log/nginx/access.log
+  error_log: /var/log/nginx/error.log
+rotation:
+  daily: true
+  retain_days: 14
+  compress: true

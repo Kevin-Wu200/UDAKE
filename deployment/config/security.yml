@@ -1,0 +1,14 @@
+# 安全参数配置模板
+auth:
+  jwt_algorithm: HS256
+  jwt_expire_minutes: 120
+  require_https: true
+network:
+  trusted_proxies:
+    - 127.0.0.1
+    - 10.0.0.0/8
+  cors_origins:
+    - https://kriging.example.com
+secrets:
+  rotate_interval_days: 90
+  min_secret_length: 32

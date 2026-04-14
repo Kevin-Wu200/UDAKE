@@ -1,0 +1,20 @@
+{
+  "index_patterns": ["udake-logs-*"],
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 1
+    },
+    "mappings": {
+      "dynamic": true,
+      "properties": {
+        "timestamp": { "type": "date" },
+        "level": { "type": "keyword" },
+        "service": { "type": "keyword" },
+        "trace_id": { "type": "keyword" },
+        "message": { "type": "text" },
+        "host": { "type": "keyword" }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+# 网络参数配置模板
+ports:
+  http: 80
+  https: 443
+  backend: 8000
+  prometheus: 9090
+healthcheck:
+  path: /health
+  interval_seconds: 30
+  timeout_seconds: 5
+  retries: 5
+rate_limit:
+  enabled: true
+  requests_per_minute: 600

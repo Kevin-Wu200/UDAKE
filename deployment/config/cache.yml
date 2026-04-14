@@ -1,0 +1,10 @@
+# 缓存配置模板
+engine: redis
+host: redis
+port: 6379
+db: 0
+password: ""
+default_ttl_seconds: 600
+max_connections: 200
+socket_timeout_seconds: 3
+retry_on_timeout: true

@@ -1,0 +1,9 @@
+retention:
+  hot_days: 7
+  warm_days: 30
+  cold_archive_days: 180
+  delete_after_days: 180
+backup:
+  daily_snapshot: true
+  snapshot_time: "03:30"
+  snapshot_repository: "s3://udake-log-archive"

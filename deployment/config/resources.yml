@@ -1,0 +1,17 @@
+# 资源限制配置模板
+container_limits:
+  backend:
+    cpu: "2"
+    memory: "4g"
+  frontend:
+    cpu: "1"
+    memory: "1g"
+  postgres:
+    cpu: "2"
+    memory: "4g"
+  redis:
+    cpu: "1"
+    memory: "2g"
+ulimits:
+  nofile_soft: 65535
+  nofile_hard: 65535

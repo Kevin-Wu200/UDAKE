@@ -1,0 +1,10 @@
+# 性能参数配置模板
+backend:
+  worker_processes: 4
+  max_requests_per_worker: 2000
+  request_timeout_seconds: 60
+  keepalive_seconds: 75
+database:
+  slow_query_threshold_ms: 300
+cache:
+  hot_key_protection: true

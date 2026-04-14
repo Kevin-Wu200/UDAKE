@@ -1,0 +1,20 @@
+groups:
+  - name: udake-log-alerts
+    rules:
+      - alert: LogErrorBurst
+        expr: increase(log_errors_total[5m]) > 50
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "错误日志突增"
+          description: "5分钟内错误日志增量超过 50 条。"
+
+      - alert: LogCollectorDown
+        expr: up{job="fluent-bit"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "日志采集器不可用"
+          description: "fluent-bit 连续 2 分钟不可用。"
