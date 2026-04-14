@@ -24,6 +24,7 @@ from sqlalchemy import String, cast, func, or_
 from sqlalchemy.orm import Session
 
 from ..auth import JWTValidationError, ProductKeyRegistry, SensitiveDataCipher, get_auth_service, hash_password
+from ..auth.input_sanitizer import sanitize_payload
 from ..auth_db.models import (
     AuditLog,
     Company,
@@ -528,6 +529,7 @@ def create_product_keys(
 ):
     current_user: User = request.state.current_user
     db_type = PRODUCT_KEY_TYPE_TO_DB[payload.type]
+    sanitized_metadata = sanitize_payload(payload.metadata) if payload.metadata is not None else None
 
     if current_user.role == "super_admin" and payload.count > 1:
         raise _fail(status.HTTP_403_FORBIDDEN, "超级管理员不支持批量生成密钥")
@@ -591,7 +593,7 @@ def create_product_keys(
             key_type=db_type,
             key_sub_type=_resolve_key_sub_type(db_type),
             generation_seed=seed,
-            key_metadata=json.dumps(payload.metadata, ensure_ascii=False) if payload.metadata is not None else None,
+            key_metadata=json.dumps(sanitized_metadata, ensure_ascii=False) if sanitized_metadata is not None else None,
             status="unused",
             company_id=company.id if company else None,
             total_quota=PRODUCT_KEY_QUOTA_MAP.get(db_type, ProductKey.get_default_quota(db_type)),
