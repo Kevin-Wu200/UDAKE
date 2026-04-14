@@ -4,9 +4,17 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import re
+import secrets
+import time
 from dataclasses import dataclass
-from typing import Callable, Dict, Optional
+from typing import Any, Callable, Dict, Optional
+
+try:
+    from pypinyin import lazy_pinyin
+except Exception:  # pragma: no cover - optional dependency fallback
+    lazy_pinyin = None  # type: ignore[assignment]
 
 BASE36_ALPHABET = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 PRODUCT_KEY_PATTERN = re.compile(r"^[A-Z0-9]{3}(?:-[A-Z0-9]{4}){3}$")
@@ -23,8 +31,14 @@ class ProductKeyRecord:
     product_key: str
     status: str = "unused"
     key_type: str = "personal_standard"
+    key_sub_type: str = "standard"
+    total_quota: int = 100
+    used_count: int = 0
+    user_id: Optional[int] = None
+    company_id: Optional[int] = None
+    generation_seed: Optional[str] = None
+    metadata: Optional[dict[str, Any]] = None
     signature: Optional[str] = None
-    metadata: Optional[dict] = None
 
 
 def base36_encode(value: int) -> str:
@@ -68,14 +82,24 @@ def _key_raw(product_key: str) -> str:
     return product_key.replace("-", "").upper()
 
 
-def _expected_checksum_char(raw_key: str) -> str:
+def _expected_checksum_char_legacy(raw_key: str) -> str:
     values = [base36_decode(ch) for ch in raw_key[:9]]
     checksum = sum(v * w for v, w in zip(values, CHECKSUM_WEIGHTS)) % 36
     return BASE36_ALPHABET[checksum]
 
 
-def _expected_hash_suffix(raw_key: str) -> str:
+def _expected_hash_suffix_legacy(raw_key: str) -> str:
     digest = hashlib.sha256(raw_key[:10].encode("ascii")).digest()
+    return _base36_chars_from_digest(digest, 5)
+
+
+def _expected_checksum_char_v2(data: str) -> str:
+    digest = hashlib.sha256(data.encode("ascii")).digest()
+    return BASE36_ALPHABET[int.from_bytes(digest, "big") % 36]
+
+
+def _expected_hash_suffix_v2(data: str) -> str:
+    digest = hashlib.sha256(data.encode("ascii")).digest()
     return _base36_chars_from_digest(digest, 5)
 
 
@@ -182,10 +206,11 @@ def verify_rsa_signature_sha256(message: bytes, signature_b64: str, public_key_p
 
 
 class ProductKeyRegistry:
-    """In-memory product key registry with deterministic validation algorithm."""
+    """In-memory product key registry with enterprise/personal generation support."""
 
     def __init__(self) -> None:
         self._keys: Dict[str, ProductKeyRecord] = {}
+        self._counter = 0
 
     def register_key(self, record: ProductKeyRecord) -> None:
         self._keys[_normalize_key(record.product_key)] = record
@@ -193,17 +218,194 @@ class ProductKeyRegistry:
     def get_record(self, product_key: str) -> Optional[ProductKeyRecord]:
         return self._keys.get(_normalize_key(product_key))
 
-    def generate_key(self, seed: str, *, key_type: str = "personal_standard") -> ProductKeyRecord:
+    def _next_counter(self) -> int:
+        self._counter += 1
+        return self._counter
+
+    def _build_key_from_seed(self, seed: str) -> str:
         digest = hashlib.sha256(seed.encode("utf-8")).digest()
         body = _base36_chars_from_digest(digest, 9)
-        checksum = _expected_checksum_char(body + "0")
+        checksum = _expected_checksum_char_v2(body + "0")
         prefix = body + checksum
-        suffix = _expected_hash_suffix(prefix + "00000")
+        suffix = _expected_hash_suffix_v2(prefix + "00000")
         raw = prefix + suffix
-        formatted = f"{raw[:3]}-{raw[3:7]}-{raw[7:11]}-{raw[11:15]}"
-        record = ProductKeyRecord(product_key=formatted, key_type=key_type, status="unused")
+        return f"{raw[:3]}-{raw[3:7]}-{raw[7:11]}-{raw[11:15]}"
+
+    @staticmethod
+    def _key_sub_type_from_type(key_type: str) -> str:
+        return "trial" if str(key_type).endswith("_trial") else "standard"
+
+    @staticmethod
+    def _get_quota_for_type(key_type: str) -> int:
+        quota_map = {
+            "personal_trial": 10,
+            "personal_standard": 100,
+            "enterprise_trial": 500,
+            "enterprise_standard": 1000,
+        }
+        return quota_map.get(key_type, 1)
+
+    @staticmethod
+    def _company_initials(company_name: str) -> str:
+        text = str(company_name or "").strip()
+        if not text:
+            return "".join(secrets.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ") for _ in range(3))
+
+        initials = ""
+        if lazy_pinyin:
+            pinyin_items = lazy_pinyin(text)
+            initials = "".join(item[0].upper() for item in pinyin_items if item)
+        if not initials:
+            initials = "".join(ch.upper() for ch in text if ch.isalpha() and ch.isascii())
+
+        if len(initials) < 3:
+            while len(initials) < 3:
+                initials += secrets.choice("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
+            return initials
+        if len(initials) > 3:
+            return "".join(secrets.choice(initials) for _ in range(3))
+        return initials
+
+    def generate_enterprise_key(
+        self,
+        *,
+        company_name: str,
+        company_id: int,
+        key_type: str,
+    ) -> tuple[str, str]:
+        company_prefix = self._company_initials(company_name)
+        random_seed = secrets.token_hex(16)
+        timestamp_ms = int(time.time() * 1000)
+        counter = self._next_counter()
+        generation_seed = (
+            f"enterprise:{company_prefix}:{company_id}:{key_type}:{timestamp_ms}:{counter}:{random_seed}"
+        )
+        return self._build_key_from_seed(generation_seed), generation_seed
+
+    def generate_personal_key(
+        self,
+        *,
+        user_id: int,
+        key_type: str,
+    ) -> tuple[str, str]:
+        random_seed = secrets.token_hex(24)
+        timestamp_ms = int(time.time() * 1000)
+        counter = self._next_counter()
+        generation_seed = f"personal:{user_id}:{key_type}:{timestamp_ms}:{counter}:{random_seed}"
+        return self._build_key_from_seed(generation_seed), generation_seed
+
+    def generate_key(
+        self,
+        seed: Optional[str] = None,
+        *,
+        key_type: str = "personal_standard",
+        user_id: Optional[int] = None,
+        company_id: Optional[int] = None,
+        company_name: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+    ) -> ProductKeyRecord:
+        key_metadata: dict[str, Any] = dict(metadata or {})
+        if seed is not None:
+            generation_seed = str(seed)
+            product_key = self._build_key_from_seed(generation_seed)
+            variant = "legacy"
+        elif str(key_type).startswith("enterprise_"):
+            if not company_id or not company_name:
+                raise ValueError("企业密钥需要提供 company_id 和 company_name")
+            product_key, generation_seed = self.generate_enterprise_key(
+                company_name=company_name,
+                company_id=company_id,
+                key_type=key_type,
+            )
+            variant = "enterprise"
+            key_metadata.setdefault("enterprise_name", company_name)
+        else:
+            if not user_id:
+                raise ValueError("个人密钥需要提供 user_id")
+            product_key, generation_seed = self.generate_personal_key(user_id=user_id, key_type=key_type)
+            variant = "personal"
+
+        key_metadata.setdefault("key_variant", variant)
+        key_metadata.setdefault("generation_seed", generation_seed)
+
+        record = ProductKeyRecord(
+            product_key=product_key.upper(),
+            key_type=key_type,
+            key_sub_type=self._key_sub_type_from_type(key_type),
+            status="unused",
+            total_quota=self._get_quota_for_type(key_type),
+            used_count=0,
+            user_id=user_id,
+            company_id=company_id,
+            generation_seed=generation_seed,
+            metadata=key_metadata,
+        )
         self.register_key(record)
         return record
+
+    def generate_keys(
+        self,
+        *,
+        key_type: str,
+        count: int,
+        user_id: Optional[int] = None,
+        company_id: Optional[int] = None,
+        company_name: Optional[str] = None,
+        metadata: Optional[dict[str, Any]] = None,
+        db: Optional[Any] = None,
+        created_by: Optional[int] = None,
+    ) -> list[Any]:
+        if count < 1 or count > 1000:
+            raise ValueError("生成数量必须在 1-1000 之间")
+
+        created: list[Any] = []
+        model_cls: Optional[type[Any]] = None
+        if db is not None:
+            from app.auth_db.models import ProductKey as ProductKeyModel
+
+            model_cls = ProductKeyModel
+
+        for index in range(count):
+            item_metadata = dict(metadata or {})
+            item_metadata["batch_index"] = index + 1
+            item_metadata["batch_size"] = count
+            record = self.generate_key(
+                key_type=key_type,
+                user_id=user_id,
+                company_id=company_id,
+                company_name=company_name,
+                metadata=item_metadata,
+            )
+
+            if db is None or model_cls is None:
+                created.append(record)
+                continue
+
+            db_item = model_cls(
+                product_key=record.product_key,
+                key_type=record.key_type,
+                key_sub_type=record.key_sub_type,
+                status=record.status,
+                total_quota=record.total_quota,
+                used_count=record.used_count,
+                user_id=record.user_id or user_id or 0,
+                company_id=record.company_id,
+                key_metadata=json.dumps(record.metadata, ensure_ascii=False),
+                generation_seed=record.generation_seed,
+            )
+            if hasattr(db_item, "created_by") and created_by is not None:
+                setattr(db_item, "created_by", created_by)
+            if hasattr(db_item, "created_by_id") and created_by is not None:
+                setattr(db_item, "created_by_id", created_by)
+            db.add(db_item)
+            created.append(db_item)
+
+        if db is not None:
+            db.commit()
+            for item in created:
+                db.refresh(item)
+
+        return created
 
     def validate_key_format(self, product_key: str) -> None:
         normalized = _normalize_key(product_key)
@@ -212,11 +414,24 @@ class ProductKeyRegistry:
 
     def validate_checksum(self, product_key: str) -> None:
         raw = _key_raw(product_key)
-        expected_checksum = _expected_checksum_char(raw)
-        if raw[9] != expected_checksum:
+        if len(raw) != 15:
+            raise ProductKeyValidationError("product key length invalid")
+
+        body = raw[:9]
+        checksum = raw[9]
+        suffix = raw[10:]
+
+        expected_checksum_v2 = _expected_checksum_char_v2(body + "0")
+        if checksum == expected_checksum_v2:
+            expected_suffix_v2 = _expected_hash_suffix_v2((body + checksum) + "00000")
+            if suffix == expected_suffix_v2:
+                return
+
+        expected_checksum_legacy = _expected_checksum_char_legacy(raw)
+        if checksum != expected_checksum_legacy:
             raise ProductKeyValidationError("product key checksum mismatch")
-        expected_suffix = _expected_hash_suffix(raw)
-        if raw[10:] != expected_suffix:
+        expected_suffix_legacy = _expected_hash_suffix_legacy(raw)
+        if suffix != expected_suffix_legacy:
             raise ProductKeyValidationError("product key hash tail mismatch")
 
     def validate_key(

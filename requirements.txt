@@ -30,6 +30,7 @@ shapely==2.0.2
 
 # 数据处理
 pandas==2.1.4
+pypinyin==0.53.0
 
 # 系统监控
 psutil==5.9.6

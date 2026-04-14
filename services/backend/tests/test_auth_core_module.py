@@ -27,7 +27,7 @@ from app.auth import (
     reset_auth_service,
     verify_password,
 )
-from app.auth.product_key_service import verify_rsa_signature_sha256
+from app.auth.product_key_service import PRODUCT_KEY_PATTERN, verify_rsa_signature_sha256
 from app.auth.rate_limiter import AuthRateLimiter, RateLimitExceededError, RateRule
 from app.auth.verification import EmailVerificationService, VerificationCodeError
 from app.security_middleware import security_guard_middleware
@@ -105,6 +105,33 @@ qZBjvhx2MwVWlSgyUwIDAQAB
         "YqF1UPZTxIX5Cd0tZ102VBrkHwZu63CT3v52Ho2AS2w="
     )
     assert verify_rsa_signature_sha256(message, signature_b64, public_pem)
+
+
+def test_product_key_new_generation_algorithms_and_batch():
+    registry = ProductKeyRegistry()
+
+    enterprise = registry.generate_key(
+        key_type="enterprise_standard",
+        company_id=88,
+        company_name="北京优达科技",
+        metadata={"source": "unit-test"},
+    )
+    personal = registry.generate_key(key_type="personal_trial", user_id=9527)
+    legacy = registry.generate_key("legacy-seed-for-compat")
+
+    assert PRODUCT_KEY_PATTERN.fullmatch(enterprise.product_key)
+    assert PRODUCT_KEY_PATTERN.fullmatch(personal.product_key)
+    assert PRODUCT_KEY_PATTERN.fullmatch(legacy.product_key)
+    assert enterprise.metadata and enterprise.metadata.get("key_variant") == "enterprise"
+    assert personal.metadata and personal.metadata.get("key_variant") == "personal"
+
+    assert registry.validate_key(personal.product_key).product_key == personal.product_key
+    assert registry.validate_key(legacy.product_key).product_key == legacy.product_key
+
+    batch = registry.generate_keys(key_type="personal_standard", count=30, user_id=9527)
+    assert len(batch) == 30
+    assert len({item.product_key for item in batch}) == 30
+    assert all(PRODUCT_KEY_PATTERN.fullmatch(item.product_key) for item in batch)
 
 
 def test_verification_code_issue_and_attempt_limit():
