@@ -323,7 +323,10 @@ const onDelete = async (row: ProductKey) => {
     await ElMessageBox.confirm(`确认删除密钥 ${row.key} 吗？`, '删除确认', {
       type: 'warning',
       confirmButtonText: '删除',
-      cancelButtonText: '取消'
+      cancelButtonText: '取消',
+      modalClass: 'admin-confirm-dialog-overlay',
+      closeOnClickModal: false,
+      closeOnPressEscape: false
     });
     await deleteProductKey(row.id);
     ElMessage.success('删除成功');
@@ -331,8 +334,11 @@ const onDelete = async (row: ProductKey) => {
       page.value -= 1;
     }
     loadList();
-  } catch {
-    // 用户取消或者删除失败
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      console.error('删除密钥失败:', error);
+      ElMessage.error('操作失败，请重试');
+    }
   }
 };
 

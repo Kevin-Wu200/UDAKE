@@ -154,13 +154,21 @@ const goEditor = (workflowId?: string) => {
 const onDelete = async (workflowId: string) => {
   try {
     await ElMessageBox.confirm('删除后不可恢复，是否继续？', '删除工作流', {
-      type: 'warning'
+      type: 'warning',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      modalClass: 'admin-confirm-dialog-overlay',
+      closeOnClickModal: false,
+      closeOnPressEscape: false
     });
     await workflowService.deleteWorkflow(workflowId);
     ElMessage.success('已删除工作流');
     await loadData();
-  } catch {
-    // 用户取消或请求失败
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      console.error('删除工作流失败:', error);
+      ElMessage.error('操作失败，请重试');
+    }
   }
 };
 

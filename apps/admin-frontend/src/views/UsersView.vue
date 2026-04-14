@@ -173,12 +173,18 @@ const onResetPassword = async (user: UserItem) => {
     await ElMessageBox.confirm(`确认重置 ${user.username} 的密码吗？`, '重置密码', {
       type: 'warning',
       confirmButtonText: '确认',
-      cancelButtonText: '取消'
+      cancelButtonText: '取消',
+      modalClass: 'admin-confirm-dialog-overlay',
+      closeOnClickModal: false,
+      closeOnPressEscape: false
     });
     await resetUserPassword(user.id);
     ElMessage.success('密码重置邮件已发送');
-  } catch {
-    // 用户取消或请求失败
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      console.error('重置密码失败:', error);
+      ElMessage.error('操作失败，请重试');
+    }
   }
 };
 

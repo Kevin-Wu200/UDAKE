@@ -43,3 +43,7 @@ p {
   display: flex;
   justify-content: flex-end;
 }
+
+.el-overlay.admin-confirm-dialog-overlay {
+  z-index: 9999 !important;
+}

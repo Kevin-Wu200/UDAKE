@@ -135,14 +135,20 @@ const onKickDevice = async (deviceId: string) => {
     await ElMessageBox.confirm('确定要踢出该设备吗？该设备的Token将立即失效。', '确认踢出', {
       type: 'warning',
       confirmButtonText: '确认',
-      cancelButtonText: '取消'
+      cancelButtonText: '取消',
+      modalClass: 'admin-confirm-dialog-overlay',
+      closeOnClickModal: false,
+      closeOnPressEscape: false
     });
 
     await kickUserDevice(deviceId);
     ElMessage.success('设备已踢出');
     await loadDevices();
-  } catch {
-    // 取消或异常均由组件/拦截器处理
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') {
+      console.error('踢出设备失败:', error);
+      ElMessage.error('操作失败，请重试');
+    }
   }
 };
 
