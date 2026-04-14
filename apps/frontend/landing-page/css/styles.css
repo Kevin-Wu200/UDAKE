@@ -8,7 +8,12 @@ body {
   padding: 0;
   font-family: var(--font-main);
   color: var(--color-text-main);
-  background: radial-gradient(circle at 10% 10%, #f7fbff 0, #ffffff 38%, #f8f8fa 100%);
+  background: radial-gradient(
+    circle at 10% 10%,
+    #f7fbff 0,
+    #ffffff 38%,
+    #f8f8fa 100%
+  );
 }
 
 body {
@@ -128,7 +133,9 @@ a {
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: transform var(--transition-base), box-shadow var(--transition-base);
+  transition:
+    transform var(--transition-base),
+    box-shadow var(--transition-base);
 }
 
 .cta-btn:hover {
@@ -167,13 +174,22 @@ a {
   border-radius: var(--radius-md);
   padding: var(--space-md);
   box-shadow: 0 8px 20px -14px var(--color-shadow);
-  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+  transition:
+    transform var(--transition-base),
+    box-shadow var(--transition-base),
+    border-color var(--transition-base);
+  cursor: pointer;
 }
 
 .feature-card:hover {
   transform: translateY(-4px);
   border-color: rgba(0, 122, 255, 0.35);
   box-shadow: 0 18px 30px -18px rgba(0, 122, 255, 0.35);
+}
+
+.feature-card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .feature-card h3 {
@@ -208,7 +224,10 @@ a {
   justify-content: center;
   align-items: flex-start;
   padding: 20px;
-  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-base);
+  transition:
+    transform var(--transition-base),
+    box-shadow var(--transition-base),
+    border-color var(--transition-base);
   cursor: pointer;
 }
 
@@ -323,12 +342,19 @@ a {
 .reveal {
   opacity: 0;
   transform: translateY(24px);
-  transition: opacity 620ms ease, transform 620ms ease;
+  transition:
+    opacity 620ms ease,
+    transform 620ms ease;
 }
 
 .reveal.is-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+body.page-transitioning {
+  opacity: 0.72;
+  transition: opacity 140ms ease;
 }
 
 @keyframes modal-up {
