@@ -979,3 +979,507 @@ class ResultPreloader:
             self._cache.move_to_end(key)
             while len(self._cache) > self.cache_size:
                 self._cache.popitem(last=False)
+
+
+class DatabaseQueryOptimizer:
+    """数据库查询优化：瓶颈分析、慢查询优化、索引建议、缓存与批量查询。"""
+
+    def __init__(
+        self,
+        *,
+        slow_query_ms: float = 120.0,
+        cache_ttl_seconds: float = 3.0,
+        cache_size: int = 256,
+    ) -> None:
+        self.slow_query_ms = float(max(1.0, slow_query_ms))
+        self.cache_ttl_seconds = float(max(0.1, cache_ttl_seconds))
+        self.cache_size = int(max(16, cache_size))
+        self._lock = threading.Lock()
+        self._history: list[dict[str, Any]] = []
+        self._cache: "OrderedDict[str, dict[str, Any]]" = OrderedDict()
+        self._indexes: set[tuple[str, str]] = set()
+        self._cache_metrics = {"hits": 0, "misses": 0, "sets": 0, "evictions": 0}
+
+    @staticmethod
+    def _normalize_sql(statement: str) -> str:
+        return " ".join(str(statement).strip().split())
+
+    @staticmethod
+    def _extract_table(statement: str) -> str:
+        tokens = DatabaseQueryOptimizer._normalize_sql(statement).split(" ")
+        lower_tokens = [item.lower() for item in tokens]
+        if "from" in lower_tokens:
+            idx = lower_tokens.index("from")
+            if idx + 1 < len(tokens):
+                return tokens[idx + 1].strip(",")
+        if "update" in lower_tokens:
+            idx = lower_tokens.index("update")
+            if idx + 1 < len(tokens):
+                return tokens[idx + 1].strip(",")
+        return "unknown"
+
+    @staticmethod
+    def _fingerprint(statement: str, params: Optional[dict[str, Any]] = None) -> str:
+        payload = {"sql": DatabaseQueryOptimizer._normalize_sql(statement), "params": dict(params or {})}
+        return hashlib.sha256(_stable_json_dumps(payload).encode("utf-8")).hexdigest()
+
+    def analyze_query_bottlenecks(self, rows: list[dict[str, Any]], *, top_n: int = 5) -> dict[str, Any]:
+        if not rows:
+            return {"total_queries": 0, "slow_queries": [], "frequent_patterns": [], "avg_elapsed_ms": 0.0}
+        normalized = []
+        for row in rows:
+            sql = self._normalize_sql(str(row.get("sql", "")))
+            elapsed_ms = float(row.get("elapsed_ms", 0.0) or 0.0)
+            rec = {"sql": sql, "elapsed_ms": elapsed_ms, "table": self._extract_table(sql)}
+            normalized.append(rec)
+        with self._lock:
+            self._history.extend(normalized)
+        elapsed_arr = np.asarray([item["elapsed_ms"] for item in normalized], dtype=float)
+        slow = [item for item in normalized if item["elapsed_ms"] >= self.slow_query_ms]
+        freq: dict[str, int] = {}
+        for item in normalized:
+            freq[item["sql"]] = freq.get(item["sql"], 0) + 1
+        frequent = sorted(freq.items(), key=lambda x: x[1], reverse=True)[: max(1, int(top_n))]
+        slow_sorted = sorted(slow, key=lambda x: float(x["elapsed_ms"]), reverse=True)[: max(1, int(top_n))]
+        return {
+            "total_queries": len(normalized),
+            "slow_queries": slow_sorted,
+            "frequent_patterns": [{"sql": sql, "count": count} for sql, count in frequent],
+            "avg_elapsed_ms": float(np.mean(elapsed_arr)),
+            "p95_elapsed_ms": float(np.percentile(elapsed_arr, 95)),
+        }
+
+    def optimize_slow_query(self, statement: str, *, elapsed_ms: float, filters: Optional[list[str]] = None) -> dict[str, Any]:
+        sql = self._normalize_sql(statement)
+        suggestions = []
+        if "select *" in sql.lower():
+            suggestions.append("避免 SELECT *，仅选择必要字段")
+        if "order by" in sql.lower():
+            suggestions.append("确认 ORDER BY 字段具备索引")
+        if "where" not in sql.lower():
+            suggestions.append("为高频查询添加 WHERE 过滤条件")
+        if float(elapsed_ms) >= self.slow_query_ms:
+            suggestions.append("该查询已超过慢查询阈值，建议启用查询缓存或重写执行计划")
+        if filters:
+            suggestions.append(f"可优先为过滤字段建立组合索引: {','.join(filters)}")
+        return {
+            "sql": sql,
+            "elapsed_ms": float(elapsed_ms),
+            "is_slow": bool(float(elapsed_ms) >= self.slow_query_ms),
+            "rewritten_sql": sql.replace("SELECT *", "SELECT id").replace("select *", "select id"),
+            "suggestions": suggestions,
+        }
+
+    def add_query_indexes(self, table: str, columns: list[str]) -> dict[str, Any]:
+        created = 0
+        for col in columns:
+            key = (str(table), str(col))
+            if key not in self._indexes:
+                self._indexes.add(key)
+                created += 1
+        return {"table": str(table), "created": created, "total_indexes": len(self._indexes)}
+
+    def cache_query_result(self, key: str, payload: Any, *, ttl_seconds: Optional[float] = None) -> None:
+        ttl = self.cache_ttl_seconds if ttl_seconds is None else max(0.1, float(ttl_seconds))
+        expires_at = time.time() + ttl
+        with self._lock:
+            self._cache[str(key)] = {"expires_at": expires_at, "payload": json.loads(_stable_json_dumps(payload))}
+            self._cache.move_to_end(str(key))
+            self._cache_metrics["sets"] += 1
+            while len(self._cache) > self.cache_size:
+                self._cache.popitem(last=False)
+                self._cache_metrics["evictions"] += 1
+
+    def get_cached_query_result(self, key: str) -> Optional[Any]:
+        now = time.time()
+        cache_key = str(key)
+        with self._lock:
+            row = self._cache.get(cache_key)
+            if row is None:
+                self._cache_metrics["misses"] += 1
+                return None
+            if float(row["expires_at"]) <= now:
+                self._cache.pop(cache_key, None)
+                self._cache_metrics["misses"] += 1
+                return None
+            self._cache.move_to_end(cache_key)
+            self._cache_metrics["hits"] += 1
+            return json.loads(_stable_json_dumps(row["payload"]))
+
+    def optimize_query_plan(self, statement: str, *, explain_rows: Optional[list[dict[str, Any]]] = None) -> dict[str, Any]:
+        rows = explain_rows or []
+        risks = []
+        for row in rows:
+            plan = str(row.get("plan", "")).lower()
+            if "seq scan" in plan:
+                risks.append("检测到全表扫描，建议增加过滤字段索引")
+            if "sort" in plan and "external" in plan:
+                risks.append("检测到磁盘排序，建议增大 work_mem 或减少排序字段")
+            if "nested loop" in plan and "rows=" in plan:
+                risks.append("嵌套循环在大结果集下成本较高，建议改写连接条件")
+        if not risks:
+            risks.append("执行计划未发现明显风险，可继续观察")
+        return {
+            "sql": self._normalize_sql(statement),
+            "plan_steps": len(rows),
+            "recommendations": risks,
+            "optimized": all("未发现明显风险" in item for item in risks),
+        }
+
+    def query_analyzer(self, *, top_n: int = 10) -> dict[str, Any]:
+        with self._lock:
+            history = list(self._history)
+            cache_metrics = dict(self._cache_metrics)
+        if not history:
+            return {"tracked": 0, "top_slow": [], "top_tables": [], "cache": cache_metrics}
+        elapsed = np.asarray([float(item["elapsed_ms"]) for item in history], dtype=float)
+        top_slow = sorted(history, key=lambda x: float(x["elapsed_ms"]), reverse=True)[: max(1, int(top_n))]
+        table_freq: dict[str, int] = {}
+        for item in history:
+            table = str(item.get("table", "unknown"))
+            table_freq[table] = table_freq.get(table, 0) + 1
+        top_tables = sorted(table_freq.items(), key=lambda x: x[1], reverse=True)[: max(1, int(top_n))]
+        return {
+            "tracked": len(history),
+            "avg_elapsed_ms": float(np.mean(elapsed)),
+            "p95_elapsed_ms": float(np.percentile(elapsed, 95)),
+            "top_slow": top_slow,
+            "top_tables": [{"table": name, "count": cnt} for name, cnt in top_tables],
+            "cache": cache_metrics,
+        }
+
+    def optimize_batch_queries(
+        self,
+        queries: list[dict[str, Any]],
+        executor: Callable[[str, dict[str, Any]], Any],
+        *,
+        batch_size: int = 8,
+    ) -> dict[str, Any]:
+        rows = []
+        cache_hits = 0
+        executed = 0
+        for i in range(0, len(queries), max(1, int(batch_size))):
+            batch = queries[i : i + max(1, int(batch_size))]
+            for item in batch:
+                sql = str(item.get("sql", ""))
+                params = dict(item.get("params", {}))
+                key = self._fingerprint(sql, params)
+                cached = self.get_cached_query_result(key)
+                if cached is not None:
+                    rows.append({"sql": self._normalize_sql(sql), "from_cache": True, "result": cached})
+                    cache_hits += 1
+                    continue
+                started = time.perf_counter()
+                result = executor(sql, params)
+                elapsed_ms = (time.perf_counter() - started) * 1000.0
+                self.cache_query_result(key, result)
+                rows.append(
+                    {
+                        "sql": self._normalize_sql(sql),
+                        "from_cache": False,
+                        "result": result,
+                        "elapsed_ms": float(elapsed_ms),
+                    }
+                )
+                executed += 1
+                with self._lock:
+                    self._history.append(
+                        {"sql": self._normalize_sql(sql), "elapsed_ms": float(elapsed_ms), "table": self._extract_table(sql)}
+                    )
+        return {
+            "total": len(queries),
+            "executed": executed,
+            "cache_hits": cache_hits,
+            "rows": rows,
+        }
+
+
+class ConnectionPoolOrchestrator:
+    """连接池管理：创建、监控、调度、健康检查、扩缩容与优化。"""
+
+    def __init__(
+        self,
+        *,
+        min_size: int = 2,
+        max_size: int = 16,
+        scale_step: int = 2,
+        health_check: Optional[Callable[[str, dict[str, Any]], bool]] = None,
+    ) -> None:
+        self.min_size = max(1, int(min_size))
+        self.max_size = max(self.min_size, int(max_size))
+        self.scale_step = max(1, int(scale_step))
+        self._health_check = health_check
+        self._pool: dict[str, dict[str, Any]] = {}
+        self._counter = 0
+        self._lock = threading.Lock()
+        self._metrics = {
+            "created": 0,
+            "acquired": 0,
+            "released": 0,
+            "health_failures": 0,
+            "scaled_up": 0,
+            "scaled_down": 0,
+            "scheduled": 0,
+        }
+
+    def _create_connection(self) -> str:
+        self._counter += 1
+        conn_id = f"conn-{self._counter}"
+        self._pool[conn_id] = {
+            "busy": False,
+            "healthy": True,
+            "created_at": time.time(),
+            "last_used_at": time.time(),
+        }
+        self._metrics["created"] += 1
+        return conn_id
+
+    def create_pool(self, *, initial_size: Optional[int] = None) -> dict[str, Any]:
+        size = self.min_size if initial_size is None else max(self.min_size, int(initial_size))
+        size = min(self.max_size, size)
+        with self._lock:
+            while len(self._pool) < size:
+                self._create_connection()
+        return self.monitor()
+
+    def acquire(self) -> Optional[str]:
+        with self._lock:
+            for conn_id, row in self._pool.items():
+                if not bool(row.get("busy", False)) and bool(row.get("healthy", True)):
+                    row["busy"] = True
+                    row["last_used_at"] = time.time()
+                    self._metrics["acquired"] += 1
+                    return conn_id
+            if len(self._pool) < self.max_size:
+                conn_id = self._create_connection()
+                self._pool[conn_id]["busy"] = True
+                self._pool[conn_id]["last_used_at"] = time.time()
+                self._metrics["acquired"] += 1
+                self._metrics["scaled_up"] += 1
+                return conn_id
+            return None
+
+    def release(self, conn_id: str) -> bool:
+        with self._lock:
+            row = self._pool.get(str(conn_id))
+            if row is None:
+                return False
+            row["busy"] = False
+            row["last_used_at"] = time.time()
+            self._metrics["released"] += 1
+            return True
+
+    def monitor(self) -> dict[str, Any]:
+        with self._lock:
+            total = len(self._pool)
+            busy = sum(1 for row in self._pool.values() if bool(row.get("busy", False)))
+            healthy = sum(1 for row in self._pool.values() if bool(row.get("healthy", True)))
+            idle = max(0, total - busy)
+            utilization = float(busy / max(1, total))
+            return {
+                "total": total,
+                "busy": busy,
+                "idle": idle,
+                "healthy": healthy,
+                "unhealthy": max(0, total - healthy),
+                "utilization": utilization,
+                "metrics": dict(self._metrics),
+            }
+
+    def schedule(self, *, request_count: int = 1) -> dict[str, Any]:
+        assigned = []
+        for _ in range(max(1, int(request_count))):
+            conn_id = self.acquire()
+            if conn_id is None:
+                break
+            assigned.append(conn_id)
+        with self._lock:
+            self._metrics["scheduled"] += len(assigned)
+        return {"requested": int(request_count), "assigned": assigned, "assigned_count": len(assigned)}
+
+    def health_check(self) -> dict[str, Any]:
+        failed = 0
+        with self._lock:
+            for conn_id, row in self._pool.items():
+                checker = self._health_check
+                if checker is None:
+                    healthy = True
+                else:
+                    healthy = bool(checker(conn_id, dict(row)))
+                row["healthy"] = healthy
+                if not healthy:
+                    failed += 1
+            self._metrics["health_failures"] += failed
+        snap = self.monitor()
+        snap["failed"] = failed
+        return snap
+
+    def scale_pool(self, target_size: int) -> dict[str, Any]:
+        target = int(max(self.min_size, min(self.max_size, int(target_size))))
+        with self._lock:
+            current = len(self._pool)
+            if target > current:
+                for _ in range(target - current):
+                    self._create_connection()
+                self._metrics["scaled_up"] += target - current
+            elif target < current:
+                removable = [k for k, v in self._pool.items() if not bool(v.get("busy", False))]
+                removed = 0
+                for key in removable:
+                    if len(self._pool) <= target:
+                        break
+                    self._pool.pop(key, None)
+                    removed += 1
+                self._metrics["scaled_down"] += removed
+        return self.monitor()
+
+    def optimize_pool_performance(self, *, high_watermark: float = 0.75, low_watermark: float = 0.2) -> dict[str, Any]:
+        snapshot = self.monitor()
+        util = float(snapshot["utilization"])
+        action = "none"
+        if util >= float(high_watermark) and snapshot["total"] < self.max_size:
+            self.scale_pool(min(self.max_size, snapshot["total"] + self.scale_step))
+            action = "scale_up"
+        elif util <= float(low_watermark) and snapshot["total"] > self.min_size:
+            self.scale_pool(max(self.min_size, snapshot["total"] - self.scale_step))
+            action = "scale_down"
+        out = self.monitor()
+        out["action"] = action
+        return out
+
+
+class PerformanceMetricsCollector:
+    """性能指标收集：采集、聚合、存储、可视化和趋势分析。"""
+
+    def __init__(self, *, retention: int = 1024) -> None:
+        self.retention = max(64, int(retention))
+        self._lock = threading.Lock()
+        self._streams: dict[str, deque[dict[str, Any]]] = {}
+        self._storage: list[dict[str, Any]] = []
+        self._categories: dict[str, str] = {}
+
+    def design_metrics_architecture(self) -> dict[str, Any]:
+        return {
+            "collector": "in_memory_stream",
+            "aggregation": ["avg", "min", "max", "p95", "sum", "count"],
+            "storage": "append_only_snapshot",
+            "visualization": ["timeline", "histogram"],
+            "analysis": ["trend", "anomaly_hint"],
+        }
+
+    def collect_metric(
+        self,
+        name: str,
+        value: float,
+        *,
+        category: str = "custom",
+        tags: Optional[dict[str, Any]] = None,
+        timestamp: Optional[float] = None,
+    ) -> dict[str, Any]:
+        metric = str(name).strip()
+        if not metric:
+            raise ValueError("metric name must not be empty")
+        entry = {
+            "name": metric,
+            "value": float(value),
+            "category": str(category),
+            "tags": dict(tags or {}),
+            "ts": float(time.time() if timestamp is None else timestamp),
+        }
+        with self._lock:
+            self._streams.setdefault(metric, deque(maxlen=self.retention)).append(entry)
+            self._categories[metric] = str(category)
+        return entry
+
+    def aggregate_metrics(self, name: str, *, window: int = 120) -> dict[str, Any]:
+        with self._lock:
+            rows = list(self._streams.get(str(name), []))[-max(1, int(window)) :]
+        if not rows:
+            return {"metric": str(name), "count": 0, "avg": 0.0, "min": 0.0, "max": 0.0, "p95": 0.0, "sum": 0.0}
+        values = np.asarray([float(item["value"]) for item in rows], dtype=float)
+        return {
+            "metric": str(name),
+            "count": int(values.size),
+            "avg": float(np.mean(values)),
+            "min": float(np.min(values)),
+            "max": float(np.max(values)),
+            "p95": float(np.percentile(values, 95)),
+            "sum": float(np.sum(values)),
+            "latest": float(values[-1]),
+        }
+
+    def store_metrics(self, *, metric_names: Optional[list[str]] = None) -> dict[str, Any]:
+        with self._lock:
+            names = list(metric_names or self._streams.keys())
+            stream_snapshots = {name: list(self._streams.get(name, [])) for name in names}
+
+        metrics: dict[str, Any] = {}
+        for name, rows in stream_snapshots.items():
+            if not rows:
+                metrics[name] = {"metric": str(name), "count": 0, "avg": 0.0, "min": 0.0, "max": 0.0, "p95": 0.0, "sum": 0.0}
+                continue
+            values = np.asarray([float(item["value"]) for item in rows], dtype=float)
+            metrics[name] = {
+                "metric": str(name),
+                "count": int(values.size),
+                "avg": float(np.mean(values)),
+                "min": float(np.min(values)),
+                "max": float(np.max(values)),
+                "p95": float(np.percentile(values, 95)),
+                "sum": float(np.sum(values)),
+                "latest": float(values[-1]),
+            }
+
+        snapshot = {"stored_at": time.time(), "metrics": metrics}
+        with self._lock:
+            self._storage.append(snapshot)
+            if len(self._storage) > self.retention:
+                self._storage = self._storage[-self.retention :]
+            storage_size = len(self._storage)
+        return {"stored_metrics": len(snapshot["metrics"]), "storage_size": storage_size}
+
+    def visualize_metrics(self, name: str, *, bins: int = 8) -> dict[str, Any]:
+        with self._lock:
+            rows = list(self._streams.get(str(name), []))
+        if not rows:
+            return {"metric": str(name), "timeline": [], "histogram": []}
+        values = np.asarray([float(item["value"]) for item in rows], dtype=float)
+        ts = [float(item["ts"]) for item in rows]
+        hist, edges = np.histogram(values, bins=max(2, int(bins)))
+        timeline = [{"ts": ts[idx], "value": float(values[idx])} for idx in range(len(values))]
+        histogram = [
+            {"range": [float(edges[i]), float(edges[i + 1])], "count": int(hist[i])}
+            for i in range(len(hist))
+        ]
+        return {"metric": str(name), "timeline": timeline, "histogram": histogram}
+
+    def analyze_metrics(self, name: str, *, window: int = 120) -> dict[str, Any]:
+        with self._lock:
+            rows = list(self._streams.get(str(name), []))[-max(2, int(window)) :]
+        if len(rows) < 2:
+            return {"metric": str(name), "trend": "insufficient", "slope": 0.0, "anomaly_hint": False}
+        values = np.asarray([float(item["value"]) for item in rows], dtype=float)
+        x = np.arange(values.size, dtype=float)
+        slope = float(np.polyfit(x, values, 1)[0])
+        mean = float(np.mean(values))
+        std = float(np.std(values))
+        anomaly_hint = bool(values[-1] > mean + 2.0 * max(1e-12, std))
+        trend = "up" if slope > 0 else "down" if slope < 0 else "flat"
+        return {
+            "metric": str(name),
+            "trend": trend,
+            "slope": slope,
+            "anomaly_hint": anomaly_hint,
+            "latest": float(values[-1]),
+            "mean": mean,
+        }
+
+    def usage_documentation(self) -> str:
+        return (
+            "# Metrics Collector Usage\n"
+            "1. 使用 collect_metric 采集指标。\n"
+            "2. 使用 aggregate_metrics 进行窗口聚合。\n"
+            "3. 使用 store_metrics 生成可归档快照。\n"
+            "4. 使用 visualize_metrics 输出时间线与直方图数据。\n"
+            "5. 使用 analyze_metrics 获取趋势与异常提示。\n"
+        )
