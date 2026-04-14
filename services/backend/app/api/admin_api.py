@@ -6,6 +6,7 @@ import base64
 import csv
 import hashlib
 import io
+import json
 import logging
 import os
 import secrets
@@ -13,6 +14,7 @@ import string
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
@@ -39,7 +41,25 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/admin")
 
-PRODUCT_KEY_TYPES = {item.value for item in ProductKeyType}
+PRODUCT_KEY_TYPE_TO_DB = {
+    "personal_trial": "personal_trial",
+    "personal_standard": "personal_standard",
+    "enterprise_trial": "enterprise_trial",
+    "enterprise_standard": "enterprise_standard",
+}
+PRODUCT_KEY_TYPE_FROM_DB = {
+    "personal_trial": "personal_trial",
+    "personal_standard": "personal_standard",
+    "enterprise_trial": "enterprise_trial",
+    "enterprise_standard": "enterprise_standard",
+}
+PRODUCT_KEY_QUOTA_MAP = {
+    "personal_trial": 10,
+    "personal_standard": 100,
+    "enterprise_trial": 500,
+    "enterprise_standard": 1000,
+}
+PRODUCT_KEY_TYPES = set(PRODUCT_KEY_TYPE_TO_DB)
 ENTERPRISE_PRODUCT_KEY_TYPES = {
     ProductKeyType.ENTERPRISE_TRIAL.value,
     ProductKeyType.ENTERPRISE_STANDARD.value,
@@ -76,8 +96,10 @@ class ProductKeyCreateRequest(BaseModel):
         ...,
         description="密钥类型",
     )
-    count: int = Field(..., ge=1, le=1000, description="生成数量")
-    company_name: Optional[str] = Field(default=None, max_length=128)
+    user_id: Optional[int] = Field(default=None, description="分配给用户ID")
+    company_id: Optional[int] = Field(default=None, description="企业ID（企业密钥必填）")
+    count: int = Field(1, ge=1, le=1000, description="生成数量")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="密钥元数据")
 
 
 class ProductKeyUpdateRequest(BaseModel):
@@ -94,6 +116,26 @@ class ProductKeyBatchImportRequest(BaseModel):
 
 class UserToggleStatusRequest(BaseModel):
     status: Literal["active", "disabled"]
+
+
+class ProductKeyResponse(BaseModel):
+    id: int
+    product_key: str
+    key_type: str
+    key_sub_type: str
+    status: str
+    total_quota: int
+    used_count: int
+    user_id: Optional[int]
+    company_id: Optional[int]
+    assigned_at: Optional[datetime]
+    expires_at: Optional[datetime]
+    metadata: Optional[Dict[str, Any]]
+
+
+class ProductKeyAssignRequest(BaseModel):
+    key_id: int = Field(..., ge=1)
+    user_id: int = Field(..., ge=1)
 
 
 def _ok(message: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -179,6 +221,59 @@ def _require_super_admin_user(request: Request, db: Session) -> User:
     return user
 
 
+def require_role(allowed_roles: List[str]):
+    """角色权限验证装饰器。"""
+
+    def decorator(handler):
+        @wraps(handler)
+        def wrapper(*args, **kwargs):
+            request = kwargs.get("request")
+            db = kwargs.get("db")
+
+            if request is None:
+                request = next((arg for arg in args if isinstance(arg, Request)), None)
+            if db is None:
+                db = next((arg for arg in args if isinstance(arg, Session)), None)
+            if request is None or db is None:
+                raise _fail(status.HTTP_500_INTERNAL_SERVER_ERROR, "权限装饰器参数解析失败")
+
+            current_user = _get_authenticated_user(request, db)
+            if current_user.role not in set(allowed_roles):
+                raise _fail(status.HTTP_403_FORBIDDEN, "权限不足")
+            request.state.current_user = current_user
+            return handler(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def company_admin_required(handler):
+    """企业管理员权限验证装饰器。"""
+
+    @wraps(handler)
+    def wrapper(*args, **kwargs):
+        request = kwargs.get("request")
+        db = kwargs.get("db")
+
+        if request is None:
+            request = next((arg for arg in args if isinstance(arg, Request)), None)
+        if db is None:
+            db = next((arg for arg in args if isinstance(arg, Session)), None)
+        if request is None or db is None:
+            raise _fail(status.HTTP_500_INTERNAL_SERVER_ERROR, "权限装饰器参数解析失败")
+
+        current_user = _get_authenticated_user(request, db)
+        if current_user.role != "company_admin":
+            raise _fail(status.HTTP_403_FORBIDDEN, "需要企业管理员权限")
+        if not current_user.company_id:
+            raise _fail(status.HTTP_403_FORBIDDEN, "企业管理员必须绑定企业")
+        request.state.current_user = current_user
+        return handler(*args, **kwargs)
+
+    return wrapper
+
+
 def _normalize_datetime(dt: datetime) -> datetime:
     if dt.tzinfo is None:
         return dt
@@ -204,13 +299,26 @@ def _to_iso(value: Any) -> Optional[str]:
     return None
 
 
+def _parse_key_metadata(raw: Optional[str]) -> Optional[Dict[str, Any]]:
+    if not raw:
+        return None
+    try:
+        parsed = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
 def _serialize_product_key(item: ProductKey, company_name: Optional[str] = None) -> Dict[str, Any]:
     return {
         "id": item.id,
         "product_key": item.product_key,
-        "type": item.key_type,
+        "type": PRODUCT_KEY_TYPE_FROM_DB.get(item.key_type, item.key_type),
         "sub_type": item.key_sub_type,
+        "key_type": PRODUCT_KEY_TYPE_FROM_DB.get(item.key_type, item.key_type),
+        "key_sub_type": item.key_sub_type,
         "status": item.status,
+        "user_id": item.user_id,
         "company_id": item.company_id,
         "company_name": company_name,
         "total_quota": int(item.total_quota or 0),
@@ -221,6 +329,7 @@ def _serialize_product_key(item: ProductKey, company_name: Optional[str] = None)
         "assigned_at": _to_iso(item.assigned_at),
         "last_used_at": _to_iso(item.last_used_at),
         "expires_at": _to_iso(item.expires_at),
+        "metadata": _parse_key_metadata(item.key_metadata),
         "created_at": _to_iso(item.created_at),
         "updated_at": _to_iso(item.updated_at),
     }
@@ -271,6 +380,12 @@ def _resolve_or_create_company(db: Session, company_name: Optional[str]) -> Opti
     db.add(company)
     db.flush()
     return company
+
+
+def _resolve_company_by_id(db: Session, company_id: Optional[int]) -> Optional[Company]:
+    if company_id is None:
+        return None
+    return db.query(Company).filter(Company.id == company_id).one_or_none()
 
 
 def _normalize_product_key(raw: str) -> str:
@@ -405,19 +520,50 @@ def _next_model_id(db: Session, model_cls: Any) -> int:
 
 
 @router.post("/product-keys")
+@require_role(["super_admin", "company_admin"])
 def create_product_keys(
     payload: ProductKeyCreateRequest,
     request: Request,
     db: Session = Depends(get_auth_db_session),
 ):
-    current_user = _require_super_admin_user(request, db)
-    db_type = payload.type
+    current_user: User = request.state.current_user
+    db_type = PRODUCT_KEY_TYPE_TO_DB[payload.type]
+
+    if current_user.role == "super_admin" and payload.count > 1:
+        raise _fail(status.HTTP_403_FORBIDDEN, "超级管理员不支持批量生成密钥")
+    if current_user.role == "company_admin":
+        if db_type not in ENTERPRISE_PRODUCT_KEY_TYPES:
+            raise _fail(status.HTTP_403_FORBIDDEN, "企业管理员只能生成企业密钥")
+        if not current_user.company_id:
+            raise _fail(status.HTTP_403_FORBIDDEN, "企业管理员必须绑定企业")
+        if payload.company_id is not None and payload.company_id != current_user.company_id:
+            raise _fail(status.HTTP_403_FORBIDDEN, "只能为所属企业生成密钥")
 
     company: Optional[Company] = None
+    resolved_company_id = payload.company_id
+    if current_user.role == "company_admin":
+        resolved_company_id = current_user.company_id
+
+    if resolved_company_id is not None:
+        company = _resolve_company_by_id(db, resolved_company_id)
+        if not company:
+            raise _fail(status.HTTP_404_NOT_FOUND, "企业不存在")
+
     if db_type in ENTERPRISE_PRODUCT_KEY_TYPES:
-        if not payload.company_name or not payload.company_name.strip():
-            raise _fail(status.HTTP_400_BAD_REQUEST, "企业密钥必须提供 company_name")
-        company = _resolve_or_create_company(db, payload.company_name)
+        if company is None:
+            raise _fail(status.HTTP_400_BAD_REQUEST, "企业密钥必须提供 company_id")
+    elif current_user.role == "company_admin":
+        raise _fail(status.HTTP_403_FORBIDDEN, "企业管理员只能生成企业密钥")
+
+    target_user: Optional[User] = None
+    target_user_id = payload.user_id or current_user.id
+    if payload.user_id is not None:
+        target_user = db.query(User).filter(User.id == payload.user_id).one_or_none()
+        if not target_user or target_user.status == "deleted":
+            raise _fail(status.HTTP_404_NOT_FOUND, "目标用户不存在")
+        if current_user.role == "company_admin" and target_user.company_id != current_user.company_id:
+            raise _fail(status.HTTP_403_FORBIDDEN, "只能为所属企业用户分配密钥")
+        target_user_id = target_user.id
 
     created_items: List[ProductKey] = []
     next_key_id = _next_model_id(db, ProductKey)
@@ -439,17 +585,19 @@ def create_product_keys(
 
         item = ProductKey(
             id=next_key_id,
-            user_id=current_user.id,
+            user_id=target_user_id,
             product_key=normalized_key,
             product_key_ciphertext=_product_key_cipher.encrypt(normalized_key),
             key_type=db_type,
             key_sub_type=_resolve_key_sub_type(db_type),
             generation_seed=seed,
+            key_metadata=json.dumps(payload.metadata, ensure_ascii=False) if payload.metadata is not None else None,
             status="unused",
             company_id=company.id if company else None,
-            total_quota=ProductKey.get_default_quota(db_type),
+            total_quota=PRODUCT_KEY_QUOTA_MAP.get(db_type, ProductKey.get_default_quota(db_type)),
             used_count=0,
             signature=signature,
+            assigned_at=datetime.now(timezone.utc) if payload.user_id else None,
         )
         db.add(item)
         created_items.append(item)
@@ -469,50 +617,75 @@ def create_product_keys(
         details={
             "action": "create_product_keys",
             "count": payload.count,
-            "type": payload.type,
-            "company_name": company.name if company else None,
+            "type": PRODUCT_KEY_TYPE_FROM_DB.get(db_type, db_type),
+            "company_id": company.id if company else None,
+            "target_user_id": payload.user_id,
         },
     )
     db.commit()
 
-    company_name = company.name if company else None
+    company_name_map: Dict[int, str] = {}
+    if company:
+        company_name_map[company.id] = company.name
+    else:
+        company_ids = {item.company_id for item in created_items if item.company_id}
+        if company_ids:
+            rows = db.query(Company.id, Company.name).filter(Company.id.in_(company_ids)).all()
+            company_name_map = {row.id: row.name for row in rows}
     return _ok(
         "产品密钥创建成功",
         {
-            "keys": [_serialize_product_key(item, company_name=company_name) for item in created_items],
+            "keys": [
+                _serialize_product_key(item, company_name=company_name_map.get(item.company_id or -1))
+                for item in created_items
+            ],
             "count": len(created_items),
         },
     )
 
 
 @router.get("/product-keys")
+@require_role(["super_admin", "company_admin"])
 def list_product_keys(
     request: Request,
     db: Session = Depends(get_auth_db_session),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=1, le=200),
-    type: Optional[str] = Query(default=None),
+    key_type: Optional[str] = Query(default=None, alias="type"),
     status_value: Optional[str] = Query(default=None, alias="status"),
+    company_id: Optional[int] = Query(default=None),
+    user_id: Optional[int] = Query(default=None),
     search: Optional[str] = Query(default=None),
 ):
-    _require_super_admin_user(request, db)
+    current_user: User = request.state.current_user
 
     query = db.query(ProductKey, Company.name.label("company_name")).outerjoin(Company, Company.id == ProductKey.company_id)
 
-    if type:
-        normalized_type = type.strip().lower()
+    if key_type:
+        normalized_type = key_type.strip().lower()
         if normalized_type not in PRODUCT_KEY_TYPES:
             raise _fail(
                 status.HTTP_400_BAD_REQUEST,
                 "type 仅支持 personal_trial/personal_standard/enterprise_trial/enterprise_standard",
             )
-        query = query.filter(ProductKey.key_type == normalized_type)
+        query = query.filter(ProductKey.key_type == PRODUCT_KEY_TYPE_TO_DB[normalized_type])
 
     if status_value:
         normalized_status = status_value.strip().lower()
         if normalized_status not in VALID_PRODUCT_KEY_STATUS:
             raise _fail(status.HTTP_400_BAD_REQUEST, "status 参数无效")
         query = query.filter(ProductKey.status == normalized_status)
+
+    effective_company_id = company_id
+    if current_user.role == "company_admin":
+        if not current_user.company_id:
+            raise _fail(status.HTTP_403_FORBIDDEN, "企业管理员必须绑定企业")
+        effective_company_id = current_user.company_id
+    if effective_company_id is not None:
+        query = query.filter(ProductKey.company_id == effective_company_id)
+
+    if user_id is not None:
+        query = query.filter(ProductKey.user_id == user_id)
 
     if search:
         pattern = f"%{search.strip()}%"
@@ -532,6 +705,85 @@ def list_product_keys(
             "keys": [_serialize_product_key(item, company_name=company_name) for item, company_name in rows],
             "pagination": {"page": page, "page_size": page_size, "total": total},
             "total": total,
+        },
+    )
+
+
+@router.post("/product-keys/assign")
+@require_role(["super_admin", "company_admin"])
+def assign_product_key_to_user(
+    payload: ProductKeyAssignRequest,
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+):
+    current_user: User = request.state.current_user
+    target_user = db.query(User).filter(User.id == payload.user_id).one_or_none()
+    if not target_user or target_user.status == "deleted":
+        raise _fail(status.HTTP_404_NOT_FOUND, "目标用户不存在")
+
+    target_key = db.query(ProductKey).filter(ProductKey.id == payload.key_id).one_or_none()
+    if not target_key:
+        raise _fail(status.HTTP_404_NOT_FOUND, "产品密钥不存在")
+
+    if current_user.role == "company_admin":
+        if target_user.company_id != current_user.company_id:
+            raise _fail(status.HTTP_403_FORBIDDEN, "只能为所属企业用户分配密钥")
+        if target_key.company_id != current_user.company_id:
+            raise _fail(status.HTTP_403_FORBIDDEN, "只能分配所属企业密钥")
+
+    if target_key.status in {"disabled", "expired"}:
+        raise _fail(status.HTTP_400_BAD_REQUEST, "密钥状态不可分配")
+
+    target_key.user_id = target_user.id
+    target_key.assigned_at = datetime.now(timezone.utc)
+    if target_key.status == "unused":
+        target_key.status = "active"
+        target_key.used_count = min(int(target_key.total_quota or 0), int(target_key.used_count or 0) + 1)
+    target_user.product_key_id = target_key.id
+
+    _record_audit_log(
+        db,
+        actor=current_user,
+        request=request,
+        operation_type="update",
+        target_table="product_keys",
+        target_id=str(target_key.id),
+        details={"action": "assign_product_key", "user_id": target_user.id},
+    )
+    db.commit()
+
+    company_name = db.query(Company.name).filter(Company.id == target_key.company_id).scalar() if target_key.company_id else None
+    return _ok("密钥分配成功", {"key": _serialize_product_key(target_key, company_name=company_name)})
+
+
+@router.get("/product-keys/stats")
+@require_role(["super_admin", "company_admin"])
+def get_product_key_stats(
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+    company_id: Optional[int] = Query(default=None),
+):
+    current_user: User = request.state.current_user
+    effective_company_id = company_id
+    if current_user.role == "company_admin":
+        effective_company_id = current_user.company_id
+
+    query = db.query(ProductKey)
+    if effective_company_id is not None:
+        query = query.filter(ProductKey.company_id == effective_company_id)
+
+    status_rows = query.with_entities(ProductKey.status, func.count(ProductKey.id)).group_by(ProductKey.status).all()
+    type_rows = query.with_entities(ProductKey.key_type, func.count(ProductKey.id)).group_by(ProductKey.key_type).all()
+
+    return _ok(
+        "密钥统计获取成功",
+        {
+            "by_status": {status_name: int(count or 0) for status_name, count in status_rows},
+            "by_type": {
+                PRODUCT_KEY_TYPE_FROM_DB.get(type_name, type_name): int(count or 0)
+                for type_name, count in type_rows
+            },
+            "company_id": effective_company_id,
         },
     )
 

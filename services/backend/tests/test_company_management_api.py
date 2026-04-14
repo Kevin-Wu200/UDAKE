@@ -179,6 +179,39 @@ def test_delete_company_user_permission_boundaries(company_client):
     assert cross_company.status_code == 403
 
 
+def test_company_product_key_batch_assign_and_stats(company_client):
+    client, session_factory, tokens = company_client
+
+    batch_resp = client.post(
+        "/api/company/product-keys/batch",
+        json={"key_type": "enterprise_trial", "count": 2, "metadata": {"ticket": "CM-1"}},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert batch_resp.status_code == 200, batch_resp.text
+    batch_data = batch_resp.json()["data"]
+    assert batch_data["count"] == 2
+    key_id = batch_data["keys"][0]["id"]
+
+    assign_resp = client.post(
+        "/api/company/product-keys/assign",
+        json={"key_id": key_id, "user_id": 12},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert assign_resp.status_code == 200, assign_resp.text
+    assert assign_resp.json()["data"]["key"]["user_id"] == 12
+
+    stats_resp = client.get("/api/company/product-keys/stats", headers=_auth_header(tokens["company_admin"]))
+    assert stats_resp.status_code == 200, stats_resp.text
+    stats_data = stats_resp.json()["data"]
+    assert stats_data["company_id"] == 1
+    assert stats_data["total"] >= 3
+    assert "enterprise_trial" in stats_data["by_type"]
+
+    with session_factory() as db:
+        user = db.query(User).filter(User.id == 12).one()
+        assert user.product_key_id == key_id
+
+
 def test_company_profile_and_super_admin_views(company_client):
     client, _, tokens = company_client
 

@@ -2,17 +2,24 @@
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import time
+import uuid
+from datetime import datetime, timezone
 from functools import wraps
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from ..auth import JWTValidationError, get_auth_service
+from ..auth import JWTValidationError, ProductKeyRegistry, SensitiveDataCipher, get_auth_service
 from ..auth_db.models import AuditLog, Company, ProductKey, User
 from ..auth_db.session import get_auth_db_session
+from ..config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -20,6 +27,27 @@ router = APIRouter(prefix="/company")
 
 ROLE_CACHE_TTL_SECONDS = 3600
 COMPANY_CACHE_TTL_SECONDS = 3600
+ENTERPRISE_PRODUCT_KEY_TYPES = {"enterprise_trial", "enterprise_standard"}
+PRODUCT_KEY_QUOTA_MAP = {
+    "personal_trial": 10,
+    "personal_standard": 100,
+    "enterprise_trial": 500,
+    "enterprise_standard": 1000,
+}
+
+_key_registry = ProductKeyRegistry()
+_product_key_cipher = SensitiveDataCipher(settings.AUTH_ENCRYPTION_KEY or os.getenv("AUTH_JWT_SECRET") or "udake-key")
+
+
+class BatchCompanyKeyRequest(BaseModel):
+    key_type: Literal["enterprise_trial", "enterprise_standard"]
+    count: int = Field(1, ge=1, le=1000)
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class AssignKeyRequest(BaseModel):
+    key_id: int = Field(..., ge=1)
+    user_id: int = Field(..., ge=1)
 
 
 def _ok(message: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -154,6 +182,48 @@ def _serialize_user(user: User, *, company_name: Optional[str] = None) -> Dict[s
     }
 
 
+def _serialize_product_key(item: ProductKey, *, company_name: Optional[str] = None) -> Dict[str, Any]:
+    metadata = None
+    if item.key_metadata:
+        try:
+            parsed = json.loads(item.key_metadata)
+            if isinstance(parsed, dict):
+                metadata = parsed
+        except (TypeError, ValueError):
+            metadata = None
+    return {
+        "id": item.id,
+        "product_key": item.product_key,
+        "key_type": item.key_type,
+        "key_sub_type": item.key_sub_type,
+        "status": item.status,
+        "user_id": item.user_id,
+        "company_id": item.company_id,
+        "company_name": company_name,
+        "total_quota": int(item.total_quota or 0),
+        "used_count": int(item.used_count or 0),
+        "assigned_at": item.assigned_at.isoformat() if item.assigned_at else None,
+        "expires_at": item.expires_at.isoformat() if item.expires_at else None,
+        "metadata": metadata,
+    }
+
+
+def _next_model_id(db: Session, model_cls: Any) -> int:
+    return int((db.query(func.max(model_cls.id)).scalar() or 0) + 1)
+
+
+def _normalize_product_key(raw: str) -> str:
+    return raw.strip().upper()
+
+
+def _make_seed(index: int, operator_id: int) -> str:
+    return f"company-admin:{operator_id}:{index}:{time.time_ns()}:{uuid.uuid4().hex}"
+
+
+def _resolve_key_sub_type(key_type: str) -> str:
+    return "trial" if key_type.endswith("_trial") else "standard"
+
+
 def company_admin_required(handler):
     """Decorator that enforces company-admin role and enterprise scope."""
 
@@ -210,6 +280,160 @@ def list_company_users(
             "users": [_serialize_user(item, company_name=company_name) for item in users],
             "pagination": {"page": page, "page_size": page_size, "total": total},
             "total": total,
+        },
+    )
+
+
+@router.post("/product-keys/batch")
+@company_admin_required
+def batch_generate_company_keys(
+    payload: BatchCompanyKeyRequest,
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+):
+    current_user: User = request.state.company_admin_user
+
+    if payload.key_type not in ENTERPRISE_PRODUCT_KEY_TYPES:
+        raise _fail(status.HTTP_400_BAD_REQUEST, "只支持企业试用和企业标准类型")
+
+    created_items: List[ProductKey] = []
+    next_key_id = _next_model_id(db, ProductKey)
+    max_attempts = payload.count * 10
+    attempt = 0
+    while len(created_items) < payload.count and attempt < max_attempts:
+        attempt += 1
+        seed = _make_seed(index=attempt, operator_id=current_user.id)
+        generated = _key_registry.generate_key(seed, key_type=payload.key_type)
+        normalized_key = _normalize_product_key(generated.product_key)
+        exists = db.query(ProductKey.id).filter(ProductKey.product_key == normalized_key).first()
+        if exists:
+            continue
+
+        item = ProductKey(
+            id=next_key_id,
+            user_id=current_user.id,
+            product_key=normalized_key,
+            product_key_ciphertext=_product_key_cipher.encrypt(normalized_key),
+            key_type=payload.key_type,
+            key_sub_type=_resolve_key_sub_type(payload.key_type),
+            generation_seed=seed,
+            key_metadata=json.dumps(payload.metadata, ensure_ascii=False) if payload.metadata is not None else None,
+            status="unused",
+            company_id=current_user.company_id,
+            total_quota=PRODUCT_KEY_QUOTA_MAP[payload.key_type],
+            used_count=0,
+        )
+        db.add(item)
+        created_items.append(item)
+        next_key_id += 1
+
+    if len(created_items) != payload.count:
+        db.rollback()
+        raise _fail(status.HTTP_500_INTERNAL_SERVER_ERROR, "批量生成密钥失败，请重试")
+
+    db.add(
+        AuditLog(
+            id=_next_model_id(db, AuditLog),
+            user_id=current_user.id,
+            actor_username=current_user.username,
+            operation_type="create",
+            target_table="product_keys",
+            target_id=None,
+            ip_address=_extract_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
+            details={
+                "action": "batch_generate_company_keys",
+                "company_id": current_user.company_id,
+                "key_type": payload.key_type,
+                "count": payload.count,
+            },
+        )
+    )
+    db.commit()
+
+    company_name = _get_company_name(db, current_user.company_id)
+    return _ok(
+        "企业密钥批量生成成功",
+        {
+            "keys": [_serialize_product_key(item, company_name=company_name) for item in created_items],
+            "count": len(created_items),
+        },
+    )
+
+
+@router.post("/product-keys/assign")
+@company_admin_required
+def assign_key_to_user(
+    payload: AssignKeyRequest,
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+):
+    current_user: User = request.state.company_admin_user
+
+    user = db.query(User).filter(User.id == payload.user_id).one_or_none()
+    if not user or user.status == "deleted" or user.company_id != current_user.company_id:
+        raise _fail(status.HTTP_404_NOT_FOUND, "用户不存在或不属于本企业")
+
+    key = db.query(ProductKey).filter(ProductKey.id == payload.key_id).one_or_none()
+    if not key:
+        raise _fail(status.HTTP_404_NOT_FOUND, "密钥不存在")
+    if key.company_id != current_user.company_id:
+        raise _fail(status.HTTP_403_FORBIDDEN, "只能分配本企业密钥")
+    if key.key_type not in ENTERPRISE_PRODUCT_KEY_TYPES:
+        raise _fail(status.HTTP_400_BAD_REQUEST, "只能分配企业类型密钥")
+    if key.status in {"disabled", "expired"}:
+        raise _fail(status.HTTP_400_BAD_REQUEST, "密钥状态不可分配")
+
+    key.user_id = user.id
+    key.assigned_at = datetime.now(timezone.utc)
+    if key.status == "unused":
+        key.status = "active"
+        key.used_count = min(int(key.total_quota or 0), int(key.used_count or 0) + 1)
+    user.product_key_id = key.id
+
+    db.add(
+        AuditLog(
+            id=_next_model_id(db, AuditLog),
+            user_id=current_user.id,
+            actor_username=current_user.username,
+            operation_type="update",
+            target_table="product_keys",
+            target_id=str(key.id),
+            ip_address=_extract_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
+            details={
+                "action": "assign_company_key",
+                "company_id": current_user.company_id,
+                "user_id": user.id,
+                "key_id": key.id,
+            },
+        )
+    )
+    db.commit()
+
+    return _ok("企业密钥分配成功", {"key": _serialize_product_key(key, company_name=_get_company_name(db, key.company_id))})
+
+
+@router.get("/product-keys/stats")
+@company_admin_required
+def get_company_key_stats(
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+):
+    current_user: User = request.state.company_admin_user
+
+    query = db.query(ProductKey).filter(ProductKey.company_id == current_user.company_id)
+    total = int(query.count())
+    by_type_rows = query.with_entities(ProductKey.key_type, func.count(ProductKey.id)).group_by(ProductKey.key_type).all()
+    by_status_rows = query.with_entities(ProductKey.status, func.count(ProductKey.id)).group_by(ProductKey.status).all()
+
+    return _ok(
+        "企业密钥统计获取成功",
+        {
+            "company_id": current_user.company_id,
+            "total": total,
+            "by_type": {key_type: int(count or 0) for key_type, count in by_type_rows},
+            "by_status": {status_name: int(count or 0) for status_name, count in by_status_rows},
         },
     )
 

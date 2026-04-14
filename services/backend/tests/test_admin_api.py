@@ -63,7 +63,16 @@ def admin_client(monkeypatch: pytest.MonkeyPatch):
             status="disabled",
             company_id=2,
         )
-        db.add_all([super_admin, user_a, user_b])
+        company_admin = User(
+            id=4,
+            username="company_admin_a",
+            email="company_admin_a@example.com",
+            password_hash="company_hash",
+            role="company_admin",
+            status="active",
+            company_id=1,
+        )
+        db.add_all([super_admin, user_a, user_b, company_admin])
         db.flush()
 
         key_unused = ProductKey(
@@ -127,6 +136,7 @@ def admin_client(monkeypatch: pytest.MonkeyPatch):
     service = get_auth_service()
     tokens: Dict[str, str] = {
         "super_admin": service.jwt.generate_access_token(user_id=1, role="super_admin", permissions=["*"]),
+        "company_admin": service.jwt.generate_access_token(user_id=4, role="company_admin", permissions=["*"]),
         "user": service.jwt.generate_access_token(user_id=2, role="user", permissions=["read"]),
     }
 
@@ -143,26 +153,47 @@ def _auth_header(token: str) -> Dict[str, str]:
 def test_admin_product_key_crud_and_batch(admin_client):
     client, _, tokens = admin_client
 
+    super_batch_resp = client.post(
+        "/api/admin/product-keys",
+        json={"type": "enterprise_standard", "count": 2, "company_id": 1},
+        headers=_auth_header(tokens["super_admin"]),
+    )
+    assert super_batch_resp.status_code == 403, super_batch_resp.text
+
     create_resp = client.post(
         "/api/admin/product-keys",
-        json={"type": "enterprise_standard", "count": 2, "company_name": "企业A"},
-        headers=_auth_header(tokens["super_admin"]),
+        json={"type": "enterprise_standard", "count": 2, "company_id": 1, "metadata": {"source": "api-test"}},
+        headers=_auth_header(tokens["company_admin"]),
     )
     assert create_resp.status_code == 200, create_resp.text
     create_data = create_resp.json()["data"]
     assert create_data["count"] == 2
     assert all(item["type"] == "enterprise_standard" for item in create_data["keys"])
-    assert all(item["signature"] for item in create_data["keys"])
+    assert all(item["metadata"] == {"source": "api-test"} for item in create_data["keys"])
 
     key_id_1 = create_data["keys"][0]["id"]
     key_id_2 = create_data["keys"][1]["id"]
 
     list_resp = client.get(
-        "/api/admin/product-keys?page=1&page_size=50&type=enterprise_standard",
-        headers=_auth_header(tokens["super_admin"]),
+        "/api/admin/product-keys?page=1&page_size=50&type=enterprise_standard&company_id=2",
+        headers=_auth_header(tokens["company_admin"]),
     )
     assert list_resp.status_code == 200, list_resp.text
-    assert list_resp.json()["data"]["total"] >= 2
+    listed = list_resp.json()["data"]
+    assert listed["total"] >= 2
+    assert all(item["company_id"] == 1 for item in listed["keys"])
+
+    assign_resp = client.post(
+        "/api/admin/product-keys/assign",
+        json={"key_id": key_id_1, "user_id": 2},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert assign_resp.status_code == 200, assign_resp.text
+    assert assign_resp.json()["data"]["key"]["user_id"] == 2
+
+    stats_resp = client.get("/api/admin/product-keys/stats", headers=_auth_header(tokens["company_admin"]))
+    assert stats_resp.status_code == 200, stats_resp.text
+    assert stats_resp.json()["data"]["company_id"] == 1
 
     update_resp = client.put(
         f"/api/admin/product-keys/{key_id_1}",
