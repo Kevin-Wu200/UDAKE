@@ -134,6 +134,76 @@ def test_product_key_new_generation_algorithms_and_batch():
     assert all(PRODUCT_KEY_PATTERN.fullmatch(item.product_key) for item in batch)
 
 
+def test_product_key_type_support_and_quota_matrix():
+    registry = ProductKeyRegistry()
+    cases = [
+        ("personal_trial", {"user_id": 1001}, "trial", 10),
+        ("personal_standard", {"user_id": 1002}, "standard", 100),
+        ("enterprise_trial", {"company_id": 88, "company_name": "测试企业A"}, "trial", 500),
+        ("enterprise_standard", {"company_id": 99, "company_name": "测试企业B"}, "standard", 1000),
+    ]
+
+    for key_type, kwargs, expected_sub_type, expected_quota in cases:
+        record = registry.generate_key(key_type=key_type, **kwargs)
+        assert record.key_type == key_type
+        assert record.key_sub_type == expected_sub_type
+        assert record.total_quota == expected_quota
+        assert PRODUCT_KEY_PATTERN.fullmatch(record.product_key)
+
+
+def test_product_key_generation_requires_required_fields():
+    registry = ProductKeyRegistry()
+
+    with pytest.raises(ValueError):
+        registry.generate_key(key_type="enterprise_standard", company_id=101)
+    with pytest.raises(ValueError):
+        registry.generate_key(key_type="enterprise_trial", company_name="仅企业名")
+    with pytest.raises(ValueError):
+        registry.generate_key(key_type="personal_standard")
+
+
+def test_product_key_format_checksum_and_suffix_validation():
+    registry = ProductKeyRegistry()
+    valid = registry.generate_key(key_type="personal_standard", user_id=9527).product_key
+    assert registry.validate_key(valid).product_key == valid
+
+    invalid_format_keys = [
+        "ABC1-DEF2-GHI3",
+        "ABC1-DEF2-GHI3-JKL4-MNO5",
+        "ABC1-DEF2-GHI3-JKL!",
+        "abc1-def2-ghi3-jkl4",
+        "ABC-DEF-GHI-JKL",
+    ]
+    for item in invalid_format_keys:
+        with pytest.raises(ProductKeyValidationError):
+            registry.validate_key_format(item)
+
+    raw = valid.replace("-", "")
+    changed_checksum = "0" if raw[9] != "0" else "1"
+    bad_checksum = f"{raw[:9]}{changed_checksum}{raw[10:]}"
+    bad_checksum = f"{bad_checksum[:3]}-{bad_checksum[3:7]}-{bad_checksum[7:11]}-{bad_checksum[11:15]}"
+    with pytest.raises(ProductKeyValidationError):
+        registry.validate_checksum(bad_checksum)
+
+    changed_suffix = "AAAAA" if raw[10:] != "AAAAA" else "BBBBB"
+    bad_suffix = f"{raw[:10]}{changed_suffix}"
+    bad_suffix = f"{bad_suffix[:3]}-{bad_suffix[3:7]}-{bad_suffix[7:11]}-{bad_suffix[11:15]}"
+    with pytest.raises(ProductKeyValidationError):
+        registry.validate_checksum(bad_suffix)
+
+
+def test_validate_key_require_unused_flag():
+    registry = ProductKeyRegistry()
+    record = registry.generate_key(key_type="personal_trial", user_id=1)
+    record.status = "active"
+
+    with pytest.raises(ProductKeyValidationError):
+        registry.validate_key(record.product_key, require_unused=True)
+
+    validated = registry.validate_key(record.product_key, require_unused=False)
+    assert validated.product_key == record.product_key
+
+
 def test_verification_code_issue_and_attempt_limit():
     cache = AuthCacheManager(redis_url=None)
     verifier = EmailVerificationService(cache, code_ttl_seconds=30, max_attempts=3)

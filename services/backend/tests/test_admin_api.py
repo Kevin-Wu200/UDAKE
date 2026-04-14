@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Dict
 
 import pytest
@@ -72,7 +73,16 @@ def admin_client(monkeypatch: pytest.MonkeyPatch):
             status="active",
             company_id=1,
         )
-        db.add_all([super_admin, user_a, user_b, company_admin])
+        user_c = User(
+            id=5,
+            username="charlie",
+            email="charlie@example.com",
+            password_hash="old_hash_charlie",
+            role="user",
+            status="active",
+            company_id=1,
+        )
+        db.add_all([super_admin, user_a, user_b, company_admin, user_c])
         db.flush()
 
         key_unused = ProductKey(
@@ -220,6 +230,82 @@ def test_admin_product_key_crud_and_batch(admin_client):
     batch_data = batch_resp.json()["data"]
     assert batch_data["success_count"] == 1
     assert batch_data["failed_count"] == 2
+
+
+def test_regular_user_product_key_permission_denied(admin_client):
+    client, _, tokens = admin_client
+
+    create_resp = client.post(
+        "/api/admin/product-keys",
+        json={"type": "personal_standard", "count": 1},
+        headers=_auth_header(tokens["user"]),
+    )
+    assert create_resp.status_code == 403, create_resp.text
+
+    list_resp = client.get("/api/admin/product-keys", headers=_auth_header(tokens["user"]))
+    assert list_resp.status_code == 403, list_resp.text
+
+    batch_resp = client.post(
+        "/api/admin/product-keys/batch",
+        json={"keys": ["ABC1-DEF2-GHI3-JKL4"], "type": "personal_standard", "duplicate_action": "skip"},
+        headers=_auth_header(tokens["user"]),
+    )
+    assert batch_resp.status_code == 403, batch_resp.text
+
+
+def test_assign_product_key_cross_company_restriction_and_reassignment(admin_client):
+    client, _, tokens = admin_client
+
+    own_key_resp = client.post(
+        "/api/admin/product-keys",
+        json={"type": "enterprise_standard", "count": 1, "company_id": 1},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert own_key_resp.status_code == 200, own_key_resp.text
+    own_key = own_key_resp.json()["data"]["keys"][0]
+
+    assign_first = client.post(
+        "/api/admin/product-keys/assign",
+        json={"key_id": own_key["id"], "user_id": 2},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert assign_first.status_code == 200, assign_first.text
+    first_payload = assign_first.json()["data"]["key"]
+    first_assigned_at = datetime.fromisoformat(first_payload["assigned_at"])
+
+    assign_second = client.post(
+        "/api/admin/product-keys/assign",
+        json={"key_id": own_key["id"], "user_id": 5},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert assign_second.status_code == 200, assign_second.text
+    second_payload = assign_second.json()["data"]["key"]
+    second_assigned_at = datetime.fromisoformat(second_payload["assigned_at"])
+    assert second_payload["user_id"] == 5
+    assert second_assigned_at >= first_assigned_at
+
+    company_b_key_resp = client.post(
+        "/api/admin/product-keys",
+        json={"type": "enterprise_standard", "count": 1, "company_id": 2},
+        headers=_auth_header(tokens["super_admin"]),
+    )
+    assert company_b_key_resp.status_code == 200, company_b_key_resp.text
+    company_b_key = company_b_key_resp.json()["data"]["keys"][0]
+
+    cross_company_assign = client.post(
+        "/api/admin/product-keys/assign",
+        json={"key_id": company_b_key["id"], "user_id": 2},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert cross_company_assign.status_code == 403, cross_company_assign.text
+
+    user_key_list = client.get(
+        "/api/admin/product-keys?user_id=5",
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert user_key_list.status_code == 200, user_key_list.text
+    listed_keys = user_key_list.json()["data"]["keys"]
+    assert any(item["id"] == own_key["id"] and item["user_id"] == 5 for item in listed_keys)
 
 
 def test_admin_user_management_and_reset_password(admin_client):
