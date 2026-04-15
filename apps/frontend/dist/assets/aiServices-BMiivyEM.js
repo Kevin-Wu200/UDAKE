@@ -1,1 +1,0 @@
-import{Jx as r,Kx as e,Yx as t,qx as i,zb as a}from"./map-geoscene-D3NqRpXK.js";a();export{e as BatchTranslationServiceFactory,r as PortalTranslationService,t as getTranslateParametersKey,i as registerFunctions};

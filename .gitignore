@@ -54,9 +54,6 @@ temp/*
 密钥*.txt
 Key*.txt
 
-# Local assistant metadata
-.claude/
-
 # 开发竞赛相关文档
 竞赛文档/
 
@@ -77,3 +74,4 @@ deep_learning/fusion/repository/
 *.apk
 release/
 android/app/build/outputs/
+apps/frontend/dist/
