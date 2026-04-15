@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import time
+import asyncio
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request, status
@@ -19,6 +20,8 @@ from ..monitoring.metrics import ValidationMetrics
 from ..security.ip_reputation import IPReputationService
 from ..validation_config import load_validation_runtime_config
 from ..config import settings
+from ..services.product_key_validation_queue import ProductKeyValidationQueue
+from ..services.websocket_service import websocket_service
 
 router = APIRouter(prefix="/product-keys")
 
@@ -60,6 +63,7 @@ _IP_REPUTATION_SERVICE: Optional[IPReputationService] = None
 _VALIDATION_AUDIT_LOGGER: Optional[ProductKeyAuditLogger] = None
 _VALIDATION_ALERTING: Optional[ValidationAlerting] = None
 _VALIDATION_DASHBOARD: Optional[ValidationDashboard] = None
+_ASYNC_VALIDATION_QUEUE: Optional[ProductKeyValidationQueue] = None
 
 
 def _ok(message: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -85,6 +89,11 @@ class ValidateResponse(BaseModel):
     message: str
     error_code: str = "OK"
     suggestion: str = ""
+
+
+class ValidateAsyncResponse(BaseModel):
+    task_id: str
+    status: str
 
 
 def _extract_bearer_token(request: Request) -> str:
@@ -306,6 +315,68 @@ def _get_active_key_for_user(service: Any, user_id: int) -> Optional[Any]:
     return None
 
 
+class _MockClient:
+    def __init__(self, host: str) -> None:
+        self.host = host
+
+
+class _MockRequest:
+    def __init__(self, *, ip_address: str, user_agent: str, user_id: str) -> None:
+        self.client = _MockClient(ip_address)
+        self.headers = {
+            "x-forwarded-for": ip_address,
+            "user-agent": user_agent,
+            "x-user-id": user_id,
+        }
+
+
+def _build_validation_payload_response(http_error: HTTPException) -> Dict[str, Any]:
+    detail = http_error.detail if isinstance(http_error.detail, dict) else {"message": str(http_error.detail)}
+    return {
+        "success": False,
+        "status_code": int(http_error.status_code),
+        "detail": detail,
+    }
+
+
+def _async_validation_processor(payload: Dict[str, Any]) -> Dict[str, Any]:
+    product_key = str(payload.get("product_key") or "")
+    ip_address = str(payload.get("ip_address") or "unknown")
+    user_agent = str(payload.get("user_agent") or "async-worker")
+    user_id = str(payload.get("user_id") or "anonymous")
+    mock_request = _MockRequest(ip_address=ip_address, user_agent=user_agent, user_id=user_id)
+    try:
+        result = validate_product_key(ValidateRequest(product_key=product_key), mock_request)  # type: ignore[arg-type]
+        _notify_async_validation_result(user_id=user_id, task_id=str(payload.get("task_id") or ""), result=result)
+        return {"response": result}
+    except HTTPException as exc:
+        response = _build_validation_payload_response(exc)
+        _notify_async_validation_result(user_id=user_id, task_id=str(payload.get("task_id") or ""), result=response)
+        return response
+
+
+def _get_async_validation_queue() -> ProductKeyValidationQueue:
+    global _ASYNC_VALIDATION_QUEUE
+    if _ASYNC_VALIDATION_QUEUE is None:
+        _ASYNC_VALIDATION_QUEUE = ProductKeyValidationQueue(processor=_async_validation_processor)
+    return _ASYNC_VALIDATION_QUEUE
+
+
+def _notify_async_validation_result(*, user_id: str, task_id: str, result: Dict[str, Any]) -> None:
+    loop = getattr(websocket_service, "_loop", None)
+    if loop is None or not user_id or user_id == "anonymous":
+        return
+    message = websocket_service.build_message(
+        "product_key_validation_completed",
+        data={"task_id": task_id, "result": result},
+        user_id=str(user_id),
+    )
+    try:
+        asyncio.run_coroutine_threadsafe(websocket_service.send_to_user(message, user_id=str(user_id)), loop)
+    except Exception:
+        return
+
+
 def _increase_failed_attempts(service: Any, user_id: int) -> Dict[str, int]:
     cache = service.cache
     now = int(time.time())
@@ -523,6 +594,42 @@ def validation_metrics_dashboard():
     service = get_auth_service()
     payload = _get_validation_dashboard(service).snapshot()
     return _ok("密钥验证监控指标获取成功", payload)
+
+
+@router.post("/validate/async")
+def validate_product_key_async(payload: ValidateRequest, request: Request):
+    queue = _get_async_validation_queue()
+    task_id = queue.submit(
+        {
+            "product_key": str(payload.product_key),
+            "ip_address": _extract_client_ip(request) or "unknown",
+            "user_agent": request.headers.get("user-agent", "unknown"),
+            "user_id": request.headers.get("x-user-id", "anonymous"),
+        }
+    )
+    response = ValidateAsyncResponse(task_id=task_id, status="queued")
+    return _ok(
+        "异步密钥校验任务已提交",
+        {
+            **response.model_dump(),
+            "poll_url": f"/api/product-keys/validate/async/{task_id}",
+        },
+    )
+
+
+@router.get("/validate/async/{task_id}")
+def get_async_validate_result(task_id: str):
+    queue = _get_async_validation_queue()
+    row = queue.get(task_id)
+    if row is None:
+        raise _fail(status.HTTP_404_NOT_FOUND, "任务不存在或已过期")
+    return _ok("异步密钥校验任务状态获取成功", row)
+
+
+@router.get("/validate/async-metrics")
+def get_async_validate_metrics():
+    queue = _get_async_validation_queue()
+    return _ok("异步密钥校验队列指标获取成功", queue.metrics())
 
 
 @router.post("/activate")

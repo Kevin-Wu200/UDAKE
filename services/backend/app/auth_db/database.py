@@ -14,10 +14,14 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
-from app.auth_db.performance import ReadWriteSessionRouter
+from app.auth_db.performance import ReadWriteSessionRouter, SlowQueryMonitor
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+_SLOW_QUERY_MONITOR = SlowQueryMonitor(
+    threshold_ms=int(getattr(settings, "AUTH_DB_LOG_SLOW_QUERY_MS", 100)),
+    max_samples=2000,
+)
 
 
 def get_auth_database_url() -> str:
@@ -97,8 +101,14 @@ def _enable_slow_query_logging(engine: Engine) -> None:
             return
         start = start_stack.pop()
         elapsed_ms = (time.perf_counter() - start) * 1000
+        _SLOW_QUERY_MONITOR.observe(statement=str(statement), elapsed_ms=float(elapsed_ms))
         if elapsed_ms >= threshold_ms:
             logger.warning("slow query %.2fms sql=%s", elapsed_ms, " ".join(str(statement).split())[:500])
+
+
+def get_slow_query_report(top_n: int = 20) -> Dict[str, Any]:
+    """Get aggregated slow-query metrics and alert hints."""
+    return _SLOW_QUERY_MONITOR.snapshot(top_n=top_n)
 
 
 def create_auth_engine(database_url: Optional[str] = None) -> Engine:
