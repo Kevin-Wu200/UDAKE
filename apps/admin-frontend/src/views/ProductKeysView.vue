@@ -155,7 +155,7 @@
       </el-form>
       <template #footer>
         <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleCreateSingle" :disabled="createDisabledByQuota">确认创建</el-button>
+        <el-button type="primary" @click="handleCreateSingle" :loading="creating" :disabled="createDisabledByQuota || creating">确认创建</el-button>
       </template>
     </el-dialog>
 
@@ -248,10 +248,11 @@ import {
   fetchProductKeys,
   importProductKeys,
   updateProductKey
-} from '../services/mockApi';
+} from '../services/http';
 
 const authStore = useAuthStore();
 const loading = ref(false);
+const creating = ref(false);
 const keys = ref<ProductKey[]>([]);
 const detailKey = ref<ProductKey | null>(null);
 
@@ -453,6 +454,7 @@ const handleCreateSingle = async () => {
     return;
   }
   try {
+    creating.value = true;
     await createFormRef.value.validate();
     await createProductKeys({
       type: createForm.type,
@@ -470,6 +472,8 @@ const handleCreateSingle = async () => {
     await Promise.all([loadList(), loadStats(), loadCompanyAdminProfile()]);
   } catch {
     ElMessage.error('创建失败');
+  } finally {
+    creating.value = false;
   }
 };
 

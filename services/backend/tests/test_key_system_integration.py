@@ -79,6 +79,7 @@ def key_system_client(monkeypatch: pytest.MonkeyPatch):
     app = FastAPI()
     app.include_router(admin_router, prefix="/api")
     app.include_router(company_router, prefix="/api")
+    app.include_router(auth_router, prefix="/api")
 
     def override_get_auth_db_session():
         db = SessionLocal()
@@ -262,6 +263,33 @@ def test_user_auth_registration_login_integration(auth_client):
     assert login_resp.status_code == 200, login_resp.text
     login_data = login_resp.json()["data"]
     assert "access_token" in login_data and "refresh_token" in login_data
+
+
+def test_register_can_use_database_created_admin_key(key_system_client, monkeypatch: pytest.MonkeyPatch):
+    client, session_factory, tokens = key_system_client
+    monkeypatch.setattr("app.auth_db.session.get_auth_session_factory", lambda: session_factory)
+
+    create_resp = client.post(
+        "/api/admin/product-keys",
+        json={"type": "personal_standard", "count": 1},
+        headers=_auth_header(tokens["super_admin"]),
+    )
+    assert create_resp.status_code == 200, create_resp.text
+    created_key = str(create_resp.json()["data"]["keys"][0]["product_key"])
+
+    register_resp = client.post(
+        "/api/auth/register",
+        json={
+            "email": "db_key_user@example.com",
+            "password": "StrongPass123",
+            "product_key": created_key,
+        },
+    )
+    assert register_resp.status_code == 200, register_resp.text
+
+    with session_factory() as db:
+        stored = db.query(ProductKey).filter(ProductKey.product_key == created_key).one()
+        assert stored.status == "active"
 
 
 def test_company_system_integration_batch_assign_and_stats(key_system_client):

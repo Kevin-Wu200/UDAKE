@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import logging
 import os
 import re
 import threading
 import time
 import uuid
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -138,6 +140,91 @@ class AuthService:
             if normalized and "@" in normalized:
                 emails.add(normalized)
         return emails
+
+    def _query_product_key_from_db(self, product_key: str) -> Optional[ProductKeyRecord]:
+        normalized = product_key.strip().upper()
+        try:
+            from app.auth_db.models import ProductKey
+            from app.auth_db.session import get_auth_session_factory
+        except Exception:  # pragma: no cover - auth db unavailable fallback
+            return None
+
+        try:
+            session_factory = get_auth_session_factory()
+        except Exception:  # pragma: no cover - auth db unavailable fallback
+            return None
+
+        db = session_factory()
+        try:
+            try:
+                row = db.query(ProductKey).filter(ProductKey.product_key == normalized).one_or_none()
+            except Exception as exc:  # pragma: no cover - db schema may be unavailable in isolated tests
+                logger.debug("query product key from db skipped: %s", exc)
+                return None
+            if row is None:
+                return None
+            metadata = None
+            if row.key_metadata:
+                try:
+                    parsed = json.loads(row.key_metadata)
+                    metadata = parsed if isinstance(parsed, dict) else None
+                except Exception:
+                    metadata = None
+            return ProductKeyRecord(
+                product_key=row.product_key,
+                status=row.status,
+                key_type=row.key_type,
+                key_sub_type=row.key_sub_type,
+                total_quota=int(row.total_quota or 0),
+                used_count=int(row.used_count or 0),
+                user_id=row.user_id,
+                company_id=row.company_id,
+                generation_seed=row.generation_seed,
+                metadata=metadata,
+                signature=None,
+            )
+        finally:
+            db.close()
+
+    def _activate_product_key_in_db(self, product_key: str, user_id: int) -> bool:
+        normalized = product_key.strip().upper()
+        try:
+            from app.auth_db.models import ProductKey
+            from app.auth_db.session import get_auth_session_factory
+        except Exception:  # pragma: no cover - auth db unavailable fallback
+            return False
+
+        try:
+            session_factory = get_auth_session_factory()
+        except Exception:  # pragma: no cover - auth db unavailable fallback
+            return False
+
+        db = session_factory()
+        try:
+            try:
+                row = db.query(ProductKey).filter(ProductKey.product_key == normalized).one_or_none()
+            except Exception as exc:  # pragma: no cover - db schema may be unavailable in isolated tests
+                logger.debug("activate product key in db skipped: %s", exc)
+                return False
+            if row is None:
+                return False
+            if str(row.status).strip().lower() != "unused":
+                raise ProductKeyValidationError(f"product key status invalid: {row.status}")
+            row.status = "active"
+            row.user_id = user_id
+            row.used_count = min(int(row.total_quota or 0), int(row.used_count or 0) + 1)
+            now = datetime.now(timezone.utc)
+            row.activated_at = row.activated_at or now
+            row.last_used_at = now
+            try:
+                db.commit()
+            except Exception as exc:  # pragma: no cover - commit failure fallback to memory mode
+                logger.warning("activate product key in db commit failed: %s", exc)
+                db.rollback()
+                return False
+            return True
+        finally:
+            db.close()
 
     def _apply_super_admin_role_if_needed(self, user: AuthUser) -> None:
         if user.email not in self._super_admin_emails:
@@ -603,7 +690,11 @@ class AuthService:
         self._ensure_rate_limit(identity=normalized_email, action="register")
 
         try:
-            record = self.product_keys.validate_key(validate_product_key, require_unused=True)
+            record = self.product_keys.validate_key(
+                validate_product_key,
+                require_unused=True,
+                query_func=self._query_product_key_from_db,
+            )
         except ProductKeyValidationError as exc:
             self._audit(
                 operation="register",
@@ -631,9 +722,14 @@ class AuthService:
                 status="active",
             )
             self._apply_super_admin_role_if_needed(user)
+            self._activate_product_key_in_db(validate_product_key, user_id)
+            record.status = "active"
+            record.user_id = user_id
+            if int(record.total_quota or 0) > 0:
+                record.used_count = min(int(record.total_quota), int(record.used_count or 0) + 1)
+            self.product_keys.register_key(record)
             self._users_by_email[normalized_email] = user
             self._users_by_id[user_id] = user
-            record.status = "active"
             self._record_password_history(user_id, user.password_hash)
 
         code = self.verifier.issue_code(normalized_email, namespace="verify_code")
