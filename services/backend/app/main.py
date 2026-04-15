@@ -138,6 +138,7 @@ else:
 # 挂载静态文件
 app.mount("/results", StaticFiles(directory=str(settings.RESULTS_DIR)), name="results")
 app.mount("/android_downloads", StaticFiles(directory=str(settings.ANDROID_APK_DIR)), name="android_downloads")
+app.mount("/windows_downloads", StaticFiles(directory=str(settings.WINDOWS_EXE_DIR)), name="windows_downloads")
 
 
 @app.middleware("http")

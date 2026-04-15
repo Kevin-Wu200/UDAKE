@@ -192,6 +192,11 @@
       androidButton.setAttribute("href", DOWNLOAD_URLS.android);
     }
 
+    const windowsButton = document.getElementById("windowsDownload");
+    if (windowsButton) {
+      windowsButton.setAttribute("href", DOWNLOAD_URLS.windows);
+    }
+
     const macosButton = document.getElementById("macosDownload");
     if (macosButton) {
       macosButton.setAttribute("href", resolveMacDownloadUrl());

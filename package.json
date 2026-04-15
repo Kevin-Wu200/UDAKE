@@ -56,6 +56,7 @@
     "deps:audit": "npm audit --omit=dev --audit-level=high",
     "build:electron": "electron-builder",
     "build:mac": "npm run build:prod && npm run build:electron -- --mac && node scripts/copy-mac-artifact.js",
+    "build:windows": "npm run build:prod && npm run build:electron -- --win && node scripts/copy-windows-artifact.js",
     "build:android": "npm run build:prod && node scripts/update-capacitor-config.js && npx cap sync android && cd android && ./gradlew assembleRelease && cd ..",
     "build:all": "npm run build:prod && npm run build:android && npm run build:electron"
   },
@@ -125,6 +126,34 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "artifactName": "${productName}-${version}-${arch}.${ext}"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "ia32"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "logo/UDAKE.ico",
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "UDAKE",
+      "uninstallDisplayName": "UDAKE",
+      "runAfterFinish": true
     },
     "dmg": {
       "contents": [

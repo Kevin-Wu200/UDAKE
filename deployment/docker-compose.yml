@@ -12,10 +12,12 @@ services:
       - HOST=0.0.0.0
       - PORT=8000
       - ANDROID_APK_DIR=/app/android_downloads
+      - WINDOWS_EXE_DIR=/app/windows_downloads
     volumes:
       - ../data_samples:/app/data_samples
       - ../services/backend/app/结果文件:/app/app/结果文件
       - ../android/app/build/outputs/apk/release:/app/android_downloads
+      - ../:/app/windows_downloads:ro
     restart: unless-stopped
 
   nginx:
