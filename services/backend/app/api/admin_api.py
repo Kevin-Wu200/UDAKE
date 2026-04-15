@@ -114,6 +114,7 @@ class ProductKeyCreateRequest(BaseModel):
 class ProductKeyUpdateRequest(BaseModel):
     status: Optional[str] = Field(default=None)
     company_name: Optional[str] = Field(default=None, max_length=128)
+    extend_days: Optional[int] = Field(default=None, ge=0, le=3650, description="延长天数，0表示取消过期限制")
 
 
 class ProductKeyBatchImportRequest(BaseModel):
@@ -865,6 +866,24 @@ def update_product_key(
         if target.status != next_status:
             changed_fields["status"] = {"from": target.status, "to": next_status}
             target.status = next_status
+
+    if payload.extend_days is not None:
+        current_expiry = target.expires_at
+        if payload.extend_days == 0:
+            target.expires_at = None
+            changed_fields["expires_at"] = {
+                "from": current_expiry.isoformat() if current_expiry else None,
+                "to": None,
+                "extend_days": payload.extend_days,
+            }
+        else:
+            base_time = current_expiry or datetime.now(timezone.utc).replace(tzinfo=None)
+            target.expires_at = base_time + timedelta(days=payload.extend_days)
+            changed_fields["expires_at"] = {
+                "from": current_expiry.isoformat() if current_expiry else None,
+                "to": target.expires_at.isoformat(),
+                "extend_days": payload.extend_days,
+            }
 
     if payload.company_name is not None:
         next_company = _resolve_or_create_company(db, payload.company_name)

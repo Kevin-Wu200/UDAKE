@@ -82,6 +82,16 @@
       </el-table-column>
       <el-table-column prop="total_quota" label="总配额" width="100" />
       <el-table-column prop="used_count" label="已使用" width="100" />
+      <el-table-column prop="company_id" label="企业ID" width="100">
+        <template #default="{ row }">
+          {{ row.company_id || '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="user_id" label="用户ID" width="100">
+        <template #default="{ row }">
+          {{ row.user_id || '-' }}
+        </template>
+      </el-table-column>
       <el-table-column prop="expires_at" label="过期时间" width="180">
         <template #default="{ row }">
           <div class="expires-cell">
@@ -187,6 +197,17 @@
         </el-form-item>
         <el-form-item label="备注" prop="notes">
           <el-input v-model="editForm.notes" type="textarea" :rows="3" maxlength="120" show-word-limit />
+        </el-form-item>
+        <el-form-item label="延长天数" prop="extend_days">
+          <el-input-number
+            v-model="editForm.extend_days"
+            :min="0"
+            :max="3650"
+            :step="30"
+            controls-position="right"
+            style="width: 100%"
+          />
+          <div class="form-tip">为0表示取消过期限制，默认30天为步长</div>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -305,7 +326,8 @@ const createForm = reactive({
 const editForm = reactive({
   id: 0,
   status: 'unused' as KeyStatus,
-  notes: ''
+  notes: '',
+  extend_days: undefined as number | undefined
 });
 
 const importText = ref('');
@@ -332,7 +354,8 @@ const createRules: FormRules<typeof createForm> = {
 };
 
 const editRules: FormRules<typeof editForm> = {
-  status: [{ required: true, message: '请选择状态', trigger: 'change' }]
+  status: [{ required: true, message: '请选择状态', trigger: 'change' }],
+  extend_days: [{ type: 'number', min: 0, max: 3650, message: '延长天数范围 0-3650' }]
 };
 
 const getKeyTypeLabel = (type: KeyType) => {
@@ -473,6 +496,7 @@ const handleEdit = (row: ProductKey) => {
   editForm.id = row.id;
   editForm.status = row.status;
   editForm.notes = row.metadata?.notes || '';
+  editForm.extend_days = undefined;
   editDialogVisible.value = true;
 };
 
@@ -485,7 +509,8 @@ const handleUpdate = async () => {
     await editFormRef.value.validate();
     await updateProductKey(editForm.id, {
       status: editForm.status,
-      notes: editForm.notes
+      notes: editForm.notes,
+      extend_days: editForm.extend_days
     });
     editDialogVisible.value = false;
     ElMessage.success('更新成功');
@@ -656,6 +681,12 @@ onMounted(async () => {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.form-tip {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
 }
 
 @media (max-width: 900px) {

@@ -383,6 +383,7 @@ export async function updateProductKey(
   payload: {
     status: KeyStatus;
     notes?: string;
+    extend_days?: number;
   }
 ) {
   await delay();
@@ -390,9 +391,20 @@ export async function updateProductKey(
     if (item.id !== id) {
       return item;
     }
+    const currentExpiryTs = item.expires_at ? new Date(item.expires_at.replace(' ', 'T')).getTime() : Number.NaN;
+    let nextExpiresAt = item.expires_at;
+    if (payload.extend_days !== undefined) {
+      if (payload.extend_days === 0) {
+        nextExpiresAt = undefined;
+      } else {
+        const baseDate = Number.isNaN(currentExpiryTs) ? new Date() : new Date(currentExpiryTs);
+        nextExpiresAt = formatDate(new Date(baseDate.getTime() + payload.extend_days * 24 * 60 * 60 * 1000));
+      }
+    }
     return {
       ...item,
       status: payload.status,
+      expires_at: nextExpiresAt,
       metadata: {
         ...item.metadata,
         notes: payload.notes ?? item.metadata?.notes

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Dict
 
 import pytest
@@ -231,6 +231,63 @@ def test_admin_product_key_crud_and_batch(admin_client):
     batch_data = batch_resp.json()["data"]
     assert batch_data["success_count"] == 1
     assert batch_data["failed_count"] == 2
+
+
+def test_update_product_key_extend_days_and_clear_expiry(admin_client):
+    client, session_factory, tokens = admin_client
+
+    set_expiry_resp = client.put(
+        "/api/admin/product-keys/101",
+        json={"extend_days": 30},
+        headers=_auth_header(tokens["super_admin"]),
+    )
+    assert set_expiry_resp.status_code == 200, set_expiry_resp.text
+    first_expiry_raw = set_expiry_resp.json()["data"]["key"]["expires_at"]
+    assert first_expiry_raw is not None
+    first_expiry = datetime.fromisoformat(first_expiry_raw)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    assert now + timedelta(days=29, hours=23) <= first_expiry <= now + timedelta(days=30, hours=1)
+
+    extend_resp = client.put(
+        "/api/admin/product-keys/101",
+        json={"extend_days": 15},
+        headers=_auth_header(tokens["super_admin"]),
+    )
+    assert extend_resp.status_code == 200, extend_resp.text
+    second_expiry_raw = extend_resp.json()["data"]["key"]["expires_at"]
+    assert second_expiry_raw is not None
+    second_expiry = datetime.fromisoformat(second_expiry_raw)
+    assert first_expiry + timedelta(days=14, hours=23) <= second_expiry <= first_expiry + timedelta(days=15, hours=1)
+
+    clear_expiry_resp = client.put(
+        "/api/admin/product-keys/101",
+        json={"extend_days": 0},
+        headers=_auth_header(tokens["super_admin"]),
+    )
+    assert clear_expiry_resp.status_code == 200, clear_expiry_resp.text
+    assert clear_expiry_resp.json()["data"]["key"]["expires_at"] is None
+
+    with session_factory() as db:
+        db_key = db.query(ProductKey).filter(ProductKey.id == 101).one()
+        assert db_key.expires_at is None
+        latest_update_log = (
+            db.query(AuditLog)
+            .filter(AuditLog.operation_type == "update", AuditLog.target_table == "product_keys", AuditLog.target_id == "101")
+            .order_by(AuditLog.id.desc())
+            .first()
+        )
+        assert latest_update_log is not None
+        assert latest_update_log.details["changes"]["expires_at"]["extend_days"] == 0
+
+
+def test_update_product_key_extend_days_out_of_range_rejected(admin_client):
+    client, _, tokens = admin_client
+    resp = client.put(
+        "/api/admin/product-keys/101",
+        json={"extend_days": 3651},
+        headers=_auth_header(tokens["super_admin"]),
+    )
+    assert resp.status_code == 422, resp.text
 
 
 def test_regular_user_product_key_permission_denied(admin_client):
