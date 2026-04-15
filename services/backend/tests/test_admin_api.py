@@ -309,6 +309,30 @@ def test_assign_product_key_cross_company_restriction_and_reassignment(admin_cli
     assert any(item["id"] == own_key["id"] and item["user_id"] == 5 for item in listed_keys)
 
 
+def test_company_admin_type_and_total_limit_enforced_in_admin_create(admin_client):
+    client, session_factory, tokens = admin_client
+
+    with session_factory() as db:
+        admin = db.query(User).filter(User.id == 4).one()
+        admin.company_admin_type = "trial"
+        admin.total_keys_created = 500
+        db.commit()
+
+    create_standard = client.post(
+        "/api/admin/product-keys",
+        json={"type": "enterprise_standard", "count": 1, "company_id": 1},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert create_standard.status_code == 403, create_standard.text
+
+    create_trial = client.post(
+        "/api/admin/product-keys",
+        json={"type": "enterprise_trial", "count": 1, "company_id": 1},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert create_trial.status_code == 403, create_trial.text
+
+
 def test_admin_user_management_and_reset_password(admin_client):
     client, session_factory, tokens = admin_client
 

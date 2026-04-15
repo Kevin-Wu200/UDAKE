@@ -4,6 +4,8 @@
       <h1>企业密钥管理</h1>
       <div class="company-info">
         <el-tag type="success">{{ currentCompany.name }}</el-tag>
+        <el-tag type="warning">管理员类型：{{ adminTypeLabel }}</el-tag>
+        <el-tag type="info">已创建 {{ companyStats.totalKeys }} / {{ createLimit }}</el-tag>
       </div>
     </div>
 
@@ -23,6 +25,10 @@
       <el-card class="stat-card">
         <div class="stat-value">{{ companyStats.availableKeys }}</div>
         <div class="stat-label">可用密钥</div>
+      </el-card>
+      <el-card class="stat-card">
+        <div class="stat-value">{{ companyStats.expiredKeys }}</div>
+        <div class="stat-label">已过期</div>
       </el-card>
     </div>
 
@@ -69,6 +75,11 @@
         <template #default="{ row }">{{ row.metadata?.assigned_user_name || '-' }}</template>
       </el-table-column>
       <el-table-column prop="assigned_at" label="分配时间" width="170" />
+      <el-table-column prop="expires_at" label="过期时间" width="180">
+        <template #default="{ row }">
+          <span :class="{ 'is-expired-time': row.status === 'expired' }">{{ row.expires_at || '-' }}</span>
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="220" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="handleView(row)">查看</el-button>
@@ -131,6 +142,7 @@
         <el-descriptions-item label="分配用户">
           {{ selectedKey.metadata?.assigned_user_name || '-' }}
         </el-descriptions-item>
+        <el-descriptions-item label="过期时间">{{ selectedKey.expires_at || '-' }}</el-descriptions-item>
         <el-descriptions-item label="分配时间">{{ selectedKey.assigned_at || '-' }}</el-descriptions-item>
         <el-descriptions-item label="备注">{{ selectedKey.metadata?.notes || '-' }}</el-descriptions-item>
       </el-descriptions>
@@ -179,8 +191,12 @@ const companyStats = reactive({
   totalKeys: 0,
   activeKeys: 0,
   assignedKeys: 0,
-  availableKeys: 0
+  availableKeys: 0,
+  expiredKeys: 0
 });
+
+const adminTypeLabel = computed(() => '标准企业管理员');
+const createLimit = computed(() => 1000);
 
 const generateDialogVisible = ref(false);
 const assignDialogVisible = ref(false);
@@ -228,6 +244,7 @@ const loadCompanyStats = async () => {
   companyStats.activeKeys = res.activeKeys;
   companyStats.assignedKeys = res.assignedKeys;
   companyStats.availableKeys = res.availableKeys;
+  companyStats.expiredKeys = keys.value.filter((item) => item.status === 'expired').length;
 };
 
 const loadCompanyUsers = async () => {
@@ -367,7 +384,7 @@ onMounted(async () => {
 
 .stats-cards {
   display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
   gap: 12px;
 }
 
@@ -390,6 +407,11 @@ onMounted(async () => {
 .pagination {
   display: flex;
   justify-content: flex-end;
+}
+
+.is-expired-time {
+  color: #dc2626;
+  font-weight: 600;
 }
 
 @media (max-width: 960px) {

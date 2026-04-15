@@ -37,6 +37,14 @@ from ..auth_db.models import (
 )
 from ..auth_db.session import get_auth_db_session
 from ..config import settings
+from ..services.company_admin_policy_service import (
+    compute_key_expires_at,
+    is_datetime_expired,
+    mark_expired_product_keys,
+    resolve_company_admin_policy,
+    send_expiry_reminders,
+    sync_company_admin_role_by_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -337,6 +345,8 @@ def _serialize_product_key(item: ProductKey, company_name: Optional[str] = None)
 
 
 def _serialize_user(item: User, company_name: Optional[str] = None) -> Dict[str, Any]:
+    company_admin_type = getattr(item, "company_admin_type", None)
+    total_keys_created = int(getattr(item, "total_keys_created", 0) or 0)
     return {
         "id": item.id,
         "username": item.username,
@@ -345,6 +355,9 @@ def _serialize_user(item: User, company_name: Optional[str] = None) -> Dict[str,
         "status": item.status,
         "company_id": item.company_id,
         "company_name": company_name,
+        "company_admin_type": company_admin_type,
+        "company_admin_key_id": getattr(item, "company_admin_key_id", None),
+        "total_keys_created": total_keys_created,
         "last_login_at": _to_iso(item.last_login_at),
         "created_at": _to_iso(item.created_at),
         "updated_at": _to_iso(item.updated_at),
@@ -520,6 +533,20 @@ def _next_model_id(db: Session, model_cls: Any) -> int:
     return int((db.query(func.max(model_cls.id)).scalar() or 0) + 1)
 
 
+def _run_company_key_maintenance(db: Session) -> None:
+    try:
+        auth_service = get_auth_service()
+        expired_result = mark_expired_product_keys(db)
+        if int(expired_result.get("expired_keys", 0) or 0) > 0 or int(
+            expired_result.get("expired_related_keys", 0) or 0
+        ) > 0:
+            db.commit()
+        send_expiry_reminders(db, auth_service=auth_service)
+        db.flush()
+    except Exception as exc:  # pragma: no cover - maintenance failure should not block API
+        logger.warning("企业密钥维护任务执行失败: %s", exc)
+
+
 @router.post("/product-keys")
 @require_role(["super_admin", "company_admin"])
 def create_product_keys(
@@ -528,6 +555,7 @@ def create_product_keys(
     db: Session = Depends(get_auth_db_session),
 ):
     current_user: User = request.state.current_user
+    _run_company_key_maintenance(db)
     db_type = PRODUCT_KEY_TYPE_TO_DB[payload.type]
     sanitized_metadata = sanitize_payload(payload.metadata) if payload.metadata is not None else None
 
@@ -540,6 +568,17 @@ def create_product_keys(
             raise _fail(status.HTTP_403_FORBIDDEN, "企业管理员必须绑定企业")
         if payload.company_id is not None and payload.company_id != current_user.company_id:
             raise _fail(status.HTTP_403_FORBIDDEN, "只能为所属企业生成密钥")
+        policy = resolve_company_admin_policy(current_user)
+        if db_type not in policy.allowed_key_types:
+            raise _fail(
+                status.HTTP_403_FORBIDDEN,
+                f"当前企业管理员类型为{policy.admin_type}，不允许创建 {db_type}",
+            )
+        if policy.total_keys_created + payload.count > policy.total_limit:
+            raise _fail(
+                status.HTTP_403_FORBIDDEN,
+                f"创建数量超限：已创建 {policy.total_keys_created}，本次 {payload.count}，上限 {policy.total_limit}",
+            )
 
     company: Optional[Company] = None
     resolved_company_id = payload.company_id
@@ -600,6 +639,7 @@ def create_product_keys(
             used_count=0,
             signature=signature,
             assigned_at=datetime.now(timezone.utc) if payload.user_id else None,
+            expires_at=compute_key_expires_at(db_type),
         )
         db.add(item)
         created_items.append(item)
@@ -624,6 +664,8 @@ def create_product_keys(
             "target_user_id": payload.user_id,
         },
     )
+    if current_user.role == "company_admin":
+        current_user.total_keys_created = int(getattr(current_user, "total_keys_created", 0) or 0) + payload.count
     db.commit()
 
     company_name_map: Dict[int, str] = {}
@@ -660,6 +702,7 @@ def list_product_keys(
     search: Optional[str] = Query(default=None),
 ):
     current_user: User = request.state.current_user
+    _run_company_key_maintenance(db)
 
     query = db.query(ProductKey, Company.name.label("company_name")).outerjoin(Company, Company.id == ProductKey.company_id)
 
@@ -719,6 +762,7 @@ def assign_product_key_to_user(
     db: Session = Depends(get_auth_db_session),
 ):
     current_user: User = request.state.current_user
+    _run_company_key_maintenance(db)
     target_user = db.query(User).filter(User.id == payload.user_id).one_or_none()
     if not target_user or target_user.status == "deleted":
         raise _fail(status.HTTP_404_NOT_FOUND, "目标用户不存在")
@@ -735,13 +779,22 @@ def assign_product_key_to_user(
 
     if target_key.status in {"disabled", "expired"}:
         raise _fail(status.HTTP_400_BAD_REQUEST, "密钥状态不可分配")
+    if is_datetime_expired(target_key.expires_at):
+        target_key.status = "expired"
+        db.commit()
+        raise _fail(status.HTTP_400_BAD_REQUEST, "密钥已过期，无法分配")
 
     target_key.user_id = target_user.id
     target_key.assigned_at = datetime.now(timezone.utc)
     if target_key.status == "unused":
         target_key.status = "active"
         target_key.used_count = min(int(target_key.total_quota or 0), int(target_key.used_count or 0) + 1)
+        target_key.activated_at = target_key.activated_at or datetime.now(timezone.utc)
+        if target_key.expires_at is None:
+            target_key.expires_at = compute_key_expires_at(target_key.key_type, base_time=target_key.activated_at)
     target_user.product_key_id = target_key.id
+    if current_user.role == "company_admin":
+        sync_company_admin_role_by_key(current_user, target_key)
 
     _record_audit_log(
         db,
@@ -766,6 +819,7 @@ def get_product_key_stats(
     company_id: Optional[int] = Query(default=None),
 ):
     current_user: User = request.state.current_user
+    _run_company_key_maintenance(db)
     effective_company_id = company_id
     if current_user.role == "company_admin":
         effective_company_id = current_user.company_id

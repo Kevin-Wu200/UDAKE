@@ -69,6 +69,11 @@ class User(Base):
         BigInteger, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
     )
     product_key_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
+    company_admin_type: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)
+    company_admin_key_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("product_keys.id", ondelete="SET NULL"), nullable=True
+    )
+    total_keys_created: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     last_login_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[Any] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
@@ -78,7 +83,12 @@ class User(Base):
     )
 
     company = relationship("Company", back_populates="users")
-    product_keys = relationship("ProductKey", back_populates="user", cascade="all, delete-orphan")
+    product_keys = relationship(
+        "ProductKey",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="ProductKey.user_id",
+    )
     email_verification_codes = relationship(
         "EmailVerificationCode", back_populates="user", cascade="all, delete-orphan"
     )
@@ -102,10 +112,15 @@ class User(Base):
             "status IN ('pending', 'active', 'disabled', 'locked', 'deleted')",
             name="ck_users_status_enum",
         ),
+        CheckConstraint(
+            "company_admin_type IS NULL OR company_admin_type IN ('trial', 'standard')",
+            name="ck_users_company_admin_type_enum",
+        ),
         Index("ix_users_username", "username"),
         Index("ix_users_email", "email"),
         Index("ix_users_status", "status"),
         Index("ix_users_company_id", "company_id"),
+        Index("ix_users_company_admin_type", "company_admin_type"),
     )
 
 
@@ -157,7 +172,7 @@ class ProductKey(Base):
     )
 
     company = relationship("Company", back_populates="product_keys")
-    user = relationship("User", back_populates="product_keys")
+    user = relationship("User", back_populates="product_keys", foreign_keys=[user_id])
 
     @classmethod
     def get_default_quota(cls, key_type: str) -> int:
@@ -193,6 +208,8 @@ class ProductKey(Base):
         Index("idx_product_keys_type_status", "key_type", "status"),
         Index("idx_product_keys_company_status", "company_id", "status"),
         Index("idx_product_keys_user_status", "user_id", "status"),
+        Index("ix_product_keys_activated_at", "activated_at"),
+        Index("ix_product_keys_expires_at", "expires_at"),
         Index("uq_product_keys_key", "product_key", unique=True),
     )
 

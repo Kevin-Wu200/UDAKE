@@ -127,7 +127,9 @@ def test_database_schema_and_api_integration(key_system_client):
     with session_factory() as db:
         inspector = inspect(db.bind)
         columns = {item["name"] for item in inspector.get_columns("product_keys")}
-        assert {"key_sub_type", "generation_seed", "key_metadata"}.issubset(columns)
+        assert {"key_sub_type", "generation_seed", "key_metadata", "activated_at", "expires_at"}.issubset(columns)
+        user_columns = {item["name"] for item in inspector.get_columns("users")}
+        assert {"company_admin_type", "company_admin_key_id", "total_keys_created"}.issubset(user_columns)
 
     create_resp = client.post(
         "/api/admin/product-keys",

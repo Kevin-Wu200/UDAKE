@@ -20,6 +20,14 @@ from ..auth import JWTValidationError, ProductKeyRegistry, SensitiveDataCipher, 
 from ..auth_db.models import AuditLog, Company, ProductKey, User
 from ..auth_db.session import get_auth_db_session
 from ..config import settings
+from ..services.company_admin_policy_service import (
+    compute_key_expires_at,
+    is_datetime_expired,
+    mark_expired_product_keys,
+    resolve_company_admin_policy,
+    send_expiry_reminders,
+    sync_company_admin_role_by_key,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -170,6 +178,7 @@ def _get_company_name(db: Session, company_id: Optional[int]) -> Optional[str]:
 
 
 def _serialize_user(user: User, *, company_name: Optional[str] = None) -> Dict[str, Any]:
+    policy = resolve_company_admin_policy(user) if user.role == "company_admin" else None
     return {
         "id": user.id,
         "username": user.username,
@@ -179,6 +188,10 @@ def _serialize_user(user: User, *, company_name: Optional[str] = None) -> Dict[s
         "last_login_at": user.last_login_at,
         "status": user.status,
         "company_name": company_name,
+        "company_admin_type": getattr(user, "company_admin_type", None),
+        "company_admin_key_id": getattr(user, "company_admin_key_id", None),
+        "total_keys_created": int(getattr(user, "total_keys_created", 0) or 0),
+        "remaining_keys_allowed": policy.remaining if policy else None,
     }
 
 
@@ -210,6 +223,20 @@ def _serialize_product_key(item: ProductKey, *, company_name: Optional[str] = No
 
 def _next_model_id(db: Session, model_cls: Any) -> int:
     return int((db.query(func.max(model_cls.id)).scalar() or 0) + 1)
+
+
+def _run_company_key_maintenance(db: Session) -> None:
+    try:
+        auth_service = get_auth_service()
+        expired_result = mark_expired_product_keys(db)
+        if int(expired_result.get("expired_keys", 0) or 0) > 0 or int(
+            expired_result.get("expired_related_keys", 0) or 0
+        ) > 0:
+            db.commit()
+        send_expiry_reminders(db, auth_service=auth_service)
+        db.flush()
+    except Exception as exc:  # pragma: no cover
+        logger.warning("企业密钥维护任务执行失败: %s", exc)
 
 
 def _normalize_product_key(raw: str) -> str:
@@ -292,9 +319,21 @@ def batch_generate_company_keys(
     db: Session = Depends(get_auth_db_session),
 ):
     current_user: User = request.state.company_admin_user
+    _run_company_key_maintenance(db)
 
     if payload.key_type not in ENTERPRISE_PRODUCT_KEY_TYPES:
         raise _fail(status.HTTP_400_BAD_REQUEST, "只支持企业试用和企业标准类型")
+    policy = resolve_company_admin_policy(current_user)
+    if payload.key_type not in policy.allowed_key_types:
+        raise _fail(
+            status.HTTP_403_FORBIDDEN,
+            f"当前企业管理员类型为{policy.admin_type}，不允许创建 {payload.key_type}",
+        )
+    if policy.total_keys_created + payload.count > policy.total_limit:
+        raise _fail(
+            status.HTTP_403_FORBIDDEN,
+            f"创建数量超限：已创建 {policy.total_keys_created}，本次 {payload.count}，上限 {policy.total_limit}",
+        )
 
     created_items: List[ProductKey] = []
     next_key_id = _next_model_id(db, ProductKey)
@@ -322,6 +361,7 @@ def batch_generate_company_keys(
             company_id=current_user.company_id,
             total_quota=PRODUCT_KEY_QUOTA_MAP[payload.key_type],
             used_count=0,
+            expires_at=compute_key_expires_at(payload.key_type),
         )
         db.add(item)
         created_items.append(item)
@@ -349,6 +389,7 @@ def batch_generate_company_keys(
             },
         )
     )
+    current_user.total_keys_created = int(getattr(current_user, "total_keys_created", 0) or 0) + payload.count
     db.commit()
 
     company_name = _get_company_name(db, current_user.company_id)
@@ -369,6 +410,7 @@ def assign_key_to_user(
     db: Session = Depends(get_auth_db_session),
 ):
     current_user: User = request.state.company_admin_user
+    _run_company_key_maintenance(db)
 
     user = db.query(User).filter(User.id == payload.user_id).one_or_none()
     if not user or user.status == "deleted" or user.company_id != current_user.company_id:
@@ -383,13 +425,21 @@ def assign_key_to_user(
         raise _fail(status.HTTP_400_BAD_REQUEST, "只能分配企业类型密钥")
     if key.status in {"disabled", "expired"}:
         raise _fail(status.HTTP_400_BAD_REQUEST, "密钥状态不可分配")
+    if is_datetime_expired(key.expires_at):
+        key.status = "expired"
+        db.commit()
+        raise _fail(status.HTTP_400_BAD_REQUEST, "密钥已过期，无法分配")
 
     key.user_id = user.id
     key.assigned_at = datetime.now(timezone.utc)
     if key.status == "unused":
         key.status = "active"
         key.used_count = min(int(key.total_quota or 0), int(key.used_count or 0) + 1)
+        key.activated_at = key.activated_at or datetime.now(timezone.utc)
+        if key.expires_at is None:
+            key.expires_at = compute_key_expires_at(key.key_type, base_time=key.activated_at)
     user.product_key_id = key.id
+    sync_company_admin_role_by_key(current_user, key)
 
     db.add(
         AuditLog(
@@ -421,6 +471,7 @@ def get_company_key_stats(
     db: Session = Depends(get_auth_db_session),
 ):
     current_user: User = request.state.company_admin_user
+    _run_company_key_maintenance(db)
 
     query = db.query(ProductKey).filter(ProductKey.company_id == current_user.company_id)
     total = int(query.count())
@@ -517,6 +568,8 @@ def get_my_company_profile(
     db: Session = Depends(get_auth_db_session),
 ):
     current_user = _get_authenticated_user(request, db)
+    _run_company_key_maintenance(db)
+    policy = resolve_company_admin_policy(current_user) if current_user.role == "company_admin" else None
     return _ok(
         "用户企业信息获取成功",
         {
@@ -527,6 +580,11 @@ def get_my_company_profile(
                 "role": current_user.role,
                 "joined_at": current_user.created_at,
                 "company_name": _get_company_name(db, current_user.company_id),
+                "company_admin_type": getattr(current_user, "company_admin_type", None),
+                "company_admin_key_id": getattr(current_user, "company_admin_key_id", None),
+                "total_keys_created": int(getattr(current_user, "total_keys_created", 0) or 0),
+                "remaining_keys_allowed": policy.remaining if policy else None,
+                "allowed_key_types": sorted(policy.allowed_key_types) if policy else [],
             }
         },
     )

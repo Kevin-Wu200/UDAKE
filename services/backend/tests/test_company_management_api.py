@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Dict
 
 import pytest
@@ -231,3 +232,105 @@ def test_company_profile_and_super_admin_views(company_client):
     assert stats_resp.status_code == 200, stats_resp.text
     companies = stats_resp.json()["data"]["companies"]
     assert {item["company_name"] for item in companies} >= {"企业A", "企业B"}
+
+
+def test_company_admin_trial_policy_limit_and_type_restriction(company_client):
+    client, session_factory, tokens = company_client
+
+    with session_factory() as db:
+        admin = db.query(User).filter(User.id == 10).one()
+        admin.company_admin_type = "trial"
+        admin.total_keys_created = 499
+        db.commit()
+
+    standard_resp = client.post(
+        "/api/company/product-keys/batch",
+        json={"key_type": "enterprise_standard", "count": 1},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert standard_resp.status_code == 403, standard_resp.text
+
+    overflow_resp = client.post(
+        "/api/company/product-keys/batch",
+        json={"key_type": "enterprise_trial", "count": 2},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert overflow_resp.status_code == 403, overflow_resp.text
+
+    ok_resp = client.post(
+        "/api/company/product-keys/batch",
+        json={"key_type": "enterprise_trial", "count": 1},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert ok_resp.status_code == 200, ok_resp.text
+
+
+def test_company_admin_role_upgrade_and_expiry_guard(company_client):
+    client, session_factory, tokens = company_client
+
+    with session_factory() as db:
+        admin = db.query(User).filter(User.id == 10).one()
+        admin.company_admin_type = "trial"
+        admin.total_keys_created = 10
+
+        expired_key = ProductKey(
+            id=401,
+            user_id=10,
+            company_id=1,
+            product_key="EXP-IR01-TEST-0001",
+            key_type="enterprise_trial",
+            key_sub_type="trial",
+            status="unused",
+            total_quota=500,
+            used_count=0,
+            expires_at=datetime(2025, 1, 1),
+        )
+        standard_key = ProductKey(
+            id=402,
+            user_id=10,
+            company_id=1,
+            product_key="UPG-RADE-TEST-0002",
+            key_type="enterprise_standard",
+            key_sub_type="standard",
+            status="unused",
+            total_quota=1000,
+            used_count=0,
+        )
+        db.add_all([expired_key, standard_key])
+        db.commit()
+
+    expired_assign = client.post(
+        "/api/company/product-keys/assign",
+        json={"key_id": 401, "user_id": 12},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert expired_assign.status_code == 400, expired_assign.text
+
+    with session_factory() as db:
+        expired_key_db = db.query(ProductKey).filter(ProductKey.id == 401).one()
+        assert expired_key_db.status == "expired"
+
+        admin = db.query(User).filter(User.id == 10).one()
+        admin.company_admin_type = "standard"
+        db.commit()
+
+    upgrade_assign = client.post(
+        "/api/company/product-keys/assign",
+        json={"key_id": 402, "user_id": 12},
+        headers=_auth_header(tokens["company_admin"]),
+    )
+    assert upgrade_assign.status_code == 200, upgrade_assign.text
+
+    with session_factory() as db:
+        admin = db.query(User).filter(User.id == 10).one()
+        assigned_key = db.query(ProductKey).filter(ProductKey.id == 402).one()
+        assert admin.company_admin_type == "standard"
+        assert admin.company_admin_key_id == 402
+        assert assigned_key.activated_at is not None
+        assert assigned_key.expires_at is not None
+
+    me_resp = client.get("/api/company/me", headers=_auth_header(tokens["company_admin"]))
+    assert me_resp.status_code == 200, me_resp.text
+    me_data = me_resp.json()["data"]["user"]
+    assert me_data["company_admin_type"] == "standard"
+    assert isinstance(me_data["remaining_keys_allowed"], int)
