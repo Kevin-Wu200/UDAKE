@@ -18,6 +18,16 @@
     anomaly: "anomaly.html",
     risk: "risk.html",
   };
+  const DOCS_URLS = {
+    interpolation: "https://github.com/Kevin-Wu200/UDAKE/wiki/空间插值模块",
+    uncertainty: "https://github.com/Kevin-Wu200/UDAKE/wiki/不确定性分析模块",
+    sampling: "https://github.com/Kevin-Wu200/UDAKE/wiki/自适应采样模块",
+    optimization: "https://github.com/Kevin-Wu200/UDAKE/wiki/多目标优化模块",
+    realtime: "https://github.com/Kevin-Wu200/UDAKE/wiki/实时插值模块",
+    deepLearning: "https://github.com/Kevin-Wu200/UDAKE/wiki/深度学习模块",
+    anomaly: "https://github.com/Kevin-Wu200/UDAKE/wiki/异常检测模块",
+    risk: "https://github.com/Kevin-Wu200/UDAKE/wiki/风险评估模块",
+  };
 
   const modal = document.getElementById("comingSoonModal");
   const modalMessage = document.getElementById("modalMessage");
@@ -185,6 +195,22 @@
     });
   }
 
+  function bindDocsLinks() {
+    const featureKey = document.body.getAttribute("data-feature");
+    if (!featureKey || !DOCS_URLS[featureKey]) {
+      return;
+    }
+
+    const docsLink = document.querySelector(
+      '.cta-btn.cta-link[href*="github.com/Kevin-Wu200/UDAKE"]',
+    );
+    if (!docsLink) {
+      return;
+    }
+
+    docsLink.setAttribute("href", DOCS_URLS[featureKey]);
+  }
+
   function bindDownloadActions() {
     const androidButton = document.getElementById("androidDownload");
     if (androidButton) {
@@ -326,6 +352,7 @@
     bindHeroAction();
     bindDownloadActions();
     bindModalActions();
+    bindDocsLinks();
     bindBackHomeAction();
     setupRevealAnimation();
     if (isLandingHomePage()) {
