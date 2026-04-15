@@ -35,13 +35,17 @@
           <el-input
             v-model="form.productKey"
             placeholder="例如：ABC-1234-5678-9XYZ"
-            @blur="onValidateProductKey"
+            @input="onProductKeyInput"
+            @blur="() => onValidateProductKey(true)"
           />
         </el-form-item>
 
         <div class="key-status" :class="{ valid: keyValidation.valid, invalid: keyValidation.valid === false }">
-          <span v-if="keyValidation.valid === true">密钥状态：有效（{{ keyValidation.type }}）</span>
-          <span v-else-if="keyValidation.valid === false">密钥状态：无效，请检查格式</span>
+          <span v-if="validating">密钥状态：校验中...</span>
+          <span v-else-if="keyValidation.valid === true">
+            密钥状态：有效（{{ keyValidation.typeLabel || keyValidation.type || '已校验' }}）
+          </span>
+          <span v-else-if="keyValidation.valid === false">密钥状态：{{ keyValidation.message || '密钥无效' }}</span>
           <span v-else>密钥状态：待校验</span>
         </div>
 
@@ -73,7 +77,7 @@ import { computed, onBeforeUnmount, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
-import { loginUser, registerUser, verifyRegisterCode } from '../../services/userAuthApi';
+import { loginUser, registerUser, validateProductKey, verifyRegisterCode } from '../../services/userAuthApi';
 import { evaluatePasswordStrength } from '../../utils/auth';
 
 interface RegisterForm {
@@ -86,10 +90,10 @@ interface RegisterForm {
 
 interface KeyValidationState {
   valid: boolean | null;
-  type: '个人' | '企业' | '';
+  type: string;
+  typeLabel: string;
+  message: string;
 }
-
-const PRODUCT_KEY_PATTERN = /^[A-Z0-9]{3}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -97,9 +101,12 @@ const formRef = ref<FormInstance>();
 
 const submitting = ref(false);
 const codeSending = ref(false);
+const validating = ref(false);
 const countdown = ref(0);
 const codeRequested = ref(false);
 let countdownTimer: number | null = null;
+let validateTimer: number | null = null;
+let validateSeq = 0;
 
 const form = reactive<RegisterForm>({
   email: '',
@@ -111,7 +118,9 @@ const form = reactive<RegisterForm>({
 
 const keyValidation = reactive<KeyValidationState>({
   valid: null,
-  type: ''
+  type: '',
+  typeLabel: '',
+  message: ''
 });
 
 const passwordStrength = computed(() => evaluatePasswordStrength(form.password));
@@ -151,26 +160,80 @@ const rules: FormRules<RegisterForm> = {
   code: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
 };
 
-function inferKeyType(productKey: string): '个人' | '企业' {
-  const normalized = productKey.trim().toUpperCase();
-  if (normalized.startsWith('ENT') || normalized.endsWith('E')) {
-    return '企业';
+function keyTypeLabel(keyType: string): string {
+  switch (keyType) {
+    case 'personal_standard':
+      return '个人标准版';
+    case 'enterprise_standard':
+      return '企业标准版';
+    case 'personal_trial':
+      return '个人试用版';
+    case 'enterprise_trial':
+      return '企业试用版';
+    default:
+      return '';
   }
-  return '个人';
 }
 
-const onValidateProductKey = () => {
+const resetKeyValidation = () => {
+  keyValidation.valid = null;
+  keyValidation.type = '';
+  keyValidation.typeLabel = '';
+  keyValidation.message = '';
+};
+
+const runValidateProductKey = async () => {
+  const seq = ++validateSeq;
   const normalized = form.productKey.trim().toUpperCase();
+  form.productKey = normalized;
+
   if (!normalized) {
-    keyValidation.valid = null;
-    keyValidation.type = '';
+    resetKeyValidation();
     return;
   }
 
-  const valid = PRODUCT_KEY_PATTERN.test(normalized);
-  keyValidation.valid = valid;
-  keyValidation.type = valid ? inferKeyType(normalized) : '';
-  form.productKey = normalized;
+  validating.value = true;
+  try {
+    const result = await validateProductKey(normalized);
+    if (seq !== validateSeq) {
+      return;
+    }
+    keyValidation.valid = result.valid;
+    keyValidation.type = result.keyType;
+    keyValidation.typeLabel = keyTypeLabel(result.keyType);
+    keyValidation.message = result.message;
+  } catch (error) {
+    if (seq !== validateSeq) {
+      return;
+    }
+    keyValidation.valid = false;
+    keyValidation.type = '';
+    keyValidation.typeLabel = '';
+    keyValidation.message = error instanceof Error ? error.message : '密钥验证失败，请稍后重试';
+  } finally {
+    if (seq === validateSeq) {
+      validating.value = false;
+    }
+  }
+};
+
+const onValidateProductKey = async (immediate = false) => {
+  if (validateTimer !== null) {
+    window.clearTimeout(validateTimer);
+    validateTimer = null;
+  }
+  if (immediate) {
+    await runValidateProductKey();
+    return;
+  }
+  validateTimer = window.setTimeout(() => {
+    validateTimer = null;
+    void runValidateProductKey();
+  }, 500);
+};
+
+const onProductKeyInput = () => {
+  void onValidateProductKey(false);
 };
 
 const startCountdown = (seconds: number) => {
@@ -193,9 +256,9 @@ const onSendCode = async () => {
     return;
   }
 
-  onValidateProductKey();
-  if (!keyValidation.valid) {
-    ElMessage.error('产品密钥格式无效');
+  await onValidateProductKey(true);
+  if (keyValidation.valid !== true) {
+    ElMessage.error(keyValidation.message || '产品密钥无效');
     return;
   }
 
@@ -242,6 +305,9 @@ const onSubmit = async () => {
 onBeforeUnmount(() => {
   if (countdownTimer !== null) {
     window.clearInterval(countdownTimer);
+  }
+  if (validateTimer !== null) {
+    window.clearTimeout(validateTimer);
   }
 });
 </script>
