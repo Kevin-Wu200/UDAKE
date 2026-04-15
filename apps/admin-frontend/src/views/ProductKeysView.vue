@@ -160,7 +160,7 @@
         type="textarea"
         :rows="9"
         style="margin-top: 12px"
-        placeholder="示例: UDAKE-ABCD-EFGH-IJKL,enterprise_standard,unused,12,企业A"
+        placeholder="示例: ABC-1234-5678-9XYZ,enterprise_standard,unused,12,企业A"
       />
       <div v-if="importResult" class="import-result">
         <el-tag type="success">成功 {{ importResult.successCount }}</el-tag>

@@ -60,9 +60,9 @@ function randomToken() {
   return `admin_${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
 }
 
-function randomKey(prefix: string): string {
-  const chunk = () => Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `${prefix}-${chunk()}-${chunk()}-${chunk()}`;
+function randomKey(): string {
+  const chunk = (size: number) => Math.random().toString(36).slice(2, 2 + size).toUpperCase();
+  return `${chunk(3)}-${chunk(4)}-${chunk(4)}-${chunk(4)}`;
 }
 
 function getQuotaByType(type: KeyType) {
@@ -99,7 +99,7 @@ let productKeys: ProductKey[] = Array.from({ length: 72 }, (_, index) => {
 
   return {
     id: productKeyAutoId++,
-    product_key: randomKey('UDAKE'),
+    product_key: randomKey(),
     key_type: keyType,
     key_sub_type: keyType.startsWith('personal') ? 'personal' : 'enterprise',
     status,
@@ -295,7 +295,7 @@ export async function createProductKeys(payload: ProductKeyCreateForm) {
     const keyType = payload.type;
     const key = {
       id: productKeyAutoId++,
-      product_key: randomKey('UDAKE'),
+      product_key: randomKey(),
       key_type: keyType,
       key_sub_type: keyType.startsWith('personal') ? 'personal' : 'enterprise',
       status: 'unused' as KeyStatus,
@@ -412,8 +412,7 @@ export async function deleteProductKey(id: number) {
 export async function previewCompanyKeys(payload: { type: KeyType; count: number }) {
   await delay(100);
   const sampleCount = Math.min(Math.max(payload.count, 1), 5);
-  const prefix = payload.type === 'enterprise_trial' ? 'TRIAL' : 'STD';
-  return Array.from({ length: sampleCount }, () => randomKey(`UDAKE-${prefix}`));
+  return Array.from({ length: sampleCount }, () => randomKey());
 }
 
 export async function fetchCompanyKeys(params: {
