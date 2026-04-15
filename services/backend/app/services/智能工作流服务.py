@@ -1107,9 +1107,58 @@ class SmartWorkflowService:
     def get_cache_metrics(self) -> Dict[str, Any]:
         return self._cache.get_metrics()
 
-    def validate_smtp_configuration(self, test_recipient: str = "") -> Dict[str, Any]:
+    def get_smtp_configuration(self) -> Dict[str, Any]:
+        return self._email_service.get_smtp_config(masked=True)
+
+    def save_smtp_configuration(
+        self,
+        *,
+        host: str,
+        port: int,
+        encryption: str,
+        username: str,
+        password: str,
+    ) -> Dict[str, Any]:
+        current = self._email_service.smtp_settings
+        password_clean = str(password or "").strip()
+        if password_clean and set(password_clean) == {"*"}:
+            password_clean = current.password
+        if not password_clean:
+            password_clean = current.password
+
+        next_settings = self._email_service.normalize_smtp_settings(
+            host=host,
+            port=port,
+            username=username,
+            password=password_clean,
+            encryption=encryption,
+            timeout_seconds=current.timeout_seconds,
+            pool_size=current.pool_size,
+        )
+        self._email_service.update_smtp_settings(next_settings)
+        return self._email_service.get_smtp_config(masked=True)
+
+    def validate_smtp_configuration(
+        self,
+        test_recipient: str = "",
+        smtp_payload: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
         recipient = str(test_recipient or "").strip()
-        return self._email_service.validate_configuration(test_recipient=recipient or None)
+        normalized = None
+        if smtp_payload:
+            normalized = self._email_service.normalize_smtp_settings(
+                host=str(smtp_payload.get("host") or ""),
+                port=int(smtp_payload.get("port") or 0),
+                username=str(smtp_payload.get("username") or ""),
+                password=str(smtp_payload.get("password") or ""),
+                encryption=str(smtp_payload.get("encryption") or "TLS"),
+                timeout_seconds=self._email_service.smtp_settings.timeout_seconds,
+                pool_size=self._email_service.smtp_settings.pool_size,
+            )
+        return self._email_service.validate_configuration(
+            test_recipient=recipient or None,
+            smtp_settings=normalized,
+        )
 
     def list_email_delivery_logs(self, limit: int = 200) -> Dict[str, Any]:
         rows = self._email_service.get_delivery_logs(limit=limit)

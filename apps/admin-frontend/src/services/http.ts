@@ -38,6 +38,14 @@ export const http = axios.create({
   timeout: 10000
 });
 
+export function isMockApiEnabled(): boolean {
+  const flag = String(import.meta.env.VITE_USE_MOCK_API ?? '').trim().toLowerCase();
+  if (import.meta.env.PROD) {
+    return false;
+  }
+  return flag === '1' || flag === 'true' || flag === 'yes' || flag === 'on';
+}
+
 http.interceptors.request.use((config) => {
   const authStore = useAuthStore();
   const token = authStore.getToken();

@@ -174,6 +174,19 @@ class CacheInvalidateRequest(BaseModel):
 
 class SMTPValidateRequest(BaseModel):
     test_recipient: str = Field(default="", max_length=255)
+    host: Optional[str] = Field(default=None, max_length=255)
+    port: Optional[int] = Field(default=None, ge=1, le=65535)
+    encryption: Optional[str] = Field(default=None, max_length=10)
+    username: Optional[str] = Field(default=None, max_length=255)
+    password: Optional[str] = Field(default=None, max_length=255)
+
+
+class SMTPConfigRequest(BaseModel):
+    host: str = Field(..., min_length=1, max_length=255)
+    port: int = Field(..., ge=1, le=65535)
+    encryption: str = Field(default="TLS", max_length=10)
+    username: str = Field(..., min_length=1, max_length=255)
+    password: str = Field(..., min_length=1, max_length=255)
 
 
 def _handle_error(exc: Exception) -> None:
@@ -210,7 +223,41 @@ async def workflow_cache_invalidate(payload: CacheInvalidateRequest) -> Dict[str
 @router.post("/workflow/notifications/smtp/validate")
 async def workflow_smtp_validate(payload: SMTPValidateRequest) -> Dict[str, Any]:
     try:
-        return smart_workflow_service.validate_smtp_configuration(test_recipient=payload.test_recipient)
+        smtp_payload = None
+        if any(value is not None for value in [payload.host, payload.port, payload.username, payload.password]):
+            smtp_payload = {
+                "host": payload.host or "",
+                "port": payload.port or 0,
+                "encryption": payload.encryption or "TLS",
+                "username": payload.username or "",
+                "password": payload.password or "",
+            }
+        return smart_workflow_service.validate_smtp_configuration(
+            test_recipient=payload.test_recipient,
+            smtp_payload=smtp_payload,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/notifications/smtp/config")
+async def workflow_smtp_config() -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.get_smtp_configuration()
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.put("/workflow/notifications/smtp/config")
+async def workflow_smtp_update(payload: SMTPConfigRequest) -> Dict[str, Any]:
+    try:
+        return smart_workflow_service.save_smtp_configuration(
+            host=payload.host,
+            port=payload.port,
+            encryption=payload.encryption,
+            username=payload.username,
+            password=payload.password,
+        )
     except Exception as exc:  # pylint: disable=broad-except
         _handle_error(exc)
 

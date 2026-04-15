@@ -301,6 +301,84 @@ class WorkflowEmailNotificationService:
     def enabled(self) -> bool:
         return self._smtp_settings.enabled
 
+    @property
+    def smtp_settings(self) -> SMTPSettings:
+        return self._smtp_settings
+
+    def update_smtp_settings(self, smtp_settings: SMTPSettings) -> None:
+        """运行时更新 SMTP 配置并重建连接池。"""
+        with self._lock:
+            self._smtp_settings = smtp_settings
+            self._pool = SMTPConnectionPool(self._smtp_settings)
+
+    @staticmethod
+    def _encryption_of(settings: SMTPSettings) -> str:
+        return "SSL" if settings.use_ssl else "TLS"
+
+    @staticmethod
+    def _mask_password(password: str) -> str:
+        cleaned = str(password or "").strip()
+        if not cleaned:
+            return ""
+        if len(cleaned) <= 2:
+            return "*" * len(cleaned)
+        return "*" * (len(cleaned) - 2) + cleaned[-2:]
+
+    @staticmethod
+    def normalize_smtp_settings(
+        *,
+        host: str,
+        port: int,
+        username: str,
+        password: str,
+        encryption: str = "TLS",
+        timeout_seconds: int = 15,
+        pool_size: int = 4,
+    ) -> SMTPSettings:
+        enc = str(encryption or "TLS").strip().upper()
+        use_ssl = enc == "SSL"
+        use_tls = not use_ssl
+        return SMTPSettings(
+            host=str(host or "").strip(),
+            port=max(1, min(65535, int(port))),
+            user=str(username or "").strip(),
+            password=str(password or "").strip(),
+            use_tls=use_tls,
+            use_ssl=use_ssl,
+            timeout_seconds=max(5, int(timeout_seconds)),
+            pool_size=max(1, int(pool_size)),
+        )
+
+    def get_smtp_config(self, *, masked: bool = True) -> Dict[str, Any]:
+        settings = self._smtp_settings
+        password = self._mask_password(settings.password) if masked else settings.password
+        return {
+            "host": settings.host,
+            "port": settings.port,
+            "encryption": self._encryption_of(settings),
+            "username": settings.user,
+            "password": password,
+        }
+
+    @staticmethod
+    def _create_connection(settings: SMTPSettings) -> smtplib.SMTP:
+        if settings.use_ssl:
+            context = ssl.create_default_context()
+            smtp = smtplib.SMTP_SSL(
+                settings.host,
+                settings.port,
+                timeout=settings.timeout_seconds,
+                context=context,
+            )
+        else:
+            smtp = smtplib.SMTP(settings.host, settings.port, timeout=settings.timeout_seconds)
+            smtp.ehlo()
+            if settings.use_tls:
+                smtp.starttls(context=ssl.create_default_context())
+                smtp.ehlo()
+        smtp.login(settings.user, settings.password)
+        return smtp
+
     def _append_log(self, item: Mapping[str, Any]) -> None:
         with self._lock:
             self._delivery_logs.append(dict(item))
@@ -474,41 +552,51 @@ class WorkflowEmailNotificationService:
         if self._loop_thread and self._loop_thread.is_alive():
             self._loop_thread.join(timeout=2.0)
 
-    def validate_configuration(self, test_recipient: Optional[str] = None) -> Dict[str, Any]:
+    def validate_configuration(
+        self,
+        test_recipient: Optional[str] = None,
+        smtp_settings: Optional[SMTPSettings] = None,
+    ) -> Dict[str, Any]:
+        active_settings = smtp_settings or self._smtp_settings
         result = {
-            "enabled": self.enabled,
+            "enabled": active_settings.enabled,
             "connected": False,
             "authenticated": False,
             "test_email_sent": False,
             "error": "",
         }
-        if not self.enabled:
+        if not active_settings.enabled:
             result["error"] = "SMTP 配置不完整"
             return result
 
+        smtp: Optional[smtplib.SMTP] = None
         try:
-            with self._pool.acquire() as smtp:
-                smtp.noop()
+            smtp = self._create_connection(active_settings)
+            smtp.noop()
             result["connected"] = True
             result["authenticated"] = True
+
+            if test_recipient:
+                message = MIMEMultipart("alternative")
+                message["From"] = active_settings.user
+                message["To"] = test_recipient
+                message["Subject"] = "SMTP 测试邮件"
+                message.attach(MIMEText("这是一封 SMTP 测试邮件。", "plain", "utf-8"))
+                message.attach(MIMEText("<p>这是一封 SMTP 测试邮件。</p>", "html", "utf-8"))
+                smtp.sendmail(active_settings.user, [test_recipient], message.as_string())
+                result["test_email_sent"] = True
         except Exception as exc:  # pylint: disable=broad-except
             result["error"] = str(exc)
             return result
-
-        if test_recipient:
-            message_id = self.enqueue_mail(
-                user_id="smtp-validator",
-                to_email=test_recipient,
-                event_type="workflow_execution_completed",
-                context={
-                    "result": "SMTP 测试邮件",
-                    "result_url": "#",
-                    "message": "这是一封测试邮件",
-                },
-                priority="high",
-            )
-            status = self.get_status(message_id)
-            result["test_email_sent"] = bool(status and status.get("status") in {"queued", "sending", "sent"})
+        finally:
+            if smtp is not None:
+                try:
+                    smtp.quit()
+                except Exception:
+                    try:
+                        smtp.close()
+                    except Exception:
+                        pass
         return result
 
     def enqueue_mail(

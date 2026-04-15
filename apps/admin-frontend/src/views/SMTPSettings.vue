@@ -47,7 +47,8 @@ import type { FormInstance, FormRules } from 'element-plus';
 import type { SMTPConfig } from '../types/admin';
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { fetchSmtpConfig, saveSmtpConfig, testSmtpConnection } from '../services/mockApi';
+import type { AxiosError } from 'axios';
+import { fetchSmtpConfig, saveSmtpConfig, testSmtpConnection } from '../services/smtpApi';
 
 const loading = ref(false);
 const saving = ref(false);
@@ -71,13 +72,32 @@ const rules: FormRules<typeof form> = {
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
 };
 
+function resolveErrorMessage(error: unknown, fallback: string): string {
+  const axiosError = error as AxiosError<{ message?: string; detail?: string | { message?: string } }>;
+  const message = axiosError?.response?.data?.message;
+  if (typeof message === 'string' && message.trim()) {
+    return message.trim();
+  }
+  const detail = axiosError?.response?.data?.detail;
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail.trim();
+  }
+  if (typeof detail === 'object' && typeof detail?.message === 'string' && detail.message.trim()) {
+    return detail.message.trim();
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message.trim();
+  }
+  return fallback;
+}
+
 const loadConfig = async () => {
   loading.value = true;
   try {
     const res = await fetchSmtpConfig();
     Object.assign(form, res);
-  } catch {
-    ElMessage.error('加载SMTP配置失败');
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error, '加载SMTP配置失败'));
   } finally {
     loading.value = false;
   }
@@ -93,7 +113,7 @@ const handleTest = async () => {
     const result = await testSmtpConnection(form);
     ElMessage.success(`连接测试成功，耗时 ${result.latencyMs}ms`);
   } catch (error) {
-    ElMessage.error((error as Error)?.message || '连接测试失败');
+    ElMessage.error(resolveErrorMessage(error, '连接测试失败'));
   } finally {
     testing.value = false;
   }
@@ -109,8 +129,8 @@ const handleSave = async () => {
     const res = await saveSmtpConfig(form);
     Object.assign(form, res);
     ElMessage.success('SMTP配置已保存（密码已脱敏存储）');
-  } catch {
-    ElMessage.error('保存失败，请检查配置后重试');
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error, '保存失败，请检查配置后重试'));
   } finally {
     saving.value = false;
   }
