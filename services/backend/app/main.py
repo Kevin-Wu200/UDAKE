@@ -139,6 +139,7 @@ else:
 app.mount("/results", StaticFiles(directory=str(settings.RESULTS_DIR)), name="results")
 app.mount("/android_downloads", StaticFiles(directory=str(settings.ANDROID_APK_DIR)), name="android_downloads")
 app.mount("/windows_downloads", StaticFiles(directory=str(settings.WINDOWS_EXE_DIR)), name="windows_downloads")
+app.mount("/macos_downloads", StaticFiles(directory=str(settings.MACOS_DMG_DIR)), name="macos_downloads")
 
 
 @app.middleware("http")

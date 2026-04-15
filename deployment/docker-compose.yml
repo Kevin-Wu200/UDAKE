@@ -11,13 +11,15 @@ services:
       - DEBUG=False
       - HOST=0.0.0.0
       - PORT=8000
-      - ANDROID_APK_DIR=/app/android_downloads
-      - WINDOWS_EXE_DIR=/app/windows_downloads
+      - ANDROID_APK_DIR=/app/downloads/apk
+      - WINDOWS_EXE_DIR=/app/downloads
+      - MACOS_DMG_DIR=/app/downloads/macos
     volumes:
       - ../data_samples:/app/data_samples
       - ../services/backend/app/结果文件:/app/app/结果文件
-      - ../android/app/build/outputs/apk/release:/app/android_downloads
-      - ../:/app/windows_downloads:ro
+      - ../android/app/build/outputs/apk/release:/app/downloads/apk:ro
+      - ../release:/app/downloads:ro
+      - ../release:/app/downloads/macos:ro
     restart: unless-stopped
 
   nginx:

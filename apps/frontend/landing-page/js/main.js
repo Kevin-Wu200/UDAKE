@@ -1,11 +1,10 @@
 (function () {
   const DOWNLOAD_URLS = {
-    android: "http://172.20.10.2:6060/android_downloads/app-release.apk",
-    windows: "http://172.20.10.2:6060/windows_downloads/UDAKE-Setup-1.0.0.exe",
-    macos: "http://172.20.10.2:6060/macos_downloads/UDAKE-1.0.0.dmg",
-    macosX64: "http://172.20.10.2:6060/macos_downloads/UDAKE-1.0.0-x64.dmg",
-    macosArm64:
-      "http://172.20.10.2:6060/macos_downloads/UDAKE-1.0.0-arm64.dmg",
+    android: "/android_downloads/app-release.apk",
+    windows: "/windows_downloads/UDAKE-1.0.0.exe",
+    macos: "/macos_downloads/UDAKE-1.0.0.dmg",
+    macosX64: "/macos_downloads/UDAKE-1.0.0-x64.dmg",
+    macosArm64: "/macos_downloads/UDAKE-1.0.0-arm64.dmg",
   };
   const HOME_SCROLL_KEY = "udake_home_scroll_y";
   const HOME_SCROLL_MARK_KEY = "udake_restore_home_scroll";

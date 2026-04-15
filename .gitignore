@@ -70,3 +70,10 @@ data/
 
 # 阶段7融合系统本地仓库
 deep_learning/fusion/repository/
+
+# Build artifacts
+*.exe
+*.dmg
+*.apk
+release/
+android/app/build/outputs/

@@ -91,7 +91,8 @@ class Settings(BaseSettings):
     RESULTS_DIR: Path = BASE_DIR / "app" / "结果文件"
     DATA_DIR: Path = PROJECT_ROOT / "data" / "samples"
     ANDROID_APK_DIR: Path = PROJECT_ROOT / "android" / "app" / "build" / "outputs" / "apk" / "release"
-    WINDOWS_EXE_DIR: Path = PROJECT_ROOT
+    WINDOWS_EXE_DIR: Path = PROJECT_ROOT / "release"
+    MACOS_DMG_DIR: Path = PROJECT_ROOT / "release"
 
     # 任务配置
     MAX_CONCURRENT_TASKS: int = 5
