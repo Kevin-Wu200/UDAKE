@@ -42,6 +42,7 @@ def test_validate_product_key_valid_key(product_key_client: TestClient):
     assert data["valid"] is True
     assert data["key_type"] == record.key_type
     assert "有效" in data["message"]
+    assert data["error_code"] == "OK"
 
 
 def test_validate_product_key_invalid_format(product_key_client: TestClient):
@@ -51,6 +52,7 @@ def test_validate_product_key_invalid_format(product_key_client: TestClient):
     assert data["valid"] is False
     assert data["key_type"] is None
     assert "格式" in data["message"]
+    assert data["error_code"] == "KEY_FORMAT_INVALID"
 
 
 def test_validate_product_key_checksum_mismatch(product_key_client: TestClient):
@@ -107,6 +109,26 @@ def test_validate_product_key_rate_limit(product_key_client: TestClient):
     assert "频繁" in blocked.json()["detail"]["message"]
 
 
+def test_validate_product_key_user_rate_limit(product_key_client: TestClient):
+    service = get_auth_service()
+    keys = [service.product_keys.generate_key(f"validate-api-user-rate-limit-seed-{idx}").product_key for idx in range(31)]
+
+    for _ in range(30):
+        resp = product_key_client.post(
+            "/api/product-keys/validate",
+            json={"product_key": keys[_]},
+            headers={"x-forwarded-for": f"10.0.0.{50 + _}", "x-user-id": "user-99"},
+        )
+        assert resp.status_code == 200
+    blocked = product_key_client.post(
+        "/api/product-keys/validate",
+        json={"product_key": keys[-1]},
+        headers={"x-forwarded-for": "10.0.0.99", "x-user-id": "user-99"},
+    )
+    assert blocked.status_code == 429
+    assert "当前用户验证次数过多" in blocked.json()["detail"]["message"]
+
+
 def test_validate_product_key_exception_handling(product_key_client: TestClient, monkeypatch: pytest.MonkeyPatch):
     service = get_auth_service()
     record = service.product_keys.generate_key("validate-api-exception-seed")
@@ -132,3 +154,28 @@ def test_validate_product_key_audit_log_recorded(product_key_client: TestClient)
     latest = service.audit_logs[-1]
     assert latest["operation"] == "product_key_validate"
     assert latest["details"]["result"] == "success"
+
+
+def test_validate_product_key_cache_hit(product_key_client: TestClient):
+    service = get_auth_service()
+    record = service.product_keys.generate_key("validate-api-cache-hit-seed")
+
+    first = _validate(product_key_client, record.product_key, ip="10.0.0.31")
+    assert first.status_code == 200
+
+    second = _validate(product_key_client, record.product_key, ip="10.0.0.31")
+    assert second.status_code == 200
+    assert second.json()["data"]["valid"] is True
+
+
+def test_validate_product_key_metrics_endpoint(product_key_client: TestClient):
+    service = get_auth_service()
+    record = service.product_keys.generate_key("validate-api-metrics-seed")
+    _validate(product_key_client, record.product_key, ip="10.0.0.41")
+
+    resp = product_key_client.get("/api/product-keys/validate/metrics")
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert "metrics" in data
+    assert "cache" in data
+    assert "recent_alerts" in data

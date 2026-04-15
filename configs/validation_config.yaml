@@ -1,0 +1,17 @@
+product_key_validation:
+  rate_limit:
+    ip_limit_per_minute: 10
+    key_limit_per_hour: 20
+    user_limit_per_hour: 30
+  cache:
+    enabled: true
+    ttl_seconds: 300
+  security:
+    enable_ip_reputation: true
+    enable_audit_log: true
+    enable_data_masking: true
+  monitoring:
+    enabled: true
+    response_time_alert_ms: 500
+    error_rate_alert: 0.05
+    cache_hit_alert: 0.5

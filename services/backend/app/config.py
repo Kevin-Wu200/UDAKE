@@ -222,6 +222,13 @@ class Settings(BaseSettings):
         "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
         "img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"
     )
+    PRODUCT_KEY_VALIDATE_IP_LIMIT_PER_MINUTE: int = 10
+    PRODUCT_KEY_VALIDATE_KEY_LIMIT_PER_HOUR: int = 20
+    PRODUCT_KEY_VALIDATE_USER_LIMIT_PER_HOUR: int = 30
+    PRODUCT_KEY_VALIDATE_CACHE_ENABLED: bool = True
+    PRODUCT_KEY_VALIDATE_CACHE_TTL_SECONDS: int = 300
+    PRODUCT_KEY_VALIDATE_ENABLE_IP_REPUTATION: bool = True
+    PRODUCT_KEY_VALIDATE_ENABLE_AUDIT_LOG: bool = True
 
     # 日志配置
     LOG_LEVEL: str = "INFO"

@@ -11,6 +11,14 @@ from pydantic import BaseModel, Field
 
 from ..auth import JWTValidationError, ProductKeyValidationError, get_auth_service
 from ..auth.input_sanitizer import ensure_safe_text
+from ..audit.audit_logger import ProductKeyAuditLogger
+from ..cache.validation_cache import ValidationCacheManager
+from ..monitoring.alerting import ValidationAlerting
+from ..monitoring.dashboard import ValidationDashboard
+from ..monitoring.metrics import ValidationMetrics
+from ..security.ip_reputation import IPReputationService
+from ..validation_config import load_validation_runtime_config
+from ..config import settings
 
 router = APIRouter(prefix="/product-keys")
 
@@ -20,7 +28,38 @@ VALIDATE_IP_LIMIT = 10
 VALIDATE_IP_WINDOW_SECONDS = 60
 VALIDATE_KEY_LIMIT = 20
 VALIDATE_KEY_WINDOW_SECONDS = 60 * 60
+VALIDATE_USER_LIMIT = 30
+VALIDATE_USER_WINDOW_SECONDS = 60 * 60
 VALIDATE_FAILED_COUNT_TTL_SECONDS = 60 * 60
+_VALIDATION_METRICS = ValidationMetrics()
+_VALIDATION_RUNTIME_CONFIG = load_validation_runtime_config()
+_VALIDATION_RUNTIME_CONFIG = _VALIDATION_RUNTIME_CONFIG.__class__(
+    ip_limit_per_minute=int(getattr(settings, "PRODUCT_KEY_VALIDATE_IP_LIMIT_PER_MINUTE", _VALIDATION_RUNTIME_CONFIG.ip_limit_per_minute)),
+    key_limit_per_hour=int(getattr(settings, "PRODUCT_KEY_VALIDATE_KEY_LIMIT_PER_HOUR", _VALIDATION_RUNTIME_CONFIG.key_limit_per_hour)),
+    user_limit_per_hour=int(getattr(settings, "PRODUCT_KEY_VALIDATE_USER_LIMIT_PER_HOUR", _VALIDATION_RUNTIME_CONFIG.user_limit_per_hour)),
+    cache_enabled=bool(getattr(settings, "PRODUCT_KEY_VALIDATE_CACHE_ENABLED", _VALIDATION_RUNTIME_CONFIG.cache_enabled)),
+    cache_ttl_seconds=int(getattr(settings, "PRODUCT_KEY_VALIDATE_CACHE_TTL_SECONDS", _VALIDATION_RUNTIME_CONFIG.cache_ttl_seconds)),
+    enable_ip_reputation=bool(
+        getattr(
+            settings,
+            "PRODUCT_KEY_VALIDATE_ENABLE_IP_REPUTATION",
+            _VALIDATION_RUNTIME_CONFIG.enable_ip_reputation,
+        )
+    ),
+    enable_audit_log=bool(
+        getattr(
+            settings,
+            "PRODUCT_KEY_VALIDATE_ENABLE_AUDIT_LOG",
+            _VALIDATION_RUNTIME_CONFIG.enable_audit_log,
+        )
+    ),
+    enable_data_masking=bool(_VALIDATION_RUNTIME_CONFIG.enable_data_masking),
+)
+_VALIDATION_CACHE: Optional[ValidationCacheManager] = None
+_IP_REPUTATION_SERVICE: Optional[IPReputationService] = None
+_VALIDATION_AUDIT_LOGGER: Optional[ProductKeyAuditLogger] = None
+_VALIDATION_ALERTING: Optional[ValidationAlerting] = None
+_VALIDATION_DASHBOARD: Optional[ValidationDashboard] = None
 
 
 def _ok(message: str, data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -44,6 +83,8 @@ class ValidateResponse(BaseModel):
     valid: bool
     key_type: Optional[str] = None
     message: str
+    error_code: str = "OK"
+    suggestion: str = ""
 
 
 def _extract_bearer_token(request: Request) -> str:
@@ -94,6 +135,10 @@ def _validate_failed_target_key(product_key: str) -> str:
     return f"product_key_validate:fail:key:{digest}"
 
 
+def _validate_user_rate_key(user_id: str) -> str:
+    return f"product_key_validate:user:{user_id}"
+
+
 def _serialize_key(record: Any) -> Dict[str, Any]:
     return {
         "product_key": getattr(record, "product_key", ""),
@@ -140,6 +185,63 @@ def _mask_product_key(product_key: str) -> str:
     if len(text) < 8:
         return "***"
     return f"{text[:3]}****{text[-4:]}"
+
+
+def _error_code_and_suggestion(message: str, valid: bool) -> tuple[str, str]:
+    if valid:
+        return "OK", "可继续进行注册或激活"
+    if "格式" in message:
+        return "KEY_FORMAT_INVALID", "请输入15位密钥，格式为XXX-XXXX-XXXX-XXXX"
+    if "校验" in message:
+        return "KEY_CHECKSUM_MISMATCH", "请确认密钥无输入错误后重试"
+    if "不存在" in message:
+        return "KEY_NOT_FOUND", "请确认密钥来源是否正确"
+    if "已被使用" in message:
+        return "KEY_ALREADY_USED", "请使用未激活的新密钥"
+    if "撤销" in message:
+        return "KEY_REVOKED", "请联系管理员获取可用密钥"
+    if "过期" in message:
+        return "KEY_EXPIRED", "请联系管理员续期或申请新密钥"
+    if "频繁" in message:
+        return "RATE_LIMITED", "请稍后再试"
+    return "KEY_INVALID", "请检查密钥后重试"
+
+
+def _get_validation_cache(service: Any) -> ValidationCacheManager:
+    global _VALIDATION_CACHE
+    if _VALIDATION_CACHE is None:
+        _VALIDATION_CACHE = ValidationCacheManager(
+            service.cache,
+            ttl_seconds=int(max(1, _VALIDATION_RUNTIME_CONFIG.cache_ttl_seconds)),
+        )
+    return _VALIDATION_CACHE
+
+
+def _get_ip_reputation_service(service: Any) -> IPReputationService:
+    global _IP_REPUTATION_SERVICE
+    if _IP_REPUTATION_SERVICE is None:
+        _IP_REPUTATION_SERVICE = IPReputationService(service.cache)
+    return _IP_REPUTATION_SERVICE
+
+
+def _get_validation_audit_logger(service: Any) -> ProductKeyAuditLogger:
+    global _VALIDATION_AUDIT_LOGGER
+    if _VALIDATION_AUDIT_LOGGER is None:
+        _VALIDATION_AUDIT_LOGGER = ProductKeyAuditLogger(service.cache)
+    return _VALIDATION_AUDIT_LOGGER
+
+
+def _get_validation_dashboard(service: Any) -> ValidationDashboard:
+    global _VALIDATION_ALERTING, _VALIDATION_DASHBOARD
+    if _VALIDATION_ALERTING is None:
+        _VALIDATION_ALERTING = ValidationAlerting(service.cache)
+    if _VALIDATION_DASHBOARD is None:
+        _VALIDATION_DASHBOARD = ValidationDashboard(
+            _VALIDATION_METRICS,
+            _get_validation_cache(service),
+            _VALIDATION_ALERTING,
+        )
+    return _VALIDATION_DASHBOARD
 
 
 def _audit_validate(
@@ -224,16 +326,22 @@ def _clear_failed_attempts(service: Any, user_id: int) -> None:
 
 @router.post("/validate")
 def validate_product_key(payload: ValidateRequest, request: Request):
+    started = time.perf_counter()
     service = get_auth_service()
     ip_address = _extract_client_ip(request) or "unknown"
     user_agent = request.headers.get("user-agent")
     now = int(time.time())
+    user_identity = request.headers.get("x-user-id", "anonymous").strip() or "anonymous"
+    validation_cache = _get_validation_cache(service)
+    ip_reputation = _get_ip_reputation_service(service)
 
     try:
         normalized_key = ensure_safe_text(payload.product_key, max_len=128, reject_sql=True).strip().upper()
     except ValueError:
         response = ValidateResponse(valid=False, key_type=None, message="密钥输入包含非法字符")
+        response.error_code, response.suggestion = _error_code_and_suggestion(response.message, response.valid)
         _record_validate_failed_count(service, ip_address=ip_address, product_key=str(payload.product_key))
+        ip_reputation.record_failed(ip_address)
         _audit_validate(
             service,
             ip_address=ip_address,
@@ -243,11 +351,25 @@ def validate_product_key(payload: ValidateRequest, request: Request):
             message=response.message,
             key_type=None,
         )
+        processing_ms = int((time.perf_counter() - started) * 1000)
+        _VALIDATION_METRICS.record(valid=response.valid, processing_time_ms=processing_ms)
+        if _VALIDATION_RUNTIME_CONFIG.enable_audit_log:
+            _get_validation_audit_logger(service).append(
+                ip_address=ip_address,
+                user_agent=user_agent,
+                product_key=str(payload.product_key),
+                valid=response.valid,
+                reason=response.message,
+                key_type=response.key_type,
+                processing_time_ms=processing_ms,
+            )
         return _ok("密钥校验完成", response.model_dump())
 
     if not normalized_key:
         response = ValidateResponse(valid=False, key_type=None, message="请输入产品密钥")
+        response.error_code, response.suggestion = _error_code_and_suggestion(response.message, response.valid)
         _record_validate_failed_count(service, ip_address=ip_address, product_key=normalized_key)
+        ip_reputation.record_failed(ip_address)
         _audit_validate(
             service,
             ip_address=ip_address,
@@ -257,24 +379,70 @@ def validate_product_key(payload: ValidateRequest, request: Request):
             message=response.message,
             key_type=None,
         )
+        processing_ms = int((time.perf_counter() - started) * 1000)
+        _VALIDATION_METRICS.record(valid=response.valid, processing_time_ms=processing_ms)
+        if _VALIDATION_RUNTIME_CONFIG.enable_audit_log:
+            _get_validation_audit_logger(service).append(
+                ip_address=ip_address,
+                user_agent=user_agent,
+                product_key=normalized_key,
+                valid=response.valid,
+                reason=response.message,
+                key_type=response.key_type,
+                processing_time_ms=processing_ms,
+            )
         return _ok("密钥校验完成", response.model_dump())
 
-    _enforce_sliding_window_limit(
-        service,
-        cache_key=_validate_ip_rate_key(ip_address),
-        window_seconds=VALIDATE_IP_WINDOW_SECONDS,
-        max_attempts=VALIDATE_IP_LIMIT,
-        now=now,
-        exceed_message="请求过于频繁",
-    )
-    _enforce_sliding_window_limit(
-        service,
-        cache_key=_validate_target_rate_key(normalized_key),
-        window_seconds=VALIDATE_KEY_WINDOW_SECONDS,
-        max_attempts=VALIDATE_KEY_LIMIT,
-        now=now,
-        exceed_message="该密钥验证次数过多",
-    )
+    if _VALIDATION_RUNTIME_CONFIG.enable_ip_reputation:
+        decision = ip_reputation.check(ip_address)
+        if not decision.allowed:
+            ip_reputation.record_rate_limited(ip_address)
+            raise _fail(status.HTTP_429_TOO_MANY_REQUESTS, "请求过于频繁，请稍后重试")
+
+    try:
+        _enforce_sliding_window_limit(
+            service,
+            cache_key=_validate_ip_rate_key(ip_address),
+            window_seconds=VALIDATE_IP_WINDOW_SECONDS,
+            max_attempts=int(max(1, _VALIDATION_RUNTIME_CONFIG.ip_limit_per_minute or VALIDATE_IP_LIMIT)),
+            now=now,
+            exceed_message="请求过于频繁",
+        )
+        _enforce_sliding_window_limit(
+            service,
+            cache_key=_validate_target_rate_key(normalized_key),
+            window_seconds=VALIDATE_KEY_WINDOW_SECONDS,
+            max_attempts=int(max(1, _VALIDATION_RUNTIME_CONFIG.key_limit_per_hour or VALIDATE_KEY_LIMIT)),
+            now=now,
+            exceed_message="该密钥验证次数过多",
+        )
+        _enforce_sliding_window_limit(
+            service,
+            cache_key=_validate_user_rate_key(user_identity),
+            window_seconds=VALIDATE_USER_WINDOW_SECONDS,
+            max_attempts=int(max(1, _VALIDATION_RUNTIME_CONFIG.user_limit_per_hour or VALIDATE_USER_LIMIT)),
+            now=now,
+            exceed_message="当前用户验证次数过多",
+        )
+    except HTTPException:
+        ip_reputation.record_rate_limited(ip_address)
+        raise
+
+    if _VALIDATION_RUNTIME_CONFIG.cache_enabled:
+        cached = validation_cache.get(normalized_key)
+        if isinstance(cached, dict):
+            cached_response = ValidateResponse(
+                valid=bool(cached.get("valid", False)),
+                key_type=cached.get("key_type"),
+                message=str(cached.get("message", "密钥验证完成")),
+            )
+            cached_response.error_code, cached_response.suggestion = _error_code_and_suggestion(
+                cached_response.message,
+                cached_response.valid,
+            )
+            processing_ms = int((time.perf_counter() - started) * 1000)
+            _VALIDATION_METRICS.record(valid=cached_response.valid, processing_time_ms=processing_ms)
+            return _ok("密钥校验完成", cached_response.model_dump())
 
     registry = service.product_keys
     response = ValidateResponse(valid=False, key_type=None, message="密钥无效")
@@ -302,6 +470,8 @@ def validate_product_key(payload: ValidateRequest, request: Request):
     except HTTPException:
         raise
     except Exception:
+        processing_ms = int((time.perf_counter() - started) * 1000)
+        _VALIDATION_METRICS.record(valid=False, processing_time_ms=processing_ms, is_error=True)
         _audit_validate(
             service,
             ip_address=ip_address,
@@ -315,6 +485,13 @@ def validate_product_key(payload: ValidateRequest, request: Request):
 
     if not response.valid:
         _record_validate_failed_count(service, ip_address=ip_address, product_key=normalized_key)
+        ip_reputation.record_failed(ip_address)
+    else:
+        ip_reputation.record_success(ip_address)
+
+    response.error_code, response.suggestion = _error_code_and_suggestion(response.message, response.valid)
+    if _VALIDATION_RUNTIME_CONFIG.cache_enabled:
+        validation_cache.set(normalized_key, response.model_dump())
 
     _audit_validate(
         service,
@@ -325,7 +502,27 @@ def validate_product_key(payload: ValidateRequest, request: Request):
         message=response.message,
         key_type=response.key_type,
     )
+    processing_ms = int((time.perf_counter() - started) * 1000)
+    _VALIDATION_METRICS.record(valid=response.valid, processing_time_ms=processing_ms)
+    if _VALIDATION_RUNTIME_CONFIG.enable_audit_log:
+        _get_validation_audit_logger(service).append(
+            ip_address=ip_address,
+            user_agent=user_agent,
+            product_key=normalized_key,
+            valid=response.valid,
+            reason=response.message,
+            key_type=response.key_type,
+            processing_time_ms=processing_ms,
+        )
+    _get_validation_dashboard(service).snapshot()
     return _ok("密钥校验完成", response.model_dump())
+
+
+@router.get("/validate/metrics")
+def validation_metrics_dashboard():
+    service = get_auth_service()
+    payload = _get_validation_dashboard(service).snapshot()
+    return _ok("密钥验证监控指标获取成功", payload)
 
 
 @router.post("/activate")
@@ -350,6 +547,7 @@ def activate_product_key(payload: ActivateRequest, request: Request):
 
     normalized_key = ensure_safe_text(payload.product_key, max_len=128, reject_sql=True).strip().upper()
     registry = service.product_keys
+    _get_validation_cache(service).invalidate(normalized_key)
     record = registry.get_record(normalized_key)
 
     try:
