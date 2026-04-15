@@ -28,6 +28,16 @@
     anomaly: "https://github.com/Kevin-Wu200/UDAKE/wiki/异常检测模块",
     risk: "https://github.com/Kevin-Wu200/UDAKE/wiki/风险评估模块",
   };
+  const WIKI_PAGE_STATUS = {
+    interpolation: false,
+    uncertainty: false,
+    sampling: true,
+    optimization: true,
+    realtime: true,
+    deepLearning: true,
+    anomaly: false,
+    risk: false,
+  };
 
   const modal = document.getElementById("comingSoonModal");
   const modalMessage = document.getElementById("modalMessage");
@@ -208,7 +218,27 @@
       return;
     }
 
-    docsLink.setAttribute("href", DOCS_URLS[featureKey]);
+    const pageExists = WIKI_PAGE_STATUS[featureKey] === true;
+    if (pageExists) {
+      docsLink.setAttribute("href", DOCS_URLS[featureKey]);
+      docsLink.classList.remove("cta-disabled");
+      docsLink.removeAttribute("aria-disabled");
+      docsLink.setAttribute("data-i18n", "pages.common.ctaDocs");
+      if (window.UDAKEI18N) {
+        window.UDAKEI18N.applyLanguage(window.UDAKEI18N.getCurrentLanguage());
+      }
+      return;
+    }
+
+    docsLink.removeAttribute("href");
+    docsLink.classList.add("cta-disabled");
+    docsLink.setAttribute("aria-disabled", "true");
+    docsLink.setAttribute("data-i18n", "pages.common.ctaDocsPending");
+    if (window.UDAKEI18N) {
+      window.UDAKEI18N.applyLanguage(window.UDAKEI18N.getCurrentLanguage());
+    } else {
+      docsLink.textContent = "文档待完善";
+    }
   }
 
   function bindDownloadActions() {

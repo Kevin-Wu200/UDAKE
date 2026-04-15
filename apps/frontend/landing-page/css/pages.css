@@ -104,6 +104,19 @@
   background: linear-gradient(135deg, #0f9f6e 0%, #0a7f56 100%);
 }
 
+.cta-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: #9aa4b2;
+  color: #fff;
+}
+
+.cta-disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
 .detail-actions {
   margin-top: var(--space-md);
   text-align: center;
