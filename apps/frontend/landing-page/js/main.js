@@ -1,6 +1,12 @@
 (function () {
-  const APK_DOWNLOAD_URL =
-    "http://172.20.10.2:6060/android_downloads/app-release.apk";
+  const DOWNLOAD_URLS = {
+    android: "http://172.20.10.2:6060/android_downloads/app-release.apk",
+    windows: "http://172.20.10.2:6060/windows_downloads/UDAKE-Setup-1.0.0.exe",
+    macos: "http://172.20.10.2:6060/macos_downloads/UDAKE-1.0.0.dmg",
+    macosX64: "http://172.20.10.2:6060/macos_downloads/UDAKE-1.0.0-x64.dmg",
+    macosArm64:
+      "http://172.20.10.2:6060/macos_downloads/UDAKE-1.0.0-arm64.dmg",
+  };
   const HOME_SCROLL_KEY = "udake_home_scroll_y";
   const HOME_SCROLL_MARK_KEY = "udake_restore_home_scroll";
   const FEATURE_PAGE_MAP = {
@@ -183,7 +189,13 @@
   function bindDownloadActions() {
     const androidButton = document.getElementById("androidDownload");
     if (androidButton) {
-      androidButton.setAttribute("href", APK_DOWNLOAD_URL);
+      androidButton.setAttribute("href", DOWNLOAD_URLS.android);
+    }
+
+    const macosButton = document.getElementById("macosDownload");
+    if (macosButton) {
+      macosButton.setAttribute("href", resolveMacDownloadUrl());
+      refreshMacStatusText();
     }
 
     document.querySelectorAll(".coming-soon").forEach(function (button) {
@@ -192,6 +204,30 @@
         openModal(platform);
       });
     });
+  }
+
+  function resolveMacDownloadUrl() {
+    const userAgent = (window.navigator.userAgent || "").toLowerCase();
+    const likelyArm64 = /arm64|aarch64|apple silicon/.test(userAgent);
+    if (likelyArm64) {
+      return DOWNLOAD_URLS.macosArm64;
+    }
+    return DOWNLOAD_URLS.macosX64 || DOWNLOAD_URLS.macos;
+  }
+
+  function refreshMacStatusText() {
+    const status = document.getElementById("macosDownloadStatus");
+    if (!status) {
+      return;
+    }
+
+    const language = window.UDAKEI18N
+      ? window.UDAKEI18N.getCurrentLanguage()
+      : "zh-CN";
+    const isArm64 = resolveMacDownloadUrl() === DOWNLOAD_URLS.macosArm64;
+    const directText = language === "en-US" ? "Download Now" : "立即下载";
+    const archText = isArm64 ? "Apple Silicon" : "Intel";
+    status.textContent = directText + " (" + archText + ")";
   }
 
   function bindModalActions() {
@@ -296,6 +332,7 @@
     }
 
     window.addEventListener("udake-language-change", renderIcons);
+    window.addEventListener("udake-language-change", refreshMacStatusText);
   }
 
   if (document.readyState === "loading") {

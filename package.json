@@ -54,7 +54,8 @@
     "i18n:tms:validate:strict": "node scripts/i18n-tms.js validate --strict",
     "deps:check": "npm ls --depth=0",
     "deps:audit": "npm audit --omit=dev --audit-level=high",
-    "build:electron": "npm run build:prod && electron-builder --mac",
+    "build:electron": "electron-builder",
+    "build:mac": "npm run build:prod && npm run build:electron -- --mac && node scripts/copy-mac-artifact.js",
     "build:android": "npm run build:prod && node scripts/update-capacitor-config.js && npx cap sync android && cd android && ./gradlew assembleRelease && cd ..",
     "build:all": "npm run build:prod && npm run build:android && npm run build:electron"
   },
@@ -118,11 +119,12 @@
         }
       ],
       "icon": "logo/UDAKE.icns",
-      "category": "public.app-category.science",
+      "category": "public.app-category.productivity",
       "hardenedRuntime": true,
       "gatekeeperAssess": false,
       "entitlements": "build/entitlements.mac.plist",
-      "entitlementsInherit": "build/entitlements.mac.plist"
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "dmg": {
       "contents": [
@@ -140,7 +142,9 @@
       "window": {
         "width": 540,
         "height": 380
-      }
-    }
+      },
+      "background": "build/dmg-background.png"
+    },
+    "afterSign": "scripts/notarize.js"
   }
 }

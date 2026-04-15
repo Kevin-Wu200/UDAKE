@@ -192,8 +192,10 @@
         android: "Android",
         windows: "Windows",
         macos: "macOS",
-        direct: "立即下载 APK",
+        direct: "立即下载",
         comingSoon: "即将推出",
+        appleSilicon: "Apple Silicon",
+        intel: "Intel",
       },
       contact: {
         title: "联系我们",
@@ -439,8 +441,10 @@
         android: "Android",
         windows: "Windows",
         macos: "macOS",
-        direct: "Download APK Now",
+        direct: "Download Now",
         comingSoon: "Coming Soon",
+        appleSilicon: "Apple Silicon",
+        intel: "Intel",
       },
       contact: {
         title: "Contact",

@@ -79,7 +79,10 @@ function createWindow() {
       webviewTag: true, // 允许使用 webview 标签（支持 iframe）
       preload: path.join(__dirname, 'preload.js')
     },
-    icon: path.join(__dirname, '../../logo/UDAKE.icns'),
+    icon: path.join(
+      __dirname,
+      '../../logo/' + (process.platform === 'win32' ? 'UDAKE.ico' : 'UDAKE.icns'),
+    ),
     backgroundColor: '#ffffff', // 设置背景色，减少闪烁
     titleBarStyle: 'hiddenInset', // macOS 风格标题栏
   })

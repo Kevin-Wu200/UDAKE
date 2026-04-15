@@ -263,14 +263,19 @@
               <span class="platform" data-i18n="download.windows">Windows</span>
               <span class="status" data-i18n="download.comingSoon">即将推出</span>
             </button>
-            <button
-              class="download-card coming-soon"
-              data-platform="macos"
-              type="button"
+            <a
+              id="macosDownload"
+              class="download-card"
+              href="http://172.20.10.2:6060/macos_downloads/UDAKE-1.0.0.dmg"
+              download
             >
               <span class="platform" data-i18n="download.macos">macOS</span>
-              <span class="status" data-i18n="download.comingSoon">即将推出</span>
-            </button>
+              <span
+                id="macosDownloadStatus"
+                class="status"
+                data-i18n="download.direct"
+              >立即下载</span>
+            </a>
           </div>
         </section>
 
