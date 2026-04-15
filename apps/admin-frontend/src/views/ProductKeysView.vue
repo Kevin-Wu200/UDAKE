@@ -52,11 +52,21 @@
     </el-card>
 
     <div class="action-bar">
-      <el-button type="primary" @click="createDialogVisible = true" :disabled="!canCreate">
+      <el-button type="primary" @click="createDialogVisible = true" :disabled="!canCreate || createDisabledByQuota">
         创建单个密钥
       </el-button>
       <el-button @click="importDialogVisible = true" :disabled="!canImport">批量导入</el-button>
     </div>
+
+    <el-alert
+      v-if="companyAdminProfile"
+      :type="createDisabledByQuota ? 'error' : 'info'"
+      :closable="false"
+      show-icon
+      class="quota-alert"
+      :title="`当前角色：${companyAdminTypeLabel}，可创建类型：${allowedTypeLabels}，配额：${companyAdminProfile.total_keys_created}/${companyAdminProfile.max_keys_allowed}`"
+      :description="createDisabledByQuota ? '已达到创建上限，无法继续创建密钥。' : `剩余可创建 ${companyAdminProfile.remaining_keys_quota} 个。`"
+    />
 
     <el-table :data="keys" border v-loading="loading">
       <el-table-column prop="product_key" label="密钥" min-width="220" />
@@ -72,6 +82,21 @@
       </el-table-column>
       <el-table-column prop="total_quota" label="总配额" width="100" />
       <el-table-column prop="used_count" label="已使用" width="100" />
+      <el-table-column prop="expires_at" label="过期时间" width="180">
+        <template #default="{ row }">
+          <div class="expires-cell">
+            <el-icon v-if="isExpired(row)" class="expired-icon"><WarningFilled /></el-icon>
+            <span :class="{ 'expired-text': isExpired(row) }">{{ row.expires_at || '-' }}</span>
+          </div>
+        </template>
+      </el-table-column>
+      <el-table-column label="到期倒计时" width="140">
+        <template #default="{ row }">
+          <el-tag :type="countdownTagType(row)">
+            {{ getCountdownText(row) }}
+          </el-tag>
+        </template>
+      </el-table-column>
       <el-table-column prop="assigned_at" label="分配时间" width="170" />
       <el-table-column prop="created_at" label="创建时间" width="170" />
       <el-table-column label="操作" width="220" fixed="right">
@@ -100,10 +125,12 @@
       <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="110px">
         <el-form-item label="密钥类型" prop="type">
           <el-select v-model="createForm.type" style="width: 100%">
-            <el-option label="个人试用" value="personal_trial" />
-            <el-option label="个人标准" value="personal_standard" />
-            <el-option label="企业试用" value="enterprise_trial" />
-            <el-option label="企业标准" value="enterprise_standard" />
+            <el-option
+              v-for="item in creatableTypeOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="企业ID" prop="company_id">
@@ -118,7 +145,7 @@
       </el-form>
       <template #footer>
         <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleCreateSingle">确认创建</el-button>
+        <el-button type="primary" @click="handleCreateSingle" :disabled="createDisabledByQuota">确认创建</el-button>
       </template>
     </el-dialog>
 
@@ -187,13 +214,15 @@
 
 <script setup lang="ts">
 import type { FormInstance, FormRules } from 'element-plus';
-import type { KeyStatus, KeyType, ProductKey } from '../types/admin';
+import type { CompanyAdmin, KeyStatus, KeyType, ProductKey } from '../types/admin';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { WarningFilled } from '@element-plus/icons-vue';
 import { useAuthStore } from '../stores/auth';
 import {
   createProductKeys,
   deleteProductKey,
+  fetchCompanyAdminProfile,
   fetchProductKeyStats,
   fetchProductKeys,
   importProductKeys,
@@ -232,6 +261,31 @@ const canCreate = computed(() => isSuperAdmin.value);
 const canImport = computed(() => isSuperAdmin.value);
 const canEdit = (key: ProductKey) => isSuperAdmin.value && key.status !== 'expired';
 const canDelete = (key: ProductKey) => isSuperAdmin.value && key.status === 'unused';
+const companyAdminProfile = ref<CompanyAdmin | null>(null);
+
+const companyAdminTypeLabel = computed(() =>
+  companyAdminProfile.value?.company_admin_type === 'trial' ? '试用企业管理员' : '标准企业管理员'
+);
+
+const creatableTypeOptions = computed<Array<{ label: string; value: KeyType }>>(() => {
+  if (!companyAdminProfile.value) {
+    return [
+      { label: '个人试用', value: 'personal_trial' },
+      { label: '个人标准', value: 'personal_standard' },
+      { label: '企业试用', value: 'enterprise_trial' },
+      { label: '企业标准', value: 'enterprise_standard' }
+    ];
+  }
+  return companyAdminProfile.value.allowed_key_types.map((value) => ({
+    value,
+    label: value === 'enterprise_trial' ? '企业试用' : '企业标准'
+  }));
+});
+
+const allowedTypeLabels = computed(() => creatableTypeOptions.value.map((item) => item.label).join('、'));
+const createDisabledByQuota = computed(() =>
+  Boolean(companyAdminProfile.value && companyAdminProfile.value.remaining_keys_quota <= 0)
+);
 
 const createDialogVisible = ref(false);
 const importDialogVisible = ref(false);
@@ -365,7 +419,7 @@ const handleSizeChange = (nextSize: number) => {
 };
 
 const resetCreateForm = () => {
-  createForm.type = 'personal_standard';
+  createForm.type = creatableTypeOptions.value[0]?.value ?? 'personal_standard';
   createForm.company_id = undefined;
   createForm.user_id = undefined;
   createForm.notes = '';
@@ -390,7 +444,7 @@ const handleCreateSingle = async () => {
     createDialogVisible.value = false;
     resetCreateForm();
     ElMessage.success('创建成功');
-    await Promise.all([loadList(), loadStats()]);
+    await Promise.all([loadList(), loadStats(), loadCompanyAdminProfile()]);
   } catch {
     ElMessage.error('创建失败');
   }
@@ -461,8 +515,65 @@ const handleDelete = async (row: ProductKey) => {
   }
 };
 
+const toTimestamp = (value?: string) => {
+  if (!value) {
+    return Number.NaN;
+  }
+  const normalized = value.replace(' ', 'T');
+  const ts = new Date(normalized).getTime();
+  return Number.isNaN(ts) ? Number.NaN : ts;
+};
+
+const isExpired = (key: ProductKey) => key.status === 'expired' || (!Number.isNaN(toTimestamp(key.expires_at)) && toTimestamp(key.expires_at) <= Date.now());
+
+const getCountdownText = (key: ProductKey) => {
+  if (!key.expires_at) {
+    return '未设置';
+  }
+  const expiry = toTimestamp(key.expires_at);
+  if (Number.isNaN(expiry)) {
+    return '时间异常';
+  }
+  const remainMs = expiry - Date.now();
+  const dayMs = 24 * 60 * 60 * 1000;
+  if (remainMs <= 0) {
+    return '已到期';
+  }
+  const days = Math.ceil(remainMs / dayMs);
+  return `剩余 ${days} 天`;
+};
+
+const countdownTagType = (key: ProductKey): 'info' | 'danger' | 'warning' | 'success' => {
+  const text = getCountdownText(key);
+  if (text === '已到期') {
+    return 'danger';
+  }
+  const match = text.match(/\d+/);
+  const days = match ? Number(match[0]) : 999;
+  if (days <= 7) {
+    return 'warning';
+  }
+  return 'success';
+};
+
+const loadCompanyAdminProfile = async () => {
+  if (!authStore.isCompanyAdmin) {
+    companyAdminProfile.value = null;
+    return;
+  }
+  try {
+    const profile = await fetchCompanyAdminProfile(authStore.currentCompany.id);
+    companyAdminProfile.value = profile;
+    if (!profile.allowed_key_types.includes(createForm.type as 'enterprise_trial' | 'enterprise_standard')) {
+      createForm.type = profile.allowed_key_types[0] ?? 'enterprise_trial';
+    }
+  } catch {
+    companyAdminProfile.value = null;
+  }
+};
+
 onMounted(async () => {
-  await Promise.all([loadList(), loadStats()]);
+  await Promise.all([loadList(), loadStats(), loadCompanyAdminProfile()]);
 });
 </script>
 
@@ -514,6 +625,25 @@ onMounted(async () => {
 .action-bar {
   display: flex;
   gap: 12px;
+}
+
+.quota-alert {
+  margin-top: 4px;
+}
+
+.expires-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.expired-icon {
+  color: #ef4444;
+}
+
+.expired-text {
+  color: #dc2626;
+  font-weight: 600;
 }
 
 .pagination {

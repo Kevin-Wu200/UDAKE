@@ -40,6 +40,8 @@ from .api.auth_api import router as auth_router
 from .api.product_keys_api import router as product_keys_router
 from .api.company_management_api import router as company_management_router
 from .api.devices_api import router as devices_router
+from .api.scheduler_api import router as scheduler_router
+from .scheduler.key_expiry_scheduler import get_scheduler_manager
 from .services.mobile_gps_service import mobile_gps_service
 
 # 导入新增的系统路由
@@ -70,6 +72,7 @@ def _setup_logging() -> None:
 _setup_logging()
 
 startup_manager = StartupManager()
+scheduler_manager = get_scheduler_manager()
 
 
 @asynccontextmanager
@@ -79,6 +82,7 @@ async def lifespan(app_instance: FastAPI):
     try:
         snapshot = await startup_manager.run()
         logging.info("启动流程完成: %s", snapshot)
+        scheduler_manager.start()
     except Exception as exc:  # pylint: disable=broad-except
         logging.exception("启动流程异常，进入降级模式: %s", exc)
         startup_manager.record_performance_event(
@@ -86,6 +90,7 @@ async def lifespan(app_instance: FastAPI):
             {"event": "startup_exception", "error": str(exc)},
         )
     yield
+    scheduler_manager.stop()
     await startup_manager.shutdown()
 
 
@@ -200,6 +205,7 @@ app.include_router(product_keys_router, prefix="/api", tags=["密钥"])
 app.include_router(devices_router, prefix="/api", tags=["设备管理"])
 app.include_router(company_management_router, prefix="/api", tags=["企业管理"])
 app.include_router(admin_router, prefix="/api", tags=["管理员后台"])
+app.include_router(scheduler_router, prefix="/api", tags=["定时任务管理"])
 app.include_router(api_versioning_router)
 
 # 注册新增的系统路由

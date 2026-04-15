@@ -5,6 +5,9 @@ const LoginView = () => import('../views/LoginView.vue');
 const DashboardView = () => import('../views/DashboardView.vue');
 const ProductKeysView = () => import('../views/ProductKeysView.vue');
 const CompanyProductKeysView = () => import('../views/CompanyProductKeysView.vue');
+const CompanyAdminProfileView = () => import('../views/CompanyAdminProfile.vue');
+const SMTPSettingsView = () => import('../views/SMTPSettings.vue');
+const EmailLogsView = () => import('../views/EmailLogs.vue');
 const UsersView = () => import('../views/UsersView.vue');
 const AuditLogsView = () => import('../views/AuditLogsView.vue');
 const WorkflowListView = () => import('../views/workflow/WorkflowList.vue');
@@ -133,6 +136,34 @@ const router = createRouter({
             requiresAuth: true,
             roles: ['company_admin'],
             requiredRoles: ['company_admin']
+          }
+        },
+        {
+          path: '/company/profile',
+          name: 'company-profile',
+          component: CompanyAdminProfileView,
+          meta: {
+            title: '企业管理员信息',
+            requiresAuth: true,
+            requiredRoles: ['company_admin']
+          }
+        },
+        {
+          path: '/smtp-settings',
+          name: 'smtp-settings',
+          component: SMTPSettingsView,
+          meta: {
+            title: 'SMTP配置',
+            requiredRoles: ['super_admin', 'admin']
+          }
+        },
+        {
+          path: '/email-logs',
+          name: 'email-logs',
+          component: EmailLogsView,
+          meta: {
+            title: '邮件发送记录',
+            requiredRoles: ['super_admin', 'admin']
           }
         },
         {

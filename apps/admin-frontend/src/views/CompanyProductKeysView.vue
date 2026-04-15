@@ -116,7 +116,12 @@
       />
     </div>
 
-    <key-generate-dialog v-model="generateDialogVisible" @success="handleGenerateSuccess" />
+    <key-generate-dialog
+      v-model="generateDialogVisible"
+      :available-types="companyAdminProfile?.allowed_key_types"
+      :remaining-quota="companyAdminProfile?.remaining_keys_quota"
+      @success="handleGenerateSuccess"
+    />
 
     <el-dialog v-model="assignDialogVisible" title="分配企业密钥" width="460px">
       <el-form ref="assignFormRef" :model="assignForm" :rules="assignRules" label-width="100px">
@@ -152,7 +157,7 @@
 
 <script setup lang="ts">
 import type { FormInstance, FormRules } from 'element-plus';
-import type { KeyStatus, ProductKey } from '../types/admin';
+import type { CompanyAdmin, KeyStatus, ProductKey } from '../types/admin';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRouter } from 'vue-router';
@@ -160,6 +165,7 @@ import { useAuthStore } from '../stores/auth';
 import KeyGenerateDialog from '../components/KeyGenerateDialog.vue';
 import {
   assignCompanyKey,
+  fetchCompanyAdminProfile,
   fetchCompanyKeyStats,
   fetchCompanyKeys,
   fetchCompanyUsers,
@@ -195,8 +201,11 @@ const companyStats = reactive({
   expiredKeys: 0
 });
 
-const adminTypeLabel = computed(() => '标准企业管理员');
-const createLimit = computed(() => 1000);
+const companyAdminProfile = ref<CompanyAdmin | null>(null);
+const adminTypeLabel = computed(() =>
+  companyAdminProfile.value?.company_admin_type === 'trial' ? '试用企业管理员' : '标准企业管理员'
+);
+const createLimit = computed(() => companyAdminProfile.value?.max_keys_allowed ?? 1000);
 
 const generateDialogVisible = ref(false);
 const assignDialogVisible = ref(false);
@@ -249,6 +258,14 @@ const loadCompanyStats = async () => {
 
 const loadCompanyUsers = async () => {
   companyUsers.value = await fetchCompanyUsers(currentCompany.value.id);
+};
+
+const loadCompanyProfile = async () => {
+  try {
+    companyAdminProfile.value = await fetchCompanyAdminProfile(currentCompany.value.id);
+  } catch {
+    companyAdminProfile.value = null;
+  }
 };
 
 const loadList = async () => {
@@ -311,7 +328,7 @@ const handleSizeChange = (nextSize: number) => {
 };
 
 const handleGenerateSuccess = async () => {
-  await Promise.all([loadList(), loadCompanyStats()]);
+  await Promise.all([loadList(), loadCompanyStats(), loadCompanyProfile()]);
 };
 
 const handleAssign = (row: ProductKey) => {
@@ -338,7 +355,7 @@ const confirmAssign = async () => {
     });
     assignDialogVisible.value = false;
     ElMessage.success('分配成功');
-    await Promise.all([loadList(), loadCompanyStats()]);
+    await Promise.all([loadList(), loadCompanyStats(), loadCompanyProfile()]);
   } catch {
     ElMessage.error('分配失败');
   }
@@ -348,7 +365,7 @@ const handleRevoke = async (row: ProductKey) => {
   try {
     await revokeCompanyKey(row.id, authStore.username || 'company_admin');
     ElMessage.success('已撤销分配');
-    await Promise.all([loadList(), loadCompanyStats()]);
+    await Promise.all([loadList(), loadCompanyStats(), loadCompanyProfile()]);
   } catch {
     ElMessage.error('撤销失败');
   }
@@ -360,7 +377,7 @@ const handleView = (row: ProductKey) => {
 };
 
 onMounted(async () => {
-  await Promise.all([loadCompanyUsers(), loadList(), loadCompanyStats()]);
+  await Promise.all([loadCompanyUsers(), loadList(), loadCompanyStats(), loadCompanyProfile()]);
 });
 </script>
 

@@ -30,6 +30,40 @@ export interface ProductKey {
   updated_at: string;
 }
 
+export type CompanyAdminType = 'trial' | 'standard';
+
+export interface CompanyAdmin {
+  id: number;
+  company_id: number;
+  company_name: string;
+  company_admin_type: CompanyAdminType;
+  total_keys_created: number;
+  max_keys_allowed: number;
+  remaining_keys_quota: number;
+  allowed_key_types: Array<Extract<KeyType, 'enterprise_trial' | 'enterprise_standard'>>;
+}
+
+export interface SMTPConfig {
+  host: string;
+  port: number;
+  encryption: 'TLS' | 'SSL';
+  username: string;
+  password: string;
+  updated_at?: string;
+}
+
+export type EmailSendStatus = 'success' | 'failed';
+
+export interface EmailLog {
+  id: number;
+  sent_at: string;
+  recipient: string;
+  subject: string;
+  status: EmailSendStatus;
+  failure_reason?: string;
+  retryable: boolean;
+}
+
 export interface ProductKeyCreateForm {
   type: KeyType;
   count: number;

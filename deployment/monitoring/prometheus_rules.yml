@@ -1,0 +1,17 @@
+groups:
+  - name: company-admin-business-metrics
+    rules:
+      - record: udake:key_create_success_rate_5m
+        expr: rate(udake_key_create_success_total[5m]) / clamp_min(rate(udake_key_create_total[5m]), 1)
+
+      - record: udake:key_expired_total_1h
+        expr: sum(increase(udake_key_expired_total[1h]))
+
+      - record: udake:email_send_success_rate_15m
+        expr: rate(udake_email_send_success_total[15m]) / clamp_min(rate(udake_email_send_total[15m]), 1)
+
+      - record: udake:scheduler_task_failure_total_1d
+        expr: sum(increase(udake_scheduler_task_failed_total[1d]))
+
+      - record: udake:db_query_p95_seconds
+        expr: histogram_quantile(0.95, sum(rate(udake_db_query_duration_seconds_bucket[5m])) by (le))

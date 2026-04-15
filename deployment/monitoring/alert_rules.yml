@@ -65,3 +65,41 @@ groups:
         annotations:
           summary: "接口 P95 时延过高"
           description: "接口 P95 时延连续 5 分钟大于 1.5 秒。"
+
+  - name: udake-business-alerts
+    rules:
+      - alert: HighExpiredKeyCount
+        expr: sum(increase(udake_key_expired_total[1h])) > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "密钥过期数量异常"
+          description: "最近 1 小时过期密钥数量超过阈值 100。"
+
+      - alert: HighEmailFailureRate
+        expr: rate(udake_email_send_failed_total[15m]) / clamp_min(rate(udake_email_send_total[15m]), 1) > 0.2
+        for: 10m
+        labels:
+          severity: critical
+        annotations:
+          summary: "邮件发送失败率过高"
+          description: "最近 15 分钟邮件发送失败率超过 20%。"
+
+      - alert: SchedulerTaskFailed
+        expr: increase(udake_scheduler_task_failed_total[30m]) > 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "定时任务执行失败"
+          description: "最近 30 分钟检测到定时任务失败。"
+
+      - alert: SlowDatabaseQuery
+        expr: histogram_quantile(0.95, sum(rate(udake_db_query_duration_seconds_bucket[5m])) by (le)) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "数据库查询超时风险"
+          description: "数据库查询 P95 连续 10 分钟超过 2 秒。"

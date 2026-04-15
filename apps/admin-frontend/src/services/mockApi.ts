@@ -1,11 +1,16 @@
 import type {
   AuditEventType,
   AuditLog,
+  CompanyAdmin,
+  CompanyAdminType,
   DashboardStats,
+  EmailLog,
+  EmailSendStatus,
   KeyStatus,
   KeyType,
   ProductKey,
   ProductKeyCreateForm,
+  SMTPConfig,
   UserItem,
   UserRole
 } from '../types/admin';
@@ -33,6 +38,22 @@ function daysAgo(day: number): string {
   date.setDate(date.getDate() - day);
   date.setHours((date.getHours() + day) % 24, (day * 7) % 60, 0, 0);
   return formatDate(date);
+}
+
+function daysLater(day: number): string {
+  const date = new Date(now);
+  date.setDate(date.getDate() + day);
+  date.setHours((date.getHours() + day) % 24, (day * 9) % 60, 0, 0);
+  return formatDate(date);
+}
+
+function toTime(text?: string): number {
+  if (!text) {
+    return 0;
+  }
+  const normalized = text.replace(' ', 'T');
+  const value = new Date(normalized).getTime();
+  return Number.isNaN(value) ? 0 : value;
 }
 
 function randomToken() {
@@ -74,6 +95,7 @@ let productKeys: ProductKey[] = Array.from({ length: 72 }, (_, index) => {
   const usedCount = status === 'unused' ? 0 : Math.min(totalQuota, (index * 13) % (totalQuota + 1));
   const companyId = isEnterpriseType(keyType) ? (index % 6) + 1 : undefined;
   const userId = status !== 'unused' ? (index % 18) + 1000 : undefined;
+  const expiresAt = status === 'expired' ? daysAgo((index % 8) + 1) : daysLater((index % 30) + 3);
 
   return {
     id: productKeyAutoId++,
@@ -86,7 +108,7 @@ let productKeys: ProductKey[] = Array.from({ length: 72 }, (_, index) => {
     user_id: userId,
     company_id: companyId,
     assigned_at: userId ? daysAgo((index % 12) + 1) : undefined,
-    expires_at: status === 'expired' ? daysAgo(index % 8) : undefined,
+    expires_at: expiresAt,
     metadata: {
       generation_seed: `seed_${10000 + index}`,
       enterprise_name: companyId ? `企业${companyId}` : undefined,
@@ -138,6 +160,52 @@ let auditLogs: AuditLog[] = Array.from({ length: 128 }, (_, index) => {
     target: index % 2 === 0 ? `用户 user_${(index % 30) + 1}` : `密钥 UDAKE-${(index % 20) + 100}`,
     time: daysAgo(index % 30),
     ip: `192.168.2.${(index % 64) + 10}`
+  };
+});
+
+const companyAdminProfiles: Record<number, CompanyAdmin> = {
+  1: {
+    id: 101,
+    company_id: 1,
+    company_name: '企业1',
+    company_admin_type: 'trial',
+    total_keys_created: 36,
+    max_keys_allowed: 50,
+    remaining_keys_quota: 14,
+    allowed_key_types: ['enterprise_trial']
+  },
+  2: {
+    id: 102,
+    company_id: 2,
+    company_name: '企业2',
+    company_admin_type: 'standard',
+    total_keys_created: 120,
+    max_keys_allowed: 300,
+    remaining_keys_quota: 180,
+    allowed_key_types: ['enterprise_trial', 'enterprise_standard']
+  }
+};
+
+let smtpConfig: SMTPConfig = {
+  host: 'smtp.example.com',
+  port: 587,
+  encryption: 'TLS',
+  username: 'noreply@example.com',
+  password: '******',
+  updated_at: daysAgo(1)
+};
+
+let emailLogAutoId = 1;
+let emailLogs: EmailLog[] = Array.from({ length: 48 }, (_, index) => {
+  const status: EmailSendStatus = index % 5 === 0 ? 'failed' : 'success';
+  return {
+    id: emailLogAutoId++,
+    sent_at: daysAgo(index % 15),
+    recipient: `user_${index + 1}@example.com`,
+    subject: index % 2 === 0 ? '密钥到期提醒' : '密钥创建通知',
+    status,
+    failure_reason: status === 'failed' ? 'SMTP 连接超时' : undefined,
+    retryable: status === 'failed'
   };
 });
 
@@ -236,6 +304,7 @@ export async function createProductKeys(payload: ProductKeyCreateForm) {
       user_id: payload.user_id,
       company_id: payload.company_id,
       assigned_at: payload.user_id ? formatDate(new Date()) : undefined,
+      expires_at: payload.type.includes('trial') ? daysLater(30) : daysLater(365),
       metadata: {
         ...payload.metadata,
         enterprise_name: payload.metadata?.enterprise_name || (payload.company_id ? `企业${payload.company_id}` : undefined),
@@ -294,6 +363,7 @@ export async function importProductKeys(rawText: string) {
       total_quota: getQuotaByType(keyType),
       used_count: status === 'unused' ? 0 : 1,
       company_id: companyId,
+      expires_at: status === 'expired' ? daysAgo(1) : daysLater(180),
       metadata: {
         enterprise_name: enterpriseName,
         notes: '批量导入'
@@ -374,6 +444,37 @@ export async function fetchCompanyKeyStats(companyId: number) {
     activeKeys,
     assignedKeys,
     availableKeys
+  };
+}
+
+export async function fetchCompanyAdminProfile(companyId: number): Promise<CompanyAdmin> {
+  await delay(120);
+  const profile = companyAdminProfiles[companyId];
+  if (profile) {
+    const companyKeys = productKeys.filter((item) => item.company_id === companyId);
+    const totalCreated = companyKeys.length;
+    return {
+      ...profile,
+      company_name: `企业${companyId}`,
+      total_keys_created: totalCreated,
+      remaining_keys_quota: Math.max(profile.max_keys_allowed - totalCreated, 0)
+    };
+  }
+
+  const fallbackType: CompanyAdminType = companyId % 2 === 0 ? 'standard' : 'trial';
+  const companyKeys = productKeys.filter((item) => item.company_id === companyId);
+  const maxKeysAllowed = fallbackType === 'trial' ? 50 : 300;
+  const allowedKeyTypes: CompanyAdmin['allowed_key_types'] =
+    fallbackType === 'trial' ? ['enterprise_trial'] : ['enterprise_trial', 'enterprise_standard'];
+  return {
+    id: 9000 + companyId,
+    company_id: companyId,
+    company_name: `企业${companyId}`,
+    company_admin_type: fallbackType,
+    total_keys_created: companyKeys.length,
+    max_keys_allowed: maxKeysAllowed,
+    remaining_keys_quota: Math.max(maxKeysAllowed - companyKeys.length, 0),
+    allowed_key_types: allowedKeyTypes
   };
 }
 
@@ -518,6 +619,74 @@ export async function fetchAuditLogs(params: {
   }
 
   return paginate(filtered, params.page, params.pageSize);
+}
+
+export async function fetchSmtpConfig() {
+  await delay(100);
+  return { ...smtpConfig };
+}
+
+export async function testSmtpConnection(payload: SMTPConfig) {
+  await delay(300);
+  if (!payload.host || !payload.username || !payload.password) {
+    throw new Error('请填写完整 SMTP 配置');
+  }
+  return {
+    success: true,
+    latencyMs: 120 + Math.floor(Math.random() * 160)
+  };
+}
+
+export async function saveSmtpConfig(payload: SMTPConfig) {
+  await delay(200);
+  smtpConfig = {
+    ...payload,
+    password: payload.password ? `***${payload.password.slice(-2)}` : '',
+    updated_at: formatDate(new Date())
+  };
+  pushAudit('update_user', '更新 SMTP 配置');
+  return { ...smtpConfig };
+}
+
+export async function fetchEmailLogs(params: {
+  page: number;
+  pageSize: number;
+  status?: EmailSendStatus;
+  startTime?: string;
+  endTime?: string;
+}) {
+  await delay(180);
+  let filtered = [...emailLogs].sort((a, b) => b.id - a.id);
+  if (params.status) {
+    filtered = filtered.filter((item) => item.status === params.status);
+  }
+  if (params.startTime) {
+    const start = toTime(params.startTime);
+    filtered = filtered.filter((item) => toTime(item.sent_at) >= start);
+  }
+  if (params.endTime) {
+    const end = toTime(params.endTime);
+    filtered = filtered.filter((item) => toTime(item.sent_at) <= end);
+  }
+  return paginate(filtered, params.page, params.pageSize);
+}
+
+export async function resendEmailLog(id: number) {
+  await delay(280);
+  emailLogs = emailLogs.map((item) => {
+    if (item.id !== id) {
+      return item;
+    }
+    const success = Math.random() > 0.2;
+    return {
+      ...item,
+      status: success ? 'success' : 'failed',
+      failure_reason: success ? undefined : '重试失败：邮件服务响应超时',
+      retryable: !success,
+      sent_at: formatDate(new Date())
+    };
+  });
+  pushAudit('update_user', `重发邮件日志 #${id}`);
 }
 
 export async function fetchAuditLogsForExport(params: {

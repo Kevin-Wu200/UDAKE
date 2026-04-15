@@ -1,0 +1,43 @@
+version: 1
+
+pipelines:
+  - name: key-operation-log
+    source: backend
+    include_patterns:
+      - "product_key"
+      - "company_admin"
+    alert_on:
+      - level: ERROR
+        threshold: 5
+        window: 5m
+
+  - name: email-delivery-log
+    source: backend
+    include_patterns:
+      - "email"
+      - "smtp"
+    alert_on:
+      - field: failure_rate
+        threshold: 0.2
+        window: 10m
+
+  - name: scheduler-log
+    source: backend
+    include_patterns:
+      - "expiry_check"
+      - "expiry_reminder"
+      - "scheduler"
+    alert_on:
+      - field: task_failed_count
+        threshold: 3
+        window: 1h
+
+  - name: exception-log
+    source: backend
+    include_patterns:
+      - "Traceback"
+      - "Exception"
+    alert_on:
+      - level: ERROR
+        threshold: 10
+        window: 5m

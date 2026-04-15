@@ -20,6 +20,18 @@
           <el-icon><Key /></el-icon>
           <span>{{ t('companyProductKeys') }}</span>
         </el-menu-item>
+        <el-menu-item v-if="authStore.isCompanyAdmin" index="/company/profile">
+          <el-icon><UserFilled /></el-icon>
+          <span>企业管理员信息</span>
+        </el-menu-item>
+        <el-menu-item v-if="!authStore.isCompanyAdmin" index="/smtp-settings">
+          <el-icon><Setting /></el-icon>
+          <span>SMTP配置</span>
+        </el-menu-item>
+        <el-menu-item v-if="!authStore.isCompanyAdmin" index="/email-logs">
+          <el-icon><Message /></el-icon>
+          <span>邮件发送记录</span>
+        </el-menu-item>
         <el-menu-item index="/workflows">
           <el-icon><Operation /></el-icon>
           <span>{{ t('workflowEngine') }}</span>
@@ -85,7 +97,7 @@
 import type { AppLanguage } from '../stores/app';
 import { computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import { DataAnalysis, Document, Histogram, Key, Operation, UserFilled } from '@element-plus/icons-vue';
+import { DataAnalysis, Document, Histogram, Key, Message, Operation, Setting, UserFilled } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useAppStore } from '../stores/app';
