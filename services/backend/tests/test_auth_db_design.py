@@ -29,6 +29,9 @@ from app.auth_db.models import (
     ShareLink,
     Team,
     TeamMember,
+    Ticket,
+    TicketStatus,
+    TicketType,
     User,
     UserDevice,
     Workflow,
@@ -427,5 +430,157 @@ def test_collaboration_constraints(sqlite_engine):
             )
         )
         with pytest.raises(IntegrityError):
+            session.commit()
+        session.rollback()
+
+
+def test_ticket_crud_and_business_rules(sqlite_engine):
+    now = datetime.now(timezone.utc)
+    with Session(sqlite_engine) as session:
+        operator = User(
+            id=101,
+            username="super_admin",
+            email="super_admin@example.com",
+            password_hash="hash",
+            role="super_admin",
+            status="active",
+            is_email_verified=True,
+        )
+        session.add(operator)
+        session.flush()
+
+        ticket = Ticket(
+            id=1,
+            ticket_type=TicketType.KEY_REQUEST.value,
+            status=TicketStatus.PENDING.value,
+            email="requester@example.com",
+            phone="13800138000",
+            industry="能源",
+            usage_purpose="用于空间分析试用",
+            key_type="personal_trial",
+        )
+        session.add(ticket)
+        session.commit()
+
+    with Session(sqlite_engine) as session:
+        ticket = session.query(Ticket).filter_by(id=1).one()
+        ticket.status = TicketStatus.APPROVED.value
+        ticket.processed_by = 101
+        ticket.processed_at = now
+        ticket.approval_notes = "审批通过"
+        session.commit()
+
+    with Session(sqlite_engine) as session:
+        ticket = session.query(Ticket).filter_by(id=1).one()
+        ticket.status = TicketStatus.COMPLETED.value
+        ticket.assigned_key = "PK-TICKET-0001"
+        ticket.response_message = "密钥已分配，请查收。"
+        session.commit()
+
+    with Session(sqlite_engine) as session:
+        ticket = session.query(Ticket).filter_by(id=1).one()
+        ticket.response_message = "尝试修改已完成工单"
+        with pytest.raises(ValueError):
+            session.commit()
+        session.rollback()
+
+
+def test_ticket_validation_and_constraints(sqlite_engine):
+    with Session(sqlite_engine) as session:
+        with pytest.raises(ValueError):
+            Ticket(
+                id=2,
+                ticket_type=TicketType.KEY_REQUEST.value,
+                status=TicketStatus.PENDING.value,
+                email="invalid_email",
+                phone="13800138000",
+                industry="制造",
+                usage_purpose="用途说明",
+                key_type="personal_standard",
+            )
+
+        with pytest.raises(ValueError):
+            Ticket(
+                id=3,
+                ticket_type=TicketType.KEY_REQUEST.value,
+                status=TicketStatus.PENDING.value,
+                email="valid@example.com",
+                phone="12345",
+                industry="制造",
+                usage_purpose="用途说明",
+                key_type="personal_standard",
+            )
+
+        session.add(
+            Ticket(
+                id=4,
+                ticket_type=TicketType.KEY_EXTENSION.value,
+                status=TicketStatus.PENDING.value,
+                email="valid@example.com",
+                phone="+8613800138000",
+                industry="制造",
+                usage_purpose="需要延期",
+                key_type="enterprise_standard",
+            )
+        )
+        with pytest.raises(ValueError):
+            session.commit()
+        session.rollback()
+
+
+def test_ticket_status_transition_and_single_processing(sqlite_engine):
+    now = datetime.now(timezone.utc)
+    with Session(sqlite_engine) as session:
+        operator = User(
+            id=202,
+            username="operator",
+            email="operator@example.com",
+            password_hash="hash",
+            role="super_admin",
+            status="active",
+            is_email_verified=True,
+        )
+        rejected_ticket = Ticket(
+            id=10,
+            ticket_type=TicketType.KEY_EXTENSION.value,
+            status=TicketStatus.REJECTED.value,
+            email="rejected@example.com",
+            phone="13900139000",
+            industry="金融",
+            usage_purpose="延期申请",
+            key_type="enterprise_trial",
+            existing_key="PK-OLD-0001",
+            processed_by=202,
+            processed_at=now,
+            approval_notes="资料不足",
+        )
+        approved_ticket = Ticket(
+            id=11,
+            ticket_type=TicketType.KEY_EXTENSION.value,
+            status=TicketStatus.APPROVED.value,
+            email="approved@example.com",
+            phone="13700137000",
+            industry="医疗",
+            usage_purpose="项目持续使用",
+            key_type="enterprise_standard",
+            existing_key="PK-OLD-0002",
+            processed_by=202,
+            processed_at=now,
+            approval_notes="审批通过",
+        )
+        session.add_all([operator, rejected_ticket, approved_ticket])
+        session.commit()
+
+    with Session(sqlite_engine) as session:
+        rejected_ticket = session.query(Ticket).filter_by(id=10).one()
+        rejected_ticket.status = TicketStatus.APPROVED.value
+        with pytest.raises(ValueError):
+            session.commit()
+        session.rollback()
+
+    with Session(sqlite_engine) as session:
+        approved_ticket = session.query(Ticket).filter_by(id=11).one()
+        approved_ticket.processed_by = 999
+        with pytest.raises(ValueError):
             session.commit()
         session.rollback()

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, Optional
@@ -18,10 +19,12 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    event,
     func,
+    inspect,
     text,
 )
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 
 
 class Base(DeclarativeBase):
@@ -100,6 +103,7 @@ class User(Base):
         "EmailChangeRequest", back_populates="user", cascade="all, delete-orphan"
     )
     audit_logs = relationship("AuditLog", back_populates="user")
+    processed_tickets = relationship("Ticket", back_populates="processor", foreign_keys="Ticket.processed_by")
 
     __table_args__ = (
         UniqueConstraint("username", name="uq_users_username"),
@@ -136,6 +140,18 @@ class ProductKeyStatus(str, Enum):
     ACTIVE = "active"
     DISABLED = "disabled"
     EXPIRED = "expired"
+
+
+class TicketType(str, Enum):
+    KEY_REQUEST = "key_request"
+    KEY_EXTENSION = "key_extension"
+
+
+class TicketStatus(str, Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    COMPLETED = "completed"
 
 
 class ProductKey(Base):
@@ -212,6 +228,171 @@ class ProductKey(Base):
         Index("ix_product_keys_expires_at", "expires_at"),
         Index("uq_product_keys_key", "product_key", unique=True),
     )
+
+
+class Ticket(Base):
+    __tablename__ = "tickets"
+
+    EMAIL_PATTERN = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+    PHONE_PATTERN = re.compile(r"^(1[3-9]\d{9}|\+[1-9]\d{6,19})$")
+    ALLOWED_TRANSITIONS = {
+        TicketStatus.PENDING.value: {TicketStatus.APPROVED.value, TicketStatus.REJECTED.value},
+        TicketStatus.APPROVED.value: {TicketStatus.COMPLETED.value},
+        TicketStatus.REJECTED.value: set(),
+        TicketStatus.COMPLETED.value: set(),
+    }
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ticket_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'pending'"))
+    email: Mapped[str] = mapped_column(String(255), nullable=False)
+    phone: Mapped[str] = mapped_column(String(20), nullable=False)
+    industry: Mapped[str] = mapped_column(String(100), nullable=False)
+    usage_purpose: Mapped[str] = mapped_column(Text, nullable=False)
+    key_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    existing_key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    processed_by: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    processed_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
+    approval_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    assigned_key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    response_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    created_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    processor = relationship("User", back_populates="processed_tickets", foreign_keys=[processed_by])
+
+    __table_args__ = (
+        CheckConstraint(
+            "ticket_type IN ('key_request', 'key_extension')",
+            name="ck_tickets_ticket_type_enum",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'approved', 'rejected', 'completed')",
+            name="ck_tickets_status_enum",
+        ),
+        CheckConstraint(
+            "key_type IN ('personal_trial', 'personal_standard', 'enterprise_trial', 'enterprise_standard')",
+            name="ck_tickets_key_type_enum",
+        ),
+        CheckConstraint(
+            "("
+            "(ticket_type = 'key_extension' AND existing_key IS NOT NULL AND length(trim(existing_key)) > 0)"
+            " OR "
+            "(ticket_type = 'key_request' AND existing_key IS NULL)"
+            ")",
+            name="ck_tickets_existing_key_required",
+        ),
+        CheckConstraint(
+            "("
+            "(status = 'pending' AND processed_by IS NULL AND processed_at IS NULL)"
+            " OR "
+            "(status IN ('approved', 'rejected', 'completed') AND processed_by IS NOT NULL AND processed_at IS NOT NULL)"
+            ")",
+            name="ck_tickets_processed_fields_consistency",
+        ),
+        CheckConstraint(
+            "status <> 'completed' OR assigned_key IS NOT NULL",
+            name="ck_tickets_completed_requires_assigned_key",
+        ),
+        Index("ix_tickets_email", "email"),
+        Index("ix_tickets_status", "status"),
+        Index("ix_tickets_created_at", "created_at"),
+        Index("ix_tickets_ticket_type", "ticket_type"),
+        Index("ix_tickets_processed_by", "processed_by"),
+    )
+
+    @validates("email")
+    def _validate_email(self, _key: str, value: str) -> str:
+        normalized = (value or "").strip()
+        if not normalized:
+            raise ValueError("email 不能为空")
+        if not self.EMAIL_PATTERN.match(normalized):
+            raise ValueError("email 格式不合法")
+        return normalized
+
+    @validates("phone")
+    def _validate_phone(self, _key: str, value: str) -> str:
+        normalized = (value or "").strip()
+        if not normalized:
+            raise ValueError("phone 不能为空")
+        if not self.PHONE_PATTERN.match(normalized):
+            raise ValueError("phone 格式不合法")
+        return normalized
+
+    @validates("industry", "usage_purpose", "key_type")
+    def _validate_required_text(self, key: str, value: str) -> str:
+        normalized = (value or "").strip()
+        if not normalized:
+            raise ValueError(f"{key} 不能为空")
+        return normalized
+
+    @validates("ticket_type")
+    def _validate_ticket_type(self, _key: str, value: str) -> str:
+        normalized = (value or "").strip()
+        if normalized not in {member.value for member in TicketType}:
+            raise ValueError("ticket_type 不合法")
+        if normalized == TicketType.KEY_REQUEST.value:
+            self.existing_key = None
+        return normalized
+
+    @validates("existing_key")
+    def _validate_existing_key(self, _key: str, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @validates("status")
+    def _validate_status_enum(self, _key: str, value: str) -> str:
+        normalized = (value or "").strip()
+        if normalized not in {member.value for member in TicketStatus}:
+            raise ValueError("status 不合法")
+        return normalized
+
+    def validate_business_rules(self) -> None:
+        if self.ticket_type == TicketType.KEY_EXTENSION.value and not self.existing_key:
+            raise ValueError("key_extension 工单必须提供 existing_key")
+        if self.ticket_type == TicketType.KEY_REQUEST.value and self.existing_key:
+            raise ValueError("key_request 工单不允许提供 existing_key")
+
+
+@event.listens_for(Ticket, "before_insert")
+def _ticket_before_insert(_mapper: Any, _connection: Any, target: Ticket) -> None:
+    target.validate_business_rules()
+
+
+@event.listens_for(Ticket, "before_update")
+def _ticket_before_update(_mapper: Any, _connection: Any, target: Ticket) -> None:
+    target.validate_business_rules()
+    state = inspect(target)
+    status_history = state.attrs.status.history
+    previous_status = status_history.deleted[0] if status_history.deleted else None
+    current_status = target.status
+
+    if previous_status is None and current_status == TicketStatus.COMPLETED.value:
+        raise ValueError("已完成工单不允许修改")
+
+    if previous_status:
+        if previous_status == TicketStatus.COMPLETED.value:
+            raise ValueError("已完成工单不允许修改")
+
+        if previous_status != current_status:
+            allowed = Ticket.ALLOWED_TRANSITIONS.get(previous_status, set())
+            if current_status not in allowed:
+                raise ValueError(f"不允许的工单状态流转: {previous_status} -> {current_status}")
+
+    processed_by_history = state.attrs.processed_by.history
+    processed_at_history = state.attrs.processed_at.history
+    if processed_by_history.deleted and processed_by_history.deleted[0] is not None:
+        if processed_by_history.added and processed_by_history.added[0] != processed_by_history.deleted[0]:
+            raise ValueError("processed_by 一旦写入后不可修改")
+    if processed_at_history.deleted and processed_at_history.deleted[0] is not None:
+        if processed_at_history.added and processed_at_history.added[0] != processed_at_history.deleted[0]:
+            raise ValueError("processed_at 一旦写入后不可修改")
 
 
 class EmailVerificationCode(Base):

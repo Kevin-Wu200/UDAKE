@@ -38,9 +38,14 @@ def run_migrations_offline() -> None:
 
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
+    db_url = get_auth_database_url()
     engine_options = build_engine_options()
     engine_options["poolclass"] = pool.NullPool
-    connectable = create_engine(get_auth_database_url(), **engine_options)
+    if db_url.startswith("sqlite"):
+        engine_options.pop("pool_size", None)
+        engine_options.pop("max_overflow", None)
+        engine_options.pop("pool_timeout", None)
+    connectable = create_engine(db_url, **engine_options)
 
     with connectable.connect() as connection:
         context.configure(
