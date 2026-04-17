@@ -12,6 +12,8 @@
     "build:dev": "tsc --noEmit -p configs/tsconfig.json && vite build --config configs/vite.config.ts --mode development && node scripts/replace-domains.js --mode=development",
     "build:test": "tsc --noEmit -p configs/tsconfig.json && vite build --config configs/vite.config.ts --mode testing && node scripts/replace-domains.js --mode=testing",
     "build:prod": "tsc --noEmit -p configs/tsconfig.json && vite build --config configs/vite.config.ts --mode production && node scripts/replace-domains.js --mode=production",
+    "docs:build:landing": "node scripts/md-to-html.js",
+    "docs:watch:landing": "node scripts/md-to-html.js --watch",
     "preview": "vite preview --config configs/vite.config.ts",
     "preview:test": "vite preview --config configs/vite.config.ts --mode testing",
     "lint": "eslint -c configs/eslint.config.mjs apps/frontend/js/",

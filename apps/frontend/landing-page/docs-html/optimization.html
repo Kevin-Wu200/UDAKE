@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UDAKE - 多目标优化模块</title>
+    <link rel="stylesheet" href="../css/variables.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/pages.css" />
+  </head>
+  <body class="page-detail docs-page">
+    <div class="page-shell">
+      <header class="site-header detail-header docs-header">
+        <a class="brand" href="../index.html#hero" aria-label="UDAKE Home">
+          <img src="../assets/logo.png" alt="UDAKE Logo" class="brand-logo" />
+          <div class="brand-copy">
+            <p class="brand-name">UDAKE</p>
+            <p class="brand-sub">智能不确定性驱动空间决策平台</p>
+          </div>
+        </a>
+        <a class="cta-btn cta-link docs-home-link" href="../index.html#features">返回首页</a>
+      </header>
+
+      <main class="detail-main docs-main">
+        <section class="detail-hero docs-hero">
+          <p class="detail-kicker">官网功能文档</p>
+          <h1>多目标优化模块</h1>
+          <p class="detail-subtitle">来源路径：optimization.md</p>
+        </section>
+
+        <section class="docs-layout" aria-label="Documentation content">
+          <aside class="docs-sidebar">
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>文档导航</h2>
+              <ul class="docs-toc">
+                <li class="docs-toc-item"><a href="#模块简介">模块简介</a></li><li class="docs-toc-item"><a href="#核心功能">核心功能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-多目标优化">1. 多目标优化</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-优化算法">2. 优化算法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-结果分析">3. 结果分析</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#4-决策支持">4. 决策支持</a></li><li class="docs-toc-item"><a href="#使用方法">使用方法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#基本操作流程">基本操作流程</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#高级功能">高级功能</a></li><li class="docs-toc-item"><a href="#配置说明">配置说明</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#目标函数配置">目标函数配置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#约束条件配置">约束条件配置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#算法参数配置">算法参数配置</a></li><li class="docs-toc-item"><a href="#技术实现">技术实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#核心算法">核心算法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#后端实现">后端实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#前端实现">前端实现</a></li><li class="docs-toc-item"><a href="#性能指标">性能指标</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#计算性能">计算性能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#优化质量">优化质量</a></li><li class="docs-toc-item"><a href="#应用场景">应用场景</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#环境管理">环境管理</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#资源管理">资源管理</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#城市规划">城市规划</a></li><li class="docs-toc-item"><a href="#常见问题">常见问题</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q1-如何选择合适的优化算法">Q1: 如何选择合适的优化算法？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q2-如何设置合理的权重参数">Q2: 如何设置合理的权重参数？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q3-如何处理约束冲突">Q3: 如何处理约束冲突？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q4-如何评估优化结果的质量">Q4: 如何评估优化结果的质量？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q5-如何处理大规模优化问题">Q5: 如何处理大规模优化问题？</a></li><li class="docs-toc-item"><a href="#最佳实践">最佳实践</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-多目标优化工作流">1. 多目标优化工作流</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-目标设定原则">2. 目标设定原则</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-约束设置技巧">3. 约束设置技巧</a></li><li class="docs-toc-item"><a href="#更新日志">更新日志</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v120-2026-04-05">v1.2.0 (2026-04-05)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v110-2026-03-15">v1.1.0 (2026-03-15)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v100-2026-02-01">v1.0.0 (2026-02-01)</a></li><li class="docs-toc-item"><a href="#技术支持">技术支持</a></li>
+              </ul>
+            </div>
+
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>快速操作</h2>
+              <div class="docs-actions">
+                <a class="cta-btn cta-link" href="../pages/optimization.html">返回功能页</a>
+                <a class="cta-btn cta-link cta-link-alt" href="../index.html#downloads">开始使用</a>
+              </div>
+            </div>
+          </aside>
+
+          <article class="detail-panel markdown-body">
+            <h1 id="多目标优化模块">多目标优化模块</h1>
+<h2 id="模块简介">模块简介</h2>
+<p>多目标优化模块是UDAKE平台的高级决策支持功能，专门用于解决具有多个冲突目标的复杂空间决策问题。通过帕累托前沿分析、多约束条件优化等技术，帮助用户在多个相互冲突的目标之间找到最优平衡方案，为科学决策提供强有力的支持。</p>
+<h2 id="核心功能">核心功能</h2>
+<h3 id="1-多目标优化">1. 多目标优化</h3>
+<ul>
+<li><p><strong>帕累托前沿分析</strong></p>
+<ul>
+<li>识别非支配解集</li>
+<li>可视化帕累托前沿</li>
+<li>解集质量评估</li>
+</ul>
+</li>
+<li><p><strong>目标权重配置</strong></p>
+<ul>
+<li>支持多目标权重设置</li>
+<li>权重敏感性分析</li>
+<li>动态权重调整</li>
+</ul>
+</li>
+<li><p><strong>约束条件管理</strong></p>
+<ul>
+<li>多类型约束支持</li>
+<li>约束优先级设置</li>
+<li>约束冲突检测</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-优化算法">2. 优化算法</h3>
+<ul>
+<li><p><strong>经典优化算法</strong></p>
+<ul>
+<li>加权求和法</li>
+<li>ε约束法</li>
+<li>目标规划法</li>
+</ul>
+</li>
+<li><p><strong>进化算法</strong></p>
+<ul>
+<li>NSGA-II（非支配排序遗传算法）</li>
+<li>MOEA/D（基于分解的多目标进化算法）</li>
+<li>SPEA2（强度帕累托进化算法）</li>
+</ul>
+</li>
+<li><p><strong>混合算法</strong></p>
+<ul>
+<li>混合整数优化</li>
+<li>多阶段优化</li>
+<li>自适应算法选择</li>
+</ul>
+</li>
+</ul>
+<h3 id="3-结果分析">3. 结果分析</h3>
+<ul>
+<li><p><strong>方案对比分析</strong></p>
+<ul>
+<li>多方案并行展示</li>
+<li>关键指标对比</li>
+<li>方案排序和推荐</li>
+</ul>
+</li>
+<li><p><strong>敏感性分析</strong></p>
+<ul>
+<li>参数敏感性测试</li>
+<li>目标权重敏感性</li>
+<li>约束条件敏感性</li>
+</ul>
+</li>
+<li><p><strong>方案可视化</strong></p>
+<ul>
+<li>2D/3D帕累托图</li>
+<li>雷达图对比</li>
+<li>决策矩阵可视化</li>
+</ul>
+</li>
+</ul>
+<h3 id="4-决策支持">4. 决策支持</h3>
+<ul>
+<li><p><strong>方案推荐</strong></p>
+<ul>
+<li>基于偏好的推荐</li>
+<li>多准则决策分析</li>
+<li>专家系统集成</li>
+</ul>
+</li>
+<li><p><strong>风险评估</strong></p>
+<ul>
+<li>方案风险评估</li>
+<li>不确定性影响分析</li>
+<li>鲁棒性检验</li>
+</ul>
+</li>
+<li><p><strong>实施规划</strong></p>
+<ul>
+<li>分阶段实施计划</li>
+<li>资源配置建议</li>
+<li>时间进度安排</li>
+</ul>
+</li>
+</ul>
+<h2 id="使用方法">使用方法</h2>
+<h3 id="基本操作流程">基本操作流程</h3>
+<ol>
+<li><p><strong>问题定义</strong></p>
+<ul>
+<li>设置优化目标</li>
+<li>定义目标函数</li>
+<li>确定约束条件</li>
+</ul>
+</li>
+<li><p><strong>算法配置</strong></p>
+<ul>
+<li>选择优化算法</li>
+<li>设置算法参数</li>
+<li>配置终止条件</li>
+</ul>
+</li>
+<li><p><strong>执行优化</strong></p>
+<ul>
+<li>启动优化计算</li>
+<li>监控优化进度</li>
+<li>实时查看结果</li>
+</ul>
+</li>
+<li><p><strong>结果分析</strong></p>
+<ul>
+<li>查看帕累托前沿</li>
+<li>分析候选方案</li>
+<li>进行敏感性分析</li>
+</ul>
+</li>
+<li><p><strong>方案选择</strong></p>
+<ul>
+<li>基于偏好选择方案</li>
+<li>评估方案可行性</li>
+<li>生成决策报告</li>
+</ul>
+</li>
+</ol>
+<h3 id="高级功能">高级功能</h3>
+<ul>
+<li><p><strong>交互式优化</strong></p>
+<ul>
+<li>实时调整目标权重</li>
+<li>动态修改约束条件</li>
+<li>交互式探索解空间</li>
+</ul>
+</li>
+<li><p><strong>历史对比</strong></p>
+<ul>
+<li>保存优化历史</li>
+<li>历史方案对比</li>
+<li>趋势分析</li>
+</ul>
+</li>
+<li><p><strong>批量优化</strong></p>
+<ul>
+<li>多场景批量运行</li>
+<li>参数扫描分析</li>
+<li>结果汇总统计</li>
+</ul>
+</li>
+</ul>
+<h2 id="配置说明">配置说明</h2>
+<h3 id="目标函数配置">目标函数配置</h3>
+<h4 id="单目标配置">单目标配置</h4>
+<pre><code class="language-json">{
+  &quot;objective&quot;: &quot;minimize_cost&quot;,
+  &quot;type&quot;: &quot;minimization&quot;,
+  &quot;function&quot;: &quot;cost_function&quot;,
+  &quot;weight&quot;: 1.0
+}
+</code></pre>
+<h4 id="多目标配置">多目标配置</h4>
+<pre><code class="language-json">{
+  &quot;objectives&quot;: [
+    {
+      &quot;name&quot;: &quot;minimize_cost&quot;,
+      &quot;type&quot;: &quot;minimization&quot;,
+      &quot;weight&quot;: 0.4
+    },
+    {
+      &quot;name&quot;: &quot;maximize_coverage&quot;,
+      &quot;type&quot;: &quot;maximization&quot;,
+      &quot;weight&quot;: 0.3
+    },
+    {
+      &quot;name&quot;: &quot;minimize_risk&quot;,
+      &quot;type&quot;: &quot;minimization&quot;,
+      &quot;weight&quot;: 0.3
+    }
+  ]
+}
+</code></pre>
+<h3 id="约束条件配置">约束条件配置</h3>
+<h4 id="约束类型">约束类型</h4>
+<ul>
+<li><strong>等式约束</strong>：g(x) = 0</li>
+<li><strong>不等式约束</strong>：g(x) ≤ 0 或 g(x) ≥ 0</li>
+<li><strong>边界约束</strong>：x_min ≤ x ≤ x_max</li>
+</ul>
+<h4 id="约束配置示例">约束配置示例</h4>
+<pre><code class="language-json">{
+  &quot;constraints&quot;: [
+    {
+      &quot;name&quot;: &quot;budget_constraint&quot;,
+      &quot;type&quot;: &quot;inequality&quot;,
+      &quot;operator&quot;: &quot;&lt;=&quot;,
+      &quot;value&quot;: 10000,
+      &quot;priority&quot;: &quot;high&quot;
+    },
+    {
+      &quot;name&quot;: &quot;coverage_constraint&quot;,
+      &quot;type&quot;: &quot;inequality&quot;,
+      &quot;operator&quot;: &quot;&gt;=&quot;,
+      &quot;value&quot;: 0.8,
+      &quot;priority&quot;: &quot;medium&quot;
+    },
+    {
+      &quot;name&quot;: &quot;boundary_constraint&quot;,
+      &quot;type&quot;: &quot;boundary&quot;,
+      &quot;lower&quot;: 0,
+      &quot;upper&quot;: 100,
+      &quot;priority&quot;: &quot;low&quot;
+    }
+  ]
+}
+</code></pre>
+<h3 id="算法参数配置">算法参数配置</h3>
+<h4 id="nsga-ii参数">NSGA-II参数</h4>
+<pre><code class="language-json">{
+  &quot;algorithm&quot;: &quot;NSGA-II&quot;,
+  &quot;population_size&quot;: 100,
+  &quot;max_generations&quot;: 200,
+  &quot;crossover_probability&quot;: 0.9,
+  &quot;mutation_probability&quot;: 0.1,
+  &quot;crossover_type&quot;: &quot;simulated_binary&quot;,
+  &quot;mutation_type&quot;: &quot;polynomial&quot;
+}
+</code></pre>
+<h4 id="moead参数">MOEA/D参数</h4>
+<pre><code class="language-json">{
+  &quot;algorithm&quot;: &quot;MOEA/D&quot;,
+  &quot;population_size&quot;: 100,
+  &quot;max_generations&quot;: 200,
+  &quot;neighborhood_size&quot;: 10,
+  &quot;weight_distribution&quot;: &quot;uniform&quot;,
+  &quot;decomposition_method&quot;: &quot;tchebycheff&quot;
+}
+</code></pre>
+<h2 id="技术实现">技术实现</h2>
+<h3 id="核心算法">核心算法</h3>
+<ul>
+<li><p><strong>帕累托支配关系</strong></p>
+<pre><code>x 支配 y 当且仅当：
+∀i: fᵢ(x) ≤ fᵢ(y) 且 ∃j: fⱼ(x) &lt; fⱼ(y)
+</code></pre>
+</li>
+<li><p><strong>拥挤度计算</strong></p>
+<pre><code>crowding_distance(x) = Σ (fᵢ(x+1) - fᵢ(x-1)) / (fᵢ_max - fᵢ_min)
+</code></pre>
+</li>
+<li><p><strong>Tchebycheff分解</strong></p>
+<pre><code>g(x|λ, z*) = max{λᵢ|fᵢ(x) - zᵢ*|}
+</code></pre>
+<p>其中：λ为权重向量，z*为理想点</p>
+</li>
+</ul>
+<h3 id="后端实现">后端实现</h3>
+<ul>
+<li><strong>核心类</strong>：<code>MultiObjectiveOptimizer</code>、<code>ParetoAnalyzer</code>、<code>NSGA2Solver</code></li>
+<li><strong>算法库</strong>：pymoo、DEAP、scipy.optimize</li>
+<li><strong>性能优化</strong>：并行计算、缓存机制、算法加速</li>
+</ul>
+<h3 id="前端实现">前端实现</h3>
+<ul>
+<li><strong>可视化组件</strong>：基于ECharts、Plotly、Three.js</li>
+<li><strong>交互设计</strong>：拖拽调整、实时反馈、方案对比</li>
+<li><strong>响应式布局</strong>：支持桌面端和移动端</li>
+</ul>
+<h2 id="性能指标">性能指标</h2>
+<h3 id="计算性能">计算性能</h3>
+<ul>
+<li>小规模问题（&lt; 10变量）：1-5秒</li>
+<li>中等规模问题（10-50变量）：5-30秒</li>
+<li>大规模问题（&gt; 50变量）：30秒-5分钟</li>
+</ul>
+<h3 id="优化质量">优化质量</h3>
+<ul>
+<li><strong>收敛性</strong>：算法收敛到帕累托前沿的能力</li>
+<li><strong>多样性</strong>：解集在帕累托前沿上的分布均匀性</li>
+<li><strong>覆盖率</strong>：找到的解集覆盖真实帕累托前沿的程度</li>
+</ul>
+<h2 id="应用场景">应用场景</h2>
+<h3 id="环境管理">环境管理</h3>
+<ul>
+<li><p><strong>环境监测网络优化</strong></p>
+<ul>
+<li>目标：最小化成本、最大化覆盖度、最小化风险</li>
+<li>约束：预算限制、覆盖率要求、可达性约束</li>
+</ul>
+</li>
+<li><p><strong>污染控制策略优化</strong></p>
+<ul>
+<li>目标：最小化治理成本、最大化环境效益、最小化社会影响</li>
+<li>约束：排放标准、技术限制、时间要求</li>
+</ul>
+</li>
+</ul>
+<h3 id="资源管理">资源管理</h3>
+<ul>
+<li><p><strong>水资源配置优化</strong></p>
+<ul>
+<li>目标：最大化供水保障、最小化供水成本、最小化生态影响</li>
+<li>约束：水资源总量、需求量、生态需水量</li>
+</ul>
+</li>
+<li><p><strong>能源系统规划</strong></p>
+<ul>
+<li>目标：最小化成本、最大化可靠性、最小化环境影响</li>
+<li>约束：能源需求、技术限制、政策约束</li>
+</ul>
+</li>
+</ul>
+<h3 id="城市规划">城市规划</h3>
+<ul>
+<li><p><strong>城市基础设施布局</strong></p>
+<ul>
+<li>目标：最大化服务覆盖、最小化建设成本、最小化交通影响</li>
+<li>约束：土地限制、资金约束、技术标准</li>
+</ul>
+</li>
+<li><p><strong>公共交通网络优化</strong></p>
+<ul>
+<li>目标：最大化服务效率、最小化运营成本、最大化乘客满意度</li>
+<li>约束：道路网络、车辆数量、预算限制</li>
+</ul>
+</li>
+</ul>
+<h2 id="常见问题">常见问题</h2>
+<h3 id="q1-如何选择合适的优化算法">Q1: 如何选择合适的优化算法？</h3>
+<p>A: 根据问题特征选择：</p>
+<ul>
+<li><strong>NSGA-II</strong>：适用于大多数多目标问题，性能稳定</li>
+<li><strong>MOEA/D</strong>：适用于目标较多的问题，分解效果好</li>
+<li><strong>SPEA2</strong>：适用于需要精确帕累托前沿的场景</li>
+</ul>
+<h3 id="q2-如何设置合理的权重参数">Q2: 如何设置合理的权重参数？</h3>
+<p>A: 采用以下方法：</p>
+<ul>
+<li>基于专家经验设定</li>
+<li>进行权重敏感性分析</li>
+<li>使用层次分析法（AHP）</li>
+<li>支持交互式权重调整</li>
+</ul>
+<h3 id="q3-如何处理约束冲突">Q3: 如何处理约束冲突？</h3>
+<p>A: 采用以下策略：</p>
+<ul>
+<li>设置约束优先级</li>
+<li>使用软约束和硬约束</li>
+<li>调整约束条件</li>
+<li>采用惩罚函数方法</li>
+</ul>
+<h3 id="q4-如何评估优化结果的质量">Q4: 如何评估优化结果的质量？</h3>
+<p>A: 通过以下指标评估：</p>
+<ul>
+<li>帕累托前沿的完整性</li>
+<li>解集的多样性和分布</li>
+<li>收敛性和稳定性</li>
+<li>实际可行性验证</li>
+</ul>
+<h3 id="q5-如何处理大规模优化问题">Q5: 如何处理大规模优化问题？</h3>
+<p>A: 采用以下方法：</p>
+<ul>
+<li>问题分解和分层优化</li>
+<li>使用启发式算法</li>
+<li>并行计算加速</li>
+<li>问题降维和简化</li>
+</ul>
+<h2 id="最佳实践">最佳实践</h2>
+<h3 id="1-多目标优化工作流">1. 多目标优化工作流</h3>
+<pre><code>问题分析 → 目标定义 → 约束设置 → 算法选择 → 参数配置 → 优化执行 → 结果分析 → 方案选择 → 实施验证
+</code></pre>
+<h3 id="2-目标设定原则">2. 目标设定原则</h3>
+<ul>
+<li><strong>明确性</strong>：目标要清晰明确，可量化</li>
+<li><strong>独立性</strong>：目标之间尽量独立</li>
+<li><strong>可测量性</strong>：目标函数可计算和测量</li>
+<li><strong>合理性</strong>：目标设定要符合实际情况</li>
+</ul>
+<h3 id="3-约束设置技巧">3. 约束设置技巧</h3>
+<ul>
+<li><strong>必要性</strong>：只设置必要的约束</li>
+<li><strong>可行性</strong>：确保约束条件可行</li>
+<li><strong>优先级</strong>：设置约束优先级</li>
+<li><strong>灵活性</strong>：考虑约束的弹性</li>
+</ul>
+<h2 id="更新日志">更新日志</h2>
+<h3 id="v120-2026-04-05">v1.2.0 (2026-04-05)</h3>
+<ul>
+<li>新增混合算法支持</li>
+<li>优化大规模问题求解性能</li>
+<li>增强交互式优化功能</li>
+</ul>
+<h3 id="v110-2026-03-15">v1.1.0 (2026-03-15)</h3>
+<ul>
+<li>新增SPEA2算法</li>
+<li>改进帕累托前沿分析</li>
+<li>增加敏感性分析功能</li>
+</ul>
+<h3 id="v100-2026-02-01">v1.0.0 (2026-02-01)</h3>
+<ul>
+<li>初始版本发布</li>
+<li>支持NSGA-II和MOEA/D算法</li>
+<li>实现基础多目标优化功能</li>
+</ul>
+<h2 id="技术支持">技术支持</h2>
+<p>如遇到问题或需要技术支持，请联系：</p>
+<ul>
+<li>邮箱：<a href="mailto:1447954419@qq.com">1447954419@qq.com</a></li>
+<li>GitHub：<a href="https://github.com/Kevin-Wu200/UDAKE">https://github.com/Kevin-Wu200/UDAKE</a></li>
+</ul>
+
+          </article>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>© 2026 UDAKE. All rights reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>

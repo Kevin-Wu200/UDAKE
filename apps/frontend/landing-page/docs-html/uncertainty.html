@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UDAKE - 不确定性分析模块</title>
+    <link rel="stylesheet" href="../css/variables.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/pages.css" />
+  </head>
+  <body class="page-detail docs-page">
+    <div class="page-shell">
+      <header class="site-header detail-header docs-header">
+        <a class="brand" href="../index.html#hero" aria-label="UDAKE Home">
+          <img src="../assets/logo.png" alt="UDAKE Logo" class="brand-logo" />
+          <div class="brand-copy">
+            <p class="brand-name">UDAKE</p>
+            <p class="brand-sub">智能不确定性驱动空间决策平台</p>
+          </div>
+        </a>
+        <a class="cta-btn cta-link docs-home-link" href="../index.html#features">返回首页</a>
+      </header>
+
+      <main class="detail-main docs-main">
+        <section class="detail-hero docs-hero">
+          <p class="detail-kicker">官网功能文档</p>
+          <h1>不确定性分析模块</h1>
+          <p class="detail-subtitle">来源路径：uncertainty.md</p>
+        </section>
+
+        <section class="docs-layout" aria-label="Documentation content">
+          <aside class="docs-sidebar">
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>文档导航</h2>
+              <ul class="docs-toc">
+                <li class="docs-toc-item"><a href="#模块简介">模块简介</a></li><li class="docs-toc-item"><a href="#核心功能">核心功能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-不确定性量化">1. 不确定性量化</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-不确定性可视化">2. 不确定性可视化</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-不确定性分析工具">3. 不确定性分析工具</a></li><li class="docs-toc-item"><a href="#使用方法">使用方法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#基本操作流程">基本操作流程</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#高级功能">高级功能</a></li><li class="docs-toc-item"><a href="#配置说明">配置说明</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#置信水平配置">置信水平配置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#不确定性分级">不确定性分级</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#风险区域识别">风险区域识别</a></li><li class="docs-toc-item"><a href="#技术实现">技术实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#不确定性计算方法">不确定性计算方法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#后端实现">后端实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#前端实现">前端实现</a></li><li class="docs-toc-item"><a href="#性能指标">性能指标</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#计算性能">计算性能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#内存使用">内存使用</a></li><li class="docs-toc-item"><a href="#应用场景">应用场景</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#环境监测">环境监测</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#地质勘探">地质勘探</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#农业规划">农业规划</a></li><li class="docs-toc-item"><a href="#常见问题">常见问题</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q1-不确定性分析结果的准确性如何保证">Q1: 不确定性分析结果的准确性如何保证？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q2-如何降低预测结果的不确定性">Q2: 如何降低预测结果的不确定性？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q3-不确定性分析对计算性能有多大影响">Q3: 不确定性分析对计算性能有多大影响？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q4-置信区间的含义是什么">Q4: 置信区间的含义是什么？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q5-如何解读不确定性分级结果">Q5: 如何解读不确定性分级结果？</a></li><li class="docs-toc-item"><a href="#最佳实践">最佳实践</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-不确定性分析工作流">1. 不确定性分析工作流</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-不确定性管理策略">2. 不确定性管理策略</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-不确定性沟通">3. 不确定性沟通</a></li><li class="docs-toc-item"><a href="#更新日志">更新日志</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v110-2026-03-20">v1.1.0 (2026-03-20)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v100-2026-02-01">v1.0.0 (2026-02-01)</a></li><li class="docs-toc-item"><a href="#技术支持">技术支持</a></li>
+              </ul>
+            </div>
+
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>快速操作</h2>
+              <div class="docs-actions">
+                <a class="cta-btn cta-link" href="../pages/uncertainty.html">返回功能页</a>
+                <a class="cta-btn cta-link cta-link-alt" href="../index.html#downloads">开始使用</a>
+              </div>
+            </div>
+          </aside>
+
+          <article class="detail-panel markdown-body">
+            <h1 id="不确定性分析模块">不确定性分析模块</h1>
+<h2 id="模块简介">模块简介</h2>
+<p>不确定性分析模块是UDAKE平台的核心特色功能，提供可量化的置信度评估能力。通过对插值结果的不确定性进行数学建模和可视化分析，帮助用户更好地理解预测结果的可靠性，为科学决策提供重要参考。</p>
+<h2 id="核心功能">核心功能</h2>
+<h3 id="1-不确定性量化">1. 不确定性量化</h3>
+<ul>
+<li><p><strong>方差估计</strong></p>
+<ul>
+<li>克里金方差计算</li>
+<li>预测误差标准差</li>
+<li>空间相关不确定性</li>
+</ul>
+</li>
+<li><p><strong>置信区间计算</strong></p>
+<ul>
+<li>95%置信区间</li>
+<li>可定制置信水平</li>
+<li>不确定性分级</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-不确定性可视化">2. 不确定性可视化</h3>
+<ul>
+<li><p><strong>不确定性分布图</strong></p>
+<ul>
+<li>热力图展示</li>
+<li>等值线图</li>
+<li>3D地形叠加</li>
+</ul>
+</li>
+<li><p><strong>置信区间可视化</strong></p>
+<ul>
+<li>区间范围图</li>
+<li>概率分布图</li>
+<li>不确定性等值线</li>
+</ul>
+</li>
+<li><p><strong>风险区域识别</strong></p>
+<ul>
+<li>高风险区域自动识别</li>
+<li>阈值可配置</li>
+<li>风险等级划分</li>
+</ul>
+</li>
+</ul>
+<h3 id="3-不确定性分析工具">3. 不确定性分析工具</h3>
+<ul>
+<li><p><strong>不确定性统计</strong></p>
+<ul>
+<li>全局不确定性指标</li>
+<li>局部不确定性分析</li>
+<li>不确定性空间分布特征</li>
+</ul>
+</li>
+<li><p><strong>不确定性传播</strong></p>
+<ul>
+<li>参数不确定性传播</li>
+<li>测量误差影响分析</li>
+<li>模型不确定性评估</li>
+</ul>
+</li>
+<li><p><strong>不确定性优化</strong></p>
+<ul>
+<li>采样点优化建议</li>
+<li>不确定性降低策略</li>
+<li>成本效益分析</li>
+</ul>
+</li>
+</ul>
+<h2 id="使用方法">使用方法</h2>
+<h3 id="基本操作流程">基本操作流程</h3>
+<ol>
+<li><p><strong>完成插值计算</strong></p>
+<ul>
+<li>首先在空间插值模块完成插值</li>
+<li>确保插值结果有效</li>
+<li>自动触发不确定性分析</li>
+</ul>
+</li>
+<li><p><strong>不确定性参数设置</strong></p>
+<ul>
+<li>选择置信水平（默认95%）</li>
+<li>设置不确定性分级阈值</li>
+<li>配置风险区域识别参数</li>
+</ul>
+</li>
+<li><p><strong>执行不确定性分析</strong></p>
+<ul>
+<li>点击&quot;分析不确定性&quot;按钮</li>
+<li>系统自动计算相关指标</li>
+<li>生成不确定性可视化结果</li>
+</ul>
+</li>
+<li><p><strong>结果解读与应用</strong></p>
+<ul>
+<li>查看不确定性分布图</li>
+<li>识别高风险区域</li>
+<li>制定相应的决策策略</li>
+</ul>
+</li>
+</ol>
+<h3 id="高级功能">高级功能</h3>
+<ul>
+<li><p><strong>不确定性对比分析</strong></p>
+<ul>
+<li>多种插值方法不确定性对比</li>
+<li>参数敏感性对不确定性的影响</li>
+<li>不确定性时间序列分析</li>
+</ul>
+</li>
+<li><p><strong>不确定性降低策略</strong></p>
+<ul>
+<li>新增采样点位置优化</li>
+<li>采样密度配置建议</li>
+<li>不确定性-成本权衡分析</li>
+</ul>
+</li>
+<li><p><strong>不确定性报告生成</strong></p>
+<ul>
+<li>自动生成分析报告</li>
+<li>包含关键指标和图表</li>
+<li>支持PDF和Word格式导出</li>
+</ul>
+</li>
+</ul>
+<h2 id="配置说明">配置说明</h2>
+<h3 id="置信水平配置">置信水平配置</h3>
+<h4 id="常用置信水平">常用置信水平</h4>
+<ul>
+<li><strong>90%置信水平</strong>：适用于一般性决策</li>
+<li><strong>95%置信水平</strong>：推荐用于科学研究和工程应用</li>
+<li><strong>99%置信水平</strong>：适用于高风险决策场景</li>
+</ul>
+<h4 id="配置建议">配置建议</h4>
+<pre><code>confidence_level: 0.95
+uncertainty_threshold: 0.3
+risk_level_definition:
+  low: 0.0-0.2
+  medium: 0.2-0.4
+  high: 0.4-1.0
+</code></pre>
+<h3 id="不确定性分级">不确定性分级</h3>
+<h4 id="分级标准">分级标准</h4>
+<ul>
+<li><p><strong>低不确定性</strong>：标准差 &lt; 0.2</p>
+<ul>
+<li>预测结果高度可信</li>
+<li>可直接用于决策</li>
+</ul>
+</li>
+<li><p><strong>中等不确定性</strong>：0.2 ≤ 标准差 &lt; 0.4</p>
+<ul>
+<li>预测结果基本可信</li>
+<li>建议结合其他信息使用</li>
+</ul>
+</li>
+<li><p><strong>高不确定性</strong>：标准差 ≥ 0.4</p>
+<ul>
+<li>预测结果可信度较低</li>
+<li>需要增加采样点验证</li>
+</ul>
+</li>
+</ul>
+<h3 id="风险区域识别">风险区域识别</h3>
+<h4 id="识别参数">识别参数</h4>
+<pre><code class="language-json">{
+  &quot;risk_threshold&quot;: 0.4,
+  &quot;min_area_size&quot;: 1000,
+  &quot;contour_smoothness&quot;: 1.0
+}
+</code></pre>
+<h4 id="配置建议-2">配置建议</h4>
+<ul>
+<li><strong>风险阈值</strong>：根据应用场景调整，一般设置为0.4</li>
+<li><strong>最小区域面积</strong>：避免识别过小的区域，建议1000平方米以上</li>
+<li><strong>等值线平滑度</strong>：影响边界识别的精确度，一般设置为1.0</li>
+</ul>
+<h2 id="技术实现">技术实现</h2>
+<h3 id="不确定性计算方法">不确定性计算方法</h3>
+<ul>
+<li><p><strong>克里金方差</strong></p>
+<pre><code>σ²(x) = C(0) - Σ λᵢ C(x, xᵢ)
+</code></pre>
+<p>其中：σ²(x)为位置x的预测方差，C为协方差函数，λ为克里金权重</p>
+</li>
+<li><p><strong>置信区间</strong></p>
+<pre><code>CI(x) = ŷ(x) ± z_α/2 × σ(x)
+</code></pre>
+<p>其中：ŷ(x)为预测值，z_α/2为标准正态分布的分位数</p>
+</li>
+<li><p><strong>不确定性校准</strong></p>
+<ul>
+<li>95%覆盖率检查</li>
+<li>校准分数计算</li>
+<li>系统性偏差校正</li>
+</ul>
+</li>
+</ul>
+<h3 id="后端实现">后端实现</h3>
+<ul>
+<li><strong>核心类</strong>：<code>UncertaintyAnalyzer</code>、<code>VarianceCalculator</code></li>
+<li><strong>算法优化</strong>：方差矩阵快速计算、不确定性传播优化</li>
+<li><strong>性能提升</strong>：支持并行计算、内存优化</li>
+</ul>
+<h3 id="前端实现">前端实现</h3>
+<ul>
+<li><strong>可视化组件</strong>：基于Leaflet、ECharts、Three.js</li>
+<li><strong>交互设计</strong>：不确定性实时更新、区域高亮显示</li>
+<li><strong>响应式布局</strong>：支持桌面端和移动端</li>
+</ul>
+<h2 id="性能指标">性能指标</h2>
+<h3 id="计算性能">计算性能</h3>
+<ul>
+<li>小数据集（&lt; 100点）：与插值同步完成</li>
+<li>中等数据集（100-500点）：额外1-5秒</li>
+<li>大数据集（&gt; 500点）：额外5-15秒</li>
+</ul>
+<h3 id="内存使用">内存使用</h3>
+<ul>
+<li>基础内存占用：&lt; 50MB</li>
+<li>大数据集处理：根据网格大小动态调整</li>
+</ul>
+<h2 id="应用场景">应用场景</h2>
+<h3 id="环境监测">环境监测</h3>
+<ul>
+<li><p><strong>空气质量监测</strong></p>
+<ul>
+<li>识别高不确定性区域</li>
+<li>优化监测站点布局</li>
+<li>提高预警准确性</li>
+</ul>
+</li>
+<li><p><strong>水质监测</strong></p>
+<ul>
+<li>评估水质预测可靠性</li>
+<li>识别需要重点监测区域</li>
+<li>制定采样策略</li>
+</ul>
+</li>
+</ul>
+<h3 id="地质勘探">地质勘探</h3>
+<ul>
+<li><p><strong>矿产资源评估</strong></p>
+<ul>
+<li>量化资源储量不确定性</li>
+<li>优化勘探钻孔布局</li>
+<li>降低勘探风险</li>
+</ul>
+</li>
+<li><p><strong>地质灾害评估</strong></p>
+<ul>
+<li>评估灾害预测不确定性</li>
+<li>识别高风险区域</li>
+<li>制定防灾措施</li>
+</ul>
+</li>
+</ul>
+<h3 id="农业规划">农业规划</h3>
+<ul>
+<li><p><strong>土壤养分分析</strong></p>
+<ul>
+<li>评估养分分布预测可靠性</li>
+<li>优化施肥方案</li>
+<li>提高资源利用效率</li>
+</ul>
+</li>
+<li><p><strong>产量预测</strong></p>
+<ul>
+<li>量化产量预测不确定性</li>
+<li>制定风险管理策略</li>
+<li>优化种植布局</li>
+</ul>
+</li>
+</ul>
+<h2 id="常见问题">常见问题</h2>
+<h3 id="q1-不确定性分析结果的准确性如何保证">Q1: 不确定性分析结果的准确性如何保证？</h3>
+<p>A: 通过以下方式保证：</p>
+<ul>
+<li>使用数学严谨的统计方法</li>
+<li>进行交叉验证校准</li>
+<li>与实际观测数据对比验证</li>
+<li>定期更新不确定性模型</li>
+</ul>
+<h3 id="q2-如何降低预测结果的不确定性">Q2: 如何降低预测结果的不确定性？</h3>
+<p>A: 可以采用以下方法：</p>
+<ul>
+<li>在高不确定性区域增加采样点</li>
+<li>提高采样数据质量</li>
+<li>优化插值参数</li>
+<li>使用更合适的插值方法</li>
+</ul>
+<h3 id="q3-不确定性分析对计算性能有多大影响">Q3: 不确定性分析对计算性能有多大影响？</h3>
+<p>A: 影响程度取决于：</p>
+<ul>
+<li>数据集大小：影响较小，通常在10-20%以内</li>
+<li>网格分辨率：分辨率越高，计算时间越长</li>
+<li>分析深度：基础分析影响小，深度分析影响较大</li>
+</ul>
+<h3 id="q4-置信区间的含义是什么">Q4: 置信区间的含义是什么？</h3>
+<p>A: 置信区间的含义：</p>
+<ul>
+<li>95%置信区间表示有95%的概率真实值落在该区间内</li>
+<li>区间宽度反映不确定性大小</li>
+<li>区间位置反映预测值</li>
+</ul>
+<h3 id="q5-如何解读不确定性分级结果">Q5: 如何解读不确定性分级结果？</h3>
+<p>A: 分级结果解读：</p>
+<ul>
+<li><strong>低不确定性</strong>：预测结果可靠，可直接用于决策</li>
+<li><strong>中等不确定性</strong>：预测结果基本可靠，建议谨慎使用</li>
+<li><strong>高不确定性</strong>：预测结果可靠性较低，建议增加数据验证</li>
+</ul>
+<h2 id="最佳实践">最佳实践</h2>
+<h3 id="1-不确定性分析工作流">1. 不确定性分析工作流</h3>
+<pre><code>数据质量检查 → 插值计算 → 不确定性分析 → 结果解读 → 决策制定 → 反馈优化
+</code></pre>
+<h3 id="2-不确定性管理策略">2. 不确定性管理策略</h3>
+<ul>
+<li><strong>预防策略</strong>：在设计阶段考虑不确定性</li>
+<li><strong>监测策略</strong>：实时跟踪不确定性变化</li>
+<li><strong>应对策略</strong>：制定不确定性应对预案</li>
+<li><strong>优化策略</strong>：持续降低不确定性</li>
+</ul>
+<h3 id="3-不确定性沟通">3. 不确定性沟通</h3>
+<ul>
+<li>明确报告不确定性水平</li>
+<li>使用可视化工具展示不确定性</li>
+<li>提供不确定性解释和建议</li>
+<li>建立不确定性反馈机制</li>
+</ul>
+<h2 id="更新日志">更新日志</h2>
+<h3 id="v110-2026-03-20">v1.1.0 (2026-03-20)</h3>
+<ul>
+<li>新增不确定性对比分析功能</li>
+<li>优化不确定性计算性能</li>
+<li>增强风险区域识别算法</li>
+</ul>
+<h3 id="v100-2026-02-01">v1.0.0 (2026-02-01)</h3>
+<ul>
+<li>初始版本发布</li>
+<li>支持基础不确定性分析</li>
+<li>实现不确定性可视化功能</li>
+</ul>
+<h2 id="技术支持">技术支持</h2>
+<p>如遇到问题或需要技术支持，请联系：</p>
+<ul>
+<li>邮箱：<a href="mailto:1447954419@qq.com">1447954419@qq.com</a></li>
+<li>GitHub：<a href="https://github.com/Kevin-Wu200/UDAKE">https://github.com/Kevin-Wu200/UDAKE</a></li>
+</ul>
+
+          </article>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>© 2026 UDAKE. All rights reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>

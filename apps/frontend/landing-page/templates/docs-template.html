@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UDAKE - {{pageTitle}}</title>
+    <link rel="stylesheet" href="{{rootPrefix}}css/variables.css" />
+    <link rel="stylesheet" href="{{rootPrefix}}css/styles.css" />
+    <link rel="stylesheet" href="{{rootPrefix}}css/pages.css" />
+  </head>
+  <body class="page-detail docs-page">
+    <div class="page-shell">
+      <header class="site-header detail-header docs-header">
+        <a class="brand" href="{{rootPrefix}}index.html#hero" aria-label="UDAKE Home">
+          <img src="{{rootPrefix}}assets/logo.png" alt="UDAKE Logo" class="brand-logo" />
+          <div class="brand-copy">
+            <p class="brand-name">UDAKE</p>
+            <p class="brand-sub">智能不确定性驱动空间决策平台</p>
+          </div>
+        </a>
+        <a class="cta-btn cta-link docs-home-link" href="{{rootPrefix}}index.html#features">返回首页</a>
+      </header>
+
+      <main class="detail-main docs-main">
+        <section class="detail-hero docs-hero">
+          <p class="detail-kicker">官网功能文档</p>
+          <h1>{{pageTitle}}</h1>
+          <p class="detail-subtitle">来源路径：{{relativeDocLabel}}</p>
+        </section>
+
+        <section class="docs-layout" aria-label="Documentation content">
+          <aside class="docs-sidebar">
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>文档导航</h2>
+              <ul class="docs-toc">
+                {{toc}}
+              </ul>
+            </div>
+
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>快速操作</h2>
+              <div class="docs-actions">
+                <a class="cta-btn cta-link" href="{{featureBackHref}}">返回功能页</a>
+                <a class="cta-btn cta-link cta-link-alt" href="{{rootPrefix}}index.html#downloads">开始使用</a>
+              </div>
+            </div>
+          </aside>
+
+          <article class="detail-panel markdown-body">
+            {{content}}
+          </article>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>© 2026 UDAKE. All rights reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>

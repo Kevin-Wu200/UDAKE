@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UDAKE - 空间插值模块</title>
+    <link rel="stylesheet" href="../css/variables.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/pages.css" />
+  </head>
+  <body class="page-detail docs-page">
+    <div class="page-shell">
+      <header class="site-header detail-header docs-header">
+        <a class="brand" href="../index.html#hero" aria-label="UDAKE Home">
+          <img src="../assets/logo.png" alt="UDAKE Logo" class="brand-logo" />
+          <div class="brand-copy">
+            <p class="brand-name">UDAKE</p>
+            <p class="brand-sub">智能不确定性驱动空间决策平台</p>
+          </div>
+        </a>
+        <a class="cta-btn cta-link docs-home-link" href="../index.html#features">返回首页</a>
+      </header>
+
+      <main class="detail-main docs-main">
+        <section class="detail-hero docs-hero">
+          <p class="detail-kicker">官网功能文档</p>
+          <h1>空间插值模块</h1>
+          <p class="detail-subtitle">来源路径：interpolation.md</p>
+        </section>
+
+        <section class="docs-layout" aria-label="Documentation content">
+          <aside class="docs-sidebar">
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>文档导航</h2>
+              <ul class="docs-toc">
+                <li class="docs-toc-item"><a href="#模块简介">模块简介</a></li><li class="docs-toc-item"><a href="#核心功能">核心功能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-多种插值算法支持">1. 多种插值算法支持</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-变异函数建模">2. 变异函数建模</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-参数可视化">3. 参数可视化</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#4-结果可视化">4. 结果可视化</a></li><li class="docs-toc-item"><a href="#使用方法">使用方法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#基本操作流程">基本操作流程</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#高级功能">高级功能</a></li><li class="docs-toc-item"><a href="#配置说明">配置说明</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#推荐参数配置">推荐参数配置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#参数调优建议">参数调优建议</a></li><li class="docs-toc-item"><a href="#技术实现">技术实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#后端实现">后端实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#前端实现">前端实现</a></li><li class="docs-toc-item"><a href="#性能指标">性能指标</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#计算性能">计算性能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#内存使用">内存使用</a></li><li class="docs-toc-item"><a href="#常见问题">常见问题</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q1-插值结果出现明显的边界效应怎么办">Q1: 插值结果出现明显的边界效应怎么办？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q2-交叉验证误差过大如何优化">Q2: 交叉验证误差过大如何优化？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q3-大数据集处理速度慢如何提升">Q3: 大数据集处理速度慢如何提升？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q4-如何选择合适的变异函数模型">Q4: 如何选择合适的变异函数模型？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q5-插值结果的可信度如何评估">Q5: 插值结果的可信度如何评估？</a></li><li class="docs-toc-item"><a href="#更新日志">更新日志</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v120-2026-04-01">v1.2.0 (2026-04-01)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v110-2026-03-15">v1.1.0 (2026-03-15)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v100-2026-02-01">v1.0.0 (2026-02-01)</a></li><li class="docs-toc-item"><a href="#技术支持">技术支持</a></li>
+              </ul>
+            </div>
+
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>快速操作</h2>
+              <div class="docs-actions">
+                <a class="cta-btn cta-link" href="../pages/interpolation.html">返回功能页</a>
+                <a class="cta-btn cta-link cta-link-alt" href="../index.html#downloads">开始使用</a>
+              </div>
+            </div>
+          </aside>
+
+          <article class="detail-panel markdown-body">
+            <h1 id="空间插值模块">空间插值模块</h1>
+<h2 id="模块简介">模块简介</h2>
+<p>空间插值模块是UDAKE平台的核心功能之一，提供高精度的空间面构建能力。通过多种插值算法，能够将离散的采样点数据转换为连续的空间分布图，广泛应用于环境监测、地质勘探、农业规划等领域。</p>
+<h2 id="核心功能">核心功能</h2>
+<h3 id="1-多种插值算法支持">1. 多种插值算法支持</h3>
+<ul>
+<li><p><strong>克里金插值（Kriging）</strong></p>
+<ul>
+<li>普通克里金（Ordinary Kriging）</li>
+<li>通用克里金（Universal Kriging）</li>
+<li>块克里金（Block Kriging）</li>
+</ul>
+</li>
+<li><p><strong>确定性插值方法</strong></p>
+<ul>
+<li>反距离加权（IDW）</li>
+<li>径向基函数（RBF）</li>
+<li>最近邻插值（Nearest Neighbor）</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-变异函数建模">2. 变异函数建模</h3>
+<ul>
+<li><p><strong>模型类型</strong></p>
+<ul>
+<li>球状模型（Spherical）</li>
+<li>指数模型（Exponential）</li>
+<li>高斯模型（Gaussian）</li>
+<li>线性模型（Linear）</li>
+</ul>
+</li>
+<li><p><strong>参数自动估计</strong></p>
+<ul>
+<li>块金值（Nugget）</li>
+<li>基台值（Sill）</li>
+<li>变程（Range）</li>
+</ul>
+</li>
+</ul>
+<h3 id="3-参数可视化">3. 参数可视化</h3>
+<ul>
+<li>参数关系图（nugget-sill、range-spatial、grid-performance）</li>
+<li>参数影响预览</li>
+<li>实时变异函数拟合</li>
+<li>拟合质量评估（R²、RMSE）</li>
+</ul>
+<h3 id="4-结果可视化">4. 结果可视化</h3>
+<ul>
+<li>等值线图</li>
+<li>热力图</li>
+<li>3D地形图</li>
+<li>不确定性可视化</li>
+</ul>
+<h2 id="使用方法">使用方法</h2>
+<h3 id="基本操作流程">基本操作流程</h3>
+<ol>
+<li><p><strong>数据导入</strong></p>
+<ul>
+<li>支持GeoJSON、CSV、Shapefile格式</li>
+<li>自动坐标系检测与转换</li>
+<li>数据质量检查与预处理</li>
+</ul>
+</li>
+<li><p><strong>参数配置</strong></p>
+<ul>
+<li>选择插值方法和变异函数模型</li>
+<li>设置网格分辨率和插值参数</li>
+<li>使用参数可视化工具优化配置</li>
+</ul>
+</li>
+<li><p><strong>执行插值</strong></p>
+<ul>
+<li>点击&quot;开始插值&quot;按钮</li>
+<li>实时显示计算进度</li>
+<li>预览初步结果</li>
+</ul>
+</li>
+<li><p><strong>结果分析</strong></p>
+<ul>
+<li>查看插值结果图</li>
+<li>分析误差分布</li>
+<li>导出结果数据</li>
+</ul>
+</li>
+</ol>
+<h3 id="高级功能">高级功能</h3>
+<ul>
+<li><p><strong>交叉验证</strong></p>
+<ul>
+<li>留一法验证</li>
+<li>k折交叉验证</li>
+<li>误差统计指标</li>
+</ul>
+</li>
+<li><p><strong>参数敏感性分析</strong></p>
+<ul>
+<li>单参数敏感性测试</li>
+<li>多参数组合优化</li>
+<li>结果对比分析</li>
+</ul>
+</li>
+</ul>
+<h2 id="配置说明">配置说明</h2>
+<h3 id="推荐参数配置">推荐参数配置</h3>
+<h4 id="小样本快速试算-30点">小样本快速试算（&lt; 30点）</h4>
+<pre><code>grid-resolution: 80
+nlags: 8
+nugget: 0.15
+sill: 1.0
+range: 20
+method: ordinary
+variogram: spherical
+</code></pre>
+<h4 id="常规平衡场景30150点">常规平衡场景（30~150点）</h4>
+<pre><code>grid-resolution: 120
+nlags: 12
+nugget: 0.10
+sill: 1.0
+range: 30
+method: ordinary
+variogram: spherical
+</code></pre>
+<h4 id="连续地形精细建模100400点">连续地形精细建模（100~400点）</h4>
+<pre><code>grid-resolution: 180
+nlags: 16
+nugget: 0.08
+sill: 1.2
+range: 42
+method: universal
+variogram: gaussian
+</code></pre>
+<h4 id="大数据性能优先-400点">大数据性能优先（&gt; 400点）</h4>
+<pre><code>grid-resolution: 90
+nlags: 10
+nugget: 0.20
+sill: 1.2
+range: 35
+method: block
+variogram: exponential
+</code></pre>
+<h3 id="参数调优建议">参数调优建议</h3>
+<ol>
+<li><p><strong>nugget参数</strong></p>
+<ul>
+<li>代表短尺度随机性或测量噪声</li>
+<li>过大会导致局部跳变</li>
+<li>建议范围：0.05-0.25</li>
+</ul>
+</li>
+<li><p><strong>sill参数</strong></p>
+<ul>
+<li>代表总体方差上限</li>
+<li>决定半方差平台高度</li>
+<li>建议范围：0.8-1.5</li>
+</ul>
+</li>
+<li><p><strong>range参数</strong></p>
+<ul>
+<li>代表空间相关影响距离</li>
+<li>过小导致图面碎片化，过大可能过度平滑</li>
+<li>建议为空间对角线长度的15%-40%</li>
+</ul>
+</li>
+<li><p><strong>grid-resolution</strong></p>
+<ul>
+<li>影响输出网格的精细程度</li>
+<li>过高会增加计算时间</li>
+<li>建议根据数据密度和精度要求调整</li>
+</ul>
+</li>
+</ol>
+<h2 id="技术实现">技术实现</h2>
+<h3 id="后端实现">后端实现</h3>
+<ul>
+<li><strong>核心类</strong>：<code>KrigingEngine</code>、<code>VariogramModeler</code></li>
+<li><strong>算法优化</strong>：空间分块计算、矩阵运算优化</li>
+<li><strong>性能提升</strong>：支持并行计算、GPU加速</li>
+</ul>
+<h3 id="前端实现">前端实现</h3>
+<ul>
+<li><strong>可视化组件</strong>：基于Leaflet、ECharts、D3.js</li>
+<li><strong>交互设计</strong>：实时参数调整、结果即时反馈</li>
+<li><strong>响应式布局</strong>：支持桌面端和移动端</li>
+</ul>
+<h2 id="性能指标">性能指标</h2>
+<h3 id="计算性能">计算性能</h3>
+<ul>
+<li>小数据集（&lt; 100点）：秒级响应</li>
+<li>中等数据集（100-500点）：10-30秒</li>
+<li>大数据集（&gt; 500点）：支持分块计算</li>
+</ul>
+<h3 id="内存使用">内存使用</h3>
+<ul>
+<li>基础内存占用：&lt; 100MB</li>
+<li>大数据集处理：根据网格大小动态调整</li>
+</ul>
+<h2 id="常见问题">常见问题</h2>
+<h3 id="q1-插值结果出现明显的边界效应怎么办">Q1: 插值结果出现明显的边界效应怎么办？</h3>
+<p>A: 可以尝试以下方法：</p>
+<ul>
+<li>增加边界区域的采样点密度</li>
+<li>使用边界缓冲区技术</li>
+<li>调整range参数，适当增大空间相关范围</li>
+</ul>
+<h3 id="q2-交叉验证误差过大如何优化">Q2: 交叉验证误差过大如何优化？</h3>
+<p>A: 建议按以下步骤检查：</p>
+<ul>
+<li>检查数据质量，剔除异常值</li>
+<li>尝试不同的变异函数模型</li>
+<li>调整nugget和sill参数</li>
+<li>考虑使用更复杂的插值方法</li>
+</ul>
+<h3 id="q3-大数据集处理速度慢如何提升">Q3: 大数据集处理速度慢如何提升？</h3>
+<p>A: 可以采用以下优化策略：</p>
+<ul>
+<li>降低grid-resolution</li>
+<li>使用块克里金方法</li>
+<li>启用空间分块计算</li>
+<li>考虑使用GPU加速</li>
+</ul>
+<h3 id="q4-如何选择合适的变异函数模型">Q4: 如何选择合适的变异函数模型？</h3>
+<p>A: 根据数据特征选择：</p>
+<ul>
+<li>球状模型：大多数情况下的默认选择</li>
+<li>指数模型：适合局地突变数据</li>
+<li>高斯模型：适合连续平滑变化的数据</li>
+<li>线性模型：快速探索用，不建议作为最终结果</li>
+</ul>
+<h3 id="q5-插值结果的可信度如何评估">Q5: 插值结果的可信度如何评估？</h3>
+<p>A: 通过以下指标评估：</p>
+<ul>
+<li>交叉验证误差（RMSE、MAE）</li>
+<li>变异函数拟合质量（R²）</li>
+<li>不确定性分布图</li>
+<li>与已知验证点对比</li>
+</ul>
+<h2 id="更新日志">更新日志</h2>
+<h3 id="v120-2026-04-01">v1.2.0 (2026-04-01)</h3>
+<ul>
+<li>新增参数可视化功能</li>
+<li>优化大数据集处理性能</li>
+<li>增加GPU加速支持</li>
+</ul>
+<h3 id="v110-2026-03-15">v1.1.0 (2026-03-15)</h3>
+<ul>
+<li>新增多目标优化支持</li>
+<li>改进变异函数拟合算法</li>
+<li>增强结果导出功能</li>
+</ul>
+<h3 id="v100-2026-02-01">v1.0.0 (2026-02-01)</h3>
+<ul>
+<li>初始版本发布</li>
+<li>支持基础插值算法</li>
+<li>实现核心可视化功能</li>
+</ul>
+<h2 id="技术支持">技术支持</h2>
+<p>如遇到问题或需要技术支持，请联系：</p>
+<ul>
+<li>邮箱：<a href="mailto:1447954419@qq.com">1447954419@qq.com</a></li>
+<li>GitHub：<a href="https://github.com/Kevin-Wu200/UDAKE">https://github.com/Kevin-Wu200/UDAKE</a></li>
+</ul>
+
+          </article>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>© 2026 UDAKE. All rights reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>

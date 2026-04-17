@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UDAKE - 深度学习模块</title>
+    <link rel="stylesheet" href="../css/variables.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/pages.css" />
+  </head>
+  <body class="page-detail docs-page">
+    <div class="page-shell">
+      <header class="site-header detail-header docs-header">
+        <a class="brand" href="../index.html#hero" aria-label="UDAKE Home">
+          <img src="../assets/logo.png" alt="UDAKE Logo" class="brand-logo" />
+          <div class="brand-copy">
+            <p class="brand-name">UDAKE</p>
+            <p class="brand-sub">智能不确定性驱动空间决策平台</p>
+          </div>
+        </a>
+        <a class="cta-btn cta-link docs-home-link" href="../index.html#features">返回首页</a>
+      </header>
+
+      <main class="detail-main docs-main">
+        <section class="detail-hero docs-hero">
+          <p class="detail-kicker">官网功能文档</p>
+          <h1>深度学习模块</h1>
+          <p class="detail-subtitle">来源路径：deepLearning.md</p>
+        </section>
+
+        <section class="docs-layout" aria-label="Documentation content">
+          <aside class="docs-sidebar">
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>文档导航</h2>
+              <ul class="docs-toc">
+                <li class="docs-toc-item"><a href="#模块简介">模块简介</a></li><li class="docs-toc-item"><a href="#核心功能">核心功能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-神经网络模型">1. 神经网络模型</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-模型训练">2. 模型训练</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-模型评估">3. 模型评估</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#4-模型部署">4. 模型部署</a></li><li class="docs-toc-item"><a href="#使用方法">使用方法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#基本操作流程">基本操作流程</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#高级功能">高级功能</a></li><li class="docs-toc-item"><a href="#配置说明">配置说明</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#模型配置">模型配置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#训练配置">训练配置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#gpu配置">GPU配置</a></li><li class="docs-toc-item"><a href="#技术实现">技术实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#核心算法">核心算法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#后端实现">后端实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#前端实现">前端实现</a></li><li class="docs-toc-item"><a href="#性能指标">性能指标</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#训练性能">训练性能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#推理性能">推理性能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#模型精度">模型精度</a></li><li class="docs-toc-item"><a href="#应用场景">应用场景</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#环境科学">环境科学</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#地质勘探">地质勘探</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#农业应用">农业应用</a></li><li class="docs-toc-item"><a href="#常见问题">常见问题</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q1-如何选择合适的模型">Q1: 如何选择合适的模型？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q2-如何处理训练数据不足">Q2: 如何处理训练数据不足？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q3-如何解决过拟合问题">Q3: 如何解决过拟合问题？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q4-gpu加速效果如何">Q4: GPU加速效果如何？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q5-如何监控训练过程">Q5: 如何监控训练过程？</a></li><li class="docs-toc-item"><a href="#最佳实践">最佳实践</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-深度学习工作流">1. 深度学习工作流</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-数据准备原则">2. 数据准备原则</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-模型设计原则">3. 模型设计原则</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#4-训练策略">4. 训练策略</a></li><li class="docs-toc-item"><a href="#更新日志">更新日志</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v130-2026-04-08">v1.3.0 (2026-04-08)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v120-2026-03-25">v1.2.0 (2026-03-25)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v110-2026-03-10">v1.1.0 (2026-03-10)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v100-2026-02-01">v1.0.0 (2026-02-01)</a></li><li class="docs-toc-item"><a href="#技术支持">技术支持</a></li>
+              </ul>
+            </div>
+
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>快速操作</h2>
+              <div class="docs-actions">
+                <a class="cta-btn cta-link" href="../pages/deepLearning.html">返回功能页</a>
+                <a class="cta-btn cta-link cta-link-alt" href="../index.html#downloads">开始使用</a>
+              </div>
+            </div>
+          </aside>
+
+          <article class="detail-panel markdown-body">
+            <h1 id="深度学习模块">深度学习模块</h1>
+<h2 id="模块简介">模块简介</h2>
+<p>深度学习模块是UDAKE平台的高级智能分析功能，通过神经网络技术辅助空间插值，能够自动学习复杂的数据模式和空间关系。该模块支持多种深度学习模型，提供GPU加速计算，为处理非线性、高维度的空间数据提供强大的分析能力。</p>
+<h2 id="核心功能">核心功能</h2>
+<h3 id="1-神经网络模型">1. 神经网络模型</h3>
+<ul>
+<li><p><strong>模型类型</strong></p>
+<ul>
+<li>多层感知机（MLP）</li>
+<li>卷积神经网络（CNN）</li>
+<li>图神经网络（GNN）</li>
+<li>循环神经网络（RNN/LSTM）</li>
+</ul>
+</li>
+<li><p><strong>模型架构</strong></p>
+<ul>
+<li>自定义网络结构</li>
+<li>预训练模型微调</li>
+<li>模型自动搜索</li>
+<li>迁移学习支持</li>
+</ul>
+</li>
+<li><p><strong>训练策略</strong></p>
+<ul>
+<li>监督学习</li>
+<li>半监督学习</li>
+<li>自监督学习</li>
+<li>迁移学习</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-模型训练">2. 模型训练</h3>
+<ul>
+<li><p><strong>训练流程</strong></p>
+<ul>
+<li>数据预处理和增强</li>
+<li>模型构建和初始化</li>
+<li>损失函数和优化器选择</li>
+<li>训练过程监控</li>
+</ul>
+</li>
+<li><p><strong>超参数优化</strong></p>
+<ul>
+<li>学习率调整</li>
+<li>批次大小优化</li>
+<li>正则化参数配置</li>
+<li>网络结构搜索</li>
+</ul>
+</li>
+<li><p><strong>训练加速</strong></p>
+<ul>
+<li>GPU加速计算</li>
+<li>混合精度训练</li>
+<li>分布式训练</li>
+<li>梯度累积</li>
+</ul>
+</li>
+</ul>
+<h3 id="3-模型评估">3. 模型评估</h3>
+<ul>
+<li><p><strong>性能指标</strong></p>
+<ul>
+<li>预测精度（RMSE、MAE、R²）</li>
+<li>训练和验证损失</li>
+<li>模型收敛性</li>
+<li>泛化能力</li>
+</ul>
+</li>
+<li><p><strong>模型对比</strong></p>
+<ul>
+<li>多模型并行训练</li>
+<li>性能指标对比</li>
+<li>可视化对比分析</li>
+<li>最优模型选择</li>
+</ul>
+</li>
+<li><p><strong>模型解释</strong></p>
+<ul>
+<li>特征重要性分析</li>
+<li>注意力机制可视化</li>
+<li>激活图分析</li>
+<li>SHAP值计算</li>
+</ul>
+</li>
+</ul>
+<h3 id="4-模型部署">4. 模型部署</h3>
+<ul>
+<li><p><strong>模型导出</strong></p>
+<ul>
+<li>模型序列化</li>
+<li>ONNX格式导出</li>
+<li>模型压缩优化</li>
+<li>推理引擎集成</li>
+</ul>
+</li>
+<li><p><strong>在线推理</strong></p>
+<ul>
+<li>实时预测服务</li>
+<li>批量预测接口</li>
+<li>模型版本管理</li>
+<li>A/B测试支持</li>
+</ul>
+</li>
+<li><p><strong>性能优化</strong></p>
+<ul>
+<li>推理加速</li>
+<li>内存优化</li>
+<li>并发处理</li>
+<li>缓存机制</li>
+</ul>
+</li>
+</ul>
+<h2 id="使用方法">使用方法</h2>
+<h3 id="基本操作流程">基本操作流程</h3>
+<ol>
+<li><p><strong>数据准备</strong></p>
+<ul>
+<li>导入训练数据</li>
+<li>数据预处理和清洗</li>
+<li>特征工程和选择</li>
+<li>数据集划分</li>
+</ul>
+</li>
+<li><p><strong>模型配置</strong></p>
+<ul>
+<li>选择模型类型</li>
+<li>配置网络结构</li>
+<li>设置超参数</li>
+<li>选择损失函数和优化器</li>
+</ul>
+</li>
+<li><p><strong>模型训练</strong></p>
+<ul>
+<li>启动训练过程</li>
+<li>监控训练进度</li>
+<li>调整训练参数</li>
+<li>处理训练异常</li>
+</ul>
+</li>
+<li><p><strong>模型评估</strong></p>
+<ul>
+<li>评估模型性能</li>
+<li>分析训练结果</li>
+<li>模型对比分析</li>
+<li>选择最优模型</li>
+</ul>
+</li>
+<li><p><strong>模型应用</strong></p>
+<ul>
+<li>加载训练好的模型</li>
+<li>进行预测推理</li>
+<li>结果分析和可视化</li>
+<li>模型性能监控</li>
+</ul>
+</li>
+</ol>
+<h3 id="高级功能">高级功能</h3>
+<ul>
+<li><p><strong>自动机器学习（AutoML）</strong></p>
+<ul>
+<li>自动模型选择</li>
+<li>超参数自动优化</li>
+<li>神经架构搜索</li>
+<li>自动特征工程</li>
+</ul>
+</li>
+<li><p><strong>模型集成</strong></p>
+<ul>
+<li>模型融合策略</li>
+<li>投票集成</li>
+<li>Stacking集成</li>
+<li>Bagging集成</li>
+</ul>
+</li>
+<li><p><strong>持续学习</strong></p>
+<ul>
+<li>在线学习</li>
+<li>增量训练</li>
+<li>模型更新策略</li>
+<li>概念漂移检测</li>
+</ul>
+</li>
+</ul>
+<h2 id="配置说明">配置说明</h2>
+<h3 id="模型配置">模型配置</h3>
+<h4 id="mlp模型配置">MLP模型配置</h4>
+<pre><code class="language-json">{
+  &quot;model_type&quot;: &quot;MLP&quot;,
+  &quot;architecture&quot;: {
+    &quot;input_dim&quot;: 10,
+    &quot;hidden_layers&quot;: [128, 64, 32],
+    &quot;output_dim&quot;: 1,
+    &quot;activation&quot;: &quot;relu&quot;,
+    &quot;dropout&quot;: 0.2
+  }
+}
+</code></pre>
+<h4 id="cnn模型配置">CNN模型配置</h4>
+<pre><code class="language-json">{
+  &quot;model_type&quot;: &quot;CNN&quot;,
+  &quot;architecture&quot;: {
+    &quot;input_channels&quot;: 1,
+    &quot;conv_layers&quot;: [
+      {&quot;filters&quot;: 32, &quot;kernel_size&quot;: 3, &quot;stride&quot;: 1, &quot;padding&quot;: &quot;same&quot;},
+      {&quot;filters&quot;: 64, &quot;kernel_size&quot;: 3, &quot;stride&quot;: 1, &quot;padding&quot;: &quot;same&quot;}
+    ],
+    &quot;pool_layers&quot;: [&quot;max&quot;, &quot;max&quot;],
+    &quot;fc_layers&quot;: [128, 64],
+    &quot;output_dim&quot;: 1
+  }
+}
+</code></pre>
+<h3 id="训练配置">训练配置</h3>
+<h4 id="基础训练配置">基础训练配置</h4>
+<pre><code class="language-json">{
+  &quot;training&quot;: {
+    &quot;epochs&quot;: 100,
+    &quot;batch_size&quot;: 32,
+    &quot;learning_rate&quot;: 0.001,
+    &quot;optimizer&quot;: &quot;adam&quot;,
+    &quot;loss_function&quot;: &quot;mse&quot;,
+    &quot;metrics&quot;: [&quot;mse&quot;, &quot;mae&quot;, &quot;r2&quot;],
+    &quot;validation_split&quot;: 0.2,
+    &quot;early_stopping&quot;: {
+      &quot;enabled&quot;: true,
+      &quot;patience&quot;: 10,
+      &quot;min_delta&quot;: 0.001
+    }
+  }
+}
+</code></pre>
+<h4 id="高级训练配置">高级训练配置</h4>
+<pre><code class="language-json">{
+  &quot;training&quot;: {
+    &quot;epochs&quot;: 100,
+    &quot;batch_size&quot;: 32,
+    &quot;learning_rate&quot;: 0.001,
+    &quot;optimizer&quot;: &quot;adam&quot;,
+    &quot;loss_function&quot;: &quot;mse&quot;,
+    &quot;metrics&quot;: [&quot;mse&quot;, &quot;mae&quot;, &quot;r2&quot;],
+    &quot;validation_split&quot;: 0.2,
+    &quot;early_stopping&quot;: {
+      &quot;enabled&quot;: true,
+      &quot;patience&quot;: 10,
+      &quot;min_delta&quot;: 0.001
+    },
+    &quot;learning_rate_scheduler&quot;: {
+      &quot;type&quot;: &quot;reduce_on_plateau&quot;,
+      &quot;factor&quot;: 0.5,
+      &quot;patience&quot;: 5
+    },
+    &quot;regularization&quot;: {
+      &quot;l2&quot;: 0.001,
+      &quot;dropout&quot;: 0.2
+    },
+    &quot;data_augmentation&quot;: {
+      &quot;enabled&quot;: true,
+      &quot;rotation&quot;: 15,
+      &quot;noise&quot;: 0.01
+    }
+  }
+}
+</code></pre>
+<h3 id="gpu配置">GPU配置</h3>
+<h4 id="gpu设置">GPU设置</h4>
+<pre><code class="language-json">{
+  &quot;gpu&quot;: {
+    &quot;enabled&quot;: true,
+    &quot;device_ids&quot;: [0],
+    &quot;mixed_precision&quot;: true,
+    &quot;num_workers&quot;: 4,
+    &quot;pin_memory&quot;: true
+  }
+}
+</code></pre>
+<h2 id="技术实现">技术实现</h2>
+<h3 id="核心算法">核心算法</h3>
+<ul>
+<li><p><strong>多层感知机</strong></p>
+<pre><code>y = σ(Wₙσ(...σ(W₂σ(W₁x + b₁)) + b₂)...) + bₙ)
+</code></pre>
+<p>其中：W为权重矩阵，b为偏置向量，σ为激活函数</p>
+</li>
+<li><p><strong>卷积神经网络</strong></p>
+<pre><code>output = activation(convolution(input, kernel) + bias)
+</code></pre>
+<p>支持多种卷积操作和池化策略</p>
+</li>
+<li><p><strong>损失函数</strong></p>
+<ul>
+<li>MSE：均方误差</li>
+<li>MAE：平均绝对误差</li>
+<li>Huber Loss：鲁棒损失函数</li>
+</ul>
+</li>
+</ul>
+<h3 id="后端实现">后端实现</h3>
+<ul>
+<li><strong>核心类</strong>：<code>DeepLearningEngine</code>、<code>ModelTrainer</code>、<code>ModelEvaluator</code></li>
+<li><strong>深度学习框架</strong>：PyTorch、TensorFlow</li>
+<li><strong>GPU加速</strong>：CUDA、cuDNN</li>
+<li><strong>性能优化</strong>：混合精度训练、分布式训练</li>
+</ul>
+<h3 id="前端实现">前端实现</h3>
+<ul>
+<li><strong>可视化组件</strong>：基于ECharts、Plotly、TensorBoard</li>
+<li><strong>训练监控</strong>：实时损失曲线、指标变化</li>
+<li><strong>模型可视化</strong>：网络结构图、特征图</li>
+<li><strong>响应式布局</strong>：支持桌面端和移动端</li>
+</ul>
+<h2 id="性能指标">性能指标</h2>
+<h3 id="训练性能">训练性能</h3>
+<ul>
+<li><strong>小数据集</strong>（&lt; 1000样本）：1-5分钟</li>
+<li><strong>中等数据集</strong>（1000-10000样本）：5-30分钟</li>
+<li><strong>大数据集</strong>（&gt; 10000样本）：30分钟-数小时</li>
+</ul>
+<h3 id="推理性能">推理性能</h3>
+<ul>
+<li><strong>CPU推理</strong>：10-100ms/样本</li>
+<li><strong>GPU推理</strong>：1-10ms/样本</li>
+<li><strong>批量推理</strong>：支持批量处理，提升吞吐量</li>
+</ul>
+<h3 id="模型精度">模型精度</h3>
+<ul>
+<li><strong>回归任务</strong>：R² &gt; 0.85为优秀</li>
+<li><strong>预测精度</strong>：相比传统方法提升10-30%</li>
+<li><strong>泛化能力</strong>：测试集性能接近验证集</li>
+</ul>
+<h2 id="应用场景">应用场景</h2>
+<h3 id="环境科学">环境科学</h3>
+<ul>
+<li><p><strong>空气质量预测</strong></p>
+<ul>
+<li>基于历史数据预测未来空气质量</li>
+<li>考虑多因素影响</li>
+<li>提高预测准确性</li>
+</ul>
+</li>
+<li><p><strong>水质预测</strong></p>
+<ul>
+<li>预测水质参数变化</li>
+<li>识别污染趋势</li>
+<li>支持预警决策</li>
+</ul>
+</li>
+</ul>
+<h3 id="地质勘探">地质勘探</h3>
+<ul>
+<li><p><strong>矿产预测</strong></p>
+<ul>
+<li>基于地质数据预测矿产分布</li>
+<li>综合多源信息</li>
+<li>提高勘探成功率</li>
+</ul>
+</li>
+<li><p><strong>地质灾害预测</strong></p>
+<ul>
+<li>预测地质灾害发生概率</li>
+<li>考虑时空因素</li>
+<li>支持防灾决策</li>
+</ul>
+</li>
+</ul>
+<h3 id="农业应用">农业应用</h3>
+<ul>
+<li><p><strong>作物产量预测</strong></p>
+<ul>
+<li>基于环境数据预测产量</li>
+<li>考虑多因素影响</li>
+<li>支持精准农业</li>
+</ul>
+</li>
+<li><p><strong>土壤参数预测</strong></p>
+<ul>
+<li>预测土壤养分分布</li>
+<li>辅助施肥决策</li>
+<li>提高资源利用效率</li>
+</ul>
+</li>
+</ul>
+<h2 id="常见问题">常见问题</h2>
+<h3 id="q1-如何选择合适的模型">Q1: 如何选择合适的模型？</h3>
+<p>A: 根据数据特征选择：</p>
+<ul>
+<li><strong>MLP</strong>：适用于表格数据，特征关系复杂</li>
+<li><strong>CNN</strong>：适用于网格数据，具有空间结构</li>
+<li><strong>GNN</strong>：适用于图数据，节点间有关系</li>
+<li><strong>RNN</strong>：适用于时序数据，具有时间依赖</li>
+</ul>
+<h3 id="q2-如何处理训练数据不足">Q2: 如何处理训练数据不足？</h3>
+<p>A: 采用以下方法：</p>
+<ul>
+<li>数据增强：旋转、平移、噪声</li>
+<li>迁移学习：使用预训练模型</li>
+<li>半监督学习：利用未标注数据</li>
+<li>生成模型：生成合成数据</li>
+</ul>
+<h3 id="q3-如何解决过拟合问题">Q3: 如何解决过拟合问题？</h3>
+<p>A: 采用以下策略：</p>
+<ul>
+<li>增加训练数据</li>
+<li>使用正则化（L1、L2、Dropout）</li>
+<li>早停策略</li>
+<li>数据增强</li>
+<li>简化模型结构</li>
+</ul>
+<h3 id="q4-gpu加速效果如何">Q4: GPU加速效果如何？</h3>
+<p>A: 加速效果取决于：</p>
+<ul>
+<li>模型复杂度：复杂模型加速效果更明显</li>
+<li>批次大小：大批次更能发挥GPU优势</li>
+<li>数据大小：大数据集训练加速显著</li>
+<li>通常可加速5-20倍</li>
+</ul>
+<h3 id="q5-如何监控训练过程">Q5: 如何监控训练过程？</h3>
+<p>A: 监控以下指标：</p>
+<ul>
+<li>训练和验证损失曲线</li>
+<li>性能指标变化</li>
+<li>梯度分布</li>
+<li>学习率变化</li>
+<li>GPU使用率</li>
+</ul>
+<h2 id="最佳实践">最佳实践</h2>
+<h3 id="1-深度学习工作流">1. 深度学习工作流</h3>
+<pre><code>数据收集 → 数据预处理 → 特征工程 → 模型设计 → 模型训练 → 模型评估 → 模型优化 → 模型部署 → 持续监控
+</code></pre>
+<h3 id="2-数据准备原则">2. 数据准备原则</h3>
+<ul>
+<li><strong>数据质量</strong>：确保数据准确、完整</li>
+<li><strong>数据平衡</strong>：处理类别不平衡</li>
+<li><strong>数据增强</strong>：增加数据多样性</li>
+<li><strong>特征工程</strong>：提取有效特征</li>
+</ul>
+<h3 id="3-模型设计原则">3. 模型设计原则</h3>
+<ul>
+<li><strong>从简单开始</strong>：先尝试简单模型</li>
+<li><strong>逐步复杂</strong>：根据需要增加复杂度</li>
+<li><strong>避免过拟合</strong>：使用正则化技术</li>
+<li><strong>可解释性</strong>：考虑模型可解释性</li>
+</ul>
+<h3 id="4-训练策略">4. 训练策略</h3>
+<ul>
+<li><strong>学习率调整</strong>：使用学习率调度器</li>
+<li><strong>早停机制</strong>：避免过拟合</li>
+<li><strong>检查点保存</strong>：保存最佳模型</li>
+<li><strong>实验记录</strong>：记录实验参数和结果</li>
+</ul>
+<h2 id="更新日志">更新日志</h2>
+<h3 id="v130-2026-04-08">v1.3.0 (2026-04-08)</h3>
+<ul>
+<li>新增图神经网络支持</li>
+<li>优化训练性能</li>
+<li>增强模型解释功能</li>
+</ul>
+<h3 id="v120-2026-03-25">v1.2.0 (2026-03-25)</h3>
+<ul>
+<li>新增AutoML功能</li>
+<li>改进GPU加速性能</li>
+<li>增加模型集成支持</li>
+</ul>
+<h3 id="v110-2026-03-10">v1.1.0 (2026-03-10)</h3>
+<ul>
+<li>新增迁移学习功能</li>
+<li>优化超参数搜索</li>
+<li>增强模型对比功能</li>
+</ul>
+<h3 id="v100-2026-02-01">v1.0.0 (2026-02-01)</h3>
+<ul>
+<li>初始版本发布</li>
+<li>支持基础神经网络模型</li>
+<li>实现GPU加速训练</li>
+</ul>
+<h2 id="技术支持">技术支持</h2>
+<p>如遇到问题或需要技术支持，请联系：</p>
+<ul>
+<li>邮箱：<a href="mailto:1447954419@qq.com">1447954419@qq.com</a></li>
+<li>GitHub：<a href="https://github.com/Kevin-Wu200/UDAKE">https://github.com/Kevin-Wu200/UDAKE</a></li>
+</ul>
+
+          </article>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>© 2026 UDAKE. All rights reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>

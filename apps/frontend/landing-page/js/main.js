@@ -18,26 +18,6 @@
     anomaly: "anomaly.html",
     risk: "risk.html",
   };
-  const DOCS_URLS = {
-    interpolation: "./docs/interpolation.md",
-    uncertainty: "./docs/uncertainty.md",
-    sampling: "./docs/sampling.md",
-    optimization: "./docs/optimization.md",
-    realtime: "./docs/realtime.md",
-    deepLearning: "./docs/deepLearning.md",
-    anomaly: "./docs/anomaly.md",
-    risk: "./docs/risk.md",
-  };
-  const WIKI_PAGE_STATUS = {
-    interpolation: true,
-    uncertainty: true,
-    sampling: true,
-    optimization: true,
-    realtime: true,
-    deepLearning: true,
-    anomaly: true,
-    risk: true,
-  };
 
   const modal = document.getElementById("comingSoonModal");
   const modalMessage = document.getElementById("modalMessage");
@@ -207,9 +187,7 @@
 
   function bindDocsLinks() {
     const featureKey = document.body.getAttribute("data-feature");
-    const docsUrl = DOCS_URLS[featureKey];
-    const pageEnabled = WIKI_PAGE_STATUS[featureKey] === true;
-    if (!featureKey || !docsUrl || !pageEnabled) {
+    if (!featureKey || !FEATURE_PAGE_MAP[featureKey]) {
       return;
     }
 
@@ -218,13 +196,10 @@
       return;
     }
 
-    docsLink.setAttribute("href", docsUrl);
+    docsLink.setAttribute("href", "../docs-html/" + featureKey + ".html");
     docsLink.classList.remove("cta-disabled");
     docsLink.removeAttribute("aria-disabled");
     docsLink.setAttribute("data-i18n", "pages.common.ctaDocs");
-    if (window.UDAKEI18N) {
-      window.UDAKEI18N.applyLanguage(window.UDAKEI18N.getCurrentLanguage());
-    }
   }
 
   function bindDownloadActions() {

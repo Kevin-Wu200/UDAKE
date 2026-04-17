@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UDAKE - 异常检测模块</title>
+    <link rel="stylesheet" href="../css/variables.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/pages.css" />
+  </head>
+  <body class="page-detail docs-page">
+    <div class="page-shell">
+      <header class="site-header detail-header docs-header">
+        <a class="brand" href="../index.html#hero" aria-label="UDAKE Home">
+          <img src="../assets/logo.png" alt="UDAKE Logo" class="brand-logo" />
+          <div class="brand-copy">
+            <p class="brand-name">UDAKE</p>
+            <p class="brand-sub">智能不确定性驱动空间决策平台</p>
+          </div>
+        </a>
+        <a class="cta-btn cta-link docs-home-link" href="../index.html#features">返回首页</a>
+      </header>
+
+      <main class="detail-main docs-main">
+        <section class="detail-hero docs-hero">
+          <p class="detail-kicker">官网功能文档</p>
+          <h1>异常检测模块</h1>
+          <p class="detail-subtitle">来源路径：anomaly.md</p>
+        </section>
+
+        <section class="docs-layout" aria-label="Documentation content">
+          <aside class="docs-sidebar">
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>文档导航</h2>
+              <ul class="docs-toc">
+                <li class="docs-toc-item"><a href="#模块简介">模块简介</a></li><li class="docs-toc-item"><a href="#核心功能">核心功能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-异常检测算法">1. 异常检测算法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-时空异常检测">2. 时空异常检测</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-异常分析">3. 异常分析</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#4-数据清洗">4. 数据清洗</a></li><li class="docs-toc-item"><a href="#使用方法">使用方法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#基本操作流程">基本操作流程</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#高级功能">高级功能</a></li><li class="docs-toc-item"><a href="#配置说明">配置说明</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#检测算法配置">检测算法配置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#时空检测配置">时空检测配置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#异常处理配置">异常处理配置</a></li><li class="docs-toc-item"><a href="#技术实现">技术实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#核心算法">核心算法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#后端实现">后端实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#前端实现">前端实现</a></li><li class="docs-toc-item"><a href="#性能指标">性能指标</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#检测性能">检测性能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#检测精度">检测精度</a></li><li class="docs-toc-item"><a href="#应用场景">应用场景</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#环境监测">环境监测</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#智能制造">智能制造</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#智慧城市">智慧城市</a></li><li class="docs-toc-item"><a href="#常见问题">常见问题</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q1-如何选择合适的检测算法">Q1: 如何选择合适的检测算法？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q2-如何设置合适的阈值">Q2: 如何设置合适的阈值？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q3-如何减少误报率">Q3: 如何减少误报率？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q4-异常检测对系统性能的影响">Q4: 异常检测对系统性能的影响？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q5-如何验证异常检测结果的准确性">Q5: 如何验证异常检测结果的准确性？</a></li><li class="docs-toc-item"><a href="#最佳实践">最佳实践</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-异常检测工作流">1. 异常检测工作流</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-算法选择原则">2. 算法选择原则</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-异常处理策略">3. 异常处理策略</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#4-质量控制">4. 质量控制</a></li><li class="docs-toc-item"><a href="#更新日志">更新日志</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v120-2026-04-05">v1.2.0 (2026-04-05)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v110-2026-03-15">v1.1.0 (2026-03-15)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v100-2026-02-01">v1.0.0 (2026-02-01)</a></li><li class="docs-toc-item"><a href="#技术支持">技术支持</a></li>
+              </ul>
+            </div>
+
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>快速操作</h2>
+              <div class="docs-actions">
+                <a class="cta-btn cta-link" href="../pages/anomaly.html">返回功能页</a>
+                <a class="cta-btn cta-link cta-link-alt" href="../index.html#downloads">开始使用</a>
+              </div>
+            </div>
+          </aside>
+
+          <article class="detail-panel markdown-body">
+            <h1 id="异常检测模块">异常检测模块</h1>
+<h2 id="模块简介">模块简介</h2>
+<p>异常检测模块是UDAKE平台的数据质量保障功能，通过多种智能算法自动识别数据中的异常模式和离群点。该模块支持时空异常联合检测，提供异常标注、清洗和分析功能，确保输入数据的质量和可靠性，为后续的空间分析提供坚实的数据基础。</p>
+<h2 id="核心功能">核心功能</h2>
+<h3 id="1-异常检测算法">1. 异常检测算法</h3>
+<ul>
+<li><p><strong>统计方法</strong></p>
+<ul>
+<li>Z-score方法</li>
+<li>IQR（四分位数范围）方法</li>
+<li>Grubbs检验</li>
+<li>箱线图分析</li>
+</ul>
+</li>
+<li><p><strong>机器学习方法</strong></p>
+<ul>
+<li>孤立森林（Isolation Forest）</li>
+<li>局部异常因子（LOF）</li>
+<li>单类SVM</li>
+<li>DBSCAN聚类</li>
+</ul>
+</li>
+<li><p><strong>深度学习方法</strong></p>
+<ul>
+<li>自编码器（Autoencoder）</li>
+<li>变分自编码器（VAE）</li>
+<li>生成对抗网络（GAN）</li>
+<li>LSTM自编码器</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-时空异常检测">2. 时空异常检测</h3>
+<ul>
+<li><p><strong>空间异常检测</strong></p>
+<ul>
+<li>空间离群点识别</li>
+<li>空间聚类异常</li>
+<li>空间模式异常</li>
+<li>空间热点分析</li>
+</ul>
+</li>
+<li><p><strong>时间异常检测</strong></p>
+<ul>
+<li>时间序列异常</li>
+<li>趋势异常检测</li>
+<li>周期性异常</li>
+<li>突变检测</li>
+</ul>
+</li>
+<li><p><strong>时空联合检测</strong></p>
+<ul>
+<li>时空轨迹异常</li>
+<li>时空聚类异常</li>
+<li>时空模式识别</li>
+<li>时空热点分析</li>
+</ul>
+</li>
+</ul>
+<h3 id="3-异常分析">3. 异常分析</h3>
+<ul>
+<li><p><strong>异常分类</strong></p>
+<ul>
+<li>数据录入错误</li>
+<li>测量误差</li>
+<li>传感器故障</li>
+<li>真实异常事件</li>
+</ul>
+</li>
+<li><p><strong>异常严重度评估</strong></p>
+<ul>
+<li>异常程度量化</li>
+<li>影响范围评估</li>
+<li>风险等级划分</li>
+<li>优先级排序</li>
+</ul>
+</li>
+<li><p><strong>异常模式识别</strong></p>
+<ul>
+<li>异常类型分类</li>
+<li>异常模式聚类</li>
+<li>异常原因分析</li>
+<li>异常趋势预测</li>
+</ul>
+</li>
+</ul>
+<h3 id="4-数据清洗">4. 数据清洗</h3>
+<ul>
+<li><p><strong>异常处理</strong></p>
+<ul>
+<li>自动剔除异常值</li>
+<li>异常值修正</li>
+<li>插值填充</li>
+<li>专家审核</li>
+</ul>
+</li>
+<li><p><strong>质量控制</strong></p>
+<ul>
+<li>数据完整性检查</li>
+<li>一致性验证</li>
+<li>准确性评估</li>
+<li>时效性检查</li>
+</ul>
+</li>
+<li><p><strong>清洗记录</strong></p>
+<ul>
+<li>操作日志记录</li>
+<li>变更追踪</li>
+<li>审计轨迹</li>
+<li>报告生成</li>
+</ul>
+</li>
+</ul>
+<h2 id="使用方法">使用方法</h2>
+<h3 id="基本操作流程">基本操作流程</h3>
+<ol>
+<li><p><strong>数据导入</strong></p>
+<ul>
+<li>导入待检测数据</li>
+<li>数据格式验证</li>
+<li>数据质量预检</li>
+<li>元数据配置</li>
+</ul>
+</li>
+<li><p><strong>检测配置</strong></p>
+<ul>
+<li>选择检测算法</li>
+<li>设置检测参数</li>
+<li>配置阈值条件</li>
+<li>定义异常类型</li>
+</ul>
+</li>
+<li><p><strong>执行检测</strong></p>
+<ul>
+<li>运行异常检测</li>
+<li>监控检测进度</li>
+<li>查看中间结果</li>
+<li>处理检测异常</li>
+</ul>
+</li>
+<li><p><strong>结果分析</strong></p>
+<ul>
+<li>查看异常清单</li>
+<li>分析异常分布</li>
+<li>评估异常影响</li>
+<li>识别异常模式</li>
+</ul>
+</li>
+<li><p><strong>数据处理</strong></p>
+<ul>
+<li>审核异常结果</li>
+<li>选择处理方式</li>
+<li>执行数据清洗</li>
+<li>验证清洗效果</li>
+</ul>
+</li>
+</ol>
+<h3 id="高级功能">高级功能</h3>
+<ul>
+<li><p><strong>自定义检测规则</strong></p>
+<ul>
+<li>基于业务规则</li>
+<li>组合条件检测</li>
+<li>阈值动态调整</li>
+<li>规则模板管理</li>
+</ul>
+</li>
+<li><p><strong>批量检测</strong></p>
+<ul>
+<li>多数据集并行检测</li>
+<li>批量参数配置</li>
+<li>结果汇总统计</li>
+<li>批量处理操作</li>
+</ul>
+</li>
+<li><p><strong>异常预测</strong></p>
+<ul>
+<li>异常趋势预测</li>
+<li>风险预警</li>
+<li>预防性检测</li>
+<li>主动干预建议</li>
+</ul>
+</li>
+</ul>
+<h2 id="配置说明">配置说明</h2>
+<h3 id="检测算法配置">检测算法配置</h3>
+<h4 id="统计方法配置">统计方法配置</h4>
+<pre><code class="language-json">{
+  &quot;method&quot;: &quot;statistical&quot;,
+  &quot;algorithms&quot;: [
+    {
+      &quot;name&quot;: &quot;zscore&quot;,
+      &quot;enabled&quot;: true,
+      &quot;threshold&quot;: 3.0
+    },
+    {
+      &quot;name&quot;: &quot;iqr&quot;,
+      &quot;enabled&quot;: true,
+      &quot;multiplier&quot;: 1.5
+    },
+    {
+      &quot;name&quot;: &quot;grubbs&quot;,
+      &quot;enabled&quot;: false,
+      &quot;alpha&quot;: 0.05
+    }
+  ]
+}
+</code></pre>
+<h4 id="机器学习方法配置">机器学习方法配置</h4>
+<pre><code class="language-json">{
+  &quot;method&quot;: &quot;machine_learning&quot;,
+  &quot;algorithms&quot;: [
+    {
+      &quot;name&quot;: &quot;isolation_forest&quot;,
+      &quot;enabled&quot;: true,
+      &quot;contamination&quot;: 0.1,
+      &quot;n_estimators&quot;: 100
+    },
+    {
+      &quot;name&quot;: &quot;lof&quot;,
+      &quot;enabled&quot;: true,
+      &quot;n_neighbors&quot;: 20,
+      &quot;contamination&quot;: 0.1
+    },
+    {
+      &quot;name&quot;: &quot;one_class_svm&quot;,
+      &quot;enabled&quot;: false,
+      &quot;nu&quot;: 0.1,
+      &quot;kernel&quot;: &quot;rbf&quot;
+    }
+  ]
+}
+</code></pre>
+<h3 id="时空检测配置">时空检测配置</h3>
+<h4 id="空间检测配置">空间检测配置</h4>
+<pre><code class="language-json">{
+  &quot;spatial_detection&quot;: {
+    &quot;enabled&quot;: true,
+    &quot;methods&quot;: [&quot;spatial_outlier&quot;, &quot;spatial_cluster&quot;],
+    &quot;distance_metric&quot;: &quot;euclidean&quot;,
+    &quot;neighbor_threshold&quot;: 1000,
+    &quot;cluster_min_size&quot;: 5
+  }
+}
+</code></pre>
+<h4 id="时序检测配置">时序检测配置</h4>
+<pre><code class="language-json">{
+  &quot;temporal_detection&quot;: {
+    &quot;enabled&quot;: true,
+    &quot;methods&quot;: [&quot;time_series_anomaly&quot;, &quot;trend_anomaly&quot;],
+    &quot;window_size&quot;: 10,
+    &quot;threshold&quot;: 2.0,
+    &quot;seasonality&quot;: false
+  }
+}
+</code></pre>
+<h3 id="异常处理配置">异常处理配置</h3>
+<h4 id="处理策略">处理策略</h4>
+<pre><code class="language-json">{
+  &quot;handling_strategy&quot;: {
+    &quot;auto_correction&quot;: {
+      &quot;enabled&quot;: true,
+      &quot;methods&quot;: [&quot;interpolation&quot;, &quot;median_replacement&quot;]
+    },
+    &quot;manual_review&quot;: {
+      &quot;enabled&quot;: true,
+      &quot;workflow&quot;: &quot;approve&quot;,
+      &quot;notification&quot;: true
+    },
+    &quot;logging&quot;: {
+      &quot;enabled&quot;: true,
+      &quot;detail_level&quot;: &quot;high&quot;,
+      &quot;retention_days&quot;: 90
+    }
+  }
+}
+</code></pre>
+<h2 id="技术实现">技术实现</h2>
+<h3 id="核心算法">核心算法</h3>
+<ul>
+<li><p><strong>Z-score方法</strong></p>
+<pre><code>z = (x - μ) / σ
+</code></pre>
+<p>其中：x为观测值，μ为均值，σ为标准差</p>
+</li>
+<li><p><strong>孤立森林</strong>
+通过随机分割特征空间来隔离异常点，异常点更容易被隔离</p>
+</li>
+<li><p><strong>局部异常因子（LOF）</strong></p>
+<pre><code>LOF(p) = (Σ lrd(q) / lrd(p)) / |N(p)|
+</code></pre>
+<p>其中：lrd为局部可达密度，N(p)为p的邻域</p>
+</li>
+<li><p><strong>自编码器</strong>
+通过训练神经网络重构输入数据，重构误差大的点为异常</p>
+</li>
+</ul>
+<h3 id="后端实现">后端实现</h3>
+<ul>
+<li><strong>核心类</strong>：<code>AnomalyDetector</code>、<code>SpatialAnomalyAnalyzer</code>、<code>TemporalAnomalyDetector</code></li>
+<li><strong>算法库</strong>：scikit-learn、PyOD、TensorFlow</li>
+<li><strong>性能优化</strong>：并行计算、增量检测、缓存机制</li>
+</ul>
+<h3 id="前端实现">前端实现</h3>
+<ul>
+<li><strong>可视化组件</strong>：基于Leaflet、ECharts、D3.js</li>
+<li><strong>交互设计</strong>：异常标注、过滤、批量操作</li>
+<li><strong>响应式布局</strong>：支持桌面端和移动端</li>
+</ul>
+<h2 id="性能指标">性能指标</h2>
+<h3 id="检测性能">检测性能</h3>
+<ul>
+<li><strong>小数据集</strong>（&lt; 1000点）：1-3秒</li>
+<li><strong>中等数据集</strong>（1000-10000点）：3-15秒</li>
+<li><strong>大数据集</strong>（&gt; 10000点）：15秒-2分钟</li>
+</ul>
+<h3 id="检测精度">检测精度</h3>
+<ul>
+<li><strong>准确率</strong>：85-95%</li>
+<li><strong>召回率</strong>：80-90%</li>
+<li><strong>精确率</strong>：85-92%</li>
+<li><strong>F1分数</strong>：82-90%</li>
+</ul>
+<h2 id="应用场景">应用场景</h2>
+<h3 id="环境监测">环境监测</h3>
+<ul>
+<li><p><strong>空气质量异常检测</strong></p>
+<ul>
+<li>识别异常高值/低值</li>
+<li>检测传感器故障</li>
+<li>发现污染事件</li>
+<li>数据质量控制</li>
+</ul>
+</li>
+<li><p><strong>水质监测异常</strong></p>
+<ul>
+<li>识别水质突变</li>
+<li>检测监测设备故障</li>
+<li>发现污染事件</li>
+<li>数据验证</li>
+</ul>
+</li>
+</ul>
+<h3 id="智能制造">智能制造</h3>
+<ul>
+<li><p><strong>生产过程监控</strong></p>
+<ul>
+<li>检测生产异常</li>
+<li>识别设备故障</li>
+<li>质量控制</li>
+<li>预测性维护</li>
+</ul>
+</li>
+<li><p><strong>能耗分析</strong></p>
+<ul>
+<li>识别能耗异常</li>
+<li>检测设备故障</li>
+<li>优化能源使用</li>
+<li>成本控制</li>
+</ul>
+</li>
+</ul>
+<h3 id="智慧城市">智慧城市</h3>
+<ul>
+<li><p><strong>交通异常检测</strong></p>
+<ul>
+<li>识别交通拥堵</li>
+<li>检测事故异常</li>
+<li>发现异常流量</li>
+<li>交通优化</li>
+</ul>
+</li>
+<li><p><strong>公共安全</strong></p>
+<ul>
+<li>检测异常事件</li>
+<li>识别安全威胁</li>
+<li>预警系统</li>
+<li>应急响应</li>
+</ul>
+</li>
+</ul>
+<h2 id="常见问题">常见问题</h2>
+<h3 id="q1-如何选择合适的检测算法">Q1: 如何选择合适的检测算法？</h3>
+<p>A: 根据数据特征选择：</p>
+<ul>
+<li><strong>统计方法</strong>：数据分布已知，计算快速</li>
+<li><strong>机器学习方法</strong>：数据分布未知，需要训练</li>
+<li><strong>深度学习方法</strong>：复杂模式，需要大量数据</li>
+<li><strong>时空方法</strong>：具有时空相关性的数据</li>
+</ul>
+<h3 id="q2-如何设置合适的阈值">Q2: 如何设置合适的阈值？</h3>
+<p>A: 采用以下方法：</p>
+<ul>
+<li>基于统计分布（3σ原则）</li>
+<li>基于业务经验</li>
+<li>交叉验证优化</li>
+<li>动态阈值调整</li>
+</ul>
+<h3 id="q3-如何减少误报率">Q3: 如何减少误报率？</h3>
+<p>A: 采用以下策略：</p>
+<ul>
+<li>调整检测阈值</li>
+<li>使用多种算法组合</li>
+<li>增加上下文信息</li>
+<li>人工审核机制</li>
+</ul>
+<h3 id="q4-异常检测对系统性能的影响">Q4: 异常检测对系统性能的影响？</h3>
+<p>A: 影响程度取决于：</p>
+<ul>
+<li>数据量大小</li>
+<li>检测算法复杂度</li>
+<li>检测频率</li>
+<li>系统资源配置</li>
+</ul>
+<h3 id="q5-如何验证异常检测结果的准确性">Q5: 如何验证异常检测结果的准确性？</h3>
+<p>A: 通过以下方法：</p>
+<ul>
+<li>专家人工审核</li>
+<li>与历史数据对比</li>
+<li>交叉验证</li>
+<li>实际应用验证</li>
+</ul>
+<h2 id="最佳实践">最佳实践</h2>
+<h3 id="1-异常检测工作流">1. 异常检测工作流</h3>
+<pre><code>数据收集 → 数据预处理 → 异常检测 → 结果分析 → 异常处理 → 效果验证 → 持续优化
+</code></pre>
+<h3 id="2-算法选择原则">2. 算法选择原则</h3>
+<ul>
+<li><strong>从简单开始</strong>：先使用统计方法</li>
+<li><strong>逐步复杂</strong>：根据需要选择复杂算法</li>
+<li><strong>多算法对比</strong>：使用多种算法验证</li>
+<li><strong>业务结合</strong>：考虑业务场景特点</li>
+</ul>
+<h3 id="3-异常处理策略">3. 异常处理策略</h3>
+<ul>
+<li><strong>自动处理</strong>：明确的异常规则</li>
+<li><strong>人工审核</strong>：不确定的异常</li>
+<li><strong>专家确认</strong>：重要的异常</li>
+<li><strong>持续学习</strong>：从处理结果学习</li>
+</ul>
+<h3 id="4-质量控制">4. 质量控制</h3>
+<ul>
+<li><strong>数据验证</strong>：多维度检查</li>
+<li><strong>流程规范</strong>：标准化操作</li>
+<li><strong>记录完整</strong>：完整操作日志</li>
+<li><strong>定期审核</strong>：定期质量检查</li>
+</ul>
+<h2 id="更新日志">更新日志</h2>
+<h3 id="v120-2026-04-05">v1.2.0 (2026-04-05)</h3>
+<ul>
+<li>新增深度学习检测方法</li>
+<li>优化时空联合检测</li>
+<li>增强异常预测功能</li>
+</ul>
+<h3 id="v110-2026-03-15">v1.1.0 (2026-03-15)</h3>
+<ul>
+<li>新增自定义检测规则</li>
+<li>改进异常分类算法</li>
+<li>增加批量处理功能</li>
+</ul>
+<h3 id="v100-2026-02-01">v1.0.0 (2026-02-01)</h3>
+<ul>
+<li>初始版本发布</li>
+<li>支持基础异常检测</li>
+<li>实现数据清洗功能</li>
+</ul>
+<h2 id="技术支持">技术支持</h2>
+<p>如遇到问题或需要技术支持，请联系：</p>
+<ul>
+<li>邮箱：<a href="mailto:1447954419@qq.com">1447954419@qq.com</a></li>
+<li>GitHub：<a href="https://github.com/Kevin-Wu200/UDAKE">https://github.com/Kevin-Wu200/UDAKE</a></li>
+</ul>
+
+          </article>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>© 2026 UDAKE. All rights reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>

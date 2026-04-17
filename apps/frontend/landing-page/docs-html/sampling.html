@@ -1,0 +1,456 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UDAKE - 采样优化模块</title>
+    <link rel="stylesheet" href="../css/variables.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/pages.css" />
+  </head>
+  <body class="page-detail docs-page">
+    <div class="page-shell">
+      <header class="site-header detail-header docs-header">
+        <a class="brand" href="../index.html#hero" aria-label="UDAKE Home">
+          <img src="../assets/logo.png" alt="UDAKE Logo" class="brand-logo" />
+          <div class="brand-copy">
+            <p class="brand-name">UDAKE</p>
+            <p class="brand-sub">智能不确定性驱动空间决策平台</p>
+          </div>
+        </a>
+        <a class="cta-btn cta-link docs-home-link" href="../index.html#features">返回首页</a>
+      </header>
+
+      <main class="detail-main docs-main">
+        <section class="detail-hero docs-hero">
+          <p class="detail-kicker">官网功能文档</p>
+          <h1>采样优化模块</h1>
+          <p class="detail-subtitle">来源路径：sampling.md</p>
+        </section>
+
+        <section class="docs-layout" aria-label="Documentation content">
+          <aside class="docs-sidebar">
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>文档导航</h2>
+              <ul class="docs-toc">
+                <li class="docs-toc-item"><a href="#模块简介">模块简介</a></li><li class="docs-toc-item"><a href="#核心功能">核心功能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-自适应采样策略">1. 自适应采样策略</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-采样点推荐">2. 采样点推荐</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-采样方案评估">3. 采样方案评估</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#4-采样密度优化">4. 采样密度优化</a></li><li class="docs-toc-item"><a href="#使用方法">使用方法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#基本操作流程">基本操作流程</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#高级功能">高级功能</a></li><li class="docs-toc-item"><a href="#配置说明">配置说明</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#采样策略配置">采样策略配置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#优化参数设置">优化参数设置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#约束条件">约束条件</a></li><li class="docs-toc-item"><a href="#技术实现">技术实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#核心算法">核心算法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#后端实现">后端实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#前端实现">前端实现</a></li><li class="docs-toc-item"><a href="#性能指标">性能指标</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#计算性能">计算性能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#优化效果">优化效果</a></li><li class="docs-toc-item"><a href="#应用场景">应用场景</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#环境监测">环境监测</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#地质勘探">地质勘探</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#农业规划">农业规划</a></li><li class="docs-toc-item"><a href="#常见问题">常见问题</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q1-如何选择合适的采样策略">Q1: 如何选择合适的采样策略？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q2-采样优化结果的可靠性如何保证">Q2: 采样优化结果的可靠性如何保证？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q3-如何平衡采样成本和精度需求">Q3: 如何平衡采样成本和精度需求？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q4-采样优化对现有采样计划的影响">Q4: 采样优化对现有采样计划的影响？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q5-如何验证采样优化方案的效果">Q5: 如何验证采样优化方案的效果？</a></li><li class="docs-toc-item"><a href="#最佳实践">最佳实践</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-采样优化工作流">1. 采样优化工作流</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-采样策略选择">2. 采样策略选择</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-采样方案实施">3. 采样方案实施</a></li><li class="docs-toc-item"><a href="#更新日志">更新日志</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v120-2026-04-01">v1.2.0 (2026-04-01)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v110-2026-03-10">v1.1.0 (2026-03-10)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v100-2026-02-01">v1.0.0 (2026-02-01)</a></li><li class="docs-toc-item"><a href="#技术支持">技术支持</a></li>
+              </ul>
+            </div>
+
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>快速操作</h2>
+              <div class="docs-actions">
+                <a class="cta-btn cta-link" href="../pages/sampling.html">返回功能页</a>
+                <a class="cta-btn cta-link cta-link-alt" href="../index.html#downloads">开始使用</a>
+              </div>
+            </div>
+          </aside>
+
+          <article class="detail-panel markdown-body">
+            <h1 id="采样优化模块">采样优化模块</h1>
+<h2 id="模块简介">模块简介</h2>
+<p>采样优化模块是UDAKE平台的智能化功能，通过自适应采样策略和算法优化，帮助用户在有限的采样预算下获得最大的信息收益。该模块能够自动识别高不确定性区域，推荐最优的新增采样点位置，显著提高数据采集效率和预测精度。</p>
+<h2 id="核心功能">核心功能</h2>
+<h3 id="1-自适应采样策略">1. 自适应采样策略</h3>
+<ul>
+<li><p><strong>不确定性驱动采样</strong></p>
+<ul>
+<li>基于克里金方差的采样点推荐</li>
+<li>高不确定性区域优先采样</li>
+<li>动态调整采样密度</li>
+</ul>
+</li>
+<li><p><strong>多目标优化采样</strong></p>
+<ul>
+<li>平衡覆盖度与收益</li>
+<li>考虑成本效益比</li>
+<li>支持约束条件优化</li>
+</ul>
+</li>
+<li><p><strong>时空联合采样</strong></p>
+<ul>
+<li>时间序列采样优化</li>
+<li>空间分布均衡考虑</li>
+<li>时序相关性分析</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-采样点推荐">2. 采样点推荐</h3>
+<ul>
+<li><p><strong>智能推荐算法</strong></p>
+<ul>
+<li>基于不确定性的推荐</li>
+<li>考虑空间分布均衡性</li>
+<li>支持多候选点排序</li>
+</ul>
+</li>
+<li><p><strong>推荐结果可视化</strong></p>
+<ul>
+<li>推荐点位地图展示</li>
+<li>优先级标识</li>
+<li>预期收益估算</li>
+</ul>
+</li>
+<li><p><strong>交互式选择</strong></p>
+<ul>
+<li>用户可调整推荐点</li>
+<li>实时更新优化结果</li>
+<li>支持批量操作</li>
+</ul>
+</li>
+</ul>
+<h3 id="3-采样方案评估">3. 采样方案评估</h3>
+<ul>
+<li><p><strong>覆盖度分析</strong></p>
+<ul>
+<li>空间覆盖度计算</li>
+<li>采样密度分布</li>
+<li>覆盖盲区识别</li>
+</ul>
+</li>
+<li><p><strong>收益预测</strong></p>
+<ul>
+<li>预期不确定性降低</li>
+<li>预测精度提升估算</li>
+<li>成本效益分析</li>
+</ul>
+</li>
+<li><p><strong>方案对比</strong></p>
+<ul>
+<li>多方案并行评估</li>
+<li>关键指标对比</li>
+<li>最优方案推荐</li>
+</ul>
+</li>
+</ul>
+<h3 id="4-采样密度优化">4. 采样密度优化</h3>
+<ul>
+<li><p><strong>密度分布优化</strong></p>
+<ul>
+<li>自适应密度调整</li>
+<li>区域差异化配置</li>
+<li>动态密度更新</li>
+</ul>
+</li>
+<li><p><strong>采样预算管理</strong></p>
+<ul>
+<li>预算约束下的优化</li>
+<li>分阶段采样计划</li>
+<li>资源配置建议</li>
+</ul>
+</li>
+</ul>
+<h2 id="使用方法">使用方法</h2>
+<h3 id="基本操作流程">基本操作流程</h3>
+<ol>
+<li><p><strong>导入现有数据</strong></p>
+<ul>
+<li>导入当前采样点数据</li>
+<li>系统自动分析采样分布</li>
+<li>识别采样不足区域</li>
+</ul>
+</li>
+<li><p><strong>设置优化目标</strong></p>
+<ul>
+<li>选择采样优化策略</li>
+<li>设置采样预算或目标数量</li>
+<li>配置约束条件</li>
+</ul>
+</li>
+<li><p><strong>生成采样方案</strong></p>
+<ul>
+<li>点击&quot;生成优化方案&quot;</li>
+<li>系统自动计算最优采样点</li>
+<li>展示推荐结果</li>
+</ul>
+</li>
+<li><p><strong>方案评估与调整</strong></p>
+<ul>
+<li>查看方案评估指标</li>
+<li>对比不同方案效果</li>
+<li>根据需要调整参数</li>
+</ul>
+</li>
+<li><p><strong>导出采样方案</strong></p>
+<ul>
+<li>导出推荐采样点坐标</li>
+<li>生成采样指导文档</li>
+<li>支持多种格式导出</li>
+</ul>
+</li>
+</ol>
+<h3 id="高级功能">高级功能</h3>
+<ul>
+<li><p><strong>历史采样分析</strong></p>
+<ul>
+<li>采样历史趋势分析</li>
+<li>采样效率评估</li>
+<li>历史数据对比</li>
+</ul>
+</li>
+<li><p><strong>成本优化</strong></p>
+<ul>
+<li>采样成本估算</li>
+<li>成本效益分析</li>
+<li>预算约束优化</li>
+</ul>
+</li>
+<li><p><strong>联合优化</strong></p>
+<ul>
+<li>与不确定性分析联合</li>
+<li>与插值结果协同优化</li>
+<li>多目标综合决策</li>
+</ul>
+</li>
+</ul>
+<h2 id="配置说明">配置说明</h2>
+<h3 id="采样策略配置">采样策略配置</h3>
+<h4 id="不确定性驱动策略">不确定性驱动策略</h4>
+<pre><code class="language-json">{
+  &quot;strategy&quot;: &quot;uncertainty_driven&quot;,
+  &quot;target_points&quot;: 10,
+  &quot;uncertainty_threshold&quot;: 0.3,
+  &quot;min_distance&quot;: 100,
+  &quot;max_distance&quot;: 1000
+}
+</code></pre>
+<h4 id="多目标优化策略">多目标优化策略</h4>
+<pre><code class="language-json">{
+  &quot;strategy&quot;: &quot;multi_objective&quot;,
+  &quot;objectives&quot;: [&quot;coverage&quot;, &quot;uncertainty&quot;, &quot;cost&quot;],
+  &quot;weights&quot;: [0.4, 0.4, 0.2],
+  &quot;budget&quot;: 5000,
+  &quot;target_points&quot;: 15
+}
+</code></pre>
+<h4 id="时空联合策略">时空联合策略</h4>
+<pre><code class="language-json">{
+  &quot;strategy&quot;: &quot;spatiotemporal&quot;,
+  &quot;time_window&quot;: 7,
+  &quot;spatial_balance&quot;: 0.7,
+  &quot;temporal_balance&quot;: 0.3,
+  &quot;max_new_points&quot;: 20
+}
+</code></pre>
+<h3 id="优化参数设置">优化参数设置</h3>
+<h4 id="基础参数">基础参数</h4>
+<ul>
+<li><strong>目标采样点数</strong>：根据需求和预算设置</li>
+<li><strong>最小间距</strong>：避免采样点过于集中，建议50-200米</li>
+<li><strong>最大间距</strong>：确保覆盖度，建议500-2000米</li>
+</ul>
+<h4 id="高级参数">高级参数</h4>
+<ul>
+<li><strong>不确定性权重</strong>：0.0-1.0，越大越重视不确定性</li>
+<li><strong>覆盖度权重</strong>：0.0-1.0，越大越重视空间分布</li>
+<li><strong>成本权重</strong>：0.0-1.0，越大越重视成本控制</li>
+</ul>
+<h3 id="约束条件">约束条件</h3>
+<h4 id="空间约束">空间约束</h4>
+<ul>
+<li><strong>可采样区域</strong>：定义可采样的地理范围</li>
+<li><strong>禁采区域</strong>：标记无法采样的区域</li>
+<li><strong>边界缓冲</strong>：避免边界效应</li>
+</ul>
+<h4 id="成本约束">成本约束</h4>
+<ul>
+<li><strong>总预算限制</strong>：设置最大采样成本</li>
+<li><strong>单点成本</strong>：定义每个采样点的成本</li>
+<li><strong>交通成本</strong>：考虑采样点可达性</li>
+</ul>
+<h4 id="时间约束">时间约束</h4>
+<ul>
+<li><strong>采样时间窗口</strong>：限制采样时间范围</li>
+<li><strong>采样频率</strong>：控制采样频次</li>
+<li><strong>时序要求</strong>：满足特定时间需求</li>
+</ul>
+<h2 id="技术实现">技术实现</h2>
+<h3 id="核心算法">核心算法</h3>
+<ul>
+<li><p><strong>不确定性计算</strong></p>
+<pre><code>U(x) = σ²(x) / max(σ²)
+</code></pre>
+<p>其中：U(x)为位置x的归一化不确定性，σ²(x)为克里金方差</p>
+</li>
+<li><p><strong>覆盖度计算</strong></p>
+<pre><code>C = 1 - exp(-λ × N / A)
+</code></pre>
+<p>其中：C为覆盖度，N为采样点数，A为区域面积，λ为覆盖系数</p>
+</li>
+<li><p><strong>多目标优化</strong></p>
+<pre><code>max Σ wᵢ × fᵢ(x)
+s.t. gⱼ(x) ≤ 0
+</code></pre>
+<p>其中：wᵢ为目标权重，fᵢ为目标函数，gⱼ为约束条件</p>
+</li>
+</ul>
+<h3 id="后端实现">后端实现</h3>
+<ul>
+<li><strong>核心类</strong>：<code>SamplingOptimizer</code>、<code>UncertaintySampler</code>、<code>MultiObjectiveOptimizer</code></li>
+<li><strong>算法库</strong>：scipy.optimize、pymoo、DEAP</li>
+<li><strong>性能优化</strong>：并行计算、缓存机制、算法加速</li>
+</ul>
+<h3 id="前端实现">前端实现</h3>
+<ul>
+<li><strong>可视化组件</strong>：基于Leaflet、ECharts、Plotly</li>
+<li><strong>交互设计</strong>：拖拽调整、实时反馈、方案对比</li>
+<li><strong>响应式布局</strong>：支持桌面端和移动端</li>
+</ul>
+<h2 id="性能指标">性能指标</h2>
+<h3 id="计算性能">计算性能</h3>
+<ul>
+<li>小规模优化（&lt; 50点）：1-3秒</li>
+<li>中等规模优化（50-200点）：3-10秒</li>
+<li>大规模优化（&gt; 200点）：10-30秒</li>
+</ul>
+<h3 id="优化效果">优化效果</h3>
+<ul>
+<li><strong>不确定性降低</strong>：新增10个采样点可降低不确定性20-40%</li>
+<li><strong>覆盖度提升</strong>：优化方案可提升覆盖度15-30%</li>
+<li><strong>成本节约</strong>：智能优化可节约采样成本25-50%</li>
+</ul>
+<h2 id="应用场景">应用场景</h2>
+<h3 id="环境监测">环境监测</h3>
+<ul>
+<li><p><strong>空气质量监测网络优化</strong></p>
+<ul>
+<li>识别监测盲区</li>
+<li>优化监测站点布局</li>
+<li>提高监测网络效率</li>
+</ul>
+</li>
+<li><p><strong>水质监测点优化</strong></p>
+<ul>
+<li>重点区域加密采样</li>
+<li>降低监测成本</li>
+<li>提高预警准确性</li>
+</ul>
+</li>
+</ul>
+<h3 id="地质勘探">地质勘探</h3>
+<ul>
+<li><p><strong>矿产资源勘探优化</strong></p>
+<ul>
+<li>优化钻孔位置</li>
+<li>降低勘探成本</li>
+<li>提高勘探成功率</li>
+</ul>
+</li>
+<li><p><strong>地质灾害监测</strong></p>
+<ul>
+<li>重点区域加密监测</li>
+<li>优化监测资源配置</li>
+<li>提高预警时效性</li>
+</ul>
+</li>
+</ul>
+<h3 id="农业规划">农业规划</h3>
+<ul>
+<li><p><strong>土壤采样优化</strong></p>
+<ul>
+<li>优化采样网格</li>
+<li>降低采样成本</li>
+<li>提高分析精度</li>
+</ul>
+</li>
+<li><p><strong>作物监测布局</strong></p>
+<ul>
+<li>关键区域重点监测</li>
+<li>优化监测资源配置</li>
+<li>提高管理效率</li>
+</ul>
+</li>
+</ul>
+<h2 id="常见问题">常见问题</h2>
+<h3 id="q1-如何选择合适的采样策略">Q1: 如何选择合适的采样策略？</h3>
+<p>A: 根据应用场景选择：</p>
+<ul>
+<li><strong>不确定性驱动</strong>：适用于已有初步数据，需要提高精度的场景</li>
+<li><strong>多目标优化</strong>：适用于需要综合考虑多个因素的场景</li>
+<li><strong>时空联合</strong>：适用于需要考虑时间序列的场景</li>
+</ul>
+<h3 id="q2-采样优化结果的可靠性如何保证">Q2: 采样优化结果的可靠性如何保证？</h3>
+<p>A: 通过以下方式保证：</p>
+<ul>
+<li>使用经过验证的优化算法</li>
+<li>考虑多种影响因素</li>
+<li>提供多个候选方案</li>
+<li>支持人工调整和验证</li>
+</ul>
+<h3 id="q3-如何平衡采样成本和精度需求">Q3: 如何平衡采样成本和精度需求？</h3>
+<p>A: 采用以下方法：</p>
+<ul>
+<li>进行成本效益分析</li>
+<li>设置合理的预算约束</li>
+<li>分阶段实施采样</li>
+<li>优先采样高价值区域</li>
+</ul>
+<h3 id="q4-采样优化对现有采样计划的影响">Q4: 采样优化对现有采样计划的影响？</h3>
+<p>A: 影响程度取决于：</p>
+<ul>
+<li>现有采样点的分布和质量</li>
+<li>优化目标的设定</li>
+<li>可用的采样预算</li>
+<li>时间约束条件</li>
+</ul>
+<h3 id="q5-如何验证采样优化方案的效果">Q5: 如何验证采样优化方案的效果？</h3>
+<p>A: 通过以下方法验证：</p>
+<ul>
+<li>实施后重新进行不确定性分析</li>
+<li>对比优化前后的预测精度</li>
+<li>统计采样效率提升情况</li>
+<li>收集实际应用反馈</li>
+</ul>
+<h2 id="最佳实践">最佳实践</h2>
+<h3 id="1-采样优化工作流">1. 采样优化工作流</h3>
+<pre><code>数据收集 → 现状分析 → 目标设定 → 方案生成 → 方案评估 → 方案实施 → 效果验证 → 持续优化
+</code></pre>
+<h3 id="2-采样策略选择">2. 采样策略选择</h3>
+<ul>
+<li><strong>初期阶段</strong>：使用不确定性驱动策略快速提升精度</li>
+<li><strong>中期阶段</strong>：采用多目标优化平衡各项指标</li>
+<li><strong>成熟阶段</strong>：应用时空联合策略实现精细化管理</li>
+</ul>
+<h3 id="3-采样方案实施">3. 采样方案实施</h3>
+<ul>
+<li>分阶段实施，逐步优化</li>
+<li>建立采样质量控制机制</li>
+<li>定期评估和调整方案</li>
+<li>建立采样数据库</li>
+</ul>
+<h2 id="更新日志">更新日志</h2>
+<h3 id="v120-2026-04-01">v1.2.0 (2026-04-01)</h3>
+<ul>
+<li>新增时空联合采样策略</li>
+<li>优化多目标算法性能</li>
+<li>增强方案对比功能</li>
+</ul>
+<h3 id="v110-2026-03-10">v1.1.0 (2026-03-10)</h3>
+<ul>
+<li>新增多目标优化策略</li>
+<li>改进采样点推荐算法</li>
+<li>增加成本优化功能</li>
+</ul>
+<h3 id="v100-2026-02-01">v1.0.0 (2026-02-01)</h3>
+<ul>
+<li>初始版本发布</li>
+<li>支持基础采样优化</li>
+<li>实现不确定性驱动策略</li>
+</ul>
+<h2 id="技术支持">技术支持</h2>
+<p>如遇到问题或需要技术支持，请联系：</p>
+<ul>
+<li>邮箱：<a href="mailto:1447954419@qq.com">1447954419@qq.com</a></li>
+<li>GitHub：<a href="https://github.com/Kevin-Wu200/UDAKE">https://github.com/Kevin-Wu200/UDAKE</a></li>
+</ul>
+
+          </article>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>© 2026 UDAKE. All rights reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>

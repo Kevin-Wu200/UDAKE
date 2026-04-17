@@ -1,0 +1,560 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>UDAKE - 风险评估模块</title>
+    <link rel="stylesheet" href="../css/variables.css" />
+    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="../css/pages.css" />
+  </head>
+  <body class="page-detail docs-page">
+    <div class="page-shell">
+      <header class="site-header detail-header docs-header">
+        <a class="brand" href="../index.html#hero" aria-label="UDAKE Home">
+          <img src="../assets/logo.png" alt="UDAKE Logo" class="brand-logo" />
+          <div class="brand-copy">
+            <p class="brand-name">UDAKE</p>
+            <p class="brand-sub">智能不确定性驱动空间决策平台</p>
+          </div>
+        </a>
+        <a class="cta-btn cta-link docs-home-link" href="../index.html#features">返回首页</a>
+      </header>
+
+      <main class="detail-main docs-main">
+        <section class="detail-hero docs-hero">
+          <p class="detail-kicker">官网功能文档</p>
+          <h1>风险评估模块</h1>
+          <p class="detail-subtitle">来源路径：risk.md</p>
+        </section>
+
+        <section class="docs-layout" aria-label="Documentation content">
+          <aside class="docs-sidebar">
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>文档导航</h2>
+              <ul class="docs-toc">
+                <li class="docs-toc-item"><a href="#模块简介">模块简介</a></li><li class="docs-toc-item"><a href="#核心功能">核心功能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-风险识别">1. 风险识别</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-风险评估">2. 风险评估</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-风险预警">3. 风险预警</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#4-决策支持">4. 决策支持</a></li><li class="docs-toc-item"><a href="#使用方法">使用方法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#基本操作流程">基本操作流程</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#高级功能">高级功能</a></li><li class="docs-toc-item"><a href="#配置说明">配置说明</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#风险指标配置">风险指标配置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#预警配置">预警配置</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#决策支持配置">决策支持配置</a></li><li class="docs-toc-item"><a href="#技术实现">技术实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#核心算法">核心算法</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#后端实现">后端实现</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#前端实现">前端实现</a></li><li class="docs-toc-item"><a href="#性能指标">性能指标</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#评估性能">评估性能</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#预警响应">预警响应</a></li><li class="docs-toc-item"><a href="#应用场景">应用场景</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#环境保护">环境保护</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#公共安全">公共安全</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#城市规划">城市规划</a></li><li class="docs-toc-item"><a href="#常见问题">常见问题</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q1-如何确定风险指标的权重">Q1: 如何确定风险指标的权重？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q2-如何设置合理的预警阈值">Q2: 如何设置合理的预警阈值？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q3-如何提高风险评估的准确性">Q3: 如何提高风险评估的准确性？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q4-风险评估如何与其他模块集成">Q4: 风险评估如何与其他模块集成？</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#q5-如何处理风险评估中的不确定性">Q5: 如何处理风险评估中的不确定性？</a></li><li class="docs-toc-item"><a href="#最佳实践">最佳实践</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#1-风险评估工作流">1. 风险评估工作流</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#2-指标选择原则">2. 指标选择原则</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#3-权重设定原则">3. 权重设定原则</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#4-预警响应原则">4. 预警响应原则</a></li><li class="docs-toc-item"><a href="#更新日志">更新日志</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v120-2026-04-12">v1.2.0 (2026-04-12)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v110-2026-03-20">v1.1.0 (2026-03-20)</a></li><li class="docs-toc-item docs-toc-item-sub"><a href="#v100-2026-02-01">v1.0.0 (2026-02-01)</a></li><li class="docs-toc-item"><a href="#技术支持">技术支持</a></li>
+              </ul>
+            </div>
+
+            <div class="detail-panel docs-sidebar-panel">
+              <h2>快速操作</h2>
+              <div class="docs-actions">
+                <a class="cta-btn cta-link" href="../pages/risk.html">返回功能页</a>
+                <a class="cta-btn cta-link cta-link-alt" href="../index.html#downloads">开始使用</a>
+              </div>
+            </div>
+          </aside>
+
+          <article class="detail-panel markdown-body">
+            <h1 id="风险评估模块">风险评估模块</h1>
+<h2 id="模块简介">模块简介</h2>
+<p>风险评估模块是UDAKE平台的决策支持功能，通过多维度风险指数计算和智能评估，为空间决策提供科学的风险分析和预警支持。该模块综合考虑环境、社会、经济等多方面因素，提供风险识别、评估、预警和决策建议的完整解决方案。</p>
+<h2 id="核心功能">核心功能</h2>
+<h3 id="1-风险识别">1. 风险识别</h3>
+<ul>
+<li><p><strong>风险源识别</strong></p>
+<ul>
+<li>自然风险源识别</li>
+<li>人为风险源识别</li>
+<li>技术风险源识别</li>
+<li>综合风险源分析</li>
+</ul>
+</li>
+<li><p><strong>风险类型分类</strong></p>
+<ul>
+<li>环境风险</li>
+<li>健康风险</li>
+<li>经济风险</li>
+<li>社会风险</li>
+</ul>
+</li>
+<li><p><strong>风险特征分析</strong></p>
+<ul>
+<li>风险空间分布</li>
+<li>风险时间变化</li>
+<li>风险传播路径</li>
+<li>风险累积效应</li>
+</ul>
+</li>
+</ul>
+<h3 id="2-风险评估">2. 风险评估</h3>
+<ul>
+<li><p><strong>多指标评估</strong></p>
+<ul>
+<li>环境指标评估</li>
+<li>健康指标评估</li>
+<li>经济指标评估</li>
+<li>社会指标评估</li>
+</ul>
+</li>
+<li><p><strong>风险指数计算</strong></p>
+<ul>
+<li>单一风险指数</li>
+<li>综合风险指数</li>
+<li>加权风险指数</li>
+<li>动态风险指数</li>
+</ul>
+</li>
+<li><p><strong>风险等级划分</strong></p>
+<ul>
+<li>风险等级定义</li>
+<li>风险阈值设定</li>
+<li>风险分级标准</li>
+<li>风险等级动态调整</li>
+</ul>
+</li>
+</ul>
+<h3 id="3-风险预警">3. 风险预警</h3>
+<ul>
+<li><p><strong>预警机制</strong></p>
+<ul>
+<li>实时监测预警</li>
+<li>趋势预警</li>
+<li>阈值预警</li>
+<li>智能预警</li>
+</ul>
+</li>
+<li><p><strong>预警级别</strong></p>
+<ul>
+<li>一般预警（蓝色）</li>
+<li>较重预警（黄色）</li>
+<li>严重预警（橙色）</li>
+<li>特别严重预警（红色）</li>
+</ul>
+</li>
+<li><p><strong>预警发布</strong></p>
+<ul>
+<li>预警信息生成</li>
+<li>预警信息推送</li>
+<li>预警信息确认</li>
+<li>预警信息解除</li>
+</ul>
+</li>
+</ul>
+<h3 id="4-决策支持">4. 决策支持</h3>
+<ul>
+<li><p><strong>风险可视化</strong></p>
+<ul>
+<li>风险分布图</li>
+<li>风险热力图</li>
+<li>风险等值线图</li>
+<li>风险3D展示</li>
+</ul>
+</li>
+<li><p><strong>决策建议</strong></p>
+<ul>
+<li>风险规避建议</li>
+<li>风险降低建议</li>
+<li>风险转移建议</li>
+<li>风险接受建议</li>
+</ul>
+</li>
+<li><p><strong>应急预案</strong></p>
+<ul>
+<li>应急响应流程</li>
+<li>资源配置建议</li>
+<li>人员调度方案</li>
+<li>协同工作机制</li>
+</ul>
+</li>
+</ul>
+<h2 id="使用方法">使用方法</h2>
+<h3 id="基本操作流程">基本操作流程</h3>
+<ol>
+<li><p><strong>风险因素定义</strong></p>
+<ul>
+<li>识别风险因素</li>
+<li>定义风险指标</li>
+<li>设定权重系数</li>
+<li>配置评估模型</li>
+</ul>
+</li>
+<li><p><strong>数据收集</strong></p>
+<ul>
+<li>收集相关数据</li>
+<li>数据预处理</li>
+<li>数据质量检查</li>
+<li>数据标准化</li>
+</ul>
+</li>
+<li><p><strong>风险评估</strong></p>
+<ul>
+<li>计算风险指数</li>
+<li>划分风险等级</li>
+<li>生成风险分布图</li>
+<li>分析风险特征</li>
+</ul>
+</li>
+<li><p><strong>预警监控</strong></p>
+<ul>
+<li>设置预警阈值</li>
+<li>实时监测风险</li>
+<li>发布预警信息</li>
+<li>跟踪预警状态</li>
+</ul>
+</li>
+<li><p><strong>决策制定</strong></p>
+<ul>
+<li>查看风险报告</li>
+<li>评估决策方案</li>
+<li>制定应对措施</li>
+<li>实施决策方案</li>
+</ul>
+</li>
+</ol>
+<h3 id="高级功能">高级功能</h3>
+<ul>
+<li><p><strong>情景分析</strong></p>
+<ul>
+<li>多情景模拟</li>
+<li>情景对比分析</li>
+<li>最优情景选择</li>
+<li>敏感性分析</li>
+</ul>
+</li>
+<li><p><strong>历史对比</strong></p>
+<ul>
+<li>历史风险对比</li>
+<li>风险趋势分析</li>
+<li>风险变化预测</li>
+<li>经验教训总结</li>
+</ul>
+</li>
+<li><p><strong>协同分析</strong></p>
+<ul>
+<li>多部门协同</li>
+<li>数据共享</li>
+<li>联合评估</li>
+<li>统一决策</li>
+</ul>
+</li>
+</ul>
+<h2 id="配置说明">配置说明</h2>
+<h3 id="风险指标配置">风险指标配置</h3>
+<h4 id="环境风险指标">环境风险指标</h4>
+<pre><code class="language-json">{
+  &quot;environmental_risk&quot;: {
+    &quot;indicators&quot;: [
+      {
+        &quot;name&quot;: &quot;air_quality_index&quot;,
+        &quot;weight&quot;: 0.3,
+        &quot;threshold&quot;: {
+          &quot;low&quot;: 50,
+          &quot;medium&quot;: 100,
+          &quot;high&quot;: 150,
+          &quot;severe&quot;: 200
+        }
+      },
+      {
+        &quot;name&quot;: &quot;water_quality_index&quot;,
+        &quot;weight&quot;: 0.3,
+        &quot;threshold&quot;: {
+          &quot;low&quot;: 40,
+          &quot;medium&quot;: 80,
+          &quot;high&quot;: 120,
+          &quot;severe&quot;: 160
+        }
+      },
+      {
+        &quot;name&quot;: &quot;noise_level&quot;,
+        &quot;weight&quot;: 0.2,
+        &quot;threshold&quot;: {
+          &quot;low&quot;: 55,
+          &quot;medium&quot;: 65,
+          &quot;high&quot;: 75,
+          &quot;severe&quot;: 85
+        }
+      },
+      {
+        &quot;name&quot;: &quot;soil_contamination&quot;,
+        &quot;weight&quot;: 0.2,
+        &quot;threshold&quot;: {
+          &quot;low&quot;: 1,
+          &quot;medium&quot;: 2,
+          &quot;high&quot;: 3,
+          &quot;severe&quot;: 4
+        }
+      }
+    ]
+  }
+}
+</code></pre>
+<h4 id="综合风险配置">综合风险配置</h4>
+<pre><code class="language-json">{
+  &quot;comprehensive_risk&quot;: {
+    &quot;dimensions&quot;: [
+      {&quot;name&quot;: &quot;environmental&quot;, &quot;weight&quot;: 0.4},
+      {&quot;name&quot;: &quot;health&quot;, &quot;weight&quot;: 0.3},
+      {&quot;name&quot;: &quot;economic&quot;, &quot;weight&quot;: 0.2},
+      {&quot;name&quot;: &quot;social&quot;, &quot;weight&quot;: 0.1}
+    ],
+    &quot;calculation_method&quot;: &quot;weighted_sum&quot;,
+    &quot;normalization&quot;: &quot;min_max&quot;
+  }
+}
+</code></pre>
+<h3 id="预警配置">预警配置</h3>
+<h4 id="预警阈值设置">预警阈值设置</h4>
+<pre><code class="language-json">{
+  &quot;warning_system&quot;: {
+    &quot;enabled&quot;: true,
+    &quot;levels&quot;: [
+      {
+        &quot;level&quot;: &quot;blue&quot;,
+        &quot;name&quot;: &quot;一般预警&quot;,
+        &quot;threshold&quot;: 0.3,
+        &quot;actions&quot;: [&quot;monitor&quot;, &quot;inform&quot;]
+      },
+      {
+        &quot;level&quot;: &quot;yellow&quot;,
+        &quot;name&quot;: &quot;较重预警&quot;,
+        &quot;threshold&quot;: 0.5,
+        &quot;actions&quot;: [&quot;monitor&quot;, &quot;inform&quot;, &quot;prepare&quot;]
+      },
+      {
+        &quot;level&quot;: &quot;orange&quot;,
+        &quot;name&quot;: &quot;严重预警&quot;,
+        &quot;threshold&quot;: 0.7,
+        &quot;actions&quot;: [&quot;monitor&quot;, &quot;inform&quot;, &quot;prepare&quot;, &quot;respond&quot;]
+      },
+      {
+        &quot;level&quot;: &quot;red&quot;,
+        &quot;name&quot;: &quot;特别严重预警&quot;,
+        &quot;threshold&quot;: 0.9,
+        &quot;actions&quot;: [&quot;emergency&quot;, &quot;evacuate&quot;, &quot;respond&quot;]
+      }
+    ]
+  }
+}
+</code></pre>
+<h3 id="决策支持配置">决策支持配置</h3>
+<h4 id="决策建议规则">决策建议规则</h4>
+<pre><code class="language-json">{
+  &quot;decision_support&quot;: {
+    &quot;rules&quot;: [
+      {
+        &quot;condition&quot;: &quot;risk_level == &#39;red&#39;&quot;,
+        &quot;actions&quot;: [&quot;immediate_evacuation&quot;, &quot;emergency_response&quot;, &quot;public_notification&quot;]
+      },
+      {
+        &quot;condition&quot;: &quot;risk_level == &#39;orange&#39;&quot;,
+        &quot;actions&quot;: [&quot;prepare_evacuation&quot;, &quot;increase_monitoring&quot;, &quot;resource_mobilization&quot;]
+      },
+      {
+        &quot;condition&quot;: &quot;risk_level == &#39;yellow&#39;&quot;,
+        &quot;actions&quot;: [&quot;enhanced_monitoring&quot;, &quot;contingency_planning&quot;, &quot;stakeholder_notification&quot;]
+      },
+      {
+        &quot;condition&quot;: &quot;risk_level == &#39;blue&#39;&quot;,
+        &quot;actions&quot;: [&quot;routine_monitoring&quot;, &quot;periodic_assessment&quot;, &quot;information_dissemination&quot;]
+      }
+    ]
+  }
+}
+</code></pre>
+<h2 id="技术实现">技术实现</h2>
+<h3 id="核心算法">核心算法</h3>
+<ul>
+<li><p><strong>风险指数计算</strong></p>
+<pre><code>Risk_Index = Σ (wᵢ × fᵢ(x))
+</code></pre>
+<p>其中：wᵢ为权重，fᵢ(x)为归一化后的指标值</p>
+</li>
+<li><p><strong>综合风险评估</strong></p>
+<pre><code>Comprehensive_Risk = Σ (Wⱼ × Rⱼ)
+</code></pre>
+<p>其中：Wⱼ为维度权重，Rⱼ为维度风险指数</p>
+</li>
+<li><p><strong>动态风险评估</strong></p>
+<pre><code>Dynamic_Risk(t) = α × Risk(t) + (1-α) × Risk(t-1)
+</code></pre>
+<p>其中：α为平滑系数，Risk(t)为当前时刻风险</p>
+</li>
+</ul>
+<h3 id="后端实现">后端实现</h3>
+<ul>
+<li><strong>核心类</strong>：<code>RiskAssessor</code>、<code>RiskCalculator</code>、<code>WarningSystem</code></li>
+<li><strong>算法库</strong>：numpy、pandas、scikit-learn</li>
+<li><strong>性能优化</strong>：并行计算、增量更新、缓存机制</li>
+</ul>
+<h3 id="前端实现">前端实现</h3>
+<ul>
+<li><strong>可视化组件</strong>：基于Leaflet、ECharts、Three.js</li>
+<li><strong>交互设计</strong>：风险区域标注、预警信息推送</li>
+<li><strong>响应式布局</strong>：支持桌面端和移动端</li>
+</ul>
+<h2 id="性能指标">性能指标</h2>
+<h3 id="评估性能">评估性能</h3>
+<ul>
+<li><strong>小规模评估</strong>（&lt; 100区域）：1-3秒</li>
+<li><strong>中等规模评估</strong>（100-1000区域）：3-15秒</li>
+<li><strong>大规模评估</strong>（&gt; 1000区域）：15秒-2分钟</li>
+</ul>
+<h3 id="预警响应">预警响应</h3>
+<ul>
+<li><strong>实时预警</strong>：&lt; 1秒</li>
+<li><strong>趋势预警</strong>：5-10秒</li>
+<li><strong>批量预警</strong>：10-30秒</li>
+<li><strong>预警准确率</strong>：&gt; 90%</li>
+</ul>
+<h2 id="应用场景">应用场景</h2>
+<h3 id="环境保护">环境保护</h3>
+<ul>
+<li><p><strong>环境污染风险评估</strong></p>
+<ul>
+<li>空气污染风险评估</li>
+<li>水污染风险评估</li>
+<li>土壤污染风险评估</li>
+<li>噪声污染风险评估</li>
+</ul>
+</li>
+<li><p><strong>生态风险评估</strong></p>
+<ul>
+<li>生物多样性风险评估</li>
+<li>生态系统脆弱性评估</li>
+<li>生态恢复风险评估</li>
+<li>生态保护效果评估</li>
+</ul>
+</li>
+</ul>
+<h3 id="公共安全">公共安全</h3>
+<ul>
+<li><p><strong>自然灾害风险评估</strong></p>
+<ul>
+<li>洪水风险评估</li>
+<li>地震风险评估</li>
+<li>滑坡风险评估</li>
+<li>台风风险评估</li>
+</ul>
+</li>
+<li><p><strong>公共卫生风险评估</strong></p>
+<ul>
+<li>传染病风险评估</li>
+<li>食品安全风险评估</li>
+<li>职业健康风险评估</li>
+<li>突发公共卫生事件评估</li>
+</ul>
+</li>
+</ul>
+<h3 id="城市规划">城市规划</h3>
+<ul>
+<li><p><strong>城市安全风险评估</strong></p>
+<ul>
+<li>消防安全风险评估</li>
+<li>交通安全风险评估</li>
+<li>建筑安全风险评估</li>
+<li>公共设施风险评估</li>
+</ul>
+</li>
+<li><p><strong>城市韧性评估</strong></p>
+<ul>
+<li>灾害承受能力评估</li>
+<li>应急响应能力评估</li>
+<li>恢复能力评估</li>
+<li>适应能力评估</li>
+</ul>
+</li>
+</ul>
+<h2 id="常见问题">常见问题</h2>
+<h3 id="q1-如何确定风险指标的权重">Q1: 如何确定风险指标的权重？</h3>
+<p>A: 采用以下方法：</p>
+<ul>
+<li>专家打分法</li>
+<li>层次分析法（AHP）</li>
+<li>德尔菲法</li>
+<li>数据驱动方法</li>
+</ul>
+<h3 id="q2-如何设置合理的预警阈值">Q2: 如何设置合理的预警阈值？</h3>
+<p>A: 考虑以下因素：</p>
+<ul>
+<li>历史风险数据</li>
+<li>相关标准和规范</li>
+<li>专家经验判断</li>
+<li>实际承受能力</li>
+</ul>
+<h3 id="q3-如何提高风险评估的准确性">Q3: 如何提高风险评估的准确性？</h3>
+<p>A: 采用以下策略：</p>
+<ul>
+<li>使用高质量数据</li>
+<li>选择合适的评估模型</li>
+<li>定期更新评估参数</li>
+<li>进行模型验证</li>
+</ul>
+<h3 id="q4-风险评估如何与其他模块集成">Q4: 风险评估如何与其他模块集成？</h3>
+<p>A: 集成方式包括：</p>
+<ul>
+<li>与不确定性分析集成</li>
+<li>与异常检测集成</li>
+<li>与实时插值集成</li>
+<li>与决策支持系统集成</li>
+</ul>
+<h3 id="q5-如何处理风险评估中的不确定性">Q5: 如何处理风险评估中的不确定性？</h3>
+<p>A: 采用以下方法：</p>
+<ul>
+<li>蒙特卡洛模拟</li>
+<li>敏感性分析</li>
+<li>情景分析</li>
+<li>概率风险评估</li>
+</ul>
+<h2 id="最佳实践">最佳实践</h2>
+<h3 id="1-风险评估工作流">1. 风险评估工作流</h3>
+<pre><code>风险识别 → 风险分析 → 风险评估 → 风险预警 → 风险应对 → 效果评估 → 持续改进
+</code></pre>
+<h3 id="2-指标选择原则">2. 指标选择原则</h3>
+<ul>
+<li><strong>科学性</strong>：指标有科学依据</li>
+<li><strong>可操作性</strong>：指标可测量和计算</li>
+<li><strong>代表性</strong>：指标能代表风险特征</li>
+<li><strong>独立性</strong>：指标间尽量独立</li>
+</ul>
+<h3 id="3-权重设定原则">3. 权重设定原则</h3>
+<ul>
+<li><strong>专家经验</strong>：基于专家判断</li>
+<li><strong>数据分析</strong>：基于统计分析</li>
+<li><strong>政策导向</strong>：符合政策要求</li>
+<li><strong>动态调整</strong>：根据实际情况调整</li>
+</ul>
+<h3 id="4-预警响应原则">4. 预警响应原则</h3>
+<ul>
+<li><strong>及时性</strong>：快速响应预警</li>
+<li><strong>准确性</strong>：准确判断风险</li>
+<li><strong>有效性</strong>：采取有效措施</li>
+<li><strong>协调性</strong>：多部门协同</li>
+</ul>
+<h2 id="更新日志">更新日志</h2>
+<h3 id="v120-2026-04-12">v1.2.0 (2026-04-12)</h3>
+<ul>
+<li>新增情景分析功能</li>
+<li>优化风险指数计算</li>
+<li>增强预警系统</li>
+</ul>
+<h3 id="v110-2026-03-20">v1.1.0 (2026-03-20)</h3>
+<ul>
+<li>新增历史对比功能</li>
+<li>改进决策支持算法</li>
+<li>增加协同分析功能</li>
+</ul>
+<h3 id="v100-2026-02-01">v1.0.0 (2026-02-01)</h3>
+<ul>
+<li>初始版本发布</li>
+<li>支持基础风险评估</li>
+<li>实现预警功能</li>
+</ul>
+<h2 id="技术支持">技术支持</h2>
+<p>如遇到问题或需要技术支持，请联系：</p>
+<ul>
+<li>邮箱：<a href="mailto:1447954419@qq.com">1447954419@qq.com</a></li>
+<li>GitHub：<a href="https://github.com/Kevin-Wu200/UDAKE">https://github.com/Kevin-Wu200/UDAKE</a></li>
+</ul>
+
+          </article>
+        </section>
+      </main>
+
+      <footer class="site-footer">
+        <p>© 2026 UDAKE. All rights reserved.</p>
+      </footer>
+    </div>
+  </body>
+</html>
