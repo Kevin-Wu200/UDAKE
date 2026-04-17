@@ -22,7 +22,7 @@
       "useDialog": true
     },
     "UDAKEConfig": {
-      "apiBaseUrl": "https://udake.xyz"
+      "apiBaseUrl": "http://172.20.10.2:8000"
     }
   },
   "android": {
