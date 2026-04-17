@@ -41,6 +41,7 @@ from .api.product_keys_api import router as product_keys_router
 from .api.company_management_api import router as company_management_router
 from .api.devices_api import router as devices_router
 from .api.scheduler_api import router as scheduler_router
+from .api.tickets_api import router as tickets_router
 from .scheduler.key_expiry_scheduler import get_scheduler_manager
 from .services.mobile_gps_service import mobile_gps_service
 
@@ -205,6 +206,7 @@ app.include_router(product_keys_router, prefix="/api", tags=["密钥"])
 app.include_router(devices_router, prefix="/api", tags=["设备管理"])
 app.include_router(company_management_router, prefix="/api", tags=["企业管理"])
 app.include_router(admin_router, prefix="/api", tags=["管理员后台"])
+app.include_router(tickets_router, prefix="/api", tags=["密钥申请工单"])
 app.include_router(scheduler_router, prefix="/api", tags=["定时任务管理"])
 app.include_router(api_versioning_router)
 
