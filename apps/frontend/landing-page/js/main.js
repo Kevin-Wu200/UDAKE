@@ -2,7 +2,6 @@
   const DOWNLOAD_URLS = {
     android: "/android_downloads/app-release.apk",
     windows: "/windows_downloads/UDAKE-1.0.0.exe",
-    macos: "/macos_downloads/UDAKE-1.0.0.dmg",
     macosX64: "/macos_downloads/UDAKE-1.0.0-x64.dmg",
     macosArm64: "/macos_downloads/UDAKE-1.0.0-arm64.dmg",
   };
@@ -213,42 +212,12 @@
       windowsButton.setAttribute("href", DOWNLOAD_URLS.windows);
     }
 
-    const macosButton = document.getElementById("macosDownload");
-    if (macosButton) {
-      macosButton.setAttribute("href", resolveMacDownloadUrl());
-      refreshMacStatusText();
-    }
-
     document.querySelectorAll(".coming-soon").forEach(function (button) {
       button.addEventListener("click", function () {
         const platform = button.getAttribute("data-platform") || "platform";
         openModal(platform);
       });
     });
-  }
-
-  function resolveMacDownloadUrl() {
-    const userAgent = (window.navigator.userAgent || "").toLowerCase();
-    const likelyArm64 = /arm64|aarch64|apple silicon/.test(userAgent);
-    if (likelyArm64) {
-      return DOWNLOAD_URLS.macosArm64;
-    }
-    return DOWNLOAD_URLS.macosX64 || DOWNLOAD_URLS.macos;
-  }
-
-  function refreshMacStatusText() {
-    const status = document.getElementById("macosDownloadStatus");
-    if (!status) {
-      return;
-    }
-
-    const language = window.UDAKEI18N
-      ? window.UDAKEI18N.getCurrentLanguage()
-      : "zh-CN";
-    const isArm64 = resolveMacDownloadUrl() === DOWNLOAD_URLS.macosArm64;
-    const directText = language === "en-US" ? "Download Now" : "立即下载";
-    const archText = isArm64 ? "Apple Silicon" : "Intel";
-    status.textContent = directText + " (" + archText + ")";
   }
 
   function bindModalActions() {
@@ -354,7 +323,6 @@
     }
 
     window.addEventListener("udake-language-change", renderIcons);
-    window.addEventListener("udake-language-change", refreshMacStatusText);
   }
 
   if (document.readyState === "loading") {

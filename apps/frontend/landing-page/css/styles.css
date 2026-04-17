@@ -270,6 +270,10 @@ a {
   cursor: pointer;
 }
 
+.download-card-macos {
+  cursor: default;
+}
+
 .download-card .platform {
   font-size: 22px;
   font-weight: 600;
@@ -293,6 +297,60 @@ a {
 .download-card:hover {
   transform: translateY(-3px);
   box-shadow: 0 16px 30px -20px rgba(29, 29, 31, 0.4);
+}
+
+.download-card-macos:hover {
+  transform: none;
+}
+
+.download-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  width: 100%;
+  margin-top: 16px;
+}
+
+.download-option {
+  flex: 1 1 168px;
+  min-height: 64px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  color: var(--color-text-main);
+  text-decoration: none;
+  transition:
+    transform var(--transition-base),
+    box-shadow var(--transition-base),
+    border-color var(--transition-base),
+    background var(--transition-base);
+}
+
+.download-option:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 149, 0, 0.45);
+  background: linear-gradient(130deg, #fffaf2 0%, #fff4e5 100%);
+  box-shadow: 0 14px 24px -20px rgba(29, 29, 31, 0.45);
+}
+
+.download-option:active {
+  transform: translateY(0);
+}
+
+.download-option-label {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.download-option-meta {
+  color: var(--color-text-sub);
+  font-size: 13px;
 }
 
 .coming-soon {
@@ -463,5 +521,13 @@ body.page-transitioning {
 
   .feature-highlights {
     margin-top: 10px;
+  }
+
+  .download-options {
+    flex-direction: column;
+  }
+
+  .download-option {
+    width: 100%;
   }
 }

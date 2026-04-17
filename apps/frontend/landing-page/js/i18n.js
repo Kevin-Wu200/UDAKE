@@ -195,6 +195,7 @@
         macos: "macOS",
         direct: "立即下载",
         comingSoon: "即将推出",
+        chooseArchitecture: "选择芯片架构下载",
         appleSilicon: "Apple Silicon",
         intel: "Intel",
       },
@@ -445,6 +446,8 @@
         macos: "macOS",
         direct: "Download Now",
         comingSoon: "Coming Soon",
+        chooseArchitecture:
+          "Choose your chip architecture",
         appleSilicon: "Apple Silicon",
         intel: "Intel",
       },
