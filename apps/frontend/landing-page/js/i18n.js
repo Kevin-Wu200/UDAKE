@@ -14,9 +14,9 @@
         toggleAria: "切换语言",
       },
       hero: {
-        kicker: "UDAKE 平台",
+        kicker: "UDAKE",
         title: "智能空间决策，驱动未来",
-        subtitle: "专业的空间插值与不确定性分析平台",
+        subtitle: "空间插值与不确定性分析平台",
         cta: "立即体验",
       },
       features: {
@@ -278,10 +278,10 @@
         toggleAria: "Switch language",
       },
       hero: {
-        kicker: "UDAKE Platform",
+        kicker: "UDAKE",
         title: "Intelligent Spatial Decisions for the Future",
         subtitle:
-          "A professional platform for spatial interpolation and uncertainty analysis",
+          "Platform for spatial interpolation and uncertainty analysis",
         cta: "Get Started",
       },
       features: {

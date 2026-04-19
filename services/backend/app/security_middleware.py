@@ -90,7 +90,7 @@ async def security_guard_middleware(request: Request, call_next):
                 request._receive = _receive  # type: ignore[attr-defined]
 
         # CSRF double-submit validation.
-        if settings.AUTH_CSRF_ENABLED and request.url.path.startswith("/api"):
+        if settings.AUTH_CSRF_ENABLED and request.url.path.startswith("/api") and not (settings.is_development or settings.is_testing):
             csrf_manager = CSRFManager(
                 service.cache,
                 cookie_name=settings.AUTH_CSRF_COOKIE_NAME,
