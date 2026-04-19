@@ -10,6 +10,8 @@ const SMTPSettingsView = () => import('../views/SMTPSettings.vue');
 const EmailLogsView = () => import('../views/EmailLogs.vue');
 const UsersView = () => import('../views/UsersView.vue');
 const AuditLogsView = () => import('../views/AuditLogsView.vue');
+const TicketsView = () => import('../views/TicketsView.vue');
+const TicketDetailView = () => import('../views/TicketDetailView.vue');
 const WorkflowListView = () => import('../views/workflow/WorkflowList.vue');
 const WorkflowEditorView = () => import('../views/workflow/WorkflowEditor.vue');
 const HistoryAnalysisLayoutView = () => import('../views/history-analysis/HistoryAnalysisLayout.vue');
@@ -274,6 +276,18 @@ const router = createRouter({
           name: 'users',
           component: UsersView,
           meta: { title: '用户管理', titleKey: 'users', breadcrumbKey: 'users' }
+        },
+        {
+          path: '/tickets',
+          name: 'tickets',
+          component: TicketsView,
+          meta: { title: '工单管理', titleKey: 'tickets', breadcrumbKey: 'tickets' }
+        },
+        {
+          path: '/tickets/:id',
+          name: 'ticket-detail',
+          component: TicketDetailView,
+          meta: { title: '工单详情', titleKey: 'ticketDetail', breadcrumbKey: 'ticketDetail' }
         },
         {
           path: '/audit-logs',
