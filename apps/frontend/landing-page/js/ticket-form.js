@@ -18,9 +18,39 @@
     const keyTypeGroup = document.getElementById('keyTypeGroup');
     const existingKeyGroup = document.getElementById('existingKeyGroup');
     
+    let iti; // intl-tel-input 实例
+    const phoneInput = document.getElementById('phone');
+    const phoneErrorMsg = document.getElementById('phone-error-msg');
+    
     // 初始化
     function init() {
+        initIntlTelInput();
         bindEvents();
+    }
+    
+    // 初始化国际电话插件
+    function initIntlTelInput() {
+        if (!phoneInput) return;
+        
+        iti = window.intlTelInput(phoneInput, {
+            initialCountry: "auto",
+            geoIpLookup: function(success, failure) {
+                fetch("https://ipapi.co/json")
+                    .then(res => res.json())
+                    .then(data => success(data.country_code))
+                    .catch(() => success("cn"));
+            },
+            preferredCountries: ["cn", "us", "hk", "gb"],
+            utilsScript: "https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/utils.js",
+            separateDialCode: true
+        });
+        
+        // 监听输入事件，清除错误状态
+        phoneInput.addEventListener('input', () => {
+            const group = phoneInput.closest('.ticket-form-group');
+            group.classList.remove('has-error');
+            if (phoneErrorMsg) phoneErrorMsg.style.display = 'none';
+        });
     }
     
     // 绑定事件
@@ -132,6 +162,11 @@
         // 收集数据
         const formData = new FormData(ticketForm);
         const data = Object.fromEntries(formData.entries());
+        
+        // 获取 E.164 标准格式手机号
+        if (iti) {
+            data.phone = iti.getNumber();
+        }
         
         try {
             submitBtn.disabled = true;
@@ -256,6 +291,41 @@
                 if (input.type === 'email' && !validateEmail(input.value)) {
                     group.classList.add('has-error');
                     isValid = false;
+                }
+                
+                // 电话验证
+                if (input.id === 'phone') {
+                    if (iti && !iti.isValidNumber()) {
+                        const errorCode = iti.getValidationError();
+                        let msg = '手机号格式不正确';
+                        
+                        // 映射错误信息
+                        if (typeof intlTelInputUtils !== 'undefined') {
+                            if (errorCode === intlTelInputUtils.validationError.TOO_SHORT) {
+                                msg = '手机号长度不足';
+                            }
+                        }
+                        
+                        // 尝试从 i18n 获取翻译
+                        if (window.UDAKEI18N) {
+                            const lang = window.UDAKEI18N.getCurrentLanguage();
+                            const dictionary = lang === 'zh-CN' ? 'zh-CN' : 'en-US';
+                            // 这里简单模拟 getByPath 逻辑或直接硬编码映射，
+                            // 鉴于 i18n.js 逻辑，我们直接根据当前语言判断
+                            if (errorCode === 1) { // TOO_SHORT
+                                msg = lang === 'zh-CN' ? '手机号长度不足' : 'Phone number too short';
+                            } else {
+                                msg = lang === 'zh-CN' ? '手机号格式不正确' : 'Invalid phone number';
+                            }
+                        }
+                        
+                        group.classList.add('has-error');
+                        if (phoneErrorMsg) {
+                            phoneErrorMsg.innerText = msg;
+                            phoneErrorMsg.style.display = 'block';
+                        }
+                        isValid = false;
+                    }
                 }
             }
         });

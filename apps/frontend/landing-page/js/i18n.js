@@ -244,7 +244,9 @@
         },
         errors: {
           required: "该字段为必填项",
-          email: "邮箱格式不正确"
+          email: "邮箱格式不正确",
+          phoneInvalid: "手机号格式不正确",
+          phoneTooShort: "手机号长度不足"
         },
         success: {
           title: "提交成功",
@@ -543,7 +545,9 @@
         },
         errors: {
           required: "This field is required",
-          email: "Invalid email format"
+          email: "Invalid email format",
+          phoneInvalid: "Invalid phone number",
+          phoneTooShort: "Phone number too short"
         },
         success: {
           title: "Submitted Successfully",

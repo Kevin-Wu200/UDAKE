@@ -7,6 +7,7 @@
     <link rel="stylesheet" href="./css/variables.css" />
     <link rel="stylesheet" href="./css/styles.css" />
     <link rel="stylesheet" href="./css/ticket-form.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/css/intlTelInput.css">
   </head>
   <body>
     <div class="page-shell">
@@ -485,8 +486,8 @@
 
           <div class="ticket-form-group">
             <label for="phone" data-i18n="ticket.fields.phone">电话号码</label>
-            <input type="tel" id="phone" name="phone" required placeholder="请输入手机号" data-i18n-placeholder="ticket.placeholders.phone">
-            <div class="error-msg" data-i18n="ticket.errors.required">该字段为必填项</div>
+            <input type="tel" id="phone" name="phone" required>
+            <div id="phone-error-msg" class="error-msg" style="display:none;"></div>
           </div>
 
           <div class="ticket-form-group">
@@ -552,6 +553,7 @@
     </div>
 
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/intl-tel-input/17.0.19/js/intlTelInput.min.js"></script>
     <script src="./js/i18n.js"></script>
     <script src="./js/main.js"></script>
     <script src="./js/ticket-form.js"></script>

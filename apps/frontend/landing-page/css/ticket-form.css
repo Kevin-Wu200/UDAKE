@@ -222,3 +222,52 @@
 .btn-get-key {
     margin-left: 10px;
 }
+
+/* intl-tel-input 适配 */
+.iti {
+    width: 100%;
+    display: block;
+}
+
+.iti__country-list {
+    z-index: 1010;
+    background-color: var(--card-bg, #fff);
+    color: var(--text-color, #333);
+    border: 1px solid var(--border-color, #ccc);
+    max-width: 400px;
+}
+
+.iti__country {
+    padding: 8px 10px;
+}
+
+.iti__country-name, .iti__dial-code {
+    color: var(--text-color, #333);
+}
+
+.iti__flag-container {
+    z-index: 5;
+}
+
+/* 暗色模式适配 (如果变量中有定义) */
+[data-theme="dark"] .iti__country-list {
+    background-color: #2d2d2d;
+    border-color: #444;
+}
+
+[data-theme="dark"] .iti__country:hover {
+    background-color: #3d3d3d;
+}
+
+[data-theme="dark"] .iti__country-name, 
+[data-theme="dark"] .iti__dial-code {
+    color: #eee;
+}
+
+.ticket-form-group.has-error .iti input {
+    border-color: #dc3545;
+}
+
+.ticket-form-group.has-error .iti input:focus {
+    box-shadow: 0 0 0 3px rgba(220, 53, 69, 0.1);
+}
