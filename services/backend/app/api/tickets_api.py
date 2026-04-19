@@ -46,6 +46,9 @@ _ADMIN_RSA_D = int(
     "444536529318902547281630975310580646401209487762487120996819065058041336924603321362037892551086296"
     "64759349273"
 )
+from ..utils.email_service import EmailService
+
+email_service = EmailService()
 _key_registry = ProductKeyRegistry()
 
 
@@ -469,6 +472,10 @@ def create_ticket(
         )
         db.add(ticket)
         db.flush()
+        try:
+            email_service.send_ticket_notification(ticket, "submitted")
+        except Exception as e:
+            logger.error("发送创建工单通知邮件失败: %s", e)
         _record_audit_log(
             db,
             user=None,
@@ -656,6 +663,14 @@ def approve_ticket(
         )
         db.commit()
         db.refresh(ticket)
+        try:
+            email_service.send_ticket_notification(
+                ticket, 
+                "approved", 
+                {"assigned_key": assigned_key, "approval_notes": notes}
+            )
+        except Exception as e:
+            logger.error("发送审批通过通知邮件失败: %s", e)
         logger.info("审批通过工单成功 ticket_id=%s processor_id=%s", ticket.id, current_user.id)
         return success_response(
             "工单审批通过",
@@ -717,6 +732,14 @@ def reject_ticket(
         )
         db.commit()
         db.refresh(ticket)
+        try:
+            email_service.send_ticket_notification(
+                ticket, 
+                "rejected", 
+                {"rejection_reason": reason}
+            )
+        except Exception as e:
+            logger.error("发送审批拒绝通知邮件失败: %s", e)
         logger.info("拒绝工单成功 ticket_id=%s processor_id=%s", ticket.id, current_user.id)
         return success_response("工单已拒绝", {"ticket": generate_ticket_response(ticket)})
     except HTTPException:

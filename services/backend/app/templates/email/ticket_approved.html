@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        h2 { color: #27ae60; }
+        .key { font-weight: bold; color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>工单申请已批准</h2>
+        <p>您好，您的工单申请已批准。</p>
+        <ul>
+            <li>工单ID: {{ ticket_id }}</li>
+            <li>分配的密钥: <span class="key">{{ assigned_key }}</span></li>
+            <li>审批备注: {{ approval_notes }}</li>
+        </ul>
+        <p>感谢您的使用。</p>
+    </div>
+</body>
+</html>
