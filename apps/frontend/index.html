@@ -56,6 +56,7 @@
         <header class="header" role="banner">
             <div class="header-content">
                 <div class="header-main-row">
+                    <button id="new-project-btn" class="btn btn-primary" data-i18n="nav.newProject" style="width: 10%; margin-left: 10%;">新建项目</button>
                     <div class="header-left"></div>
                     <h1 class="title">
                         <span class="title-zh" data-i18n="app.title">智能不确定性驱动空间决策平台</span>
@@ -69,7 +70,6 @@
                             </svg>
                         </button>
                         <div id="language-switcher-container" aria-label="language switcher"></div>
-                        <button id="new-project-btn" class="btn btn-primary" data-i18n="nav.newProject">新建项目</button>
                     </div>
                 </div>
                 <div id="header-quick-action-container" class="header-quick-action-container" aria-label="快捷操作栏容器"></div>
@@ -108,20 +108,20 @@
                     <div class="panel-content">
                         <div class="kriging-template-toolbar">
                             <div class="form-group">
-                                <label for="kriging-template-select">参数模板</label>
+                                <label for="kriging-template-select" data-i18n="template.Parameter">参数模板</label>
                                 <select id="kriging-template-select" class="select">
-                                    <option value="balanced">平衡模式（默认）</option>
-                                    <option value="quick-estimate">快速估算模式</option>
-                                    <option value="high-precision">高精度模式</option>
-                                    <option value="large-dataset">大数据集模式</option>
-                                    <option value="terrain-analysis">地形分析模式</option>
-                                    <option value="custom">自定义模板</option>
+                                    <option value="balanced" data-i18n="template.balanced">平衡模式（默认）</option>
+                                    <option value="quick-estimate" data-i18n="template.quick-estimate">快速估算模式</option>
+                                    <option value="high-precision" data-i18n="template.high-precision">高精度模式</option>
+                                    <option value="large-dataset" data-i18n="template.large-dataset">大数据集模式</option>
+                                    <option value="terrain-analysis" data-i18n="template.terrain-analysis">地形分析模式</option>
+                                    <option value="custom" data-i18n="template.custom">自定义模板</option>
                                 </select>
-                                <span class="param-description">为常见场景提供参数起点，可继续手动微调</span>
+                                <span class="param-description" data-i18n="template.description">为常见场景提供参数起点，可继续手动微调</span>
                             </div>
                             <div class="kriging-template-actions">
-                                <button id="apply-template-btn" class="btn btn-secondary" type="button">应用模板</button>
-                                <button id="recommend-template-btn" class="btn btn-secondary" type="button">智能推荐</button>
+                                <button id="apply-template-btn" class="btn btn-secondary" type="button" data-i18n="template.app">应用模板</button>
+                                <button id="recommend-template-btn" class="btn btn-secondary" type="button" data-i18n="Intelligent-recommend">智能推荐</button>
                             </div>
                         </div>
 
@@ -150,7 +150,7 @@
                             <input type="range" id="grid-resolution-slider" class="slider" min="50" max="500" value="100" step="10">
                             <input type="number" id="grid-resolution" class="input" value="100" min="50" max="500" step="10">
                             <span class="param-description" data-i18n="kriging.gridResolution.desc">影响输出栅格的精细度，值越大越精细但计算越慢</span>
-                            <span id="grid-resolution-error" class="error-message">网格分辨率必须是 1~10000 的正整数</span>
+                            <span id="grid-resolution-error" class="error-message" data-i18n="error.grid-resolution">网格分辨率必须是 1~10000 的正整数</span>
                         </div>
 
                         <div class="form-group slider-group">
@@ -161,7 +161,7 @@
                         </div>
 
                         <details class="kriging-advanced-toggle">
-                            <summary>高级参数（新手可保持默认）</summary>
+                            <summary data-i18n="advanced.parameters">高级参数（新手可保持默认）</summary>
                             <div id="kriging-advanced-fields">
                                 <div class="form-group slider-group">
                                     <label data-i18n="kriging.nugget">变差值 <span class="help-dot" title="块金值表示微尺度波动或测量误差，建议不大于基台值的 30%">?</span> <span class="param-value" id="nugget-value">0.0</span></label>
@@ -190,18 +190,18 @@
                         </details>
 
                         <details class="kriging-help-doc">
-                            <summary>参数帮助文档</summary>
+                            <summary data-i18n="kriging.help">参数帮助文档</summary>
                             <div id="kriging-help-doc" class="kriging-help-doc-body">
-                                <p><strong>快速上手：</strong>先选择“平衡模式”，上传采样点后点击“智能推荐”，最后根据警告做小幅调整。</p>
-                                <p><strong>参数关系：</strong>建议保持 <code>nugget ≤ sill</code>，且 <code>range</code> 不宜过大，否则容易过平滑。</p>
-                                <p><strong>经验范围：</strong>网格分辨率 80~220，滞后数 10~18，块金值通常小于 0.3。</p>
+                                <p><strong data-i18n="kriging.help.quick-start">快速上手：</strong data-i18n="kriging.help.quick-start.suggest">先选择“平衡模式”，上传采样点后点击“智能推荐”，最后根据警告做小幅调整。</p>
+                                <p><strong data-i18n="kriging.help.parameter-relations">参数关系：</strong data-i18n="kriging.help.parameter-relations.suggest">建议保持 <code>nugget ≤ sill</code>，且 <code>range</code> 不宜过大，否则容易过平滑。</p>
+                                <p><strong data-i18n="kriging.help.experience-range">经验范围：</strong data-i18n="kriging.help.experience-range.suggestion">网格分辨率 80~220，滞后数 10~18，块金值通常小于 0.3。</p>
                             </div>
                         </details>
 
                         <div class="kriging-template-actions">
-                            <button id="save-template-btn" class="btn btn-secondary" type="button">保存为模板</button>
-                            <button id="export-template-btn" class="btn btn-secondary" type="button">导出模板</button>
-                            <button id="import-template-btn" class="btn btn-secondary" type="button">导入模板</button>
+                            <button id="save-template-btn" class="btn btn-secondary" type="button" data-i18n="template.save">保存为模板</button>
+                            <button id="export-template-btn" class="btn btn-secondary" type="button" data-i18n="template.export">导出模板</button>
+                            <button id="import-template-btn" class="btn btn-secondary" type="button" data-i18n="template.import">导入模板</button>
                         </div>
 
                         <button id="start-kriging-btn" class="btn btn-primary" disabled data-i18n="kriging.start">开始插值</button>
@@ -311,7 +311,7 @@
                             <div class="cache-storage-bar">
                                 <div class="cache-storage-fill" id="cache-storage-fill"></div>
                             </div>
-                            <span class="cache-storage-text" id="cache-storage-text">0 B / 50 MB</span>
+                            <span class="cache-storage-text" id="cache-storage-text">0 B / 16 GB</span>
                         </div>
                         <div class="cache-status-item">
                             <div class="cache-status-label">
@@ -329,7 +329,7 @@
 
             <!-- 地图容器 -->
             <div class="map-container" role="region" aria-label="地图展示区域">
-                <p id="map-screen-reader-description" class="sr-only">地图支持键盘操作。聚焦地图后，可使用方向键平移，+ 或 - 调整缩放。</p>
+                <p id="map-screen-reader-description" class="sr-only" data-i18n="map.screenReaderDescription">地图支持键盘操作。聚焦地图后，可使用方向键平移，+ 或 - 调整缩放。</p>
                 <div id="viewDiv" class="map-view" tabindex="0" role="application" aria-label="空间地图视图" aria-describedby="map-screen-reader-description"></div>
                 <div id="info-panel" class="info-panel" style="display: none;">
                     <h3 data-i18n="map.clickInfo">点击信息</h3>

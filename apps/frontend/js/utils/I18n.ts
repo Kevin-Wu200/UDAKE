@@ -57,6 +57,14 @@ const ZH_CN: LocaleMessages = {
     'kriging.range.desc': '变异函数达到基台值时的距离，表示空间相关范围',
     'kriging.start': '开始插值',
     'kriging.resolutionError': '网格分辨率必须为大于0的整数',
+    'advanced.parameters': '高级参数（新手可保持默认）',
+    'kriging.help': '参数帮助文档',
+    'kriging.help.quick-start': '快速上手',
+    'kriging.help.parameter-relations': '参数关系',
+    'kriging.help.experience-range': '经验范围',
+    'kriging.help.quick-start.suggestion': '先选择“平衡模式”，上传采样点后点击“智能推荐”，最后根据警告做小幅调整。',
+    'kriging.help.parameter-relations.suggestion': '建议保持 <code>nugget ≤ sill</code>，且 <code>range</code> 不宜过大，否则容易过平滑。',
+    'kriging.help.experience-range.suggestion': '网格分辨率 80~220，滞后数 10~18，块金值通常小于 0.3。',
 
     // 任务状态
     'task.title': '任务状态',
@@ -92,6 +100,20 @@ const ZH_CN: LocaleMessages = {
     'template.desc': '下载 GeoJSON 模板文件，按格式填写数据后上传',
     'template.download': '下载',
     'template.rules': '数据格式要求',
+    'template.Parameter': '参数模板',
+    'template.balanced': '平衡模式（默认）',
+    'template.quick-estimate': '快速估算模式',
+    'template.high-precision': '高精度模式',
+    'template.large-dataset': '大数据集模式',
+    'template.terrain-analysis': '地形分析模式',
+    'template.custom': '自定义模板',
+    'template.description': '为常见场景提供参数起点，可继续手动微调',
+    'template.app': '应用模板',
+    'Intelligent.recommend': '智能推荐',
+    'template.save': '保存为模板',
+    'template.export': '导出模板',
+    'template.import': '导入模板',
+
 
     // 历史
     'history.title': '操作历史',
@@ -206,6 +228,7 @@ const ZH_CN: LocaleMessages = {
     'error.geolocation.position_unavailable': '位置信息不可用',
     'error.geolocation.timeout': '定位请求超时',
     'error.geolocation.unknown': '未知的定位错误',
+    'error.grid-resolution': '网格分辨率必须是 1~10000 的正整数',
 
     // 通用
     'common.confirm': '确认',
@@ -346,6 +369,7 @@ const ZH_CN: LocaleMessages = {
     // 地图
     'map.clickInfo': '点击信息',
     'sidebar.toggle': '切换侧边栏',
+    'map.screenReaderDescription': '地图支持键盘操作。聚焦地图后，可使用方向键平移，+ 或 - 调整缩放。',
 
     // 采样建议
     'recommendation.title': '采样建议',
@@ -509,6 +533,13 @@ const EN_US: LocaleMessages = {
     'kriging.range.desc': 'Distance where the variogram reaches sill, indicating spatial correlation range',
     'kriging.start': 'Start Interpolation',
     'kriging.resolutionError': 'Grid resolution must be a positive integer',
+    'kriging.help': 'Parameter help document',
+    'kriging.help.quick-start': 'Quick Start',
+    'kriging.help.parameter-relations': 'Parameter Relations',
+    'kriging.help.experience-range': 'Experience Range',
+    'kriging.help.quick-start.suggestion': 'First, select "Balanced Mode", upload the sampling points, click "Smart Recommendation", and finally make minor adjustments based on the warnings.',
+    'kriging.help.parameter-relations.suggest': 'Recommended to maintain',
+    'kriging.help.experience-range.suggestion': 'Grid resolution 80~220, lags 10~18, nugget typically less than 0.3.',
     'task.title': 'Task Status',
     'task.noTask': 'No tasks',
     'task.status': 'Status',
@@ -575,6 +606,7 @@ const EN_US: LocaleMessages = {
     'feedback.stats': '{count} feedback submitted',
     'offline.online': 'Back online',
     'offline.offline': 'Offline mode',
+    'advanced.parameters': 'Advanced Parameters (Novices can keep the defaults)',
 
     // Errors (i18n)
     'error.common.unknown': 'Unknown error',
@@ -642,6 +674,7 @@ const EN_US: LocaleMessages = {
     'error.geolocation.position_unavailable': 'Position information is unavailable',
     'error.geolocation.timeout': 'Geolocation request timed out',
     'error.geolocation.unknown': 'Unknown geolocation error',
+    'error.grid-resolution': 'Grid resolution must be a positive integer between 1 and 10000',
 
     // 通用
     'common.confirm': 'Confirm',
@@ -723,6 +756,18 @@ const EN_US: LocaleMessages = {
     'template.downloadSuccess': 'Template downloaded successfully!',
     'template.downloadFailed': 'Failed to download template, please try again later',
     'template.savedTo': 'Template file "{filename}" has been downloaded to your Downloads folder.',
+    'template.Parameter': 'Parameter Template',
+    'template.balanced': 'Balanced Sampling Template',
+    'template.quick-estimate': 'Quick Estimate Template',
+    'template.high-precision': 'High Precision Template',
+    'template.large-dataset': 'Large Dataset Template',
+    'template.terrain-analysis': 'Terrain Analysis Template',
+    'template.custom': 'Custom Template',
+    'template.description': 'Provide the starting point of parameters for common scenarios, and you can continue to manually fine-tune.',
+    'template.app': 'Applicate the Template',
+    'template.save': 'Save as Template',
+    'template.export': 'Export the Template',
+    'template.import': 'Import Template',
 
     // 面板
     'panel.project': 'Current Project',
@@ -782,6 +827,7 @@ const EN_US: LocaleMessages = {
     // Map
     'map.clickInfo': 'Click Information',
     'sidebar.toggle': 'Toggle Sidebar',
+    'map.screenReaderDescription': 'Map supports keyboard navigation. After focusing on the map, you can use arrow keys to pan, and + or - to adjust zoom.',
 
     // 采样建议
     'recommendation.title': 'Sampling Recommendations',
@@ -802,6 +848,7 @@ const EN_US: LocaleMessages = {
     'recommendation.priority.low': 'Low',
     'recommendation.noData': 'No sampling recommendations available',
     'recommendation.error': 'Failed to load industry configuration, please check if the backend service is running',
+    'Intelligent.recommend': 'Intelligent Recommend',
 
     // Dialog
     'dialog.geofence.create.clickMap': 'Please click on the map to create a circular geofence',

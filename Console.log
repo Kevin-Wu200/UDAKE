@@ -1,0 +1,181 @@
+ [PerformanceMonitor] Initialized successfully
+ [2026-04-19T13:27:50.435Z] [RuntimeLifecycle] 全局资源追踪已启用
+ [2026-04-19T13:27:50.435Z] [主程序] 主程序已执行
+ [2026-04-19T13:27:50.435Z] [PerformanceMonitor] Initialized successfully
+ [2026-04-19T13:27:50.437Z] [StateBridge] 状态桥接已启动
+ [2026-04-19T13:27:50.437Z] [StartupManager] 启动流程开始
+ [2026-04-19T13:27:50.438Z] [ResourceOptimizationManager] 初始化资源优化
+ [2026-04-19T13:27:50.438Z] [ResourceOptimizationManager] 性能监控已启动
+ [2026-04-19T13:27:50.465Z] [ResourceOptimizationManager] Service Worker 注册成功: Object
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+ [2026-04-19T13:27:58.448Z] 初始化准备完成
+ [2026-04-19T13:27:58.449Z] API URL: http://172.20.10.2:8000/api
+ [2026-04-19T13:27:58.450Z] API 初始化完成
+ [2026-04-19T13:27:58.450Z] 准备初始化地图
+ [2026-04-19T13:27:58.473Z] [MapEngineRegistry] 引擎 tilted25d 尚未提供适配器工厂，跳过注册
+ [2026-04-19T13:27:58.473Z] [地图初始化] 使用地图引擎: geoscene
+ [2026-04-19T13:27:58.474Z] ⚠️ GeoScene API Key 未配置，当前为 Mock 模式
+ [2026-04-19T13:27:58.474Z] 🗺️ 地图模式: Mock 模式
+ [2026-04-19T13:27:58.474Z] ⚠️ GeoScene API Key 未配置，当前为 Mock 模式
+ [2026-04-19T13:27:58.474Z] 🗺️ 使用 Mock 地图引擎
+ [2026-04-19T13:27:58.474Z] ✅ Mock 地图引擎初始化完成
+ [2026-04-19T13:27:58.474Z] ✅ Mock 地图初始化完成
+ [2026-04-19T13:27:58.475Z] Mock 模式：点击处理器已设置（无实际功能）
+ [2026-04-19T13:27:58.475Z] 地图初始化完成
+Logger.ts:162 [2026-04-19T13:27:58.475Z] 准备初始化组件
+Logger.ts:162 [2026-04-19T13:27:58.475Z] [ComponentInitializer] 开始初始化组件...
+Logger.ts:162 [2026-04-19T13:27:58.475Z] [ComponentInitializer] 初始化基础UI组件...
+Logger.ts:162 [2026-04-19T13:27:58.477Z] 正在加载行业配置（尝试 1/8）... URL: http://172.20.10.2:8000/api/industries
+Logger.ts:162 [2026-04-19T13:27:58.478Z] [ComponentInitializer] 基础UI组件初始化完成
+Logger.ts:162 [2026-04-19T13:27:58.478Z] [ComponentInitializer] 初始化地图交互组件...
+Logger.ts:162 [2026-04-19T13:27:58.478Z] 🗺️ 创建地图引擎切换按钮...
+Logger.ts:162 [2026-04-19T13:27:58.478Z] ✅ 地图引擎切换按钮已添加到容器
+Logger.ts:162 [2026-04-19T13:27:58.492Z] [ComponentInitializer] 地图交互组件初始化完成
+Logger.ts:162 [2026-04-19T13:27:58.492Z] [ComponentInitializer] 初始化参数组件...
+Logger.ts:162 [2026-04-19T13:27:58.500Z] [ComponentInitializer] 参数组件初始化完成
+Logger.ts:162 [2026-04-19T13:27:58.500Z] [ComponentInitializer] 初始化高级功能组件...
+Logger.ts:162 [2026-04-19T13:27:58.500Z] [ComponentInitializer] 高级功能组件初始化完成
+Logger.ts:162 [2026-04-19T13:27:58.500Z] [ComponentInitializer] 组件初始化完成
+Logger.ts:162 [2026-04-19T13:27:58.500Z] 组件初始化完成
+Logger.ts:162 [2026-04-19T13:27:58.501Z] 准备绑定事件
+Logger.ts:162 [2026-04-19T13:27:58.501Z] bindEvents 执行
+Logger.ts:162 [2026-04-19T13:27:58.501Z] [EventBinder] 未找到元素: #preferences-btn
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-04-19T13:27:58.501Z] [EventBinder] 未找到元素: #feedback-btn
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-04-19T13:27:58.501Z] [EventBinder] 未找到元素: #theme-toggle-btn
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-04-19T13:27:58.501Z] [EventBinder] 未找到元素: #export-csv
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-04-19T13:27:58.501Z] [EventBinder] 未找到元素: #export-report
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-04-19T13:27:58.501Z] [Sidebar] 移动端主侧边栏元素不完整，已跳过绑定
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-04-19T13:27:58.501Z] [Sidebar] 状态同步完成: isSidebarOpen=true, aria-expanded=true
+Logger.ts:162 [2026-04-19T13:27:58.501Z] [Sidebar] 右侧侧边栏切换事件绑定成功
+Logger.ts:162 [2026-04-19T13:27:58.501Z] [Sidebar] 移动端视口/键盘状态监听已绑定
+Logger.ts:162 [2026-04-19T13:27:58.503Z] bindEvents 调用完成
+Logger.ts:162 [2026-04-19T13:27:58.503Z] 准备检测定位权限
+Logger.ts:162 [2026-04-19T13:27:58.503Z] 准备就绪
+Logger.ts:162 [2026-04-19T13:27:58.503Z] [LaunchProgress] 所有加载阶段完成，总耗时: 8065ms
+Logger.ts:162 [2026-04-19T13:27:58.503Z] [LaunchProgress] 初始化应用: 1ms
+Logger.ts:162 [2026-04-19T13:27:58.503Z] [LaunchProgress] 连接后端: 0ms
+Logger.ts:162 [2026-04-19T13:27:58.503Z] [LaunchProgress] 初始化 API: 1ms
+Logger.ts:162 [2026-04-19T13:27:58.503Z] [LaunchProgress] 加载地图: 25ms
+Logger.ts:162 [2026-04-19T13:27:58.503Z] [LaunchProgress] 初始化组件: 25ms
+Logger.ts:162 [2026-04-19T13:27:58.503Z] [LaunchProgress] 绑定事件: 3ms
+Logger.ts:162 [2026-04-19T13:27:58.503Z] [LaunchProgress] 检查权限: 0ms
+Logger.ts:162 [2026-04-19T13:27:58.503Z] [LaunchProgress] 准备就绪: 0ms
+Logger.ts:162 [2026-04-19T13:27:58.519Z] 定位权限状态: granted
+Logger.ts:162 [2026-04-19T13:27:58.519Z] [Performance] CLS 超过阈值: 0.3142299742863653 > 0.1
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-04-19T13:27:58.708Z] [StartupManager] 启动流程完成，总耗时: 8271ms
+Logger.ts:162 [2026-04-19T13:27:58.708Z] [StartupManager] 性能数据:
+Logger.ts:162 [2026-04-19T13:27:58.708Z]   startup-start: +0ms
+Logger.ts:162 [2026-04-19T13:27:58.708Z]   startup-complete: +8271ms
+Logger.ts:162 [2026-04-19T13:27:58.710Z] 开始初始化非关键组件...
+Logger.ts:162 [2026-04-19T13:27:58.721Z] [离线管理器] 初始化完成
+WebSocket connection to 'ws:<URL>/ws/gps_client_1776605278745_d8rlct' failed: WebSocket is closed before the connection is established.
+WebSocket connection to 'ws:<URL>/ws/gps_client_1776605278745_d8rlct' failed: WebSocket is closed before the connection is established.
+WebSocket connection to 'ws:<URL>/ws/gps_client_1776605278745_d8rlct' failed: WebSocket is closed before the connection is established.
+WebSocket connection to 'ws:<URL>/ws/gps_client_1776605278745_d8rlct' failed: WebSocket is closed before the connection is established.
+WebSocket connection to 'ws:<URL>/ws/gps_client_1776605278745_d8rlct' failed: WebSocket is closed before the connection is established.
+Logger.ts:162 [2026-04-19T13:28:06.747Z] 非关键组件初始化失败: Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-04-19T13:28:17.754Z] [SEVERE] [E-SYS-UNHANDLED-REJECTION] 应用出现未处理的异步错误，请稍后重试 Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-04-19T13:28:17.755Z] [ErrorHandler] 捕获到高优先级错误 Object
+(anonymous) @ Logger.ts:162
+GPSSyncService.ts:219 Uncaught (in promise) Error: WebSocket 连接超时
+    at GPSSyncService.ts:219:16
+    at wrapped (RuntimeLifecycle.ts:73:18)
+Logger.ts:162 [2026-04-19T13:28:33.950Z] [SEVERE] [E-SYS-UNHANDLED-REJECTION] 应用出现未处理的异步错误，请稍后重试 {details: {…}, context: {…}, solutions: undefined, helpLink: undefined}
+(anonymous) @ Logger.ts:162
+(anonymous) @ ErrorHandler.ts:364
+(anonymous) @ ErrorHandler.ts:249
+(anonymous) @ ErrorHandler.ts:173
+(anonymous) @ ErrorHandler.ts:233
+(anonymous) @ ErrorHandler.ts:241
+(anonymous) @ ErrorHandler.ts:172
+(anonymous) @ ErrorHandler.ts:136
+Logger.ts:162 [2026-04-19T13:28:33.950Z] [ErrorHandler] 捕获到高优先级错误 {type: 'unknown', code: 'E-SYS-UNHANDLED-REJECTION', message: '应用出现未处理的异步错误，请稍后重试', severity: 'high', level: 'SEVERE', …}
+(anonymous) @ Logger.ts:162
+(anonymous) @ Logger.ts:201
+(anonymous) @ Logger.ts:187
+(anonymous) @ ErrorHandler.ts:395
+(anonymous) @ ErrorHandler.ts:253
+(anonymous) @ ErrorHandler.ts:173
+(anonymous) @ ErrorHandler.ts:233
+(anonymous) @ ErrorHandler.ts:241
+(anonymous) @ ErrorHandler.ts:172
+(anonymous) @ ErrorHandler.ts:136
+GPSSyncService.ts:219 Uncaught (in promise) Error: WebSocket 连接超时
+    at GPSSyncService.ts:219:16
+    at wrapped (RuntimeLifecycle.ts:73:18)
+(anonymous) @ GPSSyncService.ts:219
+(anonymous) @ RuntimeLifecycle.ts:73
+Logger.ts:162 [2026-04-19T13:28:53.189Z] [SEVERE] [E-SYS-UNHANDLED-REJECTION] 应用出现未处理的异步错误，请稍后重试 {details: {…}, context: {…}, solutions: undefined, helpLink: undefined}
+(anonymous) @ Logger.ts:162
+(anonymous) @ ErrorHandler.ts:364
+(anonymous) @ ErrorHandler.ts:249
+(anonymous) @ ErrorHandler.ts:173
+(anonymous) @ ErrorHandler.ts:233
+(anonymous) @ ErrorHandler.ts:241
+(anonymous) @ ErrorHandler.ts:172
+(anonymous) @ ErrorHandler.ts:136
+Logger.ts:162 [2026-04-19T13:28:53.189Z] [ErrorHandler] 捕获到高优先级错误 {type: 'unknown', code: 'E-SYS-UNHANDLED-REJECTION', message: '应用出现未处理的异步错误，请稍后重试', severity: 'high', level: 'SEVERE', …}
+(anonymous) @ Logger.ts:162
+(anonymous) @ Logger.ts:201
+(anonymous) @ Logger.ts:187
+(anonymous) @ ErrorHandler.ts:395
+(anonymous) @ ErrorHandler.ts:253
+(anonymous) @ ErrorHandler.ts:173
+(anonymous) @ ErrorHandler.ts:233
+(anonymous) @ ErrorHandler.ts:241
+(anonymous) @ ErrorHandler.ts:172
+(anonymous) @ ErrorHandler.ts:136
+GPSSyncService.ts:219 Uncaught (in promise) Error: WebSocket 连接超时
+    at GPSSyncService.ts:219:16
+    at wrapped (RuntimeLifecycle.ts:73:18)
+(anonymous) @ GPSSyncService.ts:219
+(anonymous) @ RuntimeLifecycle.ts:73
+setTimeout
+(anonymous) @ RuntimeLifecycle.ts:75
+(anonymous) @ GPSSyncService.ts:210
+(anonymous) @ GPSSyncService.ts:205
+(anonymous) @ GPSSyncService.ts:969
+(anonymous) @ RuntimeLifecycle.ts:73
+setTimeout
+(anonymous) @ RuntimeLifecycle.ts:75
+(anonymous) @ GPSSyncService.ts:967
+(anonymous) @ GPSSyncService.ts:254
+The FetchEvent for "http://172.20.10.2:8000/health" resulted in a network error response: the promise was rejected.
+sw.js:92  Uncaught (in promise) TypeError: Failed to fetch
+    at sw.js:92:24
+172.20.10.2:8000/health:1  Failed to load resource: net::ERR_FAILED
+report:1  Failed to load resource: the server responded with a status of 502 (Bad Gateway)
+Logger.ts:162 [2026-04-19T13:29:25.687Z] [SEVERE] [E-SYS-UNHANDLED-REJECTION] 应用出现未处理的异步错误，请稍后重试 {details: {…}, context: {…}, solutions: undefined, helpLink: undefined}
+(anonymous) @ Logger.ts:162
+(anonymous) @ ErrorHandler.ts:364
+(anonymous) @ ErrorHandler.ts:249
+(anonymous) @ ErrorHandler.ts:173
+(anonymous) @ ErrorHandler.ts:233
+(anonymous) @ ErrorHandler.ts:241
+(anonymous) @ ErrorHandler.ts:172
+(anonymous) @ ErrorHandler.ts:136
+Logger.ts:162 [2026-04-19T13:29:25.687Z] [ErrorHandler] 捕获到高优先级错误 {type: 'unknown', code: 'E-SYS-UNHANDLED-REJECTION', message: '应用出现未处理的异步错误，请稍后重试', severity: 'high', level: 'SEVERE', …}
+(anonymous) @ Logger.ts:162
+(anonymous) @ Logger.ts:201
+(anonymous) @ Logger.ts:187
+(anonymous) @ ErrorHandler.ts:395
+(anonymous) @ ErrorHandler.ts:253
+(anonymous) @ ErrorHandler.ts:173
+(anonymous) @ ErrorHandler.ts:233
+(anonymous) @ ErrorHandler.ts:241
+(anonymous) @ ErrorHandler.ts:172
+(anonymous) @ ErrorHandler.ts:136
