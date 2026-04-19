@@ -25,6 +25,10 @@ const ZH_CN: LocaleMessages = {
     'nav.feedback': '反馈建议',
     'nav.guide': '查看引导',
     'nav.themeToggle': '切换主题',
+    'nav.language': '语言',
+    'nav.mainContent': '跳转到主内容',
+    'nav.map': '跳转到地图',
+    'nav.projectPanel': '跳转到项目面板',
 
     // 数据上传
     'upload.title': '数据上传',
@@ -504,6 +508,10 @@ const EN_US: LocaleMessages = {
     'nav.preferences': 'Preferences',
     'nav.feedback': 'Feedback',
     'nav.guide': 'Guide',
+    'nav.language': 'Language',
+    'nav.mainContent': 'Skip to main content',
+    'nav.map': 'Skip to map',
+    'nav.projectPanel': 'Skip to project panel',
     'nav.themeToggle': 'Toggle Theme',
     'upload.title': 'Data Upload',
     'upload.selectFile': 'Click to select GeoJSON file',
