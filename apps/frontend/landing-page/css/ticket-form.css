@@ -1,0 +1,224 @@
+/* 密钥申请工单系统样式 */
+
+.ticket-modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+}
+
+.ticket-modal.active {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.ticket-modal-content {
+    background-color: var(--card-bg, #ffffff);
+    padding: 2rem;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 500px;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+    position: relative;
+    animation: modalFadeIn 0.3s ease-out;
+}
+
+@keyframes modalFadeIn {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.ticket-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-color, #eee);
+    padding-bottom: 1rem;
+}
+
+.ticket-modal-header h2 {
+    margin: 0;
+    font-size: 1.5rem;
+    color: var(--text-color, #333);
+}
+
+.close-modal {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #888;
+    transition: color 0.2s;
+}
+
+.close-modal:hover {
+    color: var(--primary-color, #007bff);
+}
+
+.ticket-form-group {
+    margin-bottom: 1.2rem;
+}
+
+.ticket-form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: var(--text-color, #444);
+}
+
+.ticket-form-group input,
+.ticket-form-group select,
+.ticket-form-group textarea {
+    width: 100%;
+    padding: 0.8rem;
+    border: 1px solid var(--border-color, #ccc);
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    background-color: var(--input-bg, #fff);
+    color: var(--text-color, #333);
+}
+
+.ticket-form-group input:focus,
+.ticket-form-group select:focus,
+.ticket-form-group textarea:focus {
+    outline: none;
+    border-color: var(--primary-color, #007bff);
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.ticket-form-group textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.ticket-form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.ticket-form-actions .btn {
+    flex: 1;
+    padding: 0.8rem;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.1s;
+    border: none;
+}
+
+.btn-primary {
+    background-color: var(--primary-color, #007bff);
+    color: white;
+}
+
+.btn-secondary {
+    background-color: var(--secondary-bg, #6c757d);
+    color: white;
+}
+
+.btn:hover {
+    opacity: 0.9;
+}
+
+.btn:active {
+    transform: scale(0.98);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* 成功消息样式 */
+.success-content {
+    text-align: center;
+    padding: 1rem;
+}
+
+.success-icon {
+    font-size: 3rem;
+    color: #28a745;
+    margin-bottom: 1rem;
+}
+
+.ticket-id-box {
+    background-color: #f8f9fa;
+    padding: 1rem;
+    border-radius: 6px;
+    margin: 1.5rem 0;
+    border: 1px dashed #ccc;
+}
+
+.ticket-id-box strong {
+    font-size: 1.2rem;
+    color: var(--primary-color, #007bff);
+}
+
+/* 响应式调整 */
+@media (max-width: 480px) {
+    .ticket-modal-content {
+        padding: 1.5rem;
+    }
+    
+    .ticket-form-actions {
+        flex-direction: column;
+    }
+}
+
+/* 错误提示 */
+.error-msg {
+    color: #dc3545;
+    font-size: 0.85rem;
+    margin-top: 0.3rem;
+    display: none;
+}
+
+.has-error input,
+.has-error select,
+.has-error textarea {
+    border-color: #dc3545;
+}
+
+.has-error .error-msg {
+    display: block;
+}
+
+/* 查询结果样式 */
+.query-result {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background-color: #f8f9fa;
+    border-radius: 6px;
+    border: 1px solid #eee;
+}
+
+.status-badge {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.status-pending { background-color: #ffeeba; color: #856404; }
+.status-completed { background-color: #d4edda; color: #155724; }
+.status-rejected { background-color: #f8d7da; color: #721c24; }
+
+.btn-get-key {
+    margin-left: 10px;
+}

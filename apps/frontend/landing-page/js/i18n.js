@@ -212,6 +212,53 @@
         message: "该平台版本开发中，敬请期待。",
         close: "我知道了",
       },
+      ticket: {
+        getKey: "获取密钥",
+        title: "申请密钥",
+        submit: "提交申请",
+        cancel: "取消",
+        queryLink: "已有工单？点击查询状态",
+        fields: {
+          type: "工单类型",
+          keyType: "密钥类型",
+          existingKey: "需延期的密钥",
+          email: "邮箱",
+          phone: "电话号码",
+          industry: "所处行业",
+          purpose: "用途说明"
+        },
+        options: {
+          apply: "申请密钥",
+          renew: "延长密钥期限",
+          personal_trial: "个人试用 (10次)",
+          personal_standard: "个人标准 (100次)",
+          enterprise_trial: "企业试用 (500次)",
+          enterprise_standard: "企业标准 (1000次)"
+        },
+        placeholders: {
+          existingKey: "请输入需要延期的密钥",
+          email: "请输入邮箱",
+          phone: "请输入手机号",
+          industry: "请输入企业/个人所处行业",
+          purpose: "请简要说明用途"
+        },
+        errors: {
+          required: "该字段为必填项",
+          email: "邮箱格式不正确"
+        },
+        success: {
+          title: "提交成功",
+          message: "您的申请已提交，请记录您的工单 ID：",
+          hint: "审批结果将发送至您的邮箱。"
+        },
+        query: {
+          title: "查询工单状态",
+          id: "工单 ID",
+          idPlaceholder: "请输入工单 ID",
+          emailPlaceholder: "请输入申请时填写的邮箱",
+          btn: "查询"
+        }
+      },
     },
     "en-US": {
       title: "UDAKE - Intelligent Uncertainty-Driven Spatial Decision Platform",
@@ -464,6 +511,53 @@
         message: "This platform version is under development. Stay tuned.",
         close: "OK",
       },
+      ticket: {
+        getKey: "Get Key",
+        title: "Apply for API Key",
+        submit: "Submit Application",
+        cancel: "Cancel",
+        queryLink: "Already have a ticket? Click to check status",
+        fields: {
+          type: "Ticket Type",
+          keyType: "Key Type",
+          existingKey: "Key to Renew",
+          email: "Email",
+          phone: "Phone Number",
+          industry: "Industry",
+          purpose: "Purpose"
+        },
+        options: {
+          apply: "Apply for New Key",
+          renew: "Renew Existing Key",
+          personal_trial: "Personal Trial (10 requests)",
+          personal_standard: "Personal Standard (100 requests)",
+          enterprise_trial: "Enterprise Trial (500 requests)",
+          enterprise_standard: "Enterprise Standard (1000 requests)"
+        },
+        placeholders: {
+          existingKey: "Enter the key you want to renew",
+          email: "Enter your email",
+          phone: "Enter your phone number",
+          industry: "Enter your industry (Enterprise/Individual)",
+          purpose: "Briefly explain the purpose"
+        },
+        errors: {
+          required: "This field is required",
+          email: "Invalid email format"
+        },
+        success: {
+          title: "Submitted Successfully",
+          message: "Your application has been submitted. Please note your Ticket ID:",
+          hint: "The result will be sent to your email."
+        },
+        query: {
+          title: "Check Ticket Status",
+          id: "Ticket ID",
+          idPlaceholder: "Enter your Ticket ID",
+          emailPlaceholder: "Enter the email used for application",
+          btn: "Query"
+        }
+      },
     },
   };
 
@@ -517,9 +611,23 @@
       const key = element.getAttribute("data-i18n");
       const text = getByPath(dictionary, key);
       if (typeof text === "string") {
-        element.textContent = text;
+        if (element.tagName === "INPUT" || element.tagName === "TEXTAREA") {
+          element.placeholder = text;
+        } else {
+          element.textContent = text;
+        }
       }
     });
+
+    document
+      .querySelectorAll("[data-i18n-placeholder]")
+      .forEach(function (element) {
+        const key = element.getAttribute("data-i18n-placeholder");
+        const text = getByPath(dictionary, key);
+        if (typeof text === "string") {
+          element.placeholder = text;
+        }
+      });
 
     document
       .querySelectorAll("[data-i18n-aria-label]")

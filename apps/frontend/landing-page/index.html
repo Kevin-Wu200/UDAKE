@@ -6,6 +6,7 @@
     <title data-i18n="title">UDAKE</title>
     <link rel="stylesheet" href="./css/variables.css" />
     <link rel="stylesheet" href="./css/styles.css" />
+    <link rel="stylesheet" href="./css/ticket-form.css" />
   </head>
   <body>
     <div class="page-shell">
@@ -41,14 +42,24 @@
           <p class="hero-subtitle" data-i18n="hero.subtitle">
             专业的空间插值与不确定性分析平台
           </p>
-          <button
-            id="heroCta"
-            class="cta-btn"
-            type="button"
-            data-i18n="hero.cta"
-          >
-            立即体验
-          </button>
+          <div class="hero-actions">
+            <button
+              id="heroCta"
+              class="cta-btn"
+              type="button"
+              data-i18n="hero.cta"
+            >
+              立即体验
+            </button>
+            <button
+              id="getKeyBtnHero"
+              class="cta-btn btn-secondary btn-get-key"
+              type="button"
+              data-i18n="ticket.getKey"
+            >
+              获取密钥
+            </button>
+          </div>
         </section>
 
         <section class="features section-alt reveal" id="features">
@@ -375,6 +386,16 @@
               </div>
             </div>
           </div>
+          <div class="download-actions" style="margin-top: 2rem; text-align: center;">
+            <button
+              id="getKeyBtnDownload"
+              class="cta-btn btn-get-key"
+              type="button"
+              data-i18n="ticket.getKey"
+            >
+              获取密钥
+            </button>
+          </div>
         </section>
 
         <section class="contact section-alt reveal" id="contact">
@@ -424,8 +445,115 @@
       </div>
     </div>
 
+    <!-- 密钥申请工单模态框 -->
+    <div id="ticketModal" class="ticket-modal" aria-hidden="true">
+      <div class="ticket-modal-content">
+        <div class="ticket-modal-header">
+          <h2 data-i18n="ticket.title">申请密钥</h2>
+          <button class="close-modal">&times;</button>
+        </div>
+        <form id="ticketForm">
+          <div class="ticket-form-group">
+            <label for="ticketType" data-i18n="ticket.fields.type">工单类型</label>
+            <select id="ticketType" name="ticket_type" required>
+              <option value="apply" data-i18n="ticket.options.apply">申请密钥</option>
+              <option value="renew" data-i18n="ticket.options.renew">延长密钥期限</option>
+            </select>
+          </div>
+          
+          <div id="keyTypeGroup" class="ticket-form-group">
+            <label for="keyType" data-i18n="ticket.fields.keyType">密钥类型</label>
+            <select id="keyType" name="key_type">
+              <option value="personal_trial" data-i18n="ticket.options.personal_trial">个人试用 (10次)</option>
+              <option value="personal_standard" data-i18n="ticket.options.personal_standard">个人标准 (100次)</option>
+              <option value="enterprise_trial" data-i18n="ticket.options.enterprise_trial">企业试用 (500次)</option>
+              <option value="enterprise_standard" data-i18n="ticket.options.enterprise_standard">企业标准 (1000次)</option>
+            </select>
+          </div>
+
+          <div id="existingKeyGroup" class="ticket-form-group hidden">
+            <label for="existingKey" data-i18n="ticket.fields.existingKey">需延期的密钥</label>
+            <input type="text" id="existingKey" name="existing_key" placeholder="请输入需要延期的密钥" data-i18n-placeholder="ticket.placeholders.existingKey">
+            <div class="error-msg" data-i18n="ticket.errors.required">该字段为必填项</div>
+          </div>
+
+          <div class="ticket-form-group">
+            <label for="email" data-i18n="ticket.fields.email">邮箱</label>
+            <input type="email" id="email" name="email" required placeholder="请输入邮箱" data-i18n-placeholder="ticket.placeholders.email">
+            <div class="error-msg" data-i18n="ticket.errors.email">邮箱格式不正确</div>
+          </div>
+
+          <div class="ticket-form-group">
+            <label for="phone" data-i18n="ticket.fields.phone">电话号码</label>
+            <input type="tel" id="phone" name="phone" required placeholder="请输入手机号" data-i18n-placeholder="ticket.placeholders.phone">
+            <div class="error-msg" data-i18n="ticket.errors.required">该字段为必填项</div>
+          </div>
+
+          <div class="ticket-form-group">
+            <label for="industry" data-i18n="ticket.fields.industry">所处行业</label>
+            <input type="text" id="industry" name="industry" required placeholder="请输入企业/个人所处行业" data-i18n-placeholder="ticket.placeholders.industry">
+            <div class="error-msg" data-i18n="ticket.errors.required">该字段为必填项</div>
+          </div>
+
+          <div class="ticket-form-group">
+            <label for="purpose" data-i18n="ticket.fields.purpose">用途说明</label>
+            <textarea id="purpose" name="purpose" required placeholder="请简要说明用途" data-i18n-placeholder="ticket.placeholders.purpose"></textarea>
+            <div class="error-msg" data-i18n="ticket.errors.required">该字段为必填项</div>
+          </div>
+
+          <div class="ticket-form-actions">
+            <button type="submit" class="btn btn-primary" data-i18n="ticket.submit">提交申请</button>
+            <button type="button" id="cancelTicket" class="btn btn-secondary" data-i18n="ticket.cancel">取消</button>
+          </div>
+          
+          <div style="margin-top: 1rem; text-align: center;">
+            <a href="#" id="openQueryModal" style="font-size: 0.9rem; color: #666;" data-i18n="ticket.queryLink">已有工单？点击查询状态</a>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- 成功提示模态框 -->
+    <div id="successModal" class="ticket-modal" aria-hidden="true">
+      <div class="ticket-modal-content success-content">
+        <div class="success-icon">&check;</div>
+        <h2 data-i18n="ticket.success.title">提交成功</h2>
+        <p data-i18n="ticket.success.message">您的申请已提交，请记录您的工单 ID：</p>
+        <div class="ticket-id-box">
+          <strong id="displayTicketId">TKT-XXXXXX</strong>
+        </div>
+        <p style="font-size: 0.9rem; color: #666;" data-i18n="ticket.success.hint">审批结果将发送至您的邮箱。</p>
+        <button class="btn btn-primary close-modal" style="width: 100%; margin-top: 1rem;" data-i18n="modal.close">我知道了</button>
+      </div>
+    </div>
+
+    <!-- 查询工单模态框 -->
+    <div id="queryModal" class="ticket-modal" aria-hidden="true">
+      <div class="ticket-modal-content">
+        <div class="ticket-modal-header">
+          <h2 data-i18n="ticket.query.title">查询工单状态</h2>
+          <button class="close-modal">&times;</button>
+        </div>
+        <form id="queryForm">
+          <div class="ticket-form-group">
+            <label for="queryTicketId" data-i18n="ticket.query.id">工单 ID</label>
+            <input type="text" id="queryTicketId" name="ticket_id" required placeholder="请输入工单 ID" data-i18n-placeholder="ticket.query.idPlaceholder">
+          </div>
+          <div class="ticket-form-group">
+            <label for="queryEmail" data-i18n="ticket.fields.email">邮箱</label>
+            <input type="email" id="queryEmail" name="email" required placeholder="请输入申请时填写的邮箱" data-i18n-placeholder="ticket.query.emailPlaceholder">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%;" data-i18n="ticket.query.btn">查询</button>
+        </form>
+        <div id="queryResultArea" class="hidden">
+          <!-- 查询结果将显示在这里 -->
+        </div>
+      </div>
+    </div>
+
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="./js/i18n.js"></script>
     <script src="./js/main.js"></script>
+    <script src="./js/ticket-form.js"></script>
   </body>
 </html>
