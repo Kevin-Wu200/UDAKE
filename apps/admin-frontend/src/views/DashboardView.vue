@@ -2,7 +2,7 @@
   <div class="dashboard">
     <section class="metrics">
       <el-card class="metric-card">
-        <template #header>最近7天活跃用户</template>
+        <template #header>{{ t('nearlyactiveuser') }}</template>
         <div class="metric-body">
           <span class="metric-icon">AU</span>
           <strong>{{ stats.activeUsers7d }}</strong>
@@ -10,7 +10,7 @@
       </el-card>
 
       <el-card class="metric-card">
-        <template #header>企业数量（总/活跃）</template>
+        <template #header>{{ t('enterpriseCount') }}</template>
         <div class="metric-body">
           <span class="metric-icon">CO</span>
           <strong>{{ stats.enterpriseTotal }} / {{ stats.enterpriseActive }}</strong>
@@ -18,7 +18,7 @@
       </el-card>
 
       <el-card class="metric-card">
-        <template #header>今日注册数</template>
+        <template #header>{{ t('todayRegistrations') }}</template>
         <div class="metric-body">
           <span class="metric-icon">RG</span>
           <strong>{{ stats.todayRegistrations }}</strong>
@@ -26,7 +26,7 @@
       </el-card>
 
       <el-card class="metric-card">
-        <template #header>今日登录数</template>
+        <template #header>{{ t('todayLogins') }}</template>
         <div class="metric-body">
           <span class="metric-icon">LG</span>
           <strong>{{ stats.todayLogins }}</strong>
@@ -36,12 +36,12 @@
 
     <section class="charts">
       <el-card class="chart-card">
-        <template #header>用户增长趋势（最近30天）</template>
+        <template #header>{{ t('userGrowthTrend') }}</template>
         <div ref="lineChartRef" class="chart"></div>
       </el-card>
 
       <el-card class="chart-card">
-        <template #header>密钥使用率</template>
+        <template #header>{{ t('keyUsage') }}</template>
         <div ref="pieChartRef" class="chart"></div>
       </el-card>
     </section>
@@ -53,9 +53,11 @@ import * as echarts from 'echarts';
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { fetchDashboardStats } from '../services/http';
+import { useI18nText } from '../i18n/useI18n';
 
 const lineChartRef = ref<HTMLDivElement>();
 const pieChartRef = ref<HTMLDivElement>();
+const { t } = useI18nText();
 const stats = reactive({
   userGrowth: [] as Array<{ date: string; count: number }>,
   keyUsage: { used: 0, unused: 0 },
@@ -86,7 +88,7 @@ const renderCharts = () => {
     },
     yAxis: {
       type: 'value',
-      name: '用户数'
+      name: t('usernum')
     },
     series: [
       {
@@ -109,8 +111,8 @@ const renderCharts = () => {
         type: 'pie',
         radius: ['44%', '70%'],
         data: [
-          { value: stats.keyUsage.used, name: '已用' },
-          { value: stats.keyUsage.unused, name: '未用' }
+          { value: stats.keyUsage.used, name: t('used') },
+          { value: stats.keyUsage.unused, name: t('unused') }
         ],
         label: {
           formatter: '{b}\n{d}%'
@@ -132,7 +134,7 @@ const loadData = async () => {
     await nextTick();
     renderCharts();
   } catch {
-    ElMessage.error('加载统计数据失败');
+    ElMessage.error(t('statisticloadfailed'));
   }
 };
 

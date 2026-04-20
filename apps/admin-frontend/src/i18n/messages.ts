@@ -77,6 +77,16 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     smtpsavesuccess: 'SMTP 配置保存成功（密码已脱敏存储）',
     smtpsavefailed: '保存失败，请检查配置后重试',
     devicemanage: '设备管理',
+    nearlyactiveuser: '最近7天活跃用户',
+    enterpriseCount: '企业数量（总/活跃）',
+    todayRegistrations: '今日注册数',
+    todayLogins: '今日登录数',
+    userGrowthTrend: '用户增长趋势（最近30天）',
+    keyUsage: '密钥使用率',
+    usernum: '用户数',
+    statisticloadfailed: '加载统计数据失败',
+    unused: '未用',
+    used: '已用',
   },
   'en-US': {
     appTitle: 'Admin Console',
@@ -154,6 +164,16 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     smtpsavesuccess: 'SMTP configuration saved successfully (Password is hidden)',
     smtpsavefailed: 'Failed to save SMTP configuration, please check the input and try again',
     devicemanage: 'Device Management',
+    nearlyactiveuser: 'Nearly Active Users in 7 Days',
+    enterpriseCount: 'Enterprise Count (Total/Active)',
+    todayRegistrations: 'Today Registrations',
+    todayLogins: 'Today Logins',
+    userGrowthTrend: 'User Growth Trend (Last 30 Days)',
+    keyUsage: 'Key Usage',
+    usernum: 'User Count',
+    statisticloadfailed: 'Failed to load dashboard statistics',
+    unused: 'Unused',
+    used: 'Used',
   }
 };
 
