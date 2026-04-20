@@ -48,6 +48,16 @@ svg {
     overflow: hidden;
 }
 
+#settings-btn {
+    padding: 0;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
 /* 顶部导航栏（含快捷操作栏） */
 .header {
     position: fixed;

@@ -121,7 +121,7 @@ export const languageSwitcherStyles = `
     padding: 8px 16px;
     background: white;
     border: 1px solid #ddd;
-    border-radius: 4px;
+    border-radius: 10px;
     cursor: pointer;
     font-size: 14px;
     transition: all 0.2s;
