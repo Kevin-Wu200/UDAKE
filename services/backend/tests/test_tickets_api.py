@@ -74,8 +74,9 @@ def tickets_client(monkeypatch: pytest.MonkeyPatch):
             status="pending",
             email="owner@example.com",
             phone="13800138000",
-            industry="制造业",
-            usage_purpose="测试申请",
+            industry="地理测绘",
+            organization="某某测绘集团有限公司",
+            usage_purpose="这是一个用于空间插值与不确定性分析平台测试的用途说明，确保超过十五个汉字。",
             key_type="personal_trial",
         )
         db.add_all([super_admin, admin, user, existing_key, pending_ticket])
@@ -119,8 +120,9 @@ def test_create_and_public_get_ticket(tickets_client):
             "ticket_type": "key_request",
             "email": "Applicant@Example.com",
             "phone": "13800138000",
-            "industry": "能源",
-            "usage_purpose": "新项目接入",
+            "industry": "环境",
+            "organization": "某某环境检测技术服务有限公司",
+            "usage_purpose": "这是一个用于空间插值与不确定性分析平台测试的用途说明，确保超过十五个汉字。",
             "key_type": "enterprise_trial",
         },
     )
@@ -153,8 +155,9 @@ def test_create_ticket_validates_existing_key_requirement(tickets_client):
             "ticket_type": "key_extension",
             "email": "bad@example.com",
             "phone": "13800138000",
-            "industry": "制造业",
-            "usage_purpose": "延期",
+            "industry": "地理测绘",
+            "organization": "某某测绘集团",
+            "usage_purpose": "这是一个用于空间插值与不确定性分析平台测试的用途说明，确保超过十五个汉字。",
             "key_type": "personal_standard",
         },
     )
@@ -212,8 +215,9 @@ def test_approve_key_extension_extends_expiry(tickets_client):
             status="pending",
             email="member@example.com",
             phone="13800138000",
-            industry="制造业",
-            usage_purpose="续期",
+            industry="地理测绘",
+            organization="某某测绘院",
+            usage_purpose="这是一个用于空间插值与不确定性分析平台测试的用途说明，确保超过十五个汉字。",
             key_type="personal_standard",
             existing_key="ABC-DEFG-HIJK-LMNO",
         )
@@ -246,7 +250,8 @@ def test_reject_ticket_requires_reason_and_updates_status(tickets_client):
             email="reject@example.com",
             phone="13800138000",
             industry="教育",
-            usage_purpose="申请被拒绝",
+            organization="某某大学",
+            usage_purpose="这是一个用于空间插值与不确定性分析平台测试的用途说明，确保超过十五个汉字。",
             key_type="personal_standard",
         )
         db.add(ticket)

@@ -292,6 +292,41 @@
                     group.classList.add('has-error');
                     isValid = false;
                 }
+
+                // 用途说明验证
+                if (input.id === 'purpose') {
+                    if (!validateUsagePurpose(input.value)) {
+                        group.classList.add('has-error');
+                        const errorMsg = group.querySelector('.error-msg');
+                        if (errorMsg) {
+                            const lang = window.UDAKEI18N.getCurrentLanguage();
+                            errorMsg.innerText = lang === 'zh-CN' ? 
+                                '用途说明字数不符合要求（至少15个中文字符或50个英文字符，不含标点）' : 
+                                'Purpose length requirement not met (min 15 Chinese or 50 English characters, excluding punctuation)';
+                            errorMsg.style.display = 'block';
+                        }
+                        isValid = false;
+                    }
+                }
+
+                // 所属单位验证
+                if (input.id === 'organization') {
+                    const industry = document.getElementById('industry').value;
+                    if (!validateOrganization(industry, input.value)) {
+                        group.classList.add('has-error');
+                        const errorMsg = group.querySelector('.error-msg');
+                        if (errorMsg) {
+                            const lang = window.UDAKEI18N.getCurrentLanguage();
+                            if (industry === '教育') {
+                                errorMsg.innerText = lang === 'zh-CN' ? '教育行业所属单位应包含"学院"或"大学"' : 'Organization should contain "College" or "University" for Education industry';
+                            } else {
+                                errorMsg.innerText = lang === 'zh-CN' ? '所属单位名称不规范（应包含"集团"、"公司"等内容）' : 'Organization name should contain keywords like "Group" or "Company"';
+                            }
+                            errorMsg.style.display = 'block';
+                        }
+                        isValid = false;
+                    }
+                }
                 
                 // 电话验证
                 if (input.id === 'phone') {
@@ -335,6 +370,26 @@
     
     function validateEmail(email) {
         return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    }
+
+    function validateUsagePurpose(purpose) {
+        // 校验用途说明：不低于15个中文字符 或 不低于50个英文字符 (均不包含标点符号)
+        // 移除标点符号
+        const cleaned = purpose.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()！？，。：；“”（）《》【】]/g, "");
+        const chineseChars = cleaned.match(/[\u4e00-\u9fa5]/g) || [];
+        const englishChars = cleaned.match(/[a-zA-Z]/g) || [];
+        return chineseChars.length >= 15 || englishChars.length >= 50;
+    }
+
+    function validateOrganization(industry, organization) {
+        // 校验所属单位：结合选择的"所处行业"校验合法性
+        if (industry === '教育') {
+            return organization.includes('学院') || organization.includes('大学') || 
+                   organization.toLowerCase().includes('university') || organization.toLowerCase().includes('college');
+        } else {
+            const keywords = ['集团', '公司', '局', '中心', '院', '所', 'group', 'company', 'corp', 'inc', 'center', 'institute', 'department'];
+            return keywords.some(k => organization.toLowerCase().includes(k));
+        }
     }
     
     // 显示成功模态框

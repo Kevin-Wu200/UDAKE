@@ -499,8 +499,25 @@
 
         <div class="ticket-form-group">
           <label for="industry" data-i18n="ticket.fields.industry">所处行业</label>
-          <input type="text" id="industry" name="industry" required placeholder="请输入企业/个人所处行业"
-            data-i18n-placeholder="ticket.placeholders.industry">
+          <select id="industry" name="industry" required>
+            <option value="" disabled selected data-i18n="ticket.placeholders.industry">请选择所属行业</option>
+            <option value="地理测绘" data-i18n="ticket.industries.mapping">地理测绘</option>
+            <option value="环境" data-i18n="ticket.industries.env">环境</option>
+            <option value="水文" data-i18n="ticket.industries.hydrology">水文</option>
+            <option value="气象" data-i18n="ticket.industries.meteorology">气象</option>
+            <option value="污染" data-i18n="ticket.industries.pollution">污染</option>
+            <option value="教育" data-i18n="ticket.industries.edu">教育</option>
+            <option value="矿业" data-i18n="ticket.industries.mining">矿业</option>
+            <option value="航天" data-i18n="ticket.industries.aerospace">航天</option>
+            <option value="农/林业" data-i18n="ticket.industries.agriculture">农/林业</option>
+          </select>
+          <div class="error-msg" data-i18n="ticket.errors.required">该字段为必填项</div>
+        </div>
+
+        <div class="ticket-form-group">
+          <label for="organization" data-i18n="ticket.fields.organization">所属单位</label>
+          <input type="text" id="organization" name="organization" required placeholder="请输入企业/单位名称"
+            data-i18n-placeholder="ticket.placeholders.organization">
           <div class="error-msg" data-i18n="ticket.errors.required">该字段为必填项</div>
         </div>
 

@@ -248,6 +248,7 @@ class Ticket(Base):
     email: Mapped[str] = mapped_column(String(255), nullable=False)
     phone: Mapped[str] = mapped_column(String(20), nullable=False)
     industry: Mapped[str] = mapped_column(String(100), nullable=False)
+    organization: Mapped[str] = mapped_column(String(128), nullable=False)
     usage_purpose: Mapped[str] = mapped_column(Text, nullable=False)
     key_type: Mapped[str] = mapped_column(String(50), nullable=False)
     existing_key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -323,7 +324,7 @@ class Ticket(Base):
             raise ValueError("phone 格式不合法")
         return normalized
 
-    @validates("industry", "usage_purpose", "key_type")
+    @validates("industry", "organization", "usage_purpose", "key_type")
     def _validate_required_text(self, key: str, value: str) -> str:
         normalized = (value or "").strip()
         if not normalized:

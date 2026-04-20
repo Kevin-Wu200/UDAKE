@@ -455,8 +455,9 @@ def test_ticket_crud_and_business_rules(sqlite_engine):
             status=TicketStatus.PENDING.value,
             email="requester@example.com",
             phone="13800138000",
-            industry="能源",
-            usage_purpose="用于空间分析试用",
+            industry="教育",
+            organization="某某大学",
+            usage_purpose="这是一个用于空间插值与不确定性分析平台测试的用途说明，确保超过十五个汉字。",
             key_type="personal_trial",
         )
         session.add(ticket)
@@ -507,25 +508,25 @@ def test_ticket_validation_and_constraints(sqlite_engine):
                 email="valid@example.com",
                 phone="12345",
                 industry="制造",
+                organization="某某公司",
                 usage_purpose="用途说明",
                 key_type="personal_standard",
             )
 
-        session.add(
+        with pytest.raises(ValueError):
             Ticket(
                 id=4,
                 ticket_type=TicketType.KEY_EXTENSION.value,
                 status=TicketStatus.PENDING.value,
                 email="valid@example.com",
                 phone="+8613800138000",
-                industry="制造",
-                usage_purpose="需要延期",
+                industry="环境",
+                organization="",
+                usage_purpose="这是一个用于空间插值与不确定性分析平台测试的用途说明，确保超过十五个汉字。",
                 key_type="enterprise_standard",
+                existing_key="PK-EXISTING-001"
             )
-        )
-        with pytest.raises(ValueError):
-            session.commit()
-        session.rollback()
+
 
 
 def test_ticket_status_transition_and_single_processing(sqlite_engine):
@@ -546,8 +547,9 @@ def test_ticket_status_transition_and_single_processing(sqlite_engine):
             status=TicketStatus.REJECTED.value,
             email="rejected@example.com",
             phone="13900139000",
-            industry="金融",
-            usage_purpose="延期申请",
+            industry="环境",
+            organization="某某环境公司",
+            usage_purpose="这是一个用于空间插值与不确定性分析平台测试的用途说明，确保超过十五个汉字。",
             key_type="enterprise_trial",
             existing_key="PK-OLD-0001",
             processed_by=202,
@@ -560,8 +562,9 @@ def test_ticket_status_transition_and_single_processing(sqlite_engine):
             status=TicketStatus.APPROVED.value,
             email="approved@example.com",
             phone="13700137000",
-            industry="医疗",
-            usage_purpose="项目持续使用",
+            industry="教育",
+            organization="某某大学",
+            usage_purpose="这是一个用于空间插值与不确定性分析平台测试的用途说明，确保超过十五个汉字。",
             key_type="enterprise_standard",
             existing_key="PK-OLD-0002",
             processed_by=202,

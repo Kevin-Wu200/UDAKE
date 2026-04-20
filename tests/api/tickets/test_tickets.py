@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime, timezone
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from services.backend.app.auth_db.models import Base, Ticket, TicketStatus, TicketType
@@ -27,12 +28,14 @@ def test_ticket_creation_validation():
 def test_ticket_status_transition():
     session = TestingSessionLocal()
     ticket = Ticket(
+        id=300,
         ticket_type=TicketType.KEY_REQUEST.value,
         status=TicketStatus.PENDING.value,
         email="test@example.com",
         phone="13800138000",
         industry="教育",
-        usage_purpose="教学测试",
+        organization="某某大学",
+        usage_purpose="这是一个用于空间插值与不确定性分析平台测试的用途说明，确保超过十五个汉字。",
         key_type="personal_trial"
     )
     session.add(ticket)
@@ -40,6 +43,8 @@ def test_ticket_status_transition():
     
     # 测试合法流转
     ticket.status = TicketStatus.APPROVED.value
+    ticket.processed_by = 1
+    ticket.processed_at = datetime.now(timezone.utc)
     session.commit()
     assert ticket.status == TicketStatus.APPROVED.value
     

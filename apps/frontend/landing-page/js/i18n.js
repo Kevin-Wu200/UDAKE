@@ -233,7 +233,19 @@
           email: "邮箱",
           phone: "电话号码",
           industry: "所处行业",
+          organization: "所属单位",
           purpose: "用途说明"
+        },
+        industries: {
+          mapping: "地理测绘",
+          env: "环境",
+          hydrology: "水文",
+          meteorology: "气象",
+          pollution: "污染",
+          edu: "教育",
+          mining: "矿业",
+          aerospace: "航天",
+          agriculture: "农/林业"
         },
         options: {
           apply: "申请密钥",
@@ -247,7 +259,8 @@
           existingKey: "请输入需要延期的密钥",
           email: "请输入邮箱",
           phone: "请输入手机号",
-          industry: "请输入企业/个人所处行业",
+          industry: "请选择所属行业",
+          organization: "请输入企业/单位名称",
           purpose: "请简要说明用途"
         },
         errors: {
@@ -542,7 +555,19 @@
           email: "Email",
           phone: "Phone Number",
           industry: "Industry",
+          organization: "Organization",
           purpose: "Purpose"
+        },
+        industries: {
+          mapping: "Geospatial Mapping",
+          env: "Environment",
+          hydrology: "Hydrology",
+          meteorology: "Meteorology",
+          pollution: "Pollution",
+          edu: "Education",
+          mining: "Mining",
+          aerospace: "Aerospace",
+          agriculture: "Agri/Forestry"
         },
         options: {
           apply: "Apply for New Key",
@@ -556,7 +581,8 @@
           existingKey: "Enter the key you want to renew",
           email: "Enter your email",
           phone: "Enter your phone number",
-          industry: "Enter your industry (Enterprise/Individual)",
+          industry: "Select your industry",
+          organization: "Enter your company/organization name",
           purpose: "Briefly explain the purpose"
         },
         errors: {

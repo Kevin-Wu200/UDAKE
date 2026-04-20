@@ -57,6 +57,7 @@ class TicketCreateRequest(BaseModel):
     email: str = Field(..., max_length=255, description="邮箱")
     phone: str = Field(..., max_length=20, description="电话号码")
     industry: str = Field(..., max_length=100, description="所处行业")
+    organization: str = Field(..., max_length=128, description="所属单位")
     usage_purpose: str = Field(..., min_length=1, description="用途说明")
     key_type: str = Field(..., description="密钥类型")
     existing_key: Optional[str] = Field(default=None, max_length=100, description="需延期密钥")
@@ -69,6 +70,7 @@ class TicketResponse(BaseModel):
     email: str
     phone: str
     industry: str
+    organization: str
     usage_purpose: str
     key_type: str
     existing_key: Optional[str] = None
@@ -229,6 +231,7 @@ def generate_ticket_response(ticket: Ticket, *, hide_processor: bool = False) ->
         email=ticket.email,
         phone=ticket.phone,
         industry=ticket.industry,
+        organization=ticket.organization,
         usage_purpose=ticket.usage_purpose,
         key_type=ticket.key_type,
         existing_key=ticket.existing_key,
@@ -242,6 +245,25 @@ def generate_ticket_response(ticket: Ticket, *, hide_processor: bool = False) ->
     if not hide_processor:
         payload["processed_by"] = ticket.processed_by
     return payload
+
+
+def validate_usage_purpose(purpose: str) -> bool:
+    """校验用途说明：不低于15个中文字符 或 不低于50个英文字符 (均不包含标点符号)。"""
+    import re
+    # 匹配中文字符
+    chinese_chars = re.findall(r'[\u4e00-\u9fa5]', purpose)
+    # 匹配英文字符
+    english_chars = re.findall(r'[a-zA-Z]', purpose)
+    
+    return len(chinese_chars) >= 15 or len(english_chars) >= 50
+
+
+def validate_organization(industry: str, organization: str) -> bool:
+    """校验所属单位：结合选择的"所处行业"校验合法性。"""
+    if industry == "教育":
+        return "学院" in organization or "大学" in organization
+    else:
+        return any(keyword in organization for keyword in ["集团", "公司", "局", "中心", "院", "所"])
 
 
 def verify_ticket_access(ticket_id: int, email: str, db: Session) -> Ticket:
@@ -446,11 +468,25 @@ def create_ticket(
     email = validate_email(payload.email)
     phone = validate_phone(payload.phone)
     industry = (payload.industry or "").strip()
+    organization = (payload.organization or "").strip()
     usage_purpose = (payload.usage_purpose or "").strip()
+
     if not industry:
         raise _fail(status.HTTP_400_BAD_REQUEST, "industry 不能为空")
+    if not organization:
+        raise _fail(status.HTTP_400_BAD_REQUEST, "organization 不能为空")
     if not usage_purpose:
         raise _fail(status.HTTP_400_BAD_REQUEST, "usage_purpose 不能为空")
+
+    # 业务校验
+    if not validate_usage_purpose(usage_purpose):
+        raise _fail(status.HTTP_400_BAD_REQUEST, "用途说明字数不符合要求（至少15个中文字符或50个英文字符，不含标点）")
+
+    if not validate_organization(industry, organization):
+        if industry == "教育":
+            raise _fail(status.HTTP_400_BAD_REQUEST, "教育行业所属单位应包含'学院'或'大学'")
+        else:
+            raise _fail(status.HTTP_400_BAD_REQUEST, "所属单位名称不规范（应包含'集团'、'公司'、'单位'等关键词）")
 
     existing_key = (payload.existing_key or "").strip().upper() or None
     if ticket_type == TicketType.KEY_EXTENSION.value and not existing_key:
@@ -466,6 +502,7 @@ def create_ticket(
             email=email,
             phone=phone,
             industry=industry,
+            organization=organization,
             usage_purpose=usage_purpose,
             key_type=key_type,
             existing_key=existing_key,
