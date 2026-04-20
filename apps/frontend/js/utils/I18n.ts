@@ -856,7 +856,7 @@ const EN_US: LocaleMessages = {
     'recommendation.priority.low': 'Low',
     'recommendation.noData': 'No sampling recommendations available',
     'recommendation.error': 'Failed to load industry configuration, please check if the backend service is running',
-    'Intelligent.recommend': 'Intelligent Recommend',
+    'intelligent.recommend': 'Intelligent Recommend',
 
     // Dialog
     'dialog.geofence.create.clickMap': 'Please click on the map to create a circular geofence',
