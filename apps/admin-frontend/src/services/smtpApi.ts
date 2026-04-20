@@ -1,5 +1,4 @@
-import { http, isMockApiEnabled } from './http';
-import { fetchSmtpConfig as fetchSmtpConfigMock, saveSmtpConfig as saveSmtpConfigMock, testSmtpConnection as testSmtpConnectionMock } from './mockApi';
+import { http } from './http';
 import type { SMTPConfig } from '../types/admin';
 
 interface SmtpValidateResult {
@@ -31,25 +30,16 @@ function resolveLatencyMs(startMs: number): number {
 }
 
 export async function fetchSmtpConfig(): Promise<SMTPConfig> {
-  if (isMockApiEnabled()) {
-    return fetchSmtpConfigMock();
-  }
   const response = await http.get<SMTPConfig>('/workflow/notifications/smtp/config');
   return response.data;
 }
 
 export async function saveSmtpConfig(payload: SMTPConfig): Promise<SMTPConfig> {
-  if (isMockApiEnabled()) {
-    return saveSmtpConfigMock(payload);
-  }
   const response = await http.put<SMTPConfig>('/workflow/notifications/smtp/config', payload);
   return response.data;
 }
 
 export async function testSmtpConnection(payload: SMTPConfig): Promise<{ success: boolean; latencyMs: number }> {
-  if (isMockApiEnabled()) {
-    return testSmtpConnectionMock(payload);
-  }
   const started = performance.now();
   const response = await http.post<SmtpValidateResult>('/workflow/notifications/smtp/validate', {
     host: payload.host,

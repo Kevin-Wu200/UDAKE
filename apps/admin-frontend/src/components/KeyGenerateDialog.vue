@@ -46,7 +46,7 @@ import type { FormInstance, FormRules } from 'element-plus';
 import { computed, reactive, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useAuthStore } from '../stores/auth';
-import { batchGenerateCompanyKeys, previewCompanyKeys } from '../services/mockApi';
+import { batchGenerateCompanyKeys, previewCompanyKeys } from '../services/http';
 
 const props = defineProps<{
   modelValue: boolean;

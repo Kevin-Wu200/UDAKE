@@ -52,7 +52,7 @@
 import * as echarts from 'echarts';
 import { nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { fetchDashboardStats } from '../services/mockApi';
+import { fetchDashboardStats } from '../services/http';
 
 const lineChartRef = ref<HTMLDivElement>();
 const pieChartRef = ref<HTMLDivElement>();

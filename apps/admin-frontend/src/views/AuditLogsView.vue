@@ -62,7 +62,7 @@
 import type { AuditEventType, AuditLog } from '../types/admin';
 import { onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { fetchAuditLogs, fetchAuditLogsForExport } from '../services/mockApi';
+import { fetchAuditLogs, fetchAuditLogsForExport } from '../services/http';
 
 const list = ref<AuditLog[]>([]);
 const total = ref(0);

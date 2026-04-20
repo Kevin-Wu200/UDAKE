@@ -235,6 +235,7 @@ export default defineConfig(({ mode }) => {
       __FRONTEND_URL__: JSON.stringify(frontendUrl),
       'import.meta.env.VITE_OFFICIAL_WEB': JSON.stringify(env.OFFICIAL_WEB || env.VITE_OFFICIAL_WEB || ''),
       'import.meta.env.VITE_ADMIN_WEB': JSON.stringify(env.ADMIN_WEB || env.VITE_ADMIN_WEB || ''),
+      'import.meta.env.VITE_USE_MOCK_API': isProduction ? JSON.stringify('false') : JSON.stringify(env.VITE_USE_MOCK_API || 'false'),
     },
   };
 });

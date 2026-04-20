@@ -170,7 +170,7 @@ import {
   fetchCompanyKeys,
   fetchCompanyUsers,
   revokeCompanyKey
-} from '../services/mockApi';
+} from '../services/http';
 
 const router = useRouter();
 const authStore = useAuthStore();

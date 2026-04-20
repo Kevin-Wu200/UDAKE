@@ -51,7 +51,7 @@ import type { CompanyAdmin } from '../types/admin';
 import { computed, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useAuthStore } from '../stores/auth';
-import { fetchCompanyAdminProfile } from '../services/mockApi';
+import { fetchCompanyAdminProfile } from '../services/http';
 
 const authStore = useAuthStore();
 const loading = ref(false);

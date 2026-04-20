@@ -3,15 +3,6 @@ import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ElMessage } from 'element-plus';
 import { useAuthStore } from '../stores/auth';
 import type { CompanyAdmin, KeyStatus, KeyType, ProductKey, ProductKeyCreateForm } from '../types/admin';
-import {
-  createProductKeys as createProductKeysMock,
-  deleteProductKey as deleteProductKeyMock,
-  fetchCompanyAdminProfile as fetchCompanyAdminProfileMock,
-  fetchProductKeyStats as fetchProductKeyStatsMock,
-  fetchProductKeys as fetchProductKeysMock,
-  importProductKeys as importProductKeysMock,
-  updateProductKey as updateProductKeyMock
-} from './mockApi';
 
 interface RetryConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -56,14 +47,6 @@ interface BackendResponse<T> {
 
 function unwrapData<T>(payload: BackendResponse<T> | undefined): T {
   return (payload?.data ?? {}) as T;
-}
-
-export function isMockApiEnabled(): boolean {
-  const flag = String(import.meta.env.VITE_USE_MOCK_API ?? '').trim().toLowerCase();
-  if (import.meta.env.PROD) {
-    return false;
-  }
-  return flag === '1' || flag === 'true' || flag === 'yes' || flag === 'on';
 }
 
 http.interceptors.request.use((config) => {
@@ -148,10 +131,6 @@ interface CompanyMeData {
 }
 
 export async function fetchProductKeys(params: FetchProductKeysParams): Promise<{ total: number; items: ProductKey[] }> {
-  if (isMockApiEnabled()) {
-    return fetchProductKeysMock(params);
-  }
-
   const response = await http.get<BackendResponse<ProductKeyListData>>('/admin/product-keys', {
     params: {
       page: params.page,
@@ -169,10 +148,6 @@ export async function fetchProductKeys(params: FetchProductKeysParams): Promise<
 }
 
 export async function fetchProductKeyStats(): Promise<{ total: number; active: number; unused: number }> {
-  if (isMockApiEnabled()) {
-    return fetchProductKeyStatsMock();
-  }
-
   const response = await http.get<BackendResponse<ProductKeyStatsData>>('/admin/product-keys/stats');
   const data = unwrapData(response.data);
   const byStatus = data.by_status ?? {};
@@ -184,21 +159,50 @@ export async function fetchProductKeyStats(): Promise<{ total: number; active: n
   };
 }
 
-export async function createProductKeys(payload: ProductKeyCreateForm): Promise<ProductKey[]> {
-  if (isMockApiEnabled()) {
-    return createProductKeysMock(payload);
-  }
+export async function fetchCompanyKeyStats(companyId: number): Promise<{
+  totalKeys: number;
+  activeKeys: number;
+  assignedKeys: number;
+  availableKeys: number;
+}> {
+  const response = await http.get<BackendResponse<{
+    total: number;
+    active: number;
+    assigned: number;
+    available: number;
+  }>>(`/admin/companies/${companyId}/key-stats`);
+  const data = unwrapData(response.data);
+  return {
+    totalKeys: data.total || 0,
+    activeKeys: data.active || 0,
+    assignedKeys: data.assigned || 0,
+    availableKeys: data.available || 0
+  };
+}
 
+export async function fetchCompanyKeys(params: {
+  page: number;
+  pageSize: number;
+  company_id: number;
+  type?: KeyType;
+  assigned?: boolean;
+}): Promise<{ total: number; items: ProductKey[] }> {
+  return fetchProductKeys({
+    page: params.page,
+    pageSize: params.pageSize,
+    company_id: params.company_id,
+    type: params.type,
+    assigned: params.assigned
+  });
+}
+
+export async function createProductKeys(payload: ProductKeyCreateForm): Promise<ProductKey[]> {
   const response = await http.post<BackendResponse<ProductKeyCreateData>>('/admin/product-keys', payload);
   const data = unwrapData(response.data);
   return Array.isArray(data.keys) ? data.keys : [];
 }
 
 export async function importProductKeys(rawText: string): Promise<{ successCount: number; failedCount: number; failedLines: string[] }> {
-  if (isMockApiEnabled()) {
-    return importProductKeysMock(rawText);
-  }
-
   const rows = rawText
     .split(/\r?\n/)
     .map((line) => line.trim())
@@ -246,9 +250,6 @@ export async function importProductKeys(rawText: string): Promise<{ successCount
 }
 
 export async function updateProductKey(id: number, payload: { status?: KeyStatus; notes?: string; extend_days?: number }) {
-  if (isMockApiEnabled()) {
-    return updateProductKeyMock(id, payload);
-  }
   const requestPayload = {
     status: payload.status,
     extend_days: payload.extend_days
@@ -257,16 +258,152 @@ export async function updateProductKey(id: number, payload: { status?: KeyStatus
 }
 
 export async function deleteProductKey(id: number) {
-  if (isMockApiEnabled()) {
-    return deleteProductKeyMock(id);
-  }
   await http.delete(`/admin/product-keys/${id}`);
 }
 
+export async function previewCompanyKeys(payload: { type: KeyType; count: number }): Promise<string[]> {
+  const response = await http.get<BackendResponse<{ keys: string[] }>>('/admin/product-keys/preview', {
+    params: payload
+  });
+  return unwrapData(response.data).keys || [];
+}
+
+export async function batchGenerateCompanyKeys(payload: {
+  company_id: number;
+  type: Extract<KeyType, 'enterprise_trial' | 'enterprise_standard'>;
+  count: number;
+}) {
+  return createProductKeys({
+    type: payload.type,
+    count: payload.count,
+    company_id: payload.company_id,
+    metadata: {
+      enterprise_name: `企业${payload.company_id}`,
+      notes: '企业管理员批量生成'
+    }
+  });
+}
+
+export async function fetchCompanyUsers(companyId: number): Promise<Array<{ id: number; name: string }>> {
+  const response = await http.get<BackendResponse<Array<{ id: number; name: string }>>>(`/admin/companies/${companyId}/users`);
+  return unwrapData(response.data);
+}
+
+export async function assignCompanyKey(id: number, user: { user_id: number; user_name: string; operator: string }) {
+  await http.post(`/admin/product-keys/${id}/assign`, user);
+}
+
+export async function revokeCompanyKey(id: number, operator: string) {
+  await http.post(`/admin/product-keys/${id}/revoke`, { operator });
+}
+
+export async function fetchUsers(params: {
+  page: number;
+  pageSize: number;
+  role?: UserRole;
+  status?: 'enabled' | 'disabled';
+  keyword?: string;
+}): Promise<{ total: number; items: UserItem[] }> {
+  const response = await http.get<BackendResponse<{ users: UserItem[]; total: number }>>('/admin/users', {
+    params: {
+      page: params.page,
+      page_size: params.pageSize,
+      role: params.role,
+      status: params.status,
+      search: params.keyword
+    }
+  });
+  const data = unwrapData(response.data);
+  return {
+    total: data.total || 0,
+    items: data.users || []
+  };
+}
+
+export async function updateUserStatus(id: number, enabled: boolean) {
+  await http.put(`/admin/users/${id}/status`, { status: enabled ? 'enabled' : 'disabled' });
+}
+
+export async function resetUserPassword(id: number) {
+  await http.post(`/admin/users/${id}/reset-password`);
+}
+
+export async function fetchAuditLogs(params: {
+  page: number;
+  pageSize: number;
+  eventType?: AuditEventType;
+  keyword?: string;
+  startTime?: string;
+  endTime?: string;
+}): Promise<{ total: number; items: AuditLog[] }> {
+  const response = await http.get<BackendResponse<{ logs: AuditLog[]; total: number }>>('/admin/audit-logs', {
+    params: {
+      page: params.page,
+      page_size: params.pageSize,
+      event_type: params.eventType,
+      search: params.keyword,
+      start_time: params.startTime,
+      end_time: params.endTime
+    }
+  });
+  const data = unwrapData(response.data);
+  return {
+    total: data.total || 0,
+    items: data.logs || []
+  };
+}
+
+export async function fetchAuditLogsForExport(params: {
+  eventType?: AuditEventType;
+  keyword?: string;
+  startTime?: string;
+  endTime?: string;
+}): Promise<AuditLog[]> {
+  const response = await http.get<BackendResponse<AuditLog[]>>('/admin/audit-logs/export', {
+    params: {
+      event_type: params.eventType,
+      search: params.keyword,
+      start_time: params.startTime,
+      end_time: params.endTime,
+      format: 'json'
+    }
+  });
+  return unwrapData(response.data);
+}
+
+export async function fetchEmailLogs(params: {
+  page: number;
+  pageSize: number;
+  status?: EmailSendStatus;
+  startTime?: string;
+  endTime?: string;
+}): Promise<{ total: number; items: EmailLog[] }> {
+  const response = await http.get<BackendResponse<{ logs: EmailLog[]; total: number }>>('/workflow/notifications/email-logs', {
+    params: {
+      page: params.page,
+      page_size: params.pageSize,
+      status: params.status,
+      start_time: params.startTime,
+      end_time: params.endTime
+    }
+  });
+  const data = unwrapData(response.data);
+  return {
+    total: data.total || 0,
+    items: data.logs || []
+  };
+}
+
+export async function resendEmailLog(id: number) {
+  await http.post(`/workflow/notifications/email-logs/${id}/resend`);
+}
+
+export async function fetchDashboardStats(): Promise<DashboardStats> {
+  const response = await http.get<BackendResponse<DashboardStats>>('/admin/stats');
+  return unwrapData(response.data);
+}
+
 export async function fetchCompanyAdminProfile(_companyId: number): Promise<CompanyAdmin> {
-  if (isMockApiEnabled()) {
-    return fetchCompanyAdminProfileMock(_companyId);
-  }
   const response = await http.get<BackendResponse<CompanyMeData>>('/company/me');
   const user = unwrapData(response.data).user;
   if (!user || user.company_admin_type !== 'trial' && user.company_admin_type !== 'standard') {

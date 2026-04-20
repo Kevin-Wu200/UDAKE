@@ -68,7 +68,7 @@
 import type { EmailLog, EmailSendStatus } from '../types/admin';
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { fetchEmailLogs, resendEmailLog } from '../services/mockApi';
+import { fetchEmailLogs, resendEmailLog } from '../services/http';
 
 const loading = ref(false);
 const logs = ref<EmailLog[]>([]);

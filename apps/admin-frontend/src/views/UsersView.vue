@@ -94,7 +94,7 @@
 import type { UserItem, UserRole } from '../types/admin';
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { fetchUsers, resetUserPassword, updateUserStatus } from '../services/mockApi';
+import { fetchUsers, resetUserPassword, updateUserStatus } from '../services/http';
 
 const list = ref<UserItem[]>([]);
 const total = ref(0);

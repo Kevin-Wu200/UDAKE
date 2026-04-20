@@ -44,5 +44,8 @@ export default defineConfig(({ mode }) => {
         '@': resolve(__dirname, 'src'),
       },
     },
+    define: {
+      'import.meta.env.VITE_USE_MOCK_API': mode === 'production' ? JSON.stringify('false') : JSON.stringify(env.VITE_USE_MOCK_API || 'false'),
+    },
   };
 });
