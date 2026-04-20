@@ -1,5 +1,12 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
 import { isAdminRole, useAuthStore } from '../stores/auth';
+import type { FormInstance, FormRules } from 'element-plus';
+import type { SMTPConfig } from '../types/admin';
+import { onMounted, reactive, ref } from 'vue';
+import { ElMessage } from 'element-plus';
+import type { AxiosError } from 'axios';
+import { fetchSmtpConfig, saveSmtpConfig, testSmtpConnection } from '../services/smtpApi';
+import { useI18nText } from '../i18n/useI18n';
 
 const LoginView = () => import('../views/LoginView.vue');
 const DashboardView = () => import('../views/DashboardView.vue');
@@ -29,6 +36,10 @@ const DeviceManagementView = () => import('../views/user/DeviceManagementView.vu
 
 const USER_ALLOWED_ROLES = ['user', 'company_admin', 'super_admin', 'admin'];
 const ADMIN_ALLOWED_ROLES = ['company_admin', 'super_admin', 'admin'];
+// Remove constant top-level call: const { t } = useI18nText();
+// Instead, use a simple lookup function for static route meta, or handle translation inside components.
+// For routes that require translated titles, we can defer translation or use a central registry.
+// As a temporary fix for the initialization error, we'll use a direct string or a key.
 
 const router = createRouter({
   history: createWebHashHistory(),
@@ -77,7 +88,7 @@ const router = createRouter({
           name: 'user-devices',
           component: DeviceManagementView,
           meta: {
-            title: '设备管理',
+            title: '设备管理', // was t('devicemanage')
             requiresUserAuth: true,
             requiredRoles: USER_ALLOWED_ROLES
           }
@@ -87,7 +98,7 @@ const router = createRouter({
           name: 'user-change-password',
           component: ChangePasswordView,
           meta: {
-            title: '修改密码',
+            title: '修改密码', // was t('changepassword')
             requiresUserAuth: true,
             requiredRoles: USER_ALLOWED_ROLES
           }
@@ -97,7 +108,7 @@ const router = createRouter({
           name: 'user-change-email',
           component: ChangeEmailView,
           meta: {
-            title: '修改邮箱',
+            title: '修改邮箱', // was t('changeemail')
             requiresUserAuth: true,
             requiredRoles: USER_ALLOWED_ROLES
           }
@@ -114,14 +125,13 @@ const router = createRouter({
           path: '/dashboard',
           name: 'dashboard',
           component: DashboardView,
-          meta: { title: '统计概览', titleKey: 'dashboard', breadcrumbKey: 'dashboard' }
+          meta: { titleKey: 'dashboard', breadcrumbKey: 'dashboard' }
         },
         {
           path: '/product-keys',
           name: 'product-keys',
           component: ProductKeysView,
           meta: {
-            title: '产品密钥管理',
             titleKey: 'productKeys',
             breadcrumbKey: 'productKeys',
             requiredRoles: ['super_admin', 'admin']
@@ -132,7 +142,6 @@ const router = createRouter({
           name: 'company-product-keys',
           component: CompanyProductKeysView,
           meta: {
-            title: '企业密钥管理',
             titleKey: 'companyProductKeys',
             breadcrumbKey: 'companyProductKeys',
             requiresAuth: true,
@@ -145,7 +154,7 @@ const router = createRouter({
           name: 'company-profile',
           component: CompanyAdminProfileView,
           meta: {
-            title: '企业管理员信息',
+            titleKey: 'companyProfile',
             requiresAuth: true,
             requiredRoles: ['company_admin']
           }
@@ -155,7 +164,7 @@ const router = createRouter({
           name: 'smtp-settings',
           component: SMTPSettingsView,
           meta: {
-            title: 'SMTP配置',
+            titleKey: 'smtpconfig',
             requiredRoles: ['super_admin', 'admin']
           }
         },
@@ -164,7 +173,7 @@ const router = createRouter({
           name: 'email-logs',
           component: EmailLogsView,
           meta: {
-            title: '邮件发送记录',
+            titleKey: 'emaillog',
             requiredRoles: ['super_admin', 'admin']
           }
         },
@@ -172,20 +181,19 @@ const router = createRouter({
           path: '/workflows',
           name: 'workflows',
           component: WorkflowListView,
-          meta: { title: '智能工作流引擎', titleKey: 'workflowEngine', breadcrumbKey: 'workflowEngine' }
+          meta: { titleKey: 'workflowEngine', breadcrumbKey: 'workflowEngine' }
         },
         {
           path: '/workflows/editor/:workflowId?',
           name: 'workflow-editor',
           component: WorkflowEditorView,
-          meta: { title: '工作流可视化编辑器', titleKey: 'workflowEditor', breadcrumbKey: 'workflowEditor' }
+          meta: { titleKey: 'workflowEditor', breadcrumbKey: 'workflowEditor' }
         },
         {
           path: '/history-analysis',
           component: HistoryAnalysisLayoutView,
           redirect: '/history-analysis/snapshots',
           meta: {
-            title: '历史分析',
             titleKey: 'historyAnalysis',
             breadcrumbKey: 'historyAnalysis',
             requiredRoles: ADMIN_ALLOWED_ROLES
@@ -197,7 +205,6 @@ const router = createRouter({
               component: HistorySectionView,
               props: { section: 'snapshots' },
               meta: {
-                title: '快照管理',
                 titleKey: 'historyAnalysisSnapshots',
                 breadcrumbKey: 'historyAnalysisSnapshots',
                 requiredRoles: ADMIN_ALLOWED_ROLES,
@@ -210,7 +217,6 @@ const router = createRouter({
               component: HistorySectionView,
               props: { section: 'compare' },
               meta: {
-                title: '版本对比',
                 titleKey: 'historyAnalysisCompare',
                 breadcrumbKey: 'historyAnalysisCompare',
                 requiredRoles: ADMIN_ALLOWED_ROLES,
@@ -223,7 +229,6 @@ const router = createRouter({
               component: HistorySectionView,
               props: { section: 'trend' },
               meta: {
-                title: '趋势分析',
                 titleKey: 'historyAnalysisTrend',
                 breadcrumbKey: 'historyAnalysisTrend',
                 requiredRoles: ADMIN_ALLOWED_ROLES,
@@ -236,7 +241,6 @@ const router = createRouter({
               component: HistorySectionView,
               props: { section: 'anomaly' },
               meta: {
-                title: '异常检测',
                 titleKey: 'historyAnalysisAnomaly',
                 breadcrumbKey: 'historyAnalysisAnomaly',
                 requiredRoles: ADMIN_ALLOWED_ROLES,
@@ -249,7 +253,6 @@ const router = createRouter({
               component: HistorySectionView,
               props: { section: 'forecast' },
               meta: {
-                title: '预测结果',
                 titleKey: 'historyAnalysisForecast',
                 breadcrumbKey: 'historyAnalysisForecast',
                 requiredRoles: ADMIN_ALLOWED_ROLES,
@@ -262,7 +265,6 @@ const router = createRouter({
               component: HistorySectionView,
               props: { section: 'reports' },
               meta: {
-                title: '报告管理',
                 titleKey: 'historyAnalysisReports',
                 breadcrumbKey: 'historyAnalysisReports',
                 requiredRoles: ADMIN_ALLOWED_ROLES,
@@ -275,25 +277,25 @@ const router = createRouter({
           path: '/users',
           name: 'users',
           component: UsersView,
-          meta: { title: '用户管理', titleKey: 'users', breadcrumbKey: 'users' }
+          meta: { titleKey: 'users', breadcrumbKey: 'users' }
         },
         {
           path: '/tickets',
           name: 'tickets',
           component: TicketsView,
-          meta: { title: '工单管理', titleKey: 'tickets', breadcrumbKey: 'tickets' }
+          meta: { titleKey: 'tickets', breadcrumbKey: 'tickets' }
         },
         {
           path: '/tickets/:id',
           name: 'ticket-detail',
           component: TicketDetailView,
-          meta: { title: '工单详情', titleKey: 'ticketDetail', breadcrumbKey: 'ticketDetail' }
+          meta: { titleKey: 'ticketDetail', breadcrumbKey: 'ticketDetail' }
         },
         {
           path: '/audit-logs',
           name: 'audit-logs',
           component: AuditLogsView,
-          meta: { title: '审计日志', titleKey: 'auditLogs', breadcrumbKey: 'auditLogs' }
+          meta: { titleKey: 'auditLogs', breadcrumbKey: 'auditLogs' }
         }
       ]
     },
