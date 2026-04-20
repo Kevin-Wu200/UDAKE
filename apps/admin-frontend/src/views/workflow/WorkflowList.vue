@@ -2,71 +2,71 @@
   <div class="workflow-list-page">
     <section class="stats-grid">
       <el-card>
-        <template #header>工作流总数</template>
+        <template #header>{{ t('totalWorkflows') }}</template>
         <div class="stat-value">{{ workflows.length }}</div>
       </el-card>
       <el-card>
-        <template #header>累计运行次数</template>
+        <template #header>{{ t('totalRuns') }}</template>
         <div class="stat-value">{{ metrics.total_runs }}</div>
       </el-card>
       <el-card>
-        <template #header>执行成功率</template>
+        <template #header>{{ t('successRate') }}</template>
         <div class="stat-value">{{ successRateText }}</div>
       </el-card>
       <el-card>
-        <template #header>平均耗时</template>
+        <template #header>{{ t('avgDuration') }}</template>
         <div class="stat-value">{{ metrics.avg_duration_ms.toFixed(0) }} ms</div>
       </el-card>
     </section>
 
     <section class="page-card">
       <div class="toolbar">
-        <el-input v-model="filters.keyword" placeholder="搜索名称/ID/描述" clearable style="width: 260px" />
+        <el-input v-model="filters.keyword" :placeholder="t('searchNameIdDescription')" clearable style="width: 260px" />
         <el-input-number v-model="filters.minVersion" :min="1" :max="999" controls-position="right" />
-        <el-button type="primary" @click="loadData">查询</el-button>
-        <el-button @click="resetFilters">重置</el-button>
-        <el-button type="success" @click="goEditor()">新建工作流</el-button>
+        <el-button type="primary" @click="loadData">{{ t('search') }}</el-button>
+        <el-button @click="resetFilters">{{ t('reset') }}</el-button>
+        <el-button type="success" @click="goEditor()">{{ t('createWorkflow') }}</el-button>
       </div>
 
       <el-table :data="filteredWorkflows" border>
-        <el-table-column prop="workflow_id" label="工作流ID" min-width="180" />
-        <el-table-column prop="name" label="名称" min-width="160" />
-        <el-table-column prop="description" label="描述" min-width="200" />
-        <el-table-column prop="version" label="版本" width="80" />
-        <el-table-column prop="collaborator_count" label="协作者" width="90" />
-        <el-table-column prop="updated_at" label="更新时间" min-width="180" />
+        <el-table-column prop="workflow_id" :label="t('workflowID')" min-width="180" />
+        <el-table-column prop="name" :label="t('workflowName')" min-width="160" />
+        <el-table-column prop="description" :label="t('description')" min-width="200" />
+        <el-table-column prop="version" :label="t('version')" width="80" />
+        <el-table-column prop="collaborator_count" :label="t('coworkers')" width="90" />
+        <el-table-column prop="updated_at" :label="t('updatetime')" min-width="180" />
         <el-table-column label="操作" width="350" fixed="right">
           <template #default="scope">
-            <el-button size="small" @click="goEditor(scope.row.workflow_id)">编辑</el-button>
-            <el-button size="small" @click="openShareDialog(scope.row.workflow_id)">分享</el-button>
-            <el-button size="small" @click="cloneByExport(scope.row.workflow_id)">复制</el-button>
-            <el-button size="small" type="danger" @click="onDelete(scope.row.workflow_id)">删除</el-button>
+            <el-button size="small" @click="goEditor(scope.row.workflow_id)">{{ t('edit') }}</el-button>
+            <el-button size="small" @click="openShareDialog(scope.row.workflow_id)">{{ t('share') }}</el-button>
+            <el-button size="small" @click="cloneByExport(scope.row.workflow_id)">{{ t('copy') }}</el-button>
+            <el-button size="small" type="danger" @click="onDelete(scope.row.workflow_id)">{{ t('delete') }}</el-button>
           </template>
         </el-table-column>
       </el-table>
     </section>
 
-    <el-dialog v-model="shareDialogVisible" title="工作流协作分享" width="620px">
+    <el-dialog v-model="shareDialogVisible" :title="t('workflowSharecowork')" width="620px">
       <div class="share-toolbar">
-        <el-button size="small" @click="appendCollaborator">添加协作者</el-button>
+        <el-button size="small" @click="appendCollaborator">{{ t('addcoworker') }}</el-button>
       </div>
 
       <div class="share-list">
         <div v-for="(item, index) in collaborators" :key="`col_${index}`" class="share-row">
-          <el-input v-model="item.user_id" placeholder="用户ID" />
+          <el-input v-model="item.user_id" :placeholder="t('userid')" />
           <el-select v-model="item.role" style="width: 130px">
-            <el-option label="owner" value="owner" />
-            <el-option label="editor" value="editor" />
-            <el-option label="viewer" value="viewer" />
+            <el-option :label="t('owner')" value="owner" />
+            <el-option :label="t('editor')" value="editor" />
+            <el-option :label="t('viewer')" value="viewer" />
           </el-select>
-          <el-input v-model="item.display_name" placeholder="显示名称（可选）" />
-          <el-button type="danger" plain @click="removeCollaborator(index)">移除</el-button>
+          <el-input v-model="item.display_name" :placeholder="t('displayname')" />
+          <el-button type="danger" plain @click="removeCollaborator(index)">{{ t('remove') }}</el-button>
         </div>
       </div>
 
       <template #footer>
-        <el-button @click="shareDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="saveCollaborators">保存</el-button>
+        <el-button @click="shareDialogVisible = false">{{ t('cancel') }}</el-button>
+        <el-button type="primary" @click="saveCollaborators">{{ t('save') }}</el-button>
       </template>
     </el-dialog>
   </div>
@@ -78,6 +78,7 @@ import { useRouter } from 'vue-router';
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { workflowService } from '../../services/WorkflowService';
 import type { WorkflowCollaborator, WorkflowListItem, WorkflowMetrics } from '../../types/workflow';
+import { useI18nText } from '../../i18n/useI18n';
 
 const router = useRouter();
 const loading = ref(false);
@@ -89,6 +90,7 @@ const metrics = reactive<WorkflowMetrics>({
   avg_duration_ms: 0,
   last_updated_at: ''
 });
+const { t } = useI18nText();
 
 const filters = reactive({
   keyword: '',
@@ -131,7 +133,7 @@ const loadData = async () => {
     workflows.value = listRes.workflows.sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
     Object.assign(metrics, perfRes);
   } catch {
-    ElMessage.error('加载工作流列表失败');
+    ElMessage.error(t('loadworkflowslistfailed'));
   } finally {
     loading.value = false;
   }
@@ -153,21 +155,21 @@ const goEditor = (workflowId?: string) => {
 
 const onDelete = async (workflowId: string) => {
   try {
-    await ElMessageBox.confirm('删除后不可恢复，是否继续？', '删除工作流', {
+    await ElMessageBox.confirm(t('deletewarning'), t('deleteworkflow'), {
       type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
+      confirmButtonText: t('delete'),
+      cancelButtonText: t('cancel'),
       modalClass: 'admin-confirm-dialog-overlay',
       closeOnClickModal: false,
       closeOnPressEscape: false
     });
     await workflowService.deleteWorkflow(workflowId);
-    ElMessage.success('已删除工作流');
+    ElMessage.success(t('workflowdeleted'));
     await loadData();
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
-      console.error('删除工作流失败:', error);
-      ElMessage.error('操作失败，请重试');
+      console.error(t('workflowdeletefailed'), error);
+      ElMessage.error(t('actionfailed'));
     }
   }
 };
@@ -181,7 +183,7 @@ const openShareDialog = async (workflowId: string) => {
       : [{ user_id: '', role: 'viewer', display_name: '' }];
     shareDialogVisible.value = true;
   } catch {
-    ElMessage.error('加载协作者失败');
+    ElMessage.error(t('loadcoworkerfailed'));
   }
 };
 
@@ -206,11 +208,11 @@ const saveCollaborators = async () => {
 
   try {
     await workflowService.updateCollaborators(currentShareWorkflowId.value, sanitized);
-    ElMessage.success('协作者设置已保存');
+    ElMessage.success(t('savecoworkersuccess'));
     shareDialogVisible.value = false;
     await loadData();
   } catch {
-    ElMessage.error('保存协作者失败');
+    ElMessage.error(t('savecoworkerfailed'));
   }
 };
 
@@ -218,13 +220,13 @@ const cloneByExport = async (workflowId: string) => {
   try {
     const definition = await workflowService.exportWorkflow(workflowId);
     definition.workflow_id = `wf_${Math.random().toString(36).slice(2, 10)}`;
-    definition.name = `${definition.name}_复制`;
+    definition.name = `${definition.name}_${t('copy')}`;
     definition.version = 1;
     await workflowService.createWorkflow(definition);
-    ElMessage.success('已复制工作流');
+    ElMessage.success(t('workflowcloned'));
     await loadData();
   } catch {
-    ElMessage.error('复制工作流失败');
+    ElMessage.error(t('workflowclonefailed'));
   }
 };
 
