@@ -1,61 +1,61 @@
 <template>
   <div class="product-keys-view">
     <div class="page-header">
-      <h1>产品密钥管理</h1>
+      <h1>{{ t('productKeys') }}</h1>
       <div class="stats-cards">
         <el-card class="stat-card">
           <div class="stat-value">{{ stats.total }}</div>
-          <div class="stat-label">总密钥数</div>
+          <div class="stat-label">{{ t('totalkeys') }}</div>
         </el-card>
         <el-card class="stat-card">
           <div class="stat-value">{{ stats.active }}</div>
-          <div class="stat-label">活跃密钥</div>
+          <div class="stat-label">{{ t('activeKeys') }}</div>
         </el-card>
         <el-card class="stat-card">
           <div class="stat-value">{{ stats.unused }}</div>
-          <div class="stat-label">未使用</div>
+          <div class="stat-label">{{ t('unusedKeys') }}</div>
         </el-card>
       </div>
     </div>
 
     <el-card class="filter-card">
       <el-form :inline="true" :model="filterForm">
-        <el-form-item label="密钥类型">
-          <el-select v-model="filterForm.type" placeholder="选择类型" clearable style="width: 180px">
-            <el-option label="个人试用" value="personal_trial" />
-            <el-option label="个人标准" value="personal_standard" />
-            <el-option label="企业试用" value="enterprise_trial" />
-            <el-option label="企业标准" value="enterprise_standard" />
+        <el-form-item :label="t('keytype')">
+          <el-select v-model="filterForm.type" :placeholder="t('selectkeytype')" clearable style="width: 180px">
+            <el-option :label="t('personalTrial')" value="personal_trial" />
+            <el-option :label="t('personalStandard')" value="personal_standard" />
+            <el-option :label="t('enterpriseTrial')" value="enterprise_trial" />
+            <el-option :label="t('enterpriseStandard')" value="enterprise_standard" />
           </el-select>
         </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="filterForm.status" placeholder="选择状态" clearable style="width: 160px">
-            <el-option label="未使用" value="unused" />
-            <el-option label="活跃" value="active" />
-            <el-option label="已禁用" value="disabled" />
-            <el-option label="已过期" value="expired" />
+        <el-form-item :label="t('status')">
+          <el-select v-model="filterForm.status" :placeholder="t('selectstatus')" clearable style="width: 160px">
+            <el-option :label="t('unused')" value="unused" />
+            <el-option :label="t('active')" value="active" />
+            <el-option :label="t('disabled')" value="disabled" />
+            <el-option :label="t('expired')" value="expired" />
           </el-select>
         </el-form-item>
-        <el-form-item label="关键字">
+        <el-form-item :label="t('keyword')">
           <el-input
             v-model="filterForm.keyword"
-            placeholder="密钥/企业/用户ID"
+            :placeholder="t('keywordcontent')"
             clearable
             style="width: 240px"
           />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
+          <el-button type="primary" @click="handleSearch">{{ t('search') }}</el-button>
+          <el-button @click="handleReset">{{ t('reset') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
     <div class="action-bar">
       <el-button type="primary" @click="createDialogVisible = true" :disabled="!canCreate || createDisabledByQuota">
-        创建单个密钥
+        {{ t('createsinglekey') }}
       </el-button>
-      <el-button @click="importDialogVisible = true" :disabled="!canImport">批量导入</el-button>
+      <el-button @click="importDialogVisible = true" :disabled="!canImport">{{ t('createmultiplekeys') }}</el-button>
     </div>
 
     <el-alert
@@ -64,35 +64,35 @@
       :closable="false"
       show-icon
       class="quota-alert"
-      :title="`当前角色：${companyAdminTypeLabel}，可创建类型：${allowedTypeLabels}，配额：${companyAdminProfile.total_keys_created}/${companyAdminProfile.max_keys_allowed}`"
-      :description="createDisabledByQuota ? '已达到创建上限，无法继续创建密钥。' : `剩余可创建 ${companyAdminProfile.remaining_keys_quota} 个。`"
+      :title="`${t('currentrole')}：${companyAdminTypeLabel}，${t('allowedtypes')}：${allowedTypeLabels}，${t('quota')}：${companyAdminProfile.total_keys_created}/${companyAdminProfile.max_keys_allowed}`"
+      :description="createDisabledByQuota ? t('maxquota') : ` ${t('limitquota')} ${companyAdminProfile.remaining_keys_quota} `"
     />
 
     <el-table :data="keys" border v-loading="loading">
-      <el-table-column prop="product_key" label="密钥" min-width="220" />
-      <el-table-column prop="key_type" label="类型" width="130">
+      <el-table-column prop="product_key" :label="t('key')" min-width="220" />
+      <el-table-column prop="key_type" :label="t('keytype')" width="130">
         <template #default="{ row }">
           {{ getKeyTypeLabel(row.key_type) }}
         </template>
       </el-table-column>
-      <el-table-column prop="status" label="状态" width="120">
+      <el-table-column prop="status" :label="t('status')" width="120">
         <template #default="{ row }">
           <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="total_quota" label="总配额" width="100" />
-      <el-table-column prop="used_count" label="已使用" width="100" />
-      <el-table-column prop="company_id" label="企业ID" width="100">
+      <el-table-column prop="total_quota" :label="t('totalquota')" width="100" />
+      <el-table-column prop="used_count" :label="t('usedquota')" width="100" />
+      <el-table-column prop="company_id" :label="t('companyid')" width="100">
         <template #default="{ row }">
           {{ row.company_id || '-' }}
         </template>
       </el-table-column>
-      <el-table-column prop="user_id" label="用户ID" width="100">
+      <el-table-column prop="user_id" :label="t('userid')" width="100">
         <template #default="{ row }">
           {{ row.user_id || '-' }}
         </template>
       </el-table-column>
-      <el-table-column prop="expires_at" label="过期时间" width="180">
+      <el-table-column prop="expires_at" :label="t('expiresat')" width="180">
         <template #default="{ row }">
           <div class="expires-cell">
             <el-icon v-if="isExpired(row)" class="expired-icon"><WarningFilled /></el-icon>
@@ -100,20 +100,20 @@
           </div>
         </template>
       </el-table-column>
-      <el-table-column label="到期倒计时" width="140">
+      <el-table-column :label="t('countdown')" width="140">
         <template #default="{ row }">
           <el-tag :type="countdownTagType(row)">
             {{ getCountdownText(row) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="assigned_at" label="分配时间" width="170" />
-      <el-table-column prop="created_at" label="创建时间" width="170" />
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column prop="assigned_at" :label="t('assignedat')" width="170" />
+      <el-table-column prop="created_at" :label="t('createdat')" width="170" />
+      <el-table-column :label="t('actions')" width="220" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="handleView(row)">查看</el-button>
-          <el-button link type="primary" @click="handleEdit(row)" :disabled="!canEdit(row)">编辑</el-button>
-          <el-button link type="danger" @click="handleDelete(row)" :disabled="!canDelete(row)">删除</el-button>
+          <el-button link type="primary" @click="handleView(row)">{{ t('check') }}</el-button>
+          <el-button link type="primary" @click="handleEdit(row)" :disabled="!canEdit(row)">{{ t('edit') }}</el-button>
+          <el-button link type="danger" @click="handleDelete(row)" :disabled="!canDelete(row)">{{ t('delete') }}</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -131,9 +131,9 @@
       />
     </div>
 
-    <el-dialog v-model="createDialogVisible" title="创建单个密钥" width="460px">
+    <el-dialog v-model="createDialogVisible" :title="t('createsinglekey')" width="460px">
       <el-form ref="createFormRef" :model="createForm" :rules="createRules" label-width="110px">
-        <el-form-item label="密钥类型" prop="type">
+        <el-form-item :label="t('keytype')" prop="type">
           <el-select v-model="createForm.type" style="width: 100%">
             <el-option
               v-for="item in creatableTypeOptions"
@@ -143,62 +143,62 @@
             />
           </el-select>
         </el-form-item>
-        <el-form-item label="企业ID" prop="company_id">
+        <el-form-item :label="t('companyid')" prop="company_id">
           <el-input-number v-model="createForm.company_id" :min="1" :max="999999" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="用户ID" prop="user_id">
+        <el-form-item :label="t('userid')" prop="user_id">
           <el-input-number v-model="createForm.user_id" :min="1" :max="999999" style="width: 100%" />
         </el-form-item>
-        <el-form-item label="备注" prop="notes">
+        <el-form-item :label="t('notes')" prop="notes">
           <el-input v-model="createForm.notes" type="textarea" :rows="3" maxlength="120" show-word-limit />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleCreateSingle" :loading="creating" :disabled="createDisabledByQuota || creating">确认创建</el-button>
+        <el-button @click="createDialogVisible = false">{{ t('cancel') }}</el-button>
+        <el-button type="primary" @click="handleCreateSingle" :loading="creating" :disabled="createDisabledByQuota || creating">{{ t('confirmcreate') }}</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="importDialogVisible" title="批量导入密钥" width="560px">
+    <el-dialog v-model="importDialogVisible" :title="t('importmultiplekeys')" width="560px">
       <el-alert
         type="info"
         :closable="false"
-        title="每行格式：product_key,key_type,status,company_id,enterprise_name"
+        :title="t('perlineformat')"
       />
       <el-input
         v-model="importText"
         type="textarea"
         :rows="9"
         style="margin-top: 12px"
-        placeholder="示例: ABC-1234-5678-9XYZ,enterprise_standard,unused,12,企业A"
+        :placeholder="t('example')"
       />
       <div v-if="importResult" class="import-result">
-        <el-tag type="success">成功 {{ importResult.successCount }}</el-tag>
-        <el-tag type="danger">失败 {{ importResult.failedCount }}</el-tag>
+        <el-tag type="success">t('success') {{ importResult.successCount }}</el-tag>
+        <el-tag type="danger">t('failed') {{ importResult.failedCount }}</el-tag>
         <el-text v-if="importResult.failedLines.length" type="danger">
-          失败行：{{ importResult.failedLines.join(' | ') }}
+          ${t('failedline')}: {{ importResult.failedLines.join(' | ') }}
         </el-text>
       </div>
       <template #footer>
-        <el-button @click="importDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleImport">解析并导入</el-button>
+        <el-button @click="importDialogVisible = false">{{ t('cancel') }}</el-button>
+        <el-button type="primary" @click="handleImport">{{ t('importandprocess') }}</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="editDialogVisible" title="编辑密钥" width="460px">
+    <el-dialog v-model="editDialogVisible" :title="t('editkey')" width="460px">
       <el-form ref="editFormRef" :model="editForm" :rules="editRules" label-width="100px">
-        <el-form-item label="状态" prop="status">
+        <el-form-item :label="t('status')" prop="status">
           <el-select v-model="editForm.status" style="width: 100%">
-            <el-option label="未使用" value="unused" />
-            <el-option label="活跃" value="active" />
-            <el-option label="已禁用" value="disabled" />
-            <el-option label="已过期" value="expired" />
+            <el-option :label="t('unused')" value="unused" />
+            <el-option :label="t('active')" value="active" />
+            <el-option :label="t('disabled')" value="disabled" />
+            <el-option :label="t('expired')" value="expired" />
           </el-select>
         </el-form-item>
-        <el-form-item label="备注" prop="notes">
+        <el-form-item :label="t('notes')" prop="notes">
           <el-input v-model="editForm.notes" type="textarea" :rows="3" maxlength="120" show-word-limit />
         </el-form-item>
-        <el-form-item label="延长天数" prop="extend_days">
+        <el-form-item :label="t('extenddays')" prop="extend_days">
           <el-input-number
             v-model="editForm.extend_days"
             :min="0"
@@ -207,16 +207,16 @@
             controls-position="right"
             style="width: 100%"
           />
-          <div class="form-tip">为0表示取消过期限制，默认30天为步长</div>
+          <div class="form-tip">{{ t('formTipExtendDays') }}</div>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="editDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleUpdate">保存</el-button>
+        <el-button @click="editDialogVisible = false">{{ t('cancel') }}</el-button>
+        <el-button type="primary" @click="handleUpdate">{{ t('save') }}</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailDialogVisible" title="密钥详情" width="640px">
+    <el-dialog v-model="detailDialogVisible" :title="t('keydetail')" width="640px">
       <el-descriptions :column="2" border v-if="detailKey">
         <el-descriptions-item label="密钥">{{ detailKey.product_key }}</el-descriptions-item>
         <el-descriptions-item label="类型">{{ getKeyTypeLabel(detailKey.key_type) }}</el-descriptions-item>
@@ -249,12 +249,14 @@ import {
   importProductKeys,
   updateProductKey
 } from '../services/http';
+import { useI18nText } from '../i18n/useI18n';
 
 const authStore = useAuthStore();
 const loading = ref(false);
 const creating = ref(false);
 const keys = ref<ProductKey[]>([]);
 const detailKey = ref<ProductKey | null>(null);
+const { t } = useI18nText();
 
 const filterForm = reactive<{
   type?: KeyType;
@@ -286,21 +288,21 @@ const canDelete = (key: ProductKey) => isSuperAdmin.value && key.status === 'unu
 const companyAdminProfile = ref<CompanyAdmin | null>(null);
 
 const companyAdminTypeLabel = computed(() =>
-  companyAdminProfile.value?.company_admin_type === 'trial' ? '试用企业管理员' : '标准企业管理员'
+  companyAdminProfile.value?.company_admin_type === 'trial' ? t('companyAdminTrial') : t('companyAdminStandard')
 );
 
 const creatableTypeOptions = computed<Array<{ label: string; value: KeyType }>>(() => {
   if (!companyAdminProfile.value) {
     return [
-      { label: '个人试用', value: 'personal_trial' },
-      { label: '个人标准', value: 'personal_standard' },
-      { label: '企业试用', value: 'enterprise_trial' },
-      { label: '企业标准', value: 'enterprise_standard' }
+      { label: t('personalTrial'), value: 'personal_trial' },
+      { label: t('personalStandard'), value: 'personal_standard' },
+      { label: t('enterpriseTrial'), value: 'enterprise_trial' },
+      { label: t('enterpriseStandard'), value: 'enterprise_standard' }
     ];
   }
   return companyAdminProfile.value.allowed_key_types.map((value) => ({
     value,
-    label: value === 'enterprise_trial' ? '企业试用' : '企业标准'
+    label: value === 'enterprise_trial' ? t('enterpriseTrial') : t('enterpriseStandard')
   }));
 });
 
@@ -339,12 +341,12 @@ const importResult = ref<{
 } | null>(null);
 
 const createRules: FormRules<typeof createForm> = {
-  type: [{ required: true, message: '请选择密钥类型', trigger: 'change' }],
+  type: [{ required: true, message: t('requiredKeyType'), trigger: 'change' }],
   company_id: [
     {
       validator: (_rule, value, callback) => {
         if (createForm.type.startsWith('enterprise') && !value) {
-          callback(new Error('企业类型密钥必须指定企业ID'));
+          callback(new Error(t('requiredCompanyId')));
           return;
         }
         callback();
@@ -355,26 +357,26 @@ const createRules: FormRules<typeof createForm> = {
 };
 
 const editRules: FormRules<typeof editForm> = {
-  status: [{ required: true, message: '请选择状态', trigger: 'change' }],
-  extend_days: [{ type: 'number', min: 0, max: 3650, message: '延长天数范围 0-3650' }]
+  status: [{ required: true, message: t('requiredKeyStatus'), trigger: 'change' }],
+  extend_days: [{ type: 'number', min: 0, max: 3650, message: t('formExtendDays') }]
 };
 
 const getKeyTypeLabel = (type: KeyType) => {
   const map: Record<KeyType, string> = {
-    personal_trial: '个人试用',
-    personal_standard: '个人标准',
-    enterprise_trial: '企业试用',
-    enterprise_standard: '企业标准'
+    personal_trial: t('personalTrial'),
+    personal_standard: t('personalStandard'),
+    enterprise_trial: t('enterpriseTrial'),
+    enterprise_standard: t('enterpriseStandard')
   };
   return map[type];
 };
 
 const getStatusLabel = (status: KeyStatus) => {
   const map: Record<KeyStatus, string> = {
-    unused: '未使用',
-    active: '活跃',
-    disabled: '已禁用',
-    expired: '已过期'
+    unused: t('unused'),
+    active: t('active'),
+    disabled: t('disabled'),
+    expired: t('expired')
   };
   return map[status];
 };
@@ -412,7 +414,7 @@ const loadList = async () => {
     keys.value = res.items;
     pagination.total = res.total;
   } catch {
-    ElMessage.error('获取密钥列表失败');
+    ElMessage.error(t('loadKeyListFailed'));
   } finally {
     loading.value = false;
   }
@@ -463,15 +465,15 @@ const handleCreateSingle = async () => {
       user_id: createForm.user_id,
       metadata: {
         notes: createForm.notes,
-        enterprise_name: createForm.company_id ? `企业${createForm.company_id}` : undefined
+        enterprise_name: createForm.company_id ? `${t('company')}${createForm.company_id}` : undefined
       }
     });
     createDialogVisible.value = false;
     resetCreateForm();
-    ElMessage.success('创建成功');
+    ElMessage.success(t('createsuccess'));
     await Promise.all([loadList(), loadStats(), loadCompanyAdminProfile()]);
   } catch {
-    ElMessage.error('创建失败');
+    ElMessage.error(t('createfailed'));
   } finally {
     creating.value = false;
   }
@@ -479,15 +481,15 @@ const handleCreateSingle = async () => {
 
 const handleImport = async () => {
   if (!importText.value.trim()) {
-    ElMessage.warning('请输入导入内容');
+    ElMessage.warning(t('importContentRequired'));
     return;
   }
   try {
     importResult.value = await importProductKeys(importText.value);
-    ElMessage.success('导入已完成');
+    ElMessage.success(t('importsuccess'));
     await Promise.all([loadList(), loadStats()]);
   } catch {
-    ElMessage.error('导入失败');
+    ElMessage.error(t('importfailed'));
   }
 };
 
@@ -517,29 +519,29 @@ const handleUpdate = async () => {
       extend_days: editForm.extend_days
     });
     editDialogVisible.value = false;
-    ElMessage.success('更新成功');
+    ElMessage.success(t('updatesuccess'));
     await Promise.all([loadList(), loadStats()]);
   } catch {
-    ElMessage.error('更新失败');
+    ElMessage.error(t('updatefailed'));
   }
 };
 
 const handleDelete = async (row: ProductKey) => {
   try {
-    await ElMessageBox.confirm(`确认删除密钥 ${row.product_key} 吗？`, '删除确认', {
+    await ElMessageBox.confirm(t('deletekeyconfirm') + `${row.product_key} `, t('confirmdelete'), {
       type: 'warning',
-      confirmButtonText: '删除',
-      cancelButtonText: '取消'
+      confirmButtonText: t('delete'),
+      cancelButtonText: t('cancel')
     });
     await deleteProductKey(row.id);
-    ElMessage.success('删除成功');
+    ElMessage.success(t('deletesuccess'));
     if (keys.value.length === 1 && pagination.page > 1) {
       pagination.page -= 1;
     }
     await Promise.all([loadList(), loadStats()]);
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
-      ElMessage.error('操作失败，请重试');
+      ElMessage.error(t('deletefailed'));
     }
   }
 };
@@ -557,24 +559,24 @@ const isExpired = (key: ProductKey) => key.status === 'expired' || (!Number.isNa
 
 const getCountdownText = (key: ProductKey) => {
   if (!key.expires_at) {
-    return '未设置';
+    return t('notset');
   }
   const expiry = toTimestamp(key.expires_at);
   if (Number.isNaN(expiry)) {
-    return '时间异常';
+    return t('timeerror');
   }
   const remainMs = expiry - Date.now();
   const dayMs = 24 * 60 * 60 * 1000;
   if (remainMs <= 0) {
-    return '已到期';
+    return t('expired');
   }
   const days = Math.ceil(remainMs / dayMs);
-  return `剩余 ${days} 天`;
+  return `${t('limitdate')} ${days} `;
 };
 
 const countdownTagType = (key: ProductKey): 'info' | 'danger' | 'warning' | 'success' => {
   const text = getCountdownText(key);
-  if (text === '已到期') {
+  if (text === t('expired') || text === t('timeerror')) {
     return 'danger';
   }
   const match = text.match(/\d+/);
