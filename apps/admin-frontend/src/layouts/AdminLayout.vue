@@ -22,15 +22,15 @@
         </el-menu-item>
         <el-menu-item v-if="authStore.isCompanyAdmin" index="/company/profile">
           <el-icon><UserFilled /></el-icon>
-          <span>企业管理员信息</span>
+          <span>{{ t('companyProfile') }}</span>
         </el-menu-item>
         <el-menu-item v-if="!authStore.isCompanyAdmin" index="/smtp-settings">
           <el-icon><Setting /></el-icon>
-          <span>SMTP配置</span>
+          <span>{{ t('smtpconfig') }}</span>
         </el-menu-item>
         <el-menu-item v-if="!authStore.isCompanyAdmin" index="/email-logs">
           <el-icon><Message /></el-icon>
-          <span>邮件发送记录</span>
+          <span>{{ t('emaillog') }}</span>
         </el-menu-item>
         <el-menu-item index="/workflows">
           <el-icon><Operation /></el-icon>
@@ -156,7 +156,7 @@ const onLanguageChange = (language: AppLanguage) => {
 
 const onLogout = () => {
   authStore.logout();
-  ElMessage.success('已退出登录');
+  ElMessage.success(t('logoutSuccess'));
   router.push('/login');
 };
 </script>

@@ -2,33 +2,33 @@
   <div class="smtp-settings">
     <el-card class="settings-card" v-loading="loading">
       <template #header>
-        <h2>SMTP服务器配置</h2>
+        <h2>{{ t('smtpserviceconfig') }}</h2>
       </template>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-width="110px">
-        <el-form-item label="服务器地址" prop="host">
+        <el-form-item :label="t('serviceaddress')" prop="host">
           <el-input v-model="form.host" placeholder="如 smtp.example.com" />
         </el-form-item>
-        <el-form-item label="端口" prop="port">
+        <el-form-item :label="t('port')" prop="port">
           <el-input-number v-model="form.port" :min="1" :max="65535" style="width: 220px" />
         </el-form-item>
-        <el-form-item label="加密方式" prop="encryption">
+        <el-form-item :label="t('encryption')" prop="encryption">
           <el-radio-group v-model="form.encryption">
             <el-radio value="TLS">TLS</el-radio>
             <el-radio value="SSL">SSL</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="用户名" prop="username">
-          <el-input v-model="form.username" placeholder="邮箱账号" />
+        <el-form-item :label="t('username')" prop="username">
+          <el-input v-model="form.username" :placeholder="t('email')" />
         </el-form-item>
-        <el-form-item label="密码" prop="password">
-          <el-input v-model="form.password" type="password" show-password placeholder="SMTP 密码或授权码" />
+        <el-form-item :label="t('password')" prop="password">
+          <el-input v-model="form.password" type="password" show-password :placeholder="t('smtppassword')" />
         </el-form-item>
       </el-form>
 
       <div class="actions">
-        <el-button :loading="testing" @click="handleTest">连接测试</el-button>
-        <el-button type="primary" :loading="saving" @click="handleSave">保存配置</el-button>
+        <el-button :loading="testing" @click="handleTest">{{ t('connettest') }}</el-button>
+        <el-button type="primary" :loading="saving" @click="handleSave">{{ t('saveconfig') }}</el-button>
       </div>
 
       <el-alert
@@ -36,7 +36,7 @@
         class="updated-tip"
         type="info"
         :closable="false"
-        :title="`最近更新时间：${form.updated_at}`"
+        :title="`${t('nearupdate')}：${form.updated_at}`"
       />
     </el-card>
   </div>
@@ -49,11 +49,13 @@ import { onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { AxiosError } from 'axios';
 import { fetchSmtpConfig, saveSmtpConfig, testSmtpConnection } from '../services/smtpApi';
+import { useI18nText } from '../i18n/useI18n';
 
 const loading = ref(false);
 const saving = ref(false);
 const testing = ref(false);
 const formRef = ref<FormInstance>();
+const { t } = useI18nText();
 
 const form = reactive<SMTPConfig>({
   host: '',
@@ -65,11 +67,11 @@ const form = reactive<SMTPConfig>({
 });
 
 const rules: FormRules<typeof form> = {
-  host: [{ required: true, message: '请输入服务器地址', trigger: 'blur' }],
-  port: [{ required: true, type: 'number', message: '请输入端口', trigger: 'change' }],
-  encryption: [{ required: true, message: '请选择加密方式', trigger: 'change' }],
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+  host: [{ required: true, message: t('address_error'), trigger: 'blur' }],
+  port: [{ required: true, type: 'number', message: t('port_error'), trigger: 'change' }],
+  encryption: [{ required: true, message: t('encryption_error'), trigger: 'change' }],
+  username: [{ required: true, message: t('username_error'), trigger: 'blur' }],
+  password: [{ required: true, message: t('password_error'), trigger: 'blur' }]
 };
 
 function resolveErrorMessage(error: unknown, fallback: string): string {
@@ -97,7 +99,7 @@ const loadConfig = async () => {
     const res = await fetchSmtpConfig();
     Object.assign(form, res);
   } catch (error) {
-    ElMessage.error(resolveErrorMessage(error, '加载SMTP配置失败'));
+    ElMessage.error(resolveErrorMessage(error, t('loadfailed')));
   } finally {
     loading.value = false;
   }
@@ -165,5 +167,9 @@ onMounted(() => {
 
 .updated-tip {
   margin-top: 14px;
+}
+
+.el-form-item__label {
+  white-space: nowrap;
 }
 </style>
