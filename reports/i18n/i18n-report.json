@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-04-19T05:13:11.015Z",
+  "generatedAt": "2026-04-20T01:55:42.238Z",
   "summary": {
-    "baseKeyCount": 409,
-    "usedKeyCount": 622,
-    "unusedKeyCount": 44,
+    "baseKeyCount": 436,
+    "usedKeyCount": 652,
+    "unusedKeyCount": 48,
     "baselineUnusedKeyCount": 131,
-    "hardcodedCount": 2044,
+    "hardcodedCount": 2020,
     "baselineHardcodedCount": 79
   },
   "coverage": [
@@ -17,27 +17,35 @@
     },
     {
       "locale": "en-US",
-      "coverage": 1,
-      "missingCount": 0,
-      "missingKeys": []
+      "coverage": 0.9977064220183486,
+      "missingCount": 1,
+      "missingKeys": [
+        "intelligent.recommend"
+      ]
     },
     {
       "locale": "zh-TW",
-      "coverage": 1,
-      "missingCount": 0,
-      "missingKeys": []
+      "coverage": 0.9977064220183486,
+      "missingCount": 1,
+      "missingKeys": [
+        "intelligent.recommend"
+      ]
     },
     {
       "locale": "ja-JP",
-      "coverage": 1,
-      "missingCount": 0,
-      "missingKeys": []
+      "coverage": 0.9977064220183486,
+      "missingCount": 1,
+      "missingKeys": [
+        "intelligent.recommend"
+      ]
     },
     {
       "locale": "ko-KR",
-      "coverage": 1,
-      "missingCount": 0,
-      "missingKeys": []
+      "coverage": 0.9977064220183486,
+      "missingCount": 1,
+      "missingKeys": [
+        "intelligent.recommend"
+      ]
     }
   ],
   "invalidNaming": [],
@@ -85,125 +93,14 @@
     "explain.task.partial",
     "explain.task.progress",
     "explain.task.retry",
-    "explain.task.title"
+    "explain.task.title",
+    "intelligent.recommend",
+    "kriging.help.parameter-relations.suggestion",
+    "kriging.help.quick-start.suggestion",
+    "nav.language"
   ],
   "hardcoded": {
     "html": [
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 50,
-        "text": "跳转到主内容"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 51,
-        "text": "跳转到地图"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 52,
-        "text": "跳转到项目面板"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 111,
-        "text": "参数模板"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 113,
-        "text": "平衡模式（默认）"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 114,
-        "text": "快速估算模式"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 115,
-        "text": "高精度模式"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 116,
-        "text": "大数据集模式"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 117,
-        "text": "地形分析模式"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 118,
-        "text": "自定义模板"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 120,
-        "text": "为常见场景提供参数起点，可继续手动微调"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 123,
-        "text": "应用模板"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 124,
-        "text": "智能推荐"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 153,
-        "text": "网格分辨率必须是 1~10000 的正整数"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 164,
-        "text": "高级参数（新手可保持默认）"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 193,
-        "text": "参数帮助文档"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 195,
-        "text": "快速上手："
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 196,
-        "text": "参数关系："
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 197,
-        "text": "经验范围："
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 202,
-        "text": "保存为模板"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 203,
-        "text": "导出模板"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 204,
-        "text": "导入模板"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 332,
-        "text": "地图支持键盘操作。聚焦地图后，可使用方向键平移，+ 或 - 调整缩放。"
-      },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/detail-interpolation.html",
         "line": 9,
@@ -9381,18 +9278,13 @@
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/index.html",
-        "line": 344,
-        "text": "立即下载 APK"
+        "line": 295,
+        "text": "开发者信息"
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/index.html",
-        "line": 359,
-        "text": "选择芯片架构下载"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/index.html",
-        "line": 371,
-        "text": "Apple Silicon"
+        "line": 300,
+        "text": "开发者信息"
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/templates/docs-template.html",
@@ -10298,17 +10190,17 @@
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/js/i18n.js",
-        "line": 644,
+        "line": 660,
         "text": "'中文'"
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/js/ticket-form.js",
-        "line": 177,
+        "line": 212,
         "text": "'<p>查询中...</p>'"
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/js/ticket-form.js",
-        "line": 187,
+        "line": 222,
         "text": "'>未找到相关工单或信息不匹配</p>'"
       }
     ]
