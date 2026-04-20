@@ -285,12 +285,10 @@
             <span data-i18n="contact.github">GitHub</span>
             <strong>github.com/Kevin-Wu200/UDAKE</strong>
           </a>
-          <div style="height: 15px; width: 100%; margin-left: 50%;">
-            <button id="UserLoginBtn" data-i18n="contact.userLogin" class="cta-btn" >用户入口</button>
-            <button id="AdminLoginBtn" data-i18n="contact.adminLogin" class="cta-btn">管理员入口</button>
-            <button id="DeveloperInfoBtn" data-i18n="contact.developerInfo" class="cta-btn">开发者信息</button>
-          </div>
         </div>
+        <button id="UserLoginBtn" data-i18n="contact.userLogin" class="cta-btn" >用户入口</button>
+        <button id="AdminLoginBtn" data-i18n="contact.adminLogin" class="cta-btn">管理员入口</button>
+        <button id="DeveloperInfoBtn" data-i18n="contact.developerInfo" class="cta-btn">开发者信息</button>
       </section>
 
       <div id="popup" class="apple-modal">
@@ -316,7 +314,6 @@
               <span class="value">1447954419@qq.com</span>
             </div>
           </div>
-
           <button class="close-btn" onclick="closePopup()" data-i18n="contact.close">关闭</button>
         </div>
       </div>
@@ -356,6 +353,7 @@
           white-space: nowrap;
           align-items: center;
           justify-content: center;
+          width: 100px;
         }
 
         /* 卡片 */
@@ -454,19 +452,15 @@
   <!-- 密钥申请工单模态框 -->
   <div id="ticketModal" class="ticket-modal" aria-hidden="true">
     <div class="ticket-modal-content">
-      <div class="ticket-modal-header">
-        <h2 data-i18n="ticket.title">申请密钥</h2>
-        <button class="close-modal">&times;</button>
-      </div>
       <form id="ticketForm">
         <div class="ticket-form-group">
+          <button class="close-modal" style="margin-left: 95%;">&times;</button>
           <label for="ticketType" data-i18n="ticket.fields.type">工单类型</label>
           <select id="ticketType" name="ticket_type" required>
             <option value="apply" data-i18n="ticket.options.apply">申请密钥</option>
             <option value="renew" data-i18n="ticket.options.renew">延长密钥期限</option>
           </select>
         </div>
-
         <div id="keyTypeGroup" class="ticket-form-group">
           <label for="keyType" data-i18n="ticket.fields.keyType">密钥类型</label>
           <select id="keyType" name="key_type">
@@ -563,7 +557,7 @@
         <h2 data-i18n="ticket.query.title">查询工单状态</h2>
         <button class="close-modal">&times;</button>
       </div>
-      <form id="queryForm">
+      <form id="queryForm" style="height: 250px;">
         <div class="ticket-form-group">
           <label for="queryTicketId" data-i18n="ticket.query.id">工单 ID</label>
           <input type="text" id="queryTicketId" name="ticket_id" required placeholder="请输入工单 ID"
@@ -574,7 +568,7 @@
           <input type="email" id="queryEmail" name="email" required placeholder="请输入申请时填写的邮箱"
             data-i18n-placeholder="ticket.query.emailPlaceholder">
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 50%; margin-left: 25%; border-radius: 5px;"
+        <button type="submit" class="btn btn-primary" style="width: 50%; margin-left: 25%; border-radius: 10px; height: 30px; margin-top: 10px;"
           data-i18n="ticket.query.btn">查询</button>
       </form>
       <div id="queryResultArea" class="hidden">
