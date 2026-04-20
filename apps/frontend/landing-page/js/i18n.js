@@ -209,6 +209,8 @@
         name: "姓名",
         Wu: "吴晨恺",
         close: "关闭",
+        adminLogin: "管理员入口",
+        userLogin: "用户登录",
       },
       footer: {
         copy: "© 2026 UDAKE. All rights reserved.",
@@ -516,6 +518,8 @@
         name: "Name",
         Wu: "Wu Chenkai",
         close: "Close",
+        adminLogin: "Admin Login",
+        userLogin: "User Login",
       },
       footer: {
         copy: "© 2026 UDAKE. All rights reserved.",

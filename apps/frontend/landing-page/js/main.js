@@ -330,4 +330,24 @@
   } else {
     bootstrap();
   }
+
+  const adminLoginUrl = {
+    ADMIN_LOGIN_URL: "http://127.0.0.1:5175/#/login",
+  };
+  const adminLoginBtn = document.getElementById("AdminLoginBtn");
+  if (adminLoginBtn) {
+    adminLoginBtn.addEventListener("click", function () {
+      window.location.href = adminLoginUrl.ADMIN_LOGIN_URL;
+    });
+  }
+
+  const userLoginUrl = {
+    USER_LOGIN_URL: "http://127.0.0.1:5175/#/users/login",
+  };
+  const userLoginBtn = document.getElementById("UserLoginBtn");
+  if (userLoginBtn) {
+    userLoginBtn.addEventListener("click", function () {
+      window.location.href = userLoginUrl.USER_LOGIN_URL;
+    });
+  }
 })();

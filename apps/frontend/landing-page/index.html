@@ -22,23 +22,22 @@
         </div>
       </a>
       <button id="languageToggle" class="lang-btn" type="button" data-i18n-aria-label="language.toggleAria"
-       style="margin-left: 50%;">
+        style="margin-left: 50%;">
         English
       </button>
     </header>
 
     <main>
       <section id="hero" class="hero reveal">
-        <p class="hero-kicker" data-i18n="hero.kicker">UDAKE</p>
         <h1 data-i18n="hero.title">智能空间决策，驱动未来</h1>
         <p class="hero-subtitle" data-i18n="hero.subtitle">
           空间插值与不确定性分析平台
         </p>
-        <div class="hero-actions">
-          <button id="heroCta" class="cta-btn" type="button" data-i18n="hero.cta">
+        <div class="hero-actions" style="margin-top: 20px;">
+          <button id="heroCta" class="main-btn" type="button" data-i18n="hero.cta">
             立即体验
           </button>
-          <button id="getKeyBtnHero" class="cta-btn btn-secondary btn-get-key" type="button" data-i18n="ticket.getKey">
+          <button id="getKeyBtnHero" class="main-btn btn-secondary btn-get-key" type="button" data-i18n="ticket.getKey">
             获取密钥
           </button>
         </div>
@@ -286,13 +285,13 @@
             <span data-i18n="contact.github">GitHub</span>
             <strong>github.com/Kevin-Wu200/UDAKE</strong>
           </a>
+          <div style="height: 15px; width: 100%; margin-left: 50%;">
+            <button id="UserLoginBtn" data-i18n="contact.userLogin" class="cta-btn" >用户入口</button>
+            <button id="AdminLoginBtn" data-i18n="contact.adminLogin" class="cta-btn">管理员入口</button>
+            <button id="DeveloperInfoBtn" data-i18n="contact.developerInfo" class="cta-btn">开发者信息</button>
+          </div>
         </div>
       </section>
-      <button id="DeveloperInfoBtn"
-        style="margin-top: 2rem; padding: 10px 20px; border-radius: 5px; border: none; margin-left: 80%;
-        background-color: #007aff; color: white; cursor: pointer;"
-        data-i18n="contact.developerInfo"
-      >开发者信息</button>
 
       <div id="popup" class="apple-modal">
         <div class="apple-card">
@@ -332,6 +331,31 @@
           backdrop-filter: blur(10px);
           justify-content: center;
           align-items: center;
+        }
+
+        /* 主按钮 */
+        .main-btn {
+          background: #007aff;
+          border: none;
+          border-radius: 10px;
+          color: white;
+          font-size: 14px;
+          padding: 10px 20px;
+          cursor: pointer;
+        }
+
+        /* 功能按钮 */
+        .cta-btn {
+          background: #f5f5f7;
+          border-width: 1px;
+          border-style: solid;
+          border-color: #ccc;
+          border-radius: 10px;
+          color: #007aff;
+          font-size: 10px;
+          white-space: nowrap;
+          align-items: center;
+          justify-content: center;
         }
 
         /* 卡片 */
