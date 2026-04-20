@@ -35,7 +35,7 @@
         <el-table-column prop="version" :label="t('version')" width="80" />
         <el-table-column prop="collaborator_count" :label="t('coworkers')" width="90" />
         <el-table-column prop="updated_at" :label="t('updatetime')" min-width="180" />
-        <el-table-column label="操作" width="350" fixed="right">
+        <el-table-column :label="t('actions')" width="350" fixed="right">
           <template #default="scope">
             <el-button size="small" @click="goEditor(scope.row.workflow_id)">{{ t('edit') }}</el-button>
             <el-button size="small" @click="openShareDialog(scope.row.workflow_id)">{{ t('share') }}</el-button>
