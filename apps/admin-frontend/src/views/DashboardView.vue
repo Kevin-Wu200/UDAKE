@@ -54,7 +54,10 @@ import { nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { fetchDashboardStats } from '../services/http';
 import { useI18nText } from '../i18n/useI18n';
+import { useAppStore } from '../stores/app';
+import { watch } from 'vue';
 
+const appStore = useAppStore()
 const lineChartRef = ref<HTMLDivElement>();
 const pieChartRef = ref<HTMLDivElement>();
 const { t } = useI18nText();
@@ -72,55 +75,61 @@ let lineChart: echarts.ECharts | null = null;
 let pieChart: echarts.ECharts | null = null;
 let resizeObserver: ResizeObserver | null = null;
 
-const renderCharts = () => {
-  if (!lineChartRef.value || !pieChartRef.value) {
-    return;
-  }
+const renderChart = () => {
+    if (!lineChart) return
 
-  lineChart ??= echarts.init(lineChartRef.value);
-  pieChart ??= echarts.init(pieChartRef.value);
-
-  lineChart.setOption({
-    tooltip: { trigger: 'axis' },
-    xAxis: {
-      type: 'category',
-      data: stats.userGrowth.map((item) => item.date)
-    },
-    yAxis: {
-      type: 'value',
-      name: t('usernum')
-    },
-    series: [
-      {
-        data: stats.userGrowth.map((item) => item.count),
-        type: 'line',
-        smooth: true,
-        lineStyle: { width: 3, color: '#007d73' },
-        areaStyle: { color: 'rgba(0,125,115,0.15)' }
-      }
-    ]
-  });
-
-  pieChart.setOption({
-    tooltip: {
-      trigger: 'item',
-      formatter: '{b}: {c} ({d}%)'
-    },
-    series: [
-      {
-        type: 'pie',
-        radius: ['44%', '70%'],
-        data: [
-          { value: stats.keyUsage.used, name: t('used') },
-          { value: stats.keyUsage.unused, name: t('unused') }
-        ],
-        label: {
-          formatter: '{b}\n{d}%'
+    lineChart.setOption({
+      tooltip: { trigger: 'axis' },
+      xAxis: {
+        type: 'category',
+        data: stats.userGrowth.map((item) => item.date)
+      },
+      yAxis: {
+        type: 'value',
+        name: t('usernum')
+      },
+      series: [
+        {
+          data: stats.userGrowth.map((item) => item.count),
+          type: 'line',
+          smooth: true,
+          lineStyle: { width: 3, color: '#007d73' },
+          areaStyle: { color: 'rgba(0,125,115,0.15)' }
         }
-      }
-    ]
-  });
-};
+      ]
+    })
+  };
+
+  const renderCharts = () => {
+    if (!lineChartRef.value || !pieChartRef.value) {
+      return;
+    }
+
+    lineChart ??= echarts.init(lineChartRef.value);
+    pieChart ??= echarts.init(pieChartRef.value);
+    
+    renderChart()
+
+    pieChart.setOption({
+      tooltip: {
+        trigger: 'item',
+        formatter: '{b}: {c} ({d}%)'
+      },
+      series: [
+        {
+          type: 'pie',
+          radius: ['44%', '70%'],
+          data: [
+            { value: stats.keyUsage.used, name: t('used') },
+            { value: stats.keyUsage.unused, name: t('unused') }
+          ],
+          label: {
+            formatter: '{b}\n{d}%'
+          }
+        }
+      ]
+    });
+  };
 
 const handleResize = () => {
   lineChart?.resize();
@@ -156,6 +165,14 @@ onBeforeUnmount(() => {
   lineChart?.dispose();
   pieChart?.dispose();
 });
+
+watch(
+  () => appStore.language,
+  () => {
+    renderChart()
+  },
+  { deep: true }
+)
 </script>
 
 <style scoped>

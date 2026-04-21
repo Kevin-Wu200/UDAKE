@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 
-export type AppLanguage = 'zh-CN' | 'en-US';
+export type AppLanguage = 'zh-CN' | 'en-US' | 'ja-JP' | 'zh-TW' | 'ko-KR';
 
 const LANGUAGE_KEY = 'admin_language';
 

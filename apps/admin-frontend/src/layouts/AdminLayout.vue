@@ -75,8 +75,11 @@
         </div>
         <div class="actions">
           <el-select :model-value="appStore.language" style="width: 120px" @change="onLanguageChange">
-            <el-option label="中文" value="zh-CN" />
+            <el-option label="简体中文" value="zh-CN" />
             <el-option label="English" value="en-US" />
+            <el-option label="日本語" value="ja-JP"/>
+            <el-option label="繁體中文" value="zh-TW"/>
+            <el-option label="한국어" value="ko-KR"/>
           </el-select>
           <span class="user">{{ authStore.username }}</span>
           <el-button type="danger" plain @click="onLogout">{{ t('logout') }}</el-button>
