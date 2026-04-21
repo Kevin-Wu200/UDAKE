@@ -2,39 +2,39 @@
   <div class="panel-card">
     <div class="panel-header">
       <div>
-        <div class="panel-title">执行监控</div>
-        <div class="panel-subtitle">WebSocket + 轮询双通道实时更新</div>
+        <div class="panel-title">{{ t('monitorexec') }}</div>
+        <div class="panel-subtitle">{{ t('execmonitorintroduce') }}</div>
       </div>
       <div class="header-actions">
-        <el-tag :type="wsConnected ? 'success' : 'warning'">{{ wsConnected ? 'WS已连接' : 'WS重连中' }}</el-tag>
-        <el-button link type="primary" @click="refresh">刷新</el-button>
+        <el-tag :type="wsConnected ? 'success' : 'warning'">{{ wsConnected ? t('WSconnectsuccess') : t('WSconnectretry') }}</el-tag>
+        <el-button link type="primary" @click="refresh">{{ t('refresh') }}</el-button>
       </div>
     </div>
 
     <div class="summary" v-if="selectedRun">
       <el-progress :percentage="Math.round(selectedRun.progress || 0)" :status="progressStatus" />
       <div class="summary-grid">
-        <div>运行ID：{{ selectedRun.run_id }}</div>
-        <div>状态：{{ selectedRun.status }}</div>
-        <div>触发源：{{ selectedRun.trigger }}</div>
-        <div>耗时：{{ formatDuration(selectedRun.duration_ms) }}</div>
+        <div>{{ t('execid') }}：{{ selectedRun.run_id }}</div>
+        <div>{{ t('status') }}：{{ selectedRun.status }}</div>
+        <div>{{ t('triggersource') }}：{{ selectedRun.trigger }}</div>
+        <div>{{ t('costtime') }}：{{ formatDuration(selectedRun.duration_ms) }}</div>
       </div>
       <el-alert v-if="selectedRun.error" :title="selectedRun.error" type="error" :closable="false" show-icon />
     </div>
 
-    <el-empty v-else description="暂无执行记录" :image-size="64" />
+    <el-empty v-else :description="t('noexecrecord')" :image-size="64" />
 
     <el-table :data="runs" size="small" height="220" @row-click="onSelectRun">
-      <el-table-column prop="run_id" label="运行ID" min-width="170" />
-      <el-table-column prop="status" label="状态" width="100">
+      <el-table-column prop="run_id" :label="t('execid')" min-width="170" />
+      <el-table-column prop="status" :label="t('status')" width="100">
         <template #default="scope">
           <el-tag :type="runStatusTag(scope.row.status)">{{ scope.row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="progress" label="进度" width="100">
+      <el-table-column prop="progress" :label="t('progressrate')" width="100">
         <template #default="scope">{{ Math.round(scope.row.progress || 0) }}%</template>
       </el-table-column>
-      <el-table-column prop="started_at" label="开始时间" min-width="180" />
+      <el-table-column prop="started_at" :label="t('starttime')" min-width="180" />
     </el-table>
 
     <el-scrollbar v-if="logs.length" height="180px" class="logs">
@@ -52,6 +52,9 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import { workflowService } from '../../services/WorkflowService';
 import { workflowRealtimeService } from '../../services/WorkflowRealtimeService';
 import type { WorkflowRunDetail, WorkflowRunItem, WorkflowRunLog } from '../../types/workflow';
+import { useI18nText } from '../../i18n/useI18n';
+
+const { t } = useI18nText();
 
 const props = defineProps<{
   workflowId: string;

@@ -1,37 +1,37 @@
 <template>
   <section class="collaboration-share-panel">
     <header class="panel-header">
-      <h3>协作与分享中心</h3>
+      <h3>{{ t('sharecenter') }}</h3>
       <el-radio-group v-model="activeTab" size="small">
-        <el-radio-button label="status">协作状态</el-radio-button>
-        <el-radio-button label="share">分享功能</el-radio-button>
-        <el-radio-button label="export">数据导出</el-radio-button>
+        <el-radio-button label="status">{{ t('costatus') }}</el-radio-button>
+        <el-radio-button label="share">{{ t('sharefunc') }}</el-radio-button>
+        <el-radio-button label="export">{{ t('outputdata') }}</el-radio-button>
       </el-radio-group>
     </header>
 
     <div v-if="activeTab === 'status'" class="tab-pane">
       <div class="stats-grid">
         <div class="stat-card">
-          <span class="stat-label">当前在线用户</span>
+          <span class="stat-label">{{ t('currentonlineusernum') }}</span>
           <strong>{{ onlineUsers.length }}</strong>
         </div>
         <div class="stat-card">
-          <span class="stat-label">今日访问次数</span>
+          <span class="stat-label">{{ t('todayasknum') }}</span>
           <strong>{{ visitStats.todayVisits }}</strong>
         </div>
         <div class="stat-card">
-          <span class="stat-label">今日评论数</span>
+          <span class="stat-label">{{ t('todaycommentnum') }}</span>
           <strong>{{ visitStats.todayComments }}</strong>
         </div>
         <div class="stat-card">
-          <span class="stat-label">今日协作次数</span>
+          <span class="stat-label">{{ t('todayconum') }}</span>
           <strong>{{ visitStats.todayCollaborations }}</strong>
         </div>
       </div>
 
       <div class="status-layout">
         <div class="online-list">
-          <div class="section-title">在线用户</div>
+          <div class="section-title">{{ t('onlineuser') }}</div>
           <transition-group name="user-item" tag="div" class="user-list-wrap">
             <div
               v-for="user in onlineUsers"
@@ -44,16 +44,16 @@
               <div class="user-meta">
                 <div class="name-line">
                   <span class="name">{{ user.display_name || user.user_id }}</span>
-                  <el-tag size="small" :type="user.active ? 'success' : 'info'">{{ user.active ? '活跃' : '在线' }}</el-tag>
+                  <el-tag size="small" :type="user.active ? 'success' : 'info'">{{ user.active ? t('active') : t('online') }}</el-tag>
                 </div>
-                <div class="sub-line">在线 {{ formatDuration(nowTick - user.first_seen_ms) }} · 最近活动 {{ relativeTime(user.last_seen_ms) }}</div>
+                <div class="sub-line">{{ t('online') }} {{ formatDuration(nowTick - user.first_seen_ms) }} · {{ t('recentactivity') }} {{ relativeTime(user.last_seen_ms) }}</div>
               </div>
             </div>
           </transition-group>
         </div>
 
         <div class="history-list">
-          <div class="section-title">最近编辑位置</div>
+          <div class="section-title">{{ t('recenteditlocation') }}</div>
           <div class="history-wrap">
             <div v-for="item in recentPositionHistory" :key="item.id" class="history-row">
               <span class="dot" :style="{ background: item.color }" />
@@ -61,7 +61,7 @@
                 <div>{{ item.userName }} · {{ relativeTime(item.ts) }}</div>
                 <div class="muted">x={{ item.x.toFixed(0) }}, y={{ item.y.toFixed(0) }}</div>
               </div>
-              <el-button size="small" text @click="jumpToPosition(item)">跳转</el-button>
+              <el-button size="small" text @click="jumpToPosition(item)">{{ t('jump') }}</el-button>
             </div>
           </div>
         </div>
@@ -69,7 +69,7 @@
 
       <div class="chart-grid">
         <div class="chart-card">
-          <div class="section-title">活跃度趋势</div>
+          <div class="section-title">{{ t('activitytrend') }}</div>
           <div class="bars">
             <div v-for="(point, idx) in activityTrend" :key="`trend_${idx}`" class="bar-item">
               <span class="bar" :style="{ height: `${point}%` }" />
@@ -78,7 +78,7 @@
         </div>
 
         <div class="chart-card">
-          <div class="section-title">用户贡献分布</div>
+          <div class="section-title">{{ t('usercontributiondistribution') }}</div>
           <div class="contribution-list">
             <div v-for="user in contributionTop" :key="`contrib_${user.user_id}`" class="contribution-row">
               <span class="name">{{ user.display_name || user.user_id }}</span>
@@ -88,7 +88,7 @@
         </div>
 
         <div class="chart-card">
-          <div class="section-title">协作时间分布</div>
+          <div class="section-title">{{ t('cotimedistribution') }}</div>
           <div class="time-distribution">
             <div v-for="item in timeDistribution" :key="item.label" class="time-cell">
               <div class="time-label">{{ item.label }}</div>
@@ -100,37 +100,37 @@
 
       <el-alert
         v-if="latestConflict"
-        title="检测到协作冲突"
+        :title="t('detectedcoconflict')"
         type="warning"
         show-icon
         :closable="false"
       >
         <template #default>
           <div>{{ latestConflict.detail }}</div>
-          <el-button size="small" type="warning" plain @click="conflictDialogVisible = true">查看并处理</el-button>
+          <el-button size="small" type="warning" plain @click="conflictDialogVisible = true">{{ t('checkandsolve') }}</el-button>
         </template>
       </el-alert>
 
-      <el-dialog v-model="conflictDialogVisible" title="协作冲突处理" width="560px">
+      <el-dialog v-model="conflictDialogVisible" :title="t('detectedcosolve')" width="560px">
         <template v-if="latestConflict">
           <p>{{ latestConflict.detail }}</p>
-          <p>冲突用户：{{ latestConflict.users.join('、') }}</p>
+          <p>{{ t('detectuser') }}{{ latestConflict.users.join('、') }}</p>
           <div class="conflict-actions">
-            <el-button type="success" @click="resolveConflict('accept')">接受他人更改</el-button>
-            <el-button type="danger" @click="resolveConflict('override')">覆盖他人更改</el-button>
-            <el-button @click="resolveConflict('merge')">手动合并更改</el-button>
-            <el-button @click="resolveConflict('keep_both')">保留两个版本</el-button>
+            <el-button type="success" @click="resolveConflict('accept')">{{ t('acceptotherchange') }}</el-button>
+            <el-button type="danger" @click="resolveConflict('override')">{{ t('coverotherchange') }}</el-button>
+            <el-button @click="resolveConflict('merge')">{{ t('manuallymergechanges') }}</el-button>
+            <el-button @click="resolveConflict('keep_both')">{{ t('keep2versions') }}</el-button>
           </div>
         </template>
       </el-dialog>
 
-      <el-dialog v-model="userDialogVisible" title="在线用户详情" width="420px">
+      <el-dialog v-model="userDialogVisible" :title="t('onlineuserdetail')" width="420px">
         <template v-if="selectedUser">
-          <p>用户ID：{{ selectedUser.user_id }}</p>
-          <p>显示名称：{{ selectedUser.display_name || selectedUser.user_id }}</p>
-          <p>在线时长：{{ formatDuration(nowTick - selectedUser.first_seen_ms) }}</p>
-          <p>最近活动：{{ relativeTime(selectedUser.last_seen_ms) }}</p>
-          <p>活动状态：{{ selectedUser.active ? '编辑中' : '在线待命' }}</p>
+          <p>{{ t('userid') }}：{{ selectedUser.user_id }}</p>
+          <p>{{ t('showname') }}：{{ selectedUser.display_name || selectedUser.user_id }}</p>
+          <p>{{ t('onlinetime') }}：{{ formatDuration(nowTick - selectedUser.first_seen_ms) }}</p>
+          <p>{{ t('recentactivity') }}：{{ relativeTime(selectedUser.last_seen_ms) }}</p>
+          <p>{{ t('activitystatus') }}：{{ selectedUser.active ? t('editing') : t('onlinestanby') }}</p>
         </template>
       </el-dialog>
 
@@ -139,121 +139,121 @@
         class="context-menu"
         :style="{ left: `${contextMenu.x}px`, top: `${contextMenu.y}px` }"
       >
-        <button type="button" @click="viewProfile">查看资料</button>
-        <button type="button" @click="startPrivateChat">私聊</button>
-        <button type="button" @click="mentionUser">@提及</button>
+        <button type="button" @click="viewProfile">{{ t('checkinformation') }}</button>
+        <button type="button" @click="startPrivateChat">{{ t('privatechat') }}</button>
+        <button type="button" @click="mentionUser">{{ t('mention') }}</button>
       </div>
     </div>
 
     <div v-else-if="activeTab === 'share'" class="tab-pane">
       <el-form label-width="92px" class="share-form">
-        <el-form-item label="访问模式">
+        <el-form-item :label="t('visitmode')">
           <el-radio-group v-model="shareForm.accessMode">
-            <el-radio label="public">公开访问</el-radio>
-            <el-radio label="private">私有访问</el-radio>
-            <el-radio label="password">密码访问</el-radio>
+            <el-radio label="public">{{ t('publicvisit') }}</el-radio>
+            <el-radio label="private">{{ t('privatevisit') }}</el-radio>
+            <el-radio label="password">{{ t('pwvisit') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item v-if="shareForm.accessMode === 'password'" label="访问密码">
-          <el-input v-model="shareForm.password" placeholder="请输入访问密码" show-password />
+        <el-form-item v-if="shareForm.accessMode === 'password'" :label="t('visitpw')">
+          <el-input v-model="shareForm.password" :placeholder="t('visitpwRequired')" show-password />
         </el-form-item>
-        <el-form-item label="到期时间">
-          <el-date-picker v-model="shareForm.expireAt" type="datetime" placeholder="设置链接失效时间" />
+        <el-form-item :label="t('expirationtime')">
+          <el-date-picker v-model="shareForm.expireAt" type="datetime" :placeholder="t('setlinkexpirationtime')" />
         </el-form-item>
-        <el-form-item label="访问权限">
+        <el-form-item :label="t('accessright')">
           <el-checkbox-group v-model="shareForm.permissions">
-            <el-checkbox label="read">只读</el-checkbox>
-            <el-checkbox label="edit">编辑</el-checkbox>
-            <el-checkbox label="download">下载</el-checkbox>
-            <el-checkbox label="comment">评论</el-checkbox>
+            <el-checkbox label="read">{{ t('readonly') }}</el-checkbox>
+            <el-checkbox label="edit">{{ t('edit') }}</el-checkbox>
+            <el-checkbox label="download">{{ t('download') }}</el-checkbox>
+            <el-checkbox label="comment">{{ t('comment') }}</el-checkbox>
           </el-checkbox-group>
         </el-form-item>
       </el-form>
 
       <div class="share-actions">
-        <el-button type="primary" @click="generateShareLink">生成分享链接</el-button>
-        <el-button :disabled="!generatedShareLink" @click="copyShareLink">复制链接</el-button>
+        <el-button type="primary" @click="generateShareLink">{{ t('generatesharelink') }}</el-button>
+        <el-button :disabled="!generatedShareLink" @click="copyShareLink">{{ t('copylink') }}</el-button>
       </div>
 
-      <el-input v-model="generatedShareLink" readonly placeholder="尚未生成分享链接" />
+      <el-input v-model="generatedShareLink" readonly :placeholder="t('notgeneratesharelink')" />
 
       <div class="preview-card">
-        <div class="preview-title">分享预览卡片</div>
+        <div class="preview-title">{{ t('sharepreviewcard') }}</div>
         <div class="preview-content">
           <strong>{{ sharePreview.title }}</strong>
           <p>{{ sharePreview.description }}</p>
           <div class="icon-row">
-            <span class="share-icon">微信</span>
+            <span class="share-icon">{{ t('wechat') }}</span>
             <span class="share-icon">QQ</span>
-            <span class="share-icon">微博</span>
-            <span class="share-icon">链接</span>
+            <span class="share-icon">{{ t('weibo') }}</span>
+            <span class="share-icon">{{ t('link') }}</span>
           </div>
         </div>
       </div>
 
       <div class="social-buttons">
-        <el-button @click="shareTo('wechat')">微信分享</el-button>
-        <el-button @click="shareTo('qq')">QQ分享</el-button>
-        <el-button @click="shareTo('weibo')">微博分享</el-button>
-        <el-button @click="shareTo('link')">复制链接分享</el-button>
+        <el-button @click="shareTo('wechat')">{{ t('wechatshare') }}</el-button>
+        <el-button @click="shareTo('qq')">{{ t('qqshare') }}</el-button>
+        <el-button @click="shareTo('weibo')">{{ t('weiboshare') }}</el-button>
+        <el-button @click="shareTo('link')">{{ t('linkshare') }}</el-button>
       </div>
 
       <div class="stats-grid">
         <div class="stat-card">
-          <span class="stat-label">访问次数</span>
+          <span class="stat-label">{{ t('visitnum') }}</span>
           <strong>{{ shareStats.totalVisits }}</strong>
         </div>
         <div class="stat-card">
-          <span class="stat-label">访问用户数</span>
+          <span class="stat-label">{{ t('visitornum') }}</span>
           <strong>{{ shareStats.uniqueVisitors }}</strong>
         </div>
         <div class="stat-card">
-          <span class="stat-label">分享次数</span>
+          <span class="stat-label">{{ t('sharenum') }}</span>
           <strong>{{ shareStats.shareCount }}</strong>
         </div>
         <div class="stat-card">
-          <span class="stat-label">转化率</span>
+          <span class="stat-label">{{ t('conversionrate') }}</span>
           <strong>{{ `${shareStats.conversionRate.toFixed(1)}%` }}</strong>
         </div>
       </div>
 
       <div class="share-stats-actions">
-        <el-button size="small" @click="refreshShareStats">刷新统计</el-button>
-        <el-button size="small" @click="exportShareStats">导出统计</el-button>
+        <el-button size="small" @click="refreshShareStats">{{ t('refreshstat') }}</el-button>
+        <el-button size="small" @click="exportShareStats">{{ t('exportstat') }}</el-button>
       </div>
 
       <el-table :data="visitRecords" size="small" border max-height="220">
-        <el-table-column prop="time" label="访问时间" min-width="160" />
-        <el-table-column prop="user" label="访问用户" min-width="120" />
-        <el-table-column prop="source" label="访问来源" min-width="120" />
+        <el-table-column prop="time" :label="t('visittime')" min-width="160" />
+        <el-table-column prop="user" :label="t('visitor')" min-width="120" />
+        <el-table-column prop="source" :label="t('visitsource')" min-width="120" />
       </el-table>
     </div>
 
     <div v-else class="tab-pane">
       <el-form label-width="98px" class="share-form">
-        <el-form-item label="导出范围">
+        <el-form-item :label="t('exportrange')">
           <el-select v-model="exportForm.scope" style="width: 220px">
-            <el-option label="当前工作流" value="workflow" />
-            <el-option label="当前画布视口" value="viewport" />
-            <el-option label="协作统计数据" value="collab_stats" />
-            <el-option label="分享统计数据" value="share_stats" />
+            <el-option :label="t('currentworkflow')" value="workflow" />
+            <el-option :label="t('currentcanvaviewport')" value="viewport" />
+            <el-option :label="t('costat')" value="collab_stats" />
+            <el-option :label="t('sharestat')" value="share_stats" />
           </el-select>
         </el-form-item>
-        <el-form-item label="导出格式">
+        <el-form-item :label="t('exportformat')">
           <el-radio-group v-model="exportForm.format">
             <el-radio label="json">JSON</el-radio>
             <el-radio label="geojson">GeoJSON</el-radio>
             <el-radio label="csv">CSV</el-radio>
-            <el-radio label="image">图片</el-radio>
+            <el-radio label="image">{{ t('pic') }}</el-radio>
           </el-radio-group>
         </el-form-item>
-        <el-form-item label="导出质量">
+        <el-form-item :label="t('exportquality')">
           <el-slider v-model="exportForm.quality" :min="40" :max="100" :step="5" show-input />
         </el-form-item>
       </el-form>
 
       <div class="share-actions">
-        <el-button type="primary" :loading="exporting" @click="startExport">开始导出</el-button>
+        <el-button type="primary" :loading="exporting" @click="startExport">{{ t('startexport') }}</el-button>
         <span class="muted">{{ exportStatus }}</span>
       </div>
 
@@ -268,6 +268,9 @@ import { ElMessage } from 'element-plus';
 import { workflowRealtimeService } from '../../services/WorkflowRealtimeService';
 import { workflowService } from '../../services/WorkflowService';
 import type { WorkflowCollaborationCursor } from '../../types/workflow';
+import { useI18nText } from '../../i18n/useI18n';
+
+const { t, language } = useI18nText();
 
 interface OnlineUserModel {
   user_id: string;
@@ -352,8 +355,8 @@ const shareForm = reactive({
 
 const generatedShareLink = ref('');
 const sharePreview = reactive({
-  title: '工作流协作链接',
-  description: '邀请团队成员查看、评论或协同编辑当前工作流。'
+  title: t('workflowcolink'),
+  description: t('workflowsharecontent')
 });
 
 const shareStats = reactive({
@@ -372,7 +375,7 @@ const exportForm = reactive({
 });
 
 const exportProgress = ref(0);
-const exportStatus = ref('等待开始');
+const exportStatus = ref(t('waitstart'));
 const exporting = ref(false);
 
 let tickTimer: number | null = null;
@@ -412,10 +415,10 @@ const contributionTop = computed(() =>
 
 const timeDistribution = computed(() => {
   const slots = [
-    { label: '凌晨', from: 0, to: 6, value: 0 },
-    { label: '上午', from: 6, to: 12, value: 0 },
-    { label: '下午', from: 12, to: 18, value: 0 },
-    { label: '夜间', from: 18, to: 24, value: 0 }
+    { label: t('earlymorning'), from: 0, to: 6, value: 0 },
+    { label: t('morning'), from: 6, to: 12, value: 0 },
+    { label: t('afternoon'), from: 12, to: 18, value: 0 },
+    { label: t('night'), from: 18, to: 24, value: 0 }
   ];
   positionHistory.value.forEach((item) => {
     const hour = new Date(item.ts).getHours();
@@ -454,15 +457,15 @@ const formatDuration = (ms: number) => {
 const relativeTime = (ts: number) => {
   const delta = Math.max(0, Math.floor((nowTick.value - ts) / 1000));
   if (delta < 5) {
-    return '刚刚';
+    return t('just');
   }
   if (delta < 60) {
-    return `${delta}秒前`;
+    return `${delta}${t('scearly')}`;
   }
   if (delta < 3600) {
-    return `${Math.floor(delta / 60)}分钟前`;
+    return `${Math.floor(delta / 60)}${t('miuearly')}`;
   }
-  return `${Math.floor(delta / 3600)}小时前`;
+  return `${Math.floor(delta / 3600)}${t('hourearly')}`;
 };
 
 const normalizeCursor = (rawCursor: Record<string, unknown>): WorkflowCollaborationCursor => ({
@@ -593,7 +596,7 @@ const detectConflicts = async () => {
         {
           id,
           type: 'editing' as const,
-          detail: `${left.display_name} 与 ${right.display_name} 正在同时编辑同一区域，请尽快选择解决策略。`,
+          detail: `${left.display_name} ${t('and')} ${right.display_name} ${t('areaeditcowarning')}`,
           users: [left.display_name, right.display_name],
           ts: Date.now()
         },
@@ -616,7 +619,7 @@ const detectConflicts = async () => {
             {
               id,
               type: 'permission' as const,
-              detail: `${user.display_name} 当前角色为 viewer，但检测到编辑行为，存在权限冲突。`,
+              detail: `${user.display_name} ${t('viewerpromissionconflictwarning')}`,
               users: [user.display_name],
               ts: Date.now()
             },
@@ -648,12 +651,12 @@ const closeContextMenu = () => {
 };
 
 const viewProfile = () => {
-  ElMessage.info(`查看资料：${contextMenu.displayName}`);
+  ElMessage.info(`${t('checkinformation')}：${contextMenu.displayName}`);
   closeContextMenu();
 };
 
 const startPrivateChat = () => {
-  ElMessage.success(`已发起与 ${contextMenu.displayName} 的私聊`);
+  ElMessage.success(`${t('chatinitiate')} ${contextMenu.displayName} ${t('sprivatechat')}`);
   closeContextMenu();
 };
 
@@ -685,17 +688,17 @@ const resolveConflict = (mode: 'accept' | 'override' | 'merge' | 'keep_both') =>
   conflictDialogVisible.value = false;
 
   const labels: Record<typeof mode, string> = {
-    accept: '接受他人更改',
-    override: '覆盖他人更改',
-    merge: '手动合并更改',
-    keep_both: '保留两个版本'
+    accept: t('acceptotherchange'),
+    override: t('coverotherchange'),
+    merge: t('manuallymergechanges'),
+    keep_both: t('keep2versions')
   };
-  ElMessage.success(`已执行冲突处理：${labels[mode]}`);
+  ElMessage.success(`${t('execconflictsolve')}${labels[mode]}`);
 };
 
 const generateShareLink = () => {
   if (shareForm.accessMode === 'password' && !shareForm.password.trim()) {
-    ElMessage.warning('密码访问模式需要设置访问密码');
+    ElMessage.warning(t('pwvisitwordlostwarning'));
     return;
   }
 
@@ -710,7 +713,7 @@ const generateShareLink = () => {
   }
   generatedShareLink.value = `${window.location.origin}/workflows/shared/${props.workflowId}?${params.toString()}`;
   shareStats.shareCount += 1;
-  ElMessage.success('分享链接已生成');
+  ElMessage.success(t('sharelinkgeneratesuccess'));
 };
 
 const copyShareLink = async () => {
@@ -720,9 +723,9 @@ const copyShareLink = async () => {
 
   try {
     await navigator.clipboard.writeText(generatedShareLink.value);
-    ElMessage.success('分享链接已复制到剪贴板');
+    ElMessage.success(t('sharelinkcopysuccess'));
   } catch {
-    ElMessage.error('复制失败，请手动复制');
+    ElMessage.error(t('sharelinkcopyfailed'));
   }
 };
 
@@ -761,7 +764,7 @@ const shareTo = async (platform: 'wechat' | 'qq' | 'weibo' | 'link') => {
   }
 
   const encoded = encodeURIComponent(generatedShareLink.value);
-  const title = encodeURIComponent('工作流协作分享');
+  const title = encodeURIComponent(t('workflowshare'));
   let url = '';
 
   if (platform === 'qq') {
@@ -780,7 +783,7 @@ const shareTo = async (platform: 'wechat' | 'qq' | 'weibo' | 'link') => {
 const refreshShareStats = () => {
   addVisitRecord(['weibo', 'qq', 'wechat', 'link'][Math.floor(Math.random() * 4)]);
   recomputeShareStats();
-  ElMessage.success('分享统计已刷新');
+  ElMessage.success(t('refreshsharestat'));
 };
 
 const exportShareStats = () => {
@@ -797,7 +800,7 @@ const exportShareStats = () => {
   link.download = `share_stats_${props.workflowId}.json`;
   link.click();
   URL.revokeObjectURL(url);
-  ElMessage.success('分享统计已导出');
+  ElMessage.success(t('exportsharestat'));
 };
 
 const buildExportPayload = () => {
@@ -871,7 +874,7 @@ const startExport = () => {
   }
 
   exportProgress.value = 0;
-  exportStatus.value = '正在准备导出任务';
+  exportStatus.value = t('missionexportprepare');
   exporting.value = true;
 
   if (exportTimer !== null) {
@@ -882,17 +885,17 @@ const startExport = () => {
     exportProgress.value = Math.min(100, exportProgress.value + 16);
 
     if (exportProgress.value < 45) {
-      exportStatus.value = '正在收集导出数据';
+      exportStatus.value = t('collectingexportdata');
       return;
     }
 
     if (exportProgress.value < 80) {
-      exportStatus.value = '正在生成导出文件';
+      exportStatus.value = t('generatingexportfile');
       return;
     }
 
     if (exportProgress.value < 100) {
-      exportStatus.value = '正在完成导出';
+      exportStatus.value = t('exportcompleting');
       return;
     }
 
@@ -910,9 +913,9 @@ const startExport = () => {
     link.click();
     URL.revokeObjectURL(url);
 
-    exportStatus.value = '导出完成';
+    exportStatus.value = t('exportcompleted');
     exporting.value = false;
-    ElMessage.success(`导出成功（${payload.ext.toUpperCase()}）`);
+    ElMessage.success(`${t('exportsuccess')}（${payload.ext.toUpperCase()}）`);
   }, 240);
 };
 

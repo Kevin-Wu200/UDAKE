@@ -1,5 +1,4 @@
 import type { WorkflowNodeKind } from '../../types/workflow';
-
 export interface WorkflowCanvasNodeData {
   kind: WorkflowNodeKind;
   nodeType: string;
@@ -9,12 +8,15 @@ export interface WorkflowCanvasNodeData {
   params: Record<string, unknown>;
 }
 
-export const KIND_TEXT: Record<WorkflowNodeKind, string> = {
-  input: '输入',
-  process: '处理',
-  output: '输出',
-  control: '控制'
-};
+export function getKindText(kind: WorkflowNodeKind, t: (k: string) => string): string {
+  const map: Record<WorkflowNodeKind, string> = {
+    input: t('input'),
+    process: t('access'),
+    output: t('output'),
+    control: t('control')
+  };
+  return map[kind] || kind;
+}
 
 export const KIND_ACCENT: Record<WorkflowNodeKind, string> = {
   input: '#2563eb',

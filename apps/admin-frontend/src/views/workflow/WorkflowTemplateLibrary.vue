@@ -1,16 +1,16 @@
 <template>
   <div class="panel-card">
     <div class="panel-header">
-      <div class="panel-title">模板库</div>
-      <el-button link type="primary" :loading="loading" @click="loadTemplates">刷新</el-button>
+      <div class="panel-title">{{ t('templatelib') }}</div>
+      <el-button link type="primary" :loading="loading" @click="loadTemplates">{{ t('refresh') }}</el-button>
     </div>
 
     <div class="template-filters">
-      <el-input v-model="keyword" placeholder="搜索模板名称/标签" clearable />
-      <el-input v-model="recommendTags" placeholder="推荐标签（逗号分隔）" clearable />
+      <el-input v-model="keyword" :placeholder="t('searchtemplate')" clearable />
+      <el-input v-model="recommendTags" :placeholder="t('suggesttag')" clearable />
       <div class="filter-actions">
-        <el-button size="small" @click="loadRecommendations">推荐</el-button>
-        <el-button size="small" @click="loadTemplates">查询</el-button>
+        <el-button size="small" @click="loadRecommendations">{{ t('suggest') }}</el-button>
+        <el-button size="small" @click="loadTemplates">{{ t('query') }}</el-button>
       </div>
     </div>
 
@@ -21,22 +21,22 @@
             <div>
               <div class="name">{{ item.name }}</div>
               <div class="meta">
-                {{ item.category }} · 使用 {{ item.usage_count }} 次 · 评分 {{ item.rating_average.toFixed(1) }}
+                {{ item.category }} · {{ t('use') }} {{ item.usage_count }} {{ t('times') }} · {{ t('score') }} {{ item.rating_average.toFixed(1) }}
               </div>
             </div>
-            <el-tag :type="item.shared ? 'success' : 'info'">{{ item.shared ? '共享' : '私有' }}</el-tag>
+            <el-tag :type="item.shared ? 'success' : 'info'">{{ item.shared ? t('public') : t('private') }}</el-tag>
           </div>
-          <div class="desc">{{ item.description || '暂无描述' }}</div>
+          <div class="desc">{{ item.description || t('nodescribe') }}</div>
           <div class="tags">
             <el-tag v-for="tag in item.tags" :key="`${item.template_id}_${tag}`" size="small">{{ tag }}</el-tag>
           </div>
           <div class="actions">
-            <el-button size="small" type="primary" @click="emit('apply-template', item)">应用</el-button>
-            <el-button size="small" @click="instantiate(item)">实例化</el-button>
+            <el-button size="small" type="primary" @click="emit('apply-template', item)">{{ t('app') }}</el-button>
+            <el-button size="small" @click="instantiate(item)">{{ t('instantiation') }}</el-button>
             <el-button size="small" @click="toggleShare(item)">
-              {{ item.shared ? '取消共享' : '共享' }}
+              {{ item.shared ? t('cancelshare') : t('share') }}
             </el-button>
-            <el-button size="small" @click="rate(item)">评分+1</el-button>
+            <el-button size="small" @click="rate(item)">{{ t('score') + ' + 1'}}</el-button>
           </div>
         </div>
       </div>
@@ -49,6 +49,9 @@ import { computed, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { workflowService } from '../../services/WorkflowService';
 import type { WorkflowTemplate } from '../../types/workflow';
+import { useI18nText } from '../../i18n/useI18n';
+
+const { t } = useI18nText();
 
 const emit = defineEmits<{
   'apply-template': [template: WorkflowTemplate];
@@ -58,7 +61,7 @@ const emit = defineEmits<{
 const loading = ref(false);
 const templates = ref<WorkflowTemplate[]>([]);
 const keyword = ref('');
-const recommendTags = ref('采样,插值');
+const recommendTags = ref(`${t('takesample')}, ${t('interpolation')}`);
 
 const filteredTemplates = computed(() => {
   const query = keyword.value.trim().toLowerCase();
@@ -87,7 +90,7 @@ const loadTemplates = async () => {
       (a, b) => b.rating_average - a.rating_average || b.usage_count - a.usage_count
     );
   } catch {
-    ElMessage.error('加载模板库失败');
+    ElMessage.error(t('loadtemplatelibfailed'));
   } finally {
     loading.value = false;
   }
@@ -100,7 +103,7 @@ const loadRecommendations = async () => {
     .filter(Boolean);
 
   if (!tags.length) {
-    ElMessage.warning('请输入推荐标签');
+    ElMessage.warning(t('suggesttagRequired'));
     return;
   }
 
@@ -108,9 +111,9 @@ const loadRecommendations = async () => {
   try {
     const response = await workflowService.recommendTemplates(tags, undefined, 20);
     templates.value = response.recommendations.map((item) => item.template);
-    ElMessage.success(`已按标签推荐 ${response.count} 个模板`);
+    ElMessage.success(`${t('suggestbytag')} ${response.count} ${t('templatenum')}`);
   } catch {
-    ElMessage.error('推荐模板失败');
+    ElMessage.error(t('suggesttemplatefailed'));
   } finally {
     loading.value = false;
   }
@@ -118,33 +121,33 @@ const loadRecommendations = async () => {
 
 const instantiate = async (template: WorkflowTemplate) => {
   try {
-    const record = await workflowService.instantiateTemplate(template.template_id, `${template.name}_实例`);
-    ElMessage.success('模板实例化成功');
+    const record = await workflowService.instantiateTemplate(template.template_id, `${template.name}_${t('instantiate')}`);
+    ElMessage.success(t('templateinstantiatesuccess'));
     emit('instantiated', record.workflow_id);
     await loadTemplates();
   } catch {
-    ElMessage.error('实例化模板失败');
+    ElMessage.error('templateinstantiatefailed');
   }
 };
 
 const toggleShare = async (template: WorkflowTemplate) => {
   try {
     await workflowService.shareTemplate(template.template_id, !template.shared);
-    ElMessage.success('模板共享状态已更新');
+    ElMessage.success(t('refreshtemplatesharestatussuccess'));
     await loadTemplates();
   } catch {
-    ElMessage.error('更新模板共享状态失败');
+    ElMessage.error(t('refreshtemplatesharestatusfailed'));
   }
 };
 
 const rate = async (template: WorkflowTemplate) => {
   try {
     const nextRating = Math.min(5, Math.max(1, Number((template.rating_average || 0) + 1)));
-    await workflowService.rateTemplate(template.template_id, nextRating, 'admin-console', '页面内快速评分');
-    ElMessage.success('评分已提交');
+    await workflowService.rateTemplate(template.template_id, nextRating, 'admin-console', t('quickscoreinpage'));
+    ElMessage.success(t('submittemplatescoresuccess'));
     await loadTemplates();
   } catch {
-    ElMessage.error('模板评分失败');
+    ElMessage.error(t('submittemplatescorefailed'));
   }
 };
 

@@ -1,33 +1,33 @@
 <template>
   <div class="toolbar-wrap">
     <div class="left-actions">
-      <el-button type="primary" :loading="loading" @click="emit('save')">保存</el-button>
-      <el-button :loading="loading" @click="emit('validate')">校验</el-button>
+      <el-button type="primary" :loading="loading" @click="emit('save')">{{ t('save') }}</el-button>
+      <el-button :loading="loading" @click="emit('validate')">{{ t ('calibrate') }}</el-button>
       <el-button type="success" :loading="loading" :disabled="!canExecute" @click="emit('execute')">
-        执行
+        {{ t('exec') }}
       </el-button>
-      <el-button @click="emit('fit-view')">适配画布</el-button>
-      <el-button @click="emit('auto-layout')">自动布局</el-button>
+      <el-button @click="emit('fit-view')">{{ t('adaptcanva') }}</el-button>
+      <el-button @click="emit('auto-layout')">{{ t('automaticlayout') }}</el-button>
     </div>
 
     <div class="right-actions">
       <el-dropdown @command="handleCreateNode">
         <el-button>
-          添加节点
+          {{ t('addnodes') }}
           <el-icon class="el-icon--right"><ArrowDown /></el-icon>
         </el-button>
         <template #dropdown>
           <el-dropdown-menu>
-            <el-dropdown-item command="input">输入节点</el-dropdown-item>
-            <el-dropdown-item command="process">处理节点</el-dropdown-item>
-            <el-dropdown-item command="output">输出节点</el-dropdown-item>
-            <el-dropdown-item command="control">控制节点</el-dropdown-item>
+            <el-dropdown-item command="input">{{ t('inputnode') }}</el-dropdown-item>
+            <el-dropdown-item command="process">{{ t('accessnode') }}</el-dropdown-item>
+            <el-dropdown-item command="output">{{ t('outputnode') }}</el-dropdown-item>
+            <el-dropdown-item command="control">{{ t('controlnode') }}</el-dropdown-item>
           </el-dropdown-menu>
         </template>
       </el-dropdown>
 
-      <el-button @click="triggerImport">导入</el-button>
-      <el-button :disabled="!hasWorkflow" @click="emit('export-json')">导出</el-button>
+      <el-button @click="triggerImport">{{ t('import') }}</el-button>
+      <el-button :disabled="!hasWorkflow" @click="emit('export-json')">{{ t('derive') }}</el-button>
       <input ref="fileInputRef" type="file" accept="application/json" class="file-input" @change="onFileChange" />
     </div>
   </div>
@@ -38,6 +38,9 @@ import { ref } from 'vue';
 import { ArrowDown } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 import type { WorkflowDefinition, WorkflowNodeKind } from '../../types/workflow';
+import { useI18nText } from '../../i18n/useI18n';
+
+const { t } = useI18nText();
 
 withDefaults(
   defineProps<{
@@ -87,7 +90,7 @@ const onFileChange = async (event: Event) => {
     const json = JSON.parse(text) as WorkflowDefinition;
     emit('import-json', json);
   } catch {
-    ElMessage.error('导入失败：不是合法的工作流 JSON 文件');
+    ElMessage.error( t('importworkflowjsonfailed') );
   } finally {
     target.value = '';
   }

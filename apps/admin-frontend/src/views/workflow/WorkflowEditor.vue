@@ -17,10 +17,10 @@
     <div class="editor-main">
       <section class="canvas-panel">
         <div class="meta-form">
-          <el-input v-model="meta.name" placeholder="工作流名称" />
-          <el-input v-model="meta.workflow_id" placeholder="工作流ID（保存后锁定）" :disabled="Boolean(persistedWorkflowId)" />
-          <el-input v-model="meta.description" placeholder="工作流描述" />
-          <el-tag>版本 v{{ meta.version }}</el-tag>
+          <el-input v-model="meta.name" :placeholder="t('workflowName')" />
+          <el-input v-model="meta.workflow_id" :placeholder="t('workflowID') + t('savelock')" :disabled="Boolean(persistedWorkflowId)" />
+          <el-input v-model="meta.description" :placeholder="t('workflowdescription')" />
+          <el-tag>{{ t('version') }} v{{ meta.version }}</el-tag>
         </div>
 
         <div ref="canvasWrapRef" class="workflow-canvas-wrap">
@@ -142,10 +142,12 @@ import type {
   WorkflowTemplate
 } from '../../types/workflow';
 import type { WorkflowCanvasNodeData } from './workflowCanvas';
+import { useI18nText } from '../../i18n/useI18n';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const { t, language } = useI18nText();
 
 const flowId = 'workflow-editor-canvas';
 const { fitView } = useVueFlow({ id: flowId });
@@ -163,9 +165,9 @@ let focusPulseTimer: number | null = null;
 
 const meta = reactive({
   workflow_id: '',
-  name: '未命名工作流',
+  name: t('untitledworkflow'),
   description: '',
-  version: 1
+  version: 1  
 });
 
 const nodeTypes = markRaw({
@@ -210,7 +212,7 @@ const routeWorkflowId = computed(() => {
   return typeof raw === 'string' ? raw : '';
 });
 
-const currentUserName = computed(() => authStore.user?.email || authStore.username || '当前用户');
+const currentUserName = computed(() => authStore.user?.email || authStore.username || t('currentuser'));
 
 const currentUserId = computed(() => {
   const fromStore = authStore.user?.userId ?? authStore.username;
@@ -234,8 +236,8 @@ const isAdminUser = computed(() => {
 
 const buildStarterDefinition = (): WorkflowDefinition => ({
   workflow_id: `wf_${Math.random().toString(36).slice(2, 10)}`,
-  name: '新建工作流',
-  description: '请在画布中编辑节点和连线',
+  name: '',
+  description: '',
   version: 1,
   nodes: [
     {
@@ -262,6 +264,13 @@ const buildStarterDefinition = (): WorkflowDefinition => ({
     { source: 'process_1', target: 'output_1', condition: 'always' }
   ]
 });
+
+const buildStarterDefinitiontranslate = reactive(buildStarterDefinition());
+
+watch(language, () => {
+  buildStarterDefinitiontranslate.name = t('createWorkflow');
+  buildStarterDefinitiontranslate.description = t('accessnodeincanva');
+}, { immediate: true});
 
 const hydrateFromDefinition = (definition: WorkflowDefinition, keepPersisted = false) => {
   const layout =
@@ -364,7 +373,7 @@ const buildDefinitionFromCanvas = (): WorkflowDefinition => {
 
   return {
     workflow_id: workflowId,
-    name: meta.name.trim() || '未命名工作流',
+    name: meta.name.trim() || t('untitledworkflow'),
     description: meta.description.trim(),
     version: meta.version || 1,
     nodes: nodeDefinitions,
@@ -384,7 +393,7 @@ const loadWorkflow = async (workflowId: string) => {
     hydrateFromDefinition(detail.current, true);
     persistedWorkflowId.value = detail.workflow_id;
   } catch {
-    ElMessage.error('加载工作流失败');
+    ElMessage.error(t('loadworkflowfailed'));
   } finally {
     loading.value = false;
   }
@@ -434,11 +443,15 @@ const clearSelection = () => {
 const onEdgeDoubleClick = async (payload: EdgeMouseEvent) => {
   const current = typeof payload.edge.data?.condition === 'string' ? payload.edge.data.condition : 'always';
   try {
-    const { value } = await ElMessageBox.prompt('请输入连线条件（always 表示始终执行）', '编辑连线条件', {
-      inputValue: current,
-      confirmButtonText: '保存',
-      cancelButtonText: '取消'
-    });
+    const { value } = await ElMessageBox.prompt(
+      t('connectconditionRequired'),
+      t('editconnectcondition'),
+      {
+        inputValue: current,
+        confirmButtonText: t('save'),
+        cancelButtonText: t('cancel')
+      }
+    );
 
     edges.value = edges.value.map((edge) =>
       edge.id === payload.edge.id
@@ -511,7 +524,7 @@ const cloneNode = (nodeId: string) => {
       },
       data: {
         ...sourceData,
-        label: `${sourceData.label}_复制`
+        label: `${sourceData.label}_${t('copy')}`
       }
     }
   ];
@@ -550,9 +563,9 @@ const validateWorkflow = async () => {
   try {
     const definition = buildDefinitionFromCanvas();
     const result = await workflowService.validateDefinition(definition);
-    ElMessage.success(`校验通过：${result.node_count} 个节点，${result.edge_count} 条连线`);
+    ElMessage.success(`${t('calibratesuccess')}${result.node_count}${t('nodenum')}，${result.edge_count}${t('connectionnum')}`);
   } catch {
-    ElMessage.error('工作流校验失败，请检查节点参数和连线');
+    ElMessage.error(t('workflowcalibratefailed'));
   } finally {
     loading.value = false;
   }
@@ -581,9 +594,9 @@ const saveWorkflow = async () => {
       await router.replace(`/workflows/editor/${record.workflow_id}`);
     }
 
-    ElMessage.success('工作流已保存');
+    ElMessage.success(t('workflowsavedsuccess'));
   } catch {
-    ElMessage.error('保存失败，请先完成校验错误修复');
+    ElMessage.error(t('workflowsavedfailed'));
   } finally {
     loading.value = false;
   }
@@ -605,9 +618,9 @@ const executeWorkflow = async () => {
       trigger: 'admin_console'
     });
     activeRunId.value = run.run_id;
-    ElMessage.success(`已触发执行：${run.run_id}`);
+    ElMessage.success(`${t('triggerexecsuccess')}${run.run_id}`);
   } catch {
-    ElMessage.error('触发执行失败');
+    ElMessage.error(t('triggerexecfailed'));
   } finally {
     loading.value = false;
   }
@@ -619,13 +632,13 @@ const importDefinition = async (definition: WorkflowDefinition) => {
     const imported: WorkflowDefinition = {
       ...definition,
       workflow_id: definition.workflow_id || `wf_${Math.random().toString(36).slice(2, 10)}`,
-      name: definition.name || '导入工作流',
+      name: definition.name || t('importworkflow'),
       version: Number(definition.version || 1)
     };
     hydrateFromDefinition(imported, false);
-    ElMessage.success('工作流已导入到画布');
+    ElMessage.success(t('importworkflowsuccess'));
   } catch {
-    ElMessage.error('导入的工作流定义无效');
+    ElMessage.error(t('importworkflowfailed'));
   }
 };
 
@@ -638,18 +651,18 @@ const exportDefinition = () => {
   link.download = `${definition.name || definition.workflow_id}.json`;
   link.click();
   URL.revokeObjectURL(url);
-  ElMessage.success('工作流JSON已导出');
+  ElMessage.success(t('outputworkflowjson'));
 };
 
 const applyTemplate = (template: WorkflowTemplate) => {
   const nextDefinition: WorkflowDefinition = {
     ...template.workflow,
     workflow_id: `wf_${Math.random().toString(36).slice(2, 10)}`,
-    name: `${template.name}_编辑副本`,
+    name: `${template.name}_${t('editduplicate')}`,
     version: 1
   };
   hydrateFromDefinition(nextDefinition, false);
-  ElMessage.success(`已加载模板：${template.name}`);
+  ElMessage.success(`${t('loadtemplate')}${template.name}`);
 };
 
 const openInstantiatedWorkflow = async (workflowId: string) => {
@@ -683,7 +696,7 @@ const handleJumpPosition = (payload: { x: number; y: number; userId: string; use
   focusPulse.value = {
     x: payload.x,
     y: payload.y,
-    label: `定位到 ${payload.userName}`
+    label: `${t('located')} ${payload.userName}`
   };
   if (focusPulseTimer !== null) {
     window.clearTimeout(focusPulseTimer);

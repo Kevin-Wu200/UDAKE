@@ -2,83 +2,83 @@
   <section class="notification-center">
     <header class="notification-header">
       <div class="title-wrap">
-        <h3>通知中心</h3>
-        <el-tag size="small" effect="plain">未读 {{ unreadCount }}</el-tag>
-        <el-tag size="small" effect="plain">筛选结果 {{ filteredNotifications.length }}</el-tag>
+        <h3>{{ t('noticecenter') }}</h3>
+        <el-tag size="small" effect="plain">{{ t('unread') }} {{ unreadCount }}</el-tag>
+        <el-tag size="small" effect="plain">{{ t('filterresult') }} {{ filteredNotifications.length }}</el-tag>
       </div>
       <div class="header-actions">
-        <el-button text size="small" @click="showSettings = !showSettings">通知设置</el-button>
-        <el-button text size="small" @click="markAllAsRead" :disabled="unreadCount === 0">全部已读</el-button>
-        <el-button text size="small" :loading="loading" @click="refreshNotifications">刷新</el-button>
+        <el-button text size="small" @click="showSettings = !showSettings">{{ t('noticesettings') }}</el-button>
+        <el-button text size="small" @click="markAllAsRead" :disabled="unreadCount === 0">{{ t('readall') }}</el-button>
+        <el-button text size="small" :loading="loading" @click="refreshNotifications">{{ t('refresh') }}</el-button>
       </div>
     </header>
 
     <div class="quick-filter-row">
       <el-radio-group v-model="filters.singleType" size="small">
-        <el-radio-button label="all">全部</el-radio-button>
-        <el-radio-button label="mention">@提及</el-radio-button>
-        <el-radio-button label="comment">评论</el-radio-button>
-        <el-radio-button label="share">分享</el-radio-button>
-        <el-radio-button label="system">系统</el-radio-button>
+        <el-radio-button label="all">{{ t('all') }}</el-radio-button>
+        <el-radio-button label="mention">{{ t('mention') }}</el-radio-button>
+        <el-radio-button label="comment">{{ t('comment') }}</el-radio-button>
+        <el-radio-button label="share">{{ t('share') }}</el-radio-button>
+        <el-radio-button label="system">{{ t('system') }}</el-radio-button>
       </el-radio-group>
     </div>
 
     <div class="advanced-filter-row">
       <el-checkbox-group v-model="filters.multiTypes" size="small">
-        <el-checkbox label="mention">@提及</el-checkbox>
-        <el-checkbox label="comment">评论</el-checkbox>
-        <el-checkbox label="share">分享</el-checkbox>
-        <el-checkbox label="system">系统</el-checkbox>
+        <el-checkbox label="mention">{{ t('mention') }}</el-checkbox>
+        <el-checkbox label="comment">{{ t('comment') }}</el-checkbox>
+        <el-checkbox label="share">{{ t('share') }}</el-checkbox>
+        <el-checkbox label="system">{{ t('system') }}</el-checkbox>
       </el-checkbox-group>
-      <el-input v-model="filters.sourceKeyword" placeholder="来源筛选" clearable size="small" style="width: 120px" />
-      <el-input v-model="filters.textKeyword" placeholder="关键字" clearable size="small" style="width: 140px" />
-      <el-switch v-model="filters.unreadOnly" inline-prompt active-text="仅未读" inactive-text="全部" />
-      <el-button size="small" @click="resetFilters">重置筛选</el-button>
+      <el-input v-model="filters.sourceKeyword" :placeholder="t('filtersource')" clearable size="small" style="width: 120px" />
+      <el-input v-model="filters.textKeyword" :placeholder="t('keyword')" clearable size="small" style="width: 140px" />
+      <el-switch v-model="filters.unreadOnly" inline-prompt :active-text="t('onlyunread')" :inactive-text="t('all')" />
+      <el-button size="small" @click="resetFilters">{{ t('resetfilter') }}</el-button>
     </div>
 
     <div class="sort-row">
       <el-select v-model="sortBy" size="small" style="width: 130px">
-        <el-option label="按时间" value="time" />
-        <el-option label="按类型" value="type" />
-        <el-option label="按优先级" value="priority" />
+        <el-option :label="t('bytime')" value="time" />
+        <el-option :label="t('bytype')" value="type" />
+        <el-option :label="t('bypriority')" value="priority" />
       </el-select>
-      <el-switch v-model="groupByType" inline-prompt active-text="类型分组" inactive-text="普通" />
-      <el-switch v-model="unreadFirst" inline-prompt active-text="未读置顶" inactive-text="自然排序" />
+      <el-switch v-model="groupByType" inline-prompt :active-text="t('typegrouping')" :inactive-text="t('ordinary')" />
+      <el-switch v-model="unreadFirst" inline-prompt :active-text="t('unreadpine')" :inactive-text="t('naturalsorting')" />
       <el-button size="small" :disabled="selectedIds.length === 0" @click="markSelectedAsRead">
-        批量已读 ({{ selectedIds.length }})
+        {{ t('batchread') }} ({{ selectedIds.length }})
       </el-button>
     </div>
 
     <div v-if="showSettings" class="settings-panel">
-      <h4>通知偏好设置</h4>
+      <h4>{{ t('notificationsettings') }}</h4>
       <div class="settings-grid">
-        <el-switch v-model="preferences.types.mention" active-text="@提及" />
-        <el-switch v-model="preferences.types.comment" active-text="评论" />
-        <el-switch v-model="preferences.types.share" active-text="分享" />
-        <el-switch v-model="preferences.types.system" active-text="系统" />
+        <el-switch v-model="preferences.types.mention" :active-text="t('mention')" />
+        <el-switch v-model="preferences.types.comment" :active-text="t('comment')" />
+        <el-switch v-model="preferences.types.share" :active-text="t('share')" />
+        <el-switch v-model="preferences.types.system" :active-text="t('system')" />
       </div>
       <div class="settings-row">
-        <span class="label">通知频率</span>
+        <span class="label">{{ t('notificationfrequency') }}</span>
         <el-select v-model="preferences.frequency" size="small" style="width: 150px">
-          <el-option label="实时" value="realtime" />
-          <el-option label="5 分钟汇总" value="5m" />
-          <el-option label="15 分钟汇总" value="15m" />
-          <el-option label="每日汇总" value="daily" />
+          <el-option :label="t('intime')" value="realtime" />
+          <el-option :label="'5' + t('minusummary')" value="5m" />
+          <el-option :label="'15' + t('minusummary')" value="15m" />
+          <el-option :label="t('daysummary')" value="daily" />
         </el-select>
       </div>
       <div class="settings-row">
-        <span class="label">通知方式</span>
+        <span class="label">{{ t('notificationmethod') }}</span>
         <el-checkbox-group v-model="preferences.channels" size="small">
-          <el-checkbox label="popup">弹窗</el-checkbox>
-          <el-checkbox label="list">列表</el-checkbox>
-          <el-checkbox label="email">邮件</el-checkbox>
+          <el-checkbox label="popup">{{ t('popupwindow') }}</el-checkbox>
+          <el-checkbox label="list">{{ t('list') }}</el-checkbox>
+          <el-checkbox label="email">{{ t('post') }}</el-checkbox>
         </el-checkbox-group>
       </div>
       <div class="settings-row">
         <span class="save-tip">{{ saveTip }}</span>
       </div>
       <div class="history-list" v-if="preferenceHistory.length > 0">
-        <div class="history-title">最近设置历史</div>
+        <div class="history-title">{{ t('nearlysettingshistory') }}</div>
         <div class="history-item" v-for="item in preferenceHistory.slice(0, 4)" :key="item.saved_at">
           {{ new Date(item.saved_at).toLocaleString() }} - {{ item.frequency }} - {{ item.channels.join('/') }}
         </div>
@@ -112,19 +112,19 @@
           </div>
           <p class="content">{{ item.content }}</p>
           <div class="card-actions">
-            <el-button text size="small" @click="openNotification(item)">查看详情</el-button>
+            <el-button text size="small" @click="openNotification(item)">{{ t('checkdetail') }}</el-button>
             <el-button text size="small" @click="toggleRead(item)">
-              {{ item.read ? '标记未读' : '标记已读' }}
+              {{ item.read ? t('markasread') : t('markasunread') }}
             </el-button>
           </div>
         </div>
       </article>
 
-      <div v-if="sortedNotifications.length === 0" class="empty">暂无通知</div>
+      <div v-if="sortedNotifications.length === 0" class="empty">{{ t('nonoticeforthetime') }}</div>
 
       <div class="pagination-row" v-if="sortedNotifications.length > 0">
         <el-button size="small" @click="loadMore" :disabled="pageResult.currentPage >= pageResult.totalPages">
-          下拉加载更多
+          {{ t('pulldowntoloadmore') }}
         </el-button>
         <el-pagination
           layout="prev, pager, next"
@@ -141,8 +141,8 @@
         <div class="toast-title">{{ toast.title }}</div>
         <div class="toast-message">{{ toast.message }}</div>
         <div class="toast-actions">
-          <button type="button" @click="openFromToast(toast)">查看</button>
-          <button type="button" @click="closeToast(toast.id)">关闭</button>
+          <button type="button" @click="openFromToast(toast)">{{ t('check') }}</button>
+          <button type="button" @click="closeToast(toast.id)">{{ t('close') }}</button>
         </div>
       </div>
     </transition-group>
@@ -169,6 +169,9 @@ import {
   type WorkflowNotificationPriority,
   type WorkflowNotificationType
 } from './notificationCenterUtils';
+import { useI18nText } from '../../i18n/useI18n';
+
+const { t } = useI18nText();
 
 interface WorkflowNotificationPreferences {
   types: Record<WorkflowNotificationType, boolean>;
@@ -194,7 +197,7 @@ const page = ref(1);
 const pageSize = 8;
 const selectedIdSet = ref(new Set<string>());
 const showSettings = ref(false);
-const saveTip = ref('自动保存已开启');
+const saveTip = ref(t('autosavestart'));
 const toasts = ref<NotificationToast[]>([]);
 let toastTimer: number | null = null;
 let unsubRealtime: (() => void) | null = null;
@@ -327,8 +330,8 @@ function schedulePreferenceSave() {
   preferenceSaveTimer = window.setTimeout(() => {
     cachePreferences();
     void syncPreferenceToServer();
-    saveTip.value = `已自动保存 (${new Date().toLocaleTimeString()})`;
-    ElMessage.success('通知设置已保存');
+    saveTip.value = `${t('autosavesuccess')} (${new Date().toLocaleTimeString()})`;
+    ElMessage.success(t('noticesettingssavedsuccess'));
   }, 250);
 }
 
@@ -358,7 +361,7 @@ function resetFilters() {
 }
 
 function formatTime(value: string) {
-  return formatNotificationRelativeTime(value);
+  return formatNotificationRelativeTime(value, Date.now(), t);
 }
 
 function toggleSelect(notificationId: string) {
@@ -389,9 +392,9 @@ function upsertFromPayload(payload: Record<string, unknown>) {
     notification_id: String(payload.notification_id || `rt_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
     workflow_id: props.workflowId,
     type: normalizedType,
-    title: String(payload.title || '新通知'),
+    title: String(payload.title || t('newnotice')),
     content: String(payload.content || payload.message || ''),
-    source: String(payload.source || '实时事件'),
+    source: String(payload.source || t('intimeissue')),
     source_id: payload.source_id ? String(payload.source_id) : undefined,
     created_at: typeof payload.created_at === 'string' ? payload.created_at : new Date().toISOString(),
     priority: normalizedPriority,
@@ -567,9 +570,9 @@ function attachRealtime() {
     }
     if (eventType.includes('comment') || eventType.includes('mention') || eventType.includes('share')) {
       const titleMap: Record<string, string> = {
-        comment: '新评论通知',
-        mention: '@提及通知',
-        share: '分享通知'
+        comment: t('newcommentnotice'),
+        mention: t('mentionnotice'),
+        share: t('sharenotice')
       };
       const normalized = eventType.includes('mention')
         ? 'mention'
@@ -580,8 +583,8 @@ function attachRealtime() {
         notification_id: `rt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         notification_type: normalized,
         title: titleMap[normalized],
-        content: String(event.payload.message || event.payload.content || '收到一条新的协作消息'),
-        source: '实时协作',
+        content: String(event.payload.message || event.payload.content || t('recievecomessage')),
+        source: t('intimeco'),
         priority: normalized === 'mention' ? 'high' : 'normal',
         created_at: new Date().toISOString(),
         source_id: String(event.payload.comment_id || '')

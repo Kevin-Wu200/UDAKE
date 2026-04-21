@@ -1,27 +1,27 @@
 <template>
   <div class="panel-card">
-    <div class="panel-title">节点属性</div>
+    <div class="panel-title">{{ t('nodeattribute') }}</div>
 
     <template v-if="selectedNode">
       <el-form label-position="top" class="prop-form">
-        <el-form-item label="节点ID">
+        <el-form-item :label="t('nodeid')">
           <el-input :model-value="selectedNode.id" disabled />
         </el-form-item>
 
-        <el-form-item label="节点名称">
+        <el-form-item :label="t('nodename')">
           <el-input v-model="form.label" @change="emitNodeUpdate" />
         </el-form-item>
 
-        <el-form-item label="节点类型">
+        <el-form-item :label="t('nodetype')">
           <el-select v-model="form.kind" style="width: 100%" @change="emitNodeUpdate">
-            <el-option label="输入" value="input" />
-            <el-option label="处理" value="process" />
-            <el-option label="输出" value="output" />
-            <el-option label="控制" value="control" />
+            <el-option :label="t('input')" value="input" />
+            <el-option :label="t('access')" value="process" />
+            <el-option :label="t('output')" value="output" />
+            <el-option :label="t('control')" value="control" />
           </el-select>
         </el-form-item>
 
-        <el-form-item label="处理器">
+        <el-form-item :label="t('processor')">
           <el-select
             v-if="nodeTypeOptions.length"
             v-model="form.nodeType"
@@ -36,33 +36,33 @@
           <el-input v-else v-model="form.nodeType" @change="emitNodeUpdate" />
         </el-form-item>
 
-        <el-form-item label="启用状态">
+        <el-form-item :label="t('enablestatus')">
           <el-switch v-model="form.enabled" @change="emitNodeUpdate" />
         </el-form-item>
 
-        <el-form-item label="节点描述">
+        <el-form-item :label="t('nodedescription')">
           <el-input v-model="form.description" type="textarea" :rows="2" @change="emitNodeUpdate" />
         </el-form-item>
 
-        <el-form-item label="参数(JSON)">
+        <el-form-item :label="t('jsonparameter')">
           <el-input
             v-model="form.paramsText"
             type="textarea"
             :rows="8"
-            placeholder="请输入合法 JSON，例如 {&quot;step&quot;: 2}"
+            placeholder="${t('illegaljsonwarning')} {&quot;step&quot;: 2}"
           />
         </el-form-item>
 
-        <el-button type="primary" @click="applyParams">应用参数</el-button>
+        <el-button type="primary" @click="applyParams">{{ t('applyparameter') }}</el-button>
       </el-form>
 
       <div class="panel-actions">
-        <el-button type="warning" plain @click="emit('clone-node', selectedNode.id)">复制节点</el-button>
-        <el-button type="danger" plain @click="emit('delete-node', selectedNode.id)">删除节点</el-button>
+        <el-button type="warning" plain @click="emit('clone-node', selectedNode.id)">{{ t('copynode') }}</el-button>
+        <el-button type="danger" plain @click="emit('delete-node', selectedNode.id)">{{ t('deletenode') }}</el-button>
       </div>
     </template>
 
-    <el-empty v-else description="请在画布中选择一个节点" :image-size="70" />
+    <el-empty v-else :description="t('nodeselectRequired')" :image-size="70" />
   </div>
 </template>
 
@@ -71,6 +71,9 @@ import { reactive, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import type { Node } from '@vue-flow/core';
 import type { WorkflowCanvasNodeData } from './workflowCanvas';
+import { useI18nText } from '../../i18n/useI18n';
+
+const { t } = useI18nText();
 
 interface PanelForm {
   label: string;
@@ -179,9 +182,9 @@ const applyParams = () => {
         params: parsed
       }
     });
-    ElMessage.success('节点参数已更新');
+    ElMessage.success(t('nodeparameterrefreshsuccess'));
   } catch {
-    ElMessage.error('参数 JSON 格式无效');
+    ElMessage.error(t('nodeparameterjsoninvalid'));
   }
 };
 </script>

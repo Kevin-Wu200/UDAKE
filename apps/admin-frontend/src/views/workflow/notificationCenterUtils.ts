@@ -64,23 +64,32 @@ export function countUnreadNotifications(items: WorkflowNotificationItem[]) {
   return items.reduce((count, item) => (item.read ? count : count + 1), 0);
 }
 
-export function formatNotificationRelativeTime(isoTime: string, nowTs = Date.now()) {
+export function formatNotificationRelativeTime(isoTime: string, nowTs = Date.now(), t?: (key: string) => string) {
+  const _t = t || ((key: string) => {
+    const fallback: Record<string, string> = {
+      scearly: '秒前',
+      minuearly: '分钟前',
+      hourearly: '小时前',
+      dayearly: '天前'
+    };
+    return fallback[key] || key;
+  });
   const delta = Math.max(0, nowTs - normalizeTime(isoTime));
   const seconds = Math.floor(delta / 1000);
   if (seconds < 60) {
-    return `${seconds}秒前`;
+    return `${seconds}${_t('scearly')}`;
   }
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) {
-    return `${minutes}分钟前`;
+    return `${minutes}${_t('minuearly')}`;
   }
   const hours = Math.floor(minutes / 60);
   if (hours < 24) {
-    return `${hours}小时前`;
+    return `${hours}${_t('hourearly')}`;
   }
   const days = Math.floor(hours / 24);
   if (days < 7) {
-    return `${days}天前`;
+    return `${days}${_t('dayearly')}`;
   }
   return new Date(isoTime).toLocaleString();
 }

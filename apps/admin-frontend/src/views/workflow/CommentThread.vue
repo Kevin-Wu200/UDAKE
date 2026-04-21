@@ -2,34 +2,34 @@
   <section class="comment-thread">
     <header class="comment-header">
       <div class="header-main">
-        <h3>评论线程</h3>
-        <el-tag size="small" effect="plain">{{ totalCount }} 条</el-tag>
-        <el-tag v-if="mentionCount > 0" size="small" type="warning" effect="plain">@我 {{ mentionCount }}</el-tag>
+        <h3>{{ t('commentthread') }}</h3>
+        <el-tag size="small" effect="plain">{{ totalCount }} {{ t('pieces') }}</el-tag>
+        <el-tag v-if="mentionCount > 0" size="small" type="warning" effect="plain">{{ t('me') }} {{ mentionCount }}</el-tag>
       </div>
       <div class="header-actions">
-        <el-switch v-model="settingsEnabled" inline-prompt active-text="通知" inactive-text="静默" />
-        <el-button text @click="toggleSettings">设置</el-button>
-        <el-button text @click="toggleBatchMode">{{ batchMode ? '退出批量' : '批量操作' }}</el-button>
+        <el-switch v-model="settingsEnabled" inline-prompt :active-text="t('notice')" :inactive-text="t('quiet')" />
+        <el-button text @click="toggleSettings">{{ t('settings') }}</el-button>
+        <el-button text @click="toggleBatchMode">{{ batchMode ? t('quitbatchoperation') : t('batchoperation') }}</el-button>
       </div>
     </header>
 
     <div v-if="showSettings" class="settings-panel">
-      <el-switch v-model="settings.enableNewComment" active-text="新评论" />
-      <el-switch v-model="settings.enableMention" active-text="@提及" />
-      <el-switch v-model="settings.enableReply" active-text="回复" />
-      <el-switch v-model="settings.doNotDisturb" active-text="免打扰" />
+      <el-switch v-model="settings.enableNewComment" :active-text="t('newcomment')" />
+      <el-switch v-model="settings.enableMention" :active-text="t('mention')" />
+      <el-switch v-model="settings.enableReply" :active-text="t('answer')" />
+      <el-switch v-model="settings.doNotDisturb" :active-text="t('nodisturb')" />
       <el-select v-model="settings.frequency" size="small" style="width: 120px">
-        <el-option label="实时" value="realtime" />
-        <el-option label="30秒" value="30s" />
-        <el-option label="60秒" value="60s" />
+        <el-option :label="t('intime')" value="realtime" />
+        <el-option :label="`${30} ${t('sc')}`" value="30s" />
+        <el-option :label="`${60} ${t('sc')}`" value="60s" />
       </el-select>
-      <el-button size="small" @click="saveSettings">保存设置</el-button>
+      <el-button size="small" @click="saveSettings">{{ t('savesettings') }}</el-button>
     </div>
 
     <div class="composer-card">
       <div v-if="replyingTo" class="replying-banner">
-        正在回复 {{ replyingTo.author_name }}
-        <el-button link type="primary" @click="cancelReply">取消</el-button>
+        {{ t('answering') }} {{ replyingTo.author_name }}
+        <el-button link type="primary" @click="cancelReply">{{ t('cancel') }}</el-button>
       </div>
       <el-input
         ref="composerRef"
@@ -37,7 +37,7 @@
         type="textarea"
         :rows="4"
         resize="vertical"
-        placeholder="输入评论，使用 @ 可提及协作者"
+        :placeholder="t('addcomment')"
         @input="onComposerInput"
         @keydown="onComposerKeydown"
       />
@@ -54,13 +54,13 @@
             <span>{{ user.display_name }}</span>
             <span class="muted">@{{ user.user_id }}</span>
           </div>
-          <span class="muted">提及 {{ user.mention_count }} 次</span>
+          <span class="muted">{{ t('mentionwithoutat') + ' ' + user.mention_count + ' ' + t('times')}}</span>
         </div>
       </div>
 
       <div class="composer-actions">
-        <el-button size="small" @click="previewVisible = !previewVisible">{{ previewVisible ? '隐藏预览' : '预览' }}</el-button>
-        <el-button type="primary" :loading="submitting" :disabled="!composer.trim()" @click="submitComment">提交评论</el-button>
+        <el-button size="small" @click="previewVisible = !previewVisible">{{ previewVisible ? t('hidepreview') : t('preview') }}</el-button>
+        <el-button type="primary" :loading="submitting" :disabled="!composer.trim()" @click="submitComment">{{ t('submitcomment') }}</el-button>
       </div>
 
       <div v-if="previewVisible" class="preview-box" v-html="renderHighlighted(composer)"></div>
@@ -68,10 +68,10 @@
 
     <div class="list-toolbar">
       <el-radio-group v-model="sortOrder" size="small" @change="refreshComments">
-        <el-radio-button label="asc">时间正序</el-radio-button>
-        <el-radio-button label="desc">时间倒序</el-radio-button>
+        <el-radio-button label="asc">{{ t('timesequence') }}</el-radio-button>
+        <el-radio-button label="desc">{{ t('timereverseorder') }}</el-radio-button>
       </el-radio-group>
-      <el-button size="small" @click="refreshComments" :loading="loading">刷新</el-button>
+      <el-button size="small" @click="refreshComments" :loading="loading">{{ t('refresh') }}</el-button>
       <el-button
         v-if="batchMode"
         size="small"
@@ -79,7 +79,7 @@
         :disabled="selectedCommentIds.length === 0"
         @click="batchDelete"
       >
-        批量删除 ({{ selectedCommentIds.length }})
+        {{ t('batchdeletion') }} ({{ selectedCommentIds.length }})
       </el-button>
     </div>
 
@@ -105,8 +105,8 @@
         />
       </template>
       <div class="load-more">
-        <el-button v-if="hasMore" size="small" :loading="loadingMore" @click="loadMore">加载更多</el-button>
-        <span v-else class="muted">已加载全部评论</span>
+        <el-button v-if="hasMore" size="small" :loading="loadingMore" @click="loadMore">{{ t('loadmore') }}</el-button>
+        <span v-else class="muted">{{ t('allcommentloaded') }}</span>
       </div>
     </div>
   </section>
@@ -118,6 +118,7 @@ import { ElMessage, ElMessageBox, ElNotification } from 'element-plus';
 import { workflowRealtimeService } from '../../services/WorkflowRealtimeService';
 import { workflowService } from '../../services/WorkflowService';
 import type { WorkflowComment, WorkflowCommentMention } from '../../types/workflow';
+import { useI18nText } from '../../i18n/useI18n';
 
 interface MentionCandidate {
   user_id: string;
@@ -155,6 +156,7 @@ const props = withDefaults(
 
 const COMMENT_CACHE_PREFIX = 'udake_workflow_comment_cache_';
 const SETTING_CACHE_PREFIX = 'udake_workflow_comment_settings_';
+const { t } = useI18nText();
 
 const composerRef = ref();
 const composer = ref('');
@@ -242,7 +244,7 @@ function saveSettings() {
     })
   );
   syncPolling();
-  ElMessage.success('评论通知设置已保存');
+  ElMessage.success(t('commentnoticesettingssavedsuccess'));
 }
 
 function loadSettings() {
@@ -365,10 +367,10 @@ function notifyForNewComments(incoming: WorkflowComment[]) {
       : false;
 
     if (mentionedCurrent && settings.enableMention) {
-      emitNotificationPush(item, 'mention', '@提及通知', `${item.author_name} 在评论中提及了你`, 'high');
+      emitNotificationPush(item, 'mention', `${t('mentionnotice')}`, `${item.author_name} ${t('mentionedincomment')}`, 'high');
       ElNotification({
-        title: '@提及通知',
-        message: `${item.author_name} 在评论中提及了你`,
+        title: t('mentionnotice'),
+        message: `${item.author_name} ${t('mentionedincomment')}`,
         duration: 2800,
         onClick: () => scrollToComment(item.comment_id)
       });
@@ -376,10 +378,10 @@ function notifyForNewComments(incoming: WorkflowComment[]) {
     }
 
     if (replyCurrent && settings.enableReply) {
-      emitNotificationPush(item, 'comment', '回复通知', `${item.author_name} 回复了你的评论`, 'high');
+      emitNotificationPush(item, 'comment', t('replynotice'), `${item.author_name} ${t('replycomment')}`, 'high');
       ElNotification({
-        title: '回复通知',
-        message: `${item.author_name} 回复了你的评论`,
+        title: t('replynotice'),
+        message: `${item.author_name} ${t('replycomment')}`,
         duration: 2800,
         onClick: () => scrollToComment(item.comment_id)
       });
@@ -387,9 +389,9 @@ function notifyForNewComments(incoming: WorkflowComment[]) {
     }
 
     if (settings.enableNewComment) {
-      emitNotificationPush(item, 'comment', '新评论', `${item.author_name}: ${truncate(item.content, 32)}`, 'normal');
+      emitNotificationPush(item, 'comment', t('newcomment'), `${item.author_name}: ${truncate(item.content, 32)}`, 'normal');
       ElNotification({
-        title: '新评论',
+        title: t('newcomment'),
         message: `${item.author_name}: ${truncate(item.content, 32)}`,
         duration: 2200,
         onClick: () => scrollToComment(item.comment_id)
@@ -420,7 +422,7 @@ function emitNotificationPush(
         notification_type: type,
         title,
         content: message,
-        source: '评论线程',
+        source: t('commentthread'),
         source_id: item.comment_id,
         priority,
         created_at: item.created_at
@@ -456,9 +458,9 @@ async function batchDelete() {
   }
 
   try {
-    await ElMessageBox.confirm(`确认删除 ${selectedCommentIds.value.length} 条评论吗？`, '批量删除确认', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm(`${t('confirmdelete')} ${selectedCommentIds.value.length} ${t('askforthiscomment')}`, t('confirmbatchdelete'), {
+      confirmButtonText: t('delete'),
+      cancelButtonText: t('cancel'),
       type: 'warning'
     });
   } catch {
@@ -467,7 +469,7 @@ async function batchDelete() {
 
   try {
     await workflowService.batchDeleteComments(props.workflowId, selectedCommentIds.value);
-    ElMessage.success('批量删除完成');
+    ElMessage.success(t('batchdeletefinish'));
   } catch {
     // 兼容无批量接口，改为串行删除
     await Promise.all(
@@ -715,9 +717,9 @@ async function submitComment() {
     normalizeComments(
       comments.value.map((item) => (item.comment_id === optimisticId ? created : item))
     );
-    ElMessage.success('评论已发布');
+    ElMessage.success(t('commentpublished'));
   } catch {
-    ElMessage.warning('评论已本地保存，待网络恢复后将同步');
+    ElMessage.warning(t('commentnointernet'));
   } finally {
     submitting.value = false;
   }
@@ -770,7 +772,7 @@ async function saveEdit(item: CommentTreeItem) {
     await workflowService.updateComment(props.workflowId, item.comment_id, {
       content: next
     });
-    ElMessage.success('评论已更新');
+    ElMessage.success(t('commentrefresh'));
   } catch {
     item.content = previous;
     normalizeComments(
@@ -783,20 +785,20 @@ async function saveEdit(item: CommentTreeItem) {
           : comment
       )
     );
-    ElMessage.error('编辑失败，已恢复原内容');
+    ElMessage.error(t('editfailed'));
   }
 }
 
 async function deleteComment(item: CommentTreeItem) {
   if (!canDelete(item)) {
-    ElMessage.warning('无删除权限');
+    ElMessage.warning(t('nodeleteright'));
     return;
   }
 
   try {
-    await ElMessageBox.confirm('确认删除该评论吗？删除后会显示已删除标记。', '删除确认', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
+    await ElMessageBox.confirm(t('commentdeleteconfirm'), t('deleteconfirm'), {
+      confirmButtonText: t('delete'),
+      cancelButtonText: t('cancel'),
       type: 'warning'
     });
   } catch {
@@ -808,7 +810,7 @@ async function deleteComment(item: CommentTreeItem) {
       ? {
           ...comment,
           deleted: true,
-          content: '该评论已删除'
+          content: t('commentdeleted')
         }
       : comment
   );
@@ -816,9 +818,9 @@ async function deleteComment(item: CommentTreeItem) {
 
   try {
     await workflowService.deleteComment(props.workflowId, item.comment_id);
-    ElMessage.success('评论已删除');
+    ElMessage.success(t('commentdeletesuccess'));
   } catch {
-    ElMessage.warning('删除请求失败，当前仅本地标记为已删除');
+    ElMessage.warning(t('deleteRequestfailed'));
   }
 }
 
@@ -919,7 +921,7 @@ function scrollToComment(commentId: string) {
 }
 
 function jumpToUser(displayName: string) {
-  ElMessage.info(`提及用户：${displayName}`);
+  ElMessage.info(`${t('mentionuser')}${displayName}`);
 }
 
 function syncPolling() {
@@ -1100,7 +1102,7 @@ const CommentItem: any = defineComponent({
                       class: 'mini-btn primary',
                       onClick: () => emit('save-edit', childProps.item)
                     },
-                    '保存'
+                    t('save')
                   ),
                   h(
                     'button',
@@ -1108,7 +1110,7 @@ const CommentItem: any = defineComponent({
                       class: 'mini-btn',
                       onClick: () => emit('cancel-edit', childProps.item)
                     },
-                    '取消'
+                    t('cancel')
                   )
                 ])
               ])
@@ -1122,7 +1124,7 @@ const CommentItem: any = defineComponent({
                 disabled: childProps.item.deleted,
                 onClick: () => emit('reply', childProps.item)
               },
-              '回复'
+              t('answer')
             ),
             canEditSelf.value
               ? h(
@@ -1131,7 +1133,7 @@ const CommentItem: any = defineComponent({
                     class: 'mini-btn',
                     onClick: () => emit('edit', childProps.item)
                   },
-                  '编辑'
+                  t('edit')
                 )
               : null,
             canDeleteSelf.value
@@ -1141,7 +1143,7 @@ const CommentItem: any = defineComponent({
                     class: 'mini-btn danger',
                     onClick: () => emit('delete', childProps.item)
                   },
-                  '删除'
+                  t('delete')
                 )
               : null,
             ...resolveMentions(childProps.item.content, childProps.item.mention_users).map((m) =>
@@ -1164,8 +1166,8 @@ const CommentItem: any = defineComponent({
                   onClick: () => emit('toggle-collapse', childProps.item.comment_id)
                 },
                 childProps.collapsedMap[childProps.item.comment_id]
-                  ? `展开 ${childProps.item.children.length - 1} 条回复`
-                  : '收起回复'
+                  ? `${t('spreadout')} ${childProps.item.children.length - 1} ${t('piecereply')}`
+                  : t('closereply')
               )
             : null,
 

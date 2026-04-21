@@ -15,12 +15,14 @@
 import { computed } from 'vue';
 import { Handle, Position } from '@vue-flow/core';
 import type { NodeProps } from '@vue-flow/core';
-import { KIND_ACCENT, KIND_TEXT } from './workflowCanvas';
+import { KIND_ACCENT, getKindText } from './workflowCanvas';
 import type { WorkflowCanvasNodeData } from './workflowCanvas';
+import { useI18nText } from '../../i18n/useI18n';
 
+const { t } = useI18nText();
 const props = defineProps<NodeProps<WorkflowCanvasNodeData>>();
 
-const kindText = computed(() => KIND_TEXT[props.data.kind]);
+const kindText = computed(() => getKindText(props.data.kind, t));
 const nodeStyle = computed(() => ({
   '--accent-color': KIND_ACCENT[props.data.kind]
 }));
