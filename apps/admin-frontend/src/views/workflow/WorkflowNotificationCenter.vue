@@ -114,7 +114,7 @@
           <div class="card-actions">
             <el-button text size="small" @click="openNotification(item)">{{ t('checkdetail') }}</el-button>
             <el-button text size="small" @click="toggleRead(item)">
-              {{ item.read ? t('markasread') : t('markasunread') }}
+              {{ item.read ? t('markasunread') : t('markasread') }}
             </el-button>
           </div>
         </div>
