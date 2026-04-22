@@ -104,7 +104,7 @@ describe('I18n', () => {
         it('应该获取英文翻译', () => {
             I18n.setLocale('en-US');
             const text = I18n.t('app.title');
-            expect(text).toBe('Uncertainty-Driven Adaptive Kriging Engine');
+            expect(text).toBe('Intelligent Uncertainty-Driven Spatial Decision Platform');
         });
 
         it('应该支持插值变量替换', () => {

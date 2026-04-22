@@ -1,20 +1,20 @@
 # 前端国际化检查报告
 
-- 生成时间: 2026-04-20T01:55:42.238Z
+- 生成时间: 2026-04-22T00:43:22.239Z
 - 基准语言总键数: 436
-- 检测到使用键数: 652
+- 检测到使用键数: 662
 - 未使用键数: 48
 - 基线保留键数: 131
-- 可疑硬编码数: 2020
+- 可疑硬编码数: 2021
 - 基线忽略硬编码数: 79
 
 ## 语言覆盖率
 
 - zh-CN: 100.00% (缺失 0)
-- en-US: 99.77% (缺失 1)
-- zh-TW: 99.77% (缺失 1)
-- ja-JP: 99.77% (缺失 1)
-- ko-KR: 99.77% (缺失 1)
+- en-US: 100.00% (缺失 0)
+- zh-TW: 100.00% (缺失 0)
+- ja-JP: 100.00% (缺失 0)
+- ko-KR: 100.00% (缺失 0)
 
 ## 命名规范问题
 
@@ -22,6 +22,7 @@
 
 ## 未使用翻译键（最多 50 条）
 
+- app.subtitle
 - common.delete
 - common.view
 - error.common.detailsButton
@@ -66,13 +67,14 @@
 - explain.task.progress
 - explain.task.retry
 - explain.task.title
-- intelligent.recommend
 - kriging.help.parameter-relations.suggestion
 - kriging.help.quick-start.suggestion
 - nav.language
 
 ## 可疑硬编码（最多 50 条）
 
+- apps/frontend/index.html:63 -> 新建项目
+- apps/frontend/index.html:231 -> ，且
 - apps/frontend/landing-page/detail-interpolation.html:9 -> 跳转到空间插值模块详情页
 - apps/frontend/landing-page/detail-realtime.html:9 -> 跳转到实时插值模块详情页
 - apps/frontend/landing-page/detail-template.html:6 -> UDAKE - 详情页模板
@@ -121,5 +123,3 @@
 - apps/frontend/landing-page/docs-html/anomaly.html:68 -> 单类SVM
 - apps/frontend/landing-page/docs-html/anomaly.html:69 -> DBSCAN聚类
 - apps/frontend/landing-page/docs-html/anomaly.html:72 -> 深度学习方法
-- apps/frontend/landing-page/docs-html/anomaly.html:74 -> 自编码器（Autoencoder）
-- apps/frontend/landing-page/docs-html/anomaly.html:75 -> 变分自编码器（VAE）

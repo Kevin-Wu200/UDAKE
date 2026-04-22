@@ -357,7 +357,7 @@ describe('ErrorHandler', () => {
         it('英文环境下校验错误应返回英文', () => {
             I18n.setLocale('en-US');
             const result = ErrorHandler.validateGeoJSON({});
-            expect(result.error).toBe('GeoJSON is missing type field');
+            expect(result.error).toBe('GeoJSON is missing the type field');
         });
     });
 

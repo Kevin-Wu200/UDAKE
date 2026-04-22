@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-04-20T01:55:42.238Z",
+  "generatedAt": "2026-04-22T00:43:22.239Z",
   "summary": {
     "baseKeyCount": 436,
-    "usedKeyCount": 652,
+    "usedKeyCount": 662,
     "unusedKeyCount": 48,
     "baselineUnusedKeyCount": 131,
-    "hardcodedCount": 2020,
+    "hardcodedCount": 2021,
     "baselineHardcodedCount": 79
   },
   "coverage": [
@@ -17,39 +17,32 @@
     },
     {
       "locale": "en-US",
-      "coverage": 0.9977064220183486,
-      "missingCount": 1,
-      "missingKeys": [
-        "intelligent.recommend"
-      ]
+      "coverage": 1,
+      "missingCount": 0,
+      "missingKeys": []
     },
     {
       "locale": "zh-TW",
-      "coverage": 0.9977064220183486,
-      "missingCount": 1,
-      "missingKeys": [
-        "intelligent.recommend"
-      ]
+      "coverage": 1,
+      "missingCount": 0,
+      "missingKeys": []
     },
     {
       "locale": "ja-JP",
-      "coverage": 0.9977064220183486,
-      "missingCount": 1,
-      "missingKeys": [
-        "intelligent.recommend"
-      ]
+      "coverage": 1,
+      "missingCount": 0,
+      "missingKeys": []
     },
     {
       "locale": "ko-KR",
-      "coverage": 0.9977064220183486,
-      "missingCount": 1,
-      "missingKeys": [
-        "intelligent.recommend"
-      ]
+      "coverage": 1,
+      "missingCount": 0,
+      "missingKeys": []
     }
   ],
   "invalidNaming": [],
   "unusedKeys": [
+    "app.subtitle",
     "common.delete",
     "common.view",
     "error.common.detailsButton",
@@ -94,13 +87,22 @@
     "explain.task.progress",
     "explain.task.retry",
     "explain.task.title",
-    "intelligent.recommend",
     "kriging.help.parameter-relations.suggestion",
     "kriging.help.quick-start.suggestion",
     "nav.language"
   ],
   "hardcoded": {
     "html": [
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
+        "line": 63,
+        "text": "新建项目"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
+        "line": 231,
+        "text": "，且"
+      },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/detail-interpolation.html",
         "line": 9,
@@ -9278,12 +9280,7 @@
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/index.html",
-        "line": 295,
-        "text": "开发者信息"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/index.html",
-        "line": 300,
+        "line": 297,
         "text": "开发者信息"
       },
       {
@@ -10190,7 +10187,7 @@
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/js/i18n.js",
-        "line": 660,
+        "line": 690,
         "text": "'中文'"
       },
       {
