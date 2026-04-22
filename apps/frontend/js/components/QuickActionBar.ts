@@ -1,5 +1,8 @@
 import { KeyboardManager } from '../utils/KeyboardManager.js';
 import { HistoryManager } from '../utils/HistoryManager.js';
+import { I18n } from '../utils/I18n.js';
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 export interface QuickActionShortcut {
     key: string;
@@ -16,6 +19,11 @@ export interface QuickActionItem {
     category: 'project' | 'sampling' | 'interpolation' | 'export' | 'guide' | 'history';
     defaultVisible: boolean;
     shortcut?: QuickActionShortcut;
+}
+
+interface QuickActionDefinition extends Omit<QuickActionItem, 'label' | 'description'> {
+    labelKey: string;
+    descriptionKey: string;
 }
 
 interface QuickActionBarState {
@@ -41,13 +49,13 @@ function shortcutToText(shortcut?: QuickActionShortcut): string {
     return keys.join(' + ');
 }
 
-function getDefaultActions(): QuickActionItem[] {
+function getDefaultActions(): QuickActionDefinition[] {
     return [
         {
             id: 'new-project',
-            label: '新建项目',
+            labelKey: 'quickaction.newProject',
             icon: '📁',
-            description: '快速创建新的采样项目',
+            descriptionKey: 'description.newProject',
             command: 'new-project',
             category: 'project',
             defaultVisible: true,
@@ -55,9 +63,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'import-data',
-            label: '导入数据',
+            labelKey: 'quickaction.importData',
             icon: '📤',
-            description: '打开文件选择框进行数据导入',
+            descriptionKey: 'description.importData',
             command: 'import-data',
             category: 'project',
             defaultVisible: true,
@@ -65,9 +73,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'wizard-import-data',
-            label: '导入向导',
+            labelKey: 'quickaction.importWizard',
             icon: '🧭',
-            description: '打开数据导入向导',
+            descriptionKey: 'description.importWizard',
             command: 'wizard-start:data-import',
             category: 'guide',
             defaultVisible: true,
@@ -75,9 +83,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'wizard-sampling',
-            label: '采样向导',
+            labelKey: 'quickaction.samplingWizard',
             icon: '📍',
-            description: '打开采样优化向导',
+            descriptionKey: 'description.samplingWizard',
             command: 'wizard-start:sampling-optimization',
             category: 'sampling',
             defaultVisible: true,
@@ -85,9 +93,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'wizard-interpolation',
-            label: '插值向导',
+            labelKey: 'quickaction.interpolationWizard',
             icon: '🌐',
-            description: '打开插值分析向导',
+            descriptionKey: 'description.interpolationWizard',
             command: 'wizard-start:interpolation-analysis',
             category: 'interpolation',
             defaultVisible: true,
@@ -95,9 +103,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'wizard-export',
-            label: '导出向导',
+            labelKey: 'quickaction.exportWizard',
             icon: '📦',
-            description: '打开结果导出向导',
+            descriptionKey: 'description.exportWizard',
             command: 'wizard-start:result-export',
             category: 'export',
             defaultVisible: true,
@@ -105,9 +113,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'wizard-mobile',
-            label: '移动采集向导',
+            labelKey: 'quickaction.mobileWizard',
             icon: '📱',
-            description: '打开移动端采集向导',
+            descriptionKey: 'description.mobileWizard',
             command: 'wizard-start:mobile-collection',
             category: 'guide',
             defaultVisible: false,
@@ -115,9 +123,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'start-kriging',
-            label: '开始插值',
+            labelKey: 'quickaction.startKriging',
             icon: '▶',
-            description: '执行当前参数下的插值任务',
+            descriptionKey: 'description.startKriging',
             command: 'start-kriging',
             category: 'interpolation',
             defaultVisible: true,
@@ -125,9 +133,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'export-geojson',
-            label: '导出GeoJSON',
+            labelKey: 'quickaction.exportGeoJSON',
             icon: '💾',
-            description: '导出预测结果 GeoJSON',
+            descriptionKey: 'description.exportGeoJSON',
             command: 'export-geojson',
             category: 'export',
             defaultVisible: true,
@@ -135,9 +143,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'account-info',
-            label: '账户信息',
+            labelKey: 'quickaction.accountInfo',
             icon: '👤',
-            description: '查看当前账户和密钥状态',
+            descriptionKey: 'description.accountInfo',
             command: 'show-account-info',
             category: 'guide',
             defaultVisible: true,
@@ -145,9 +153,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'history-undo',
-            label: '撤销',
+            labelKey: 'quickaction.undoHistory',
             icon: '↩',
-            description: '撤销最近可撤销操作',
+            descriptionKey: 'description.undoHistory',
             command: 'history-undo',
             category: 'history',
             defaultVisible: true,
@@ -155,9 +163,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'history-redo',
-            label: '重做',
+            labelKey: 'quickaction.redoHistory',
             icon: '↪',
-            description: '重做最近已撤销操作',
+            descriptionKey: 'description.redoHistory',
             command: 'history-redo',
             category: 'history',
             defaultVisible: true,
@@ -165,9 +173,9 @@ function getDefaultActions(): QuickActionItem[] {
         },
         {
             id: 'wizard-center',
-            label: '向导中心',
+            labelKey: 'quickaction.wizardCenter',
             icon: '🗂',
-            description: '打开向导中心并管理自定义向导',
+            descriptionKey: 'description.wizardCenter',
             command: 'open-wizard-center',
             category: 'guide',
             defaultVisible: true
@@ -176,20 +184,24 @@ function getDefaultActions(): QuickActionItem[] {
 }
 
 export class QuickActionBar {
-    private readonly actions: QuickActionItem[];
+    private readonly actions: QuickActionDefinition[];
     private state: QuickActionBarState;
     private root: HTMLDivElement | null;
     private actionsContainer: HTMLDivElement | null;
     private settingsPanel: HTMLDivElement | null;
     private dragActionId: string | null;
+    private readonly unsubscribeLocaleChange: (() => void) | null;
 
-    constructor(actions: QuickActionItem[] = getDefaultActions()) {
+    constructor(actions: QuickActionDefinition[] = getDefaultActions()) {
         this.actions = actions;
         this.state = this.loadState();
         this.root = null;
         this.actionsContainer = null;
         this.settingsPanel = null;
         this.dragActionId = null;
+        this.unsubscribeLocaleChange = I18n.onChange(() => {
+            this.refreshUI();
+        });
     }
 
     public mount(container: HTMLElement): void {
@@ -202,7 +214,7 @@ export class QuickActionBar {
 
         const title = document.createElement('div');
         title.className = 'quick-action-bar-title';
-        title.textContent = '快捷操作栏';
+        title.textContent = t('quickaction.title');
 
         this.actionsContainer = document.createElement('div');
         this.actionsContainer.className = 'quick-action-list';
@@ -210,7 +222,7 @@ export class QuickActionBar {
         const settingsBtn = document.createElement('button');
         settingsBtn.className = 'quick-action-settings-btn';
         settingsBtn.type = 'button';
-        settingsBtn.title = '自定义快捷操作栏';
+        settingsBtn.title = t('quickaction.settings.title');
         settingsBtn.textContent = '⚙';
         settingsBtn.addEventListener('click', () => this.toggleSettingsPanel());
 
@@ -223,10 +235,11 @@ export class QuickActionBar {
     }
 
     public getActions(): QuickActionItem[] {
-        return [...this.actions];
+        return this.actions.map((action) => this.resolveAction(action));
     }
 
     public destroy(): void {
+        this.unsubscribeLocaleChange?.();
         this.settingsPanel?.remove();
         this.root?.remove();
         this.settingsPanel = null;
@@ -261,8 +274,40 @@ export class QuickActionBar {
         }
     }
 
+    private resolveAction(action: QuickActionDefinition): QuickActionItem {
+        return {
+            ...action,
+            label: t(action.labelKey),
+            description: t(action.descriptionKey)
+        };
+    }
+
+    private refreshUI(): void {
+        if (!this.root) {
+            return;
+        }
+
+        const title = this.root.querySelector('.quick-action-bar-title');
+        if (title) {
+            title.textContent = t('quickaction.title');
+        }
+
+        const settingsBtn = this.root.querySelector('.quick-action-settings-btn') as HTMLButtonElement | null;
+        if (settingsBtn) {
+            settingsBtn.title = t('quickaction.settings.title');
+        }
+
+        this.renderActions();
+
+        if (this.settingsPanel) {
+            this.hideSettingsPanel();
+            this.toggleSettingsPanel();
+        }
+    }
+
     private registerShortcuts(): void {
         for (const action of this.actions) {
+            const resolvedAction = this.resolveAction(action);
             if (!action.shortcut) {
                 continue;
             }
@@ -271,7 +316,7 @@ export class QuickActionBar {
                 key: action.shortcut.key,
                 ctrl: action.shortcut.ctrl,
                 shift: action.shortcut.shift,
-                description: `快捷栏：${action.label}`,
+                description: `${t('quickaction.label')}${resolvedAction.label}`,
                 handler: () => this.triggerAction(action.id, 'shortcut')
             });
         }
@@ -282,7 +327,8 @@ export class QuickActionBar {
     }
 
     private getActionById(actionId: string): QuickActionItem | null {
-        return this.actions.find((item) => item.id === actionId) || null;
+        const action = this.actions.find((item) => item.id === actionId);
+        return action ? this.resolveAction(action) : null;
     }
 
     private renderActions(): void {
@@ -364,9 +410,12 @@ export class QuickActionBar {
         this.renderActions();
 
         HistoryManager.record({
-            action: '快捷栏排序调整',
+            action: t('quickaction.Sequence'),
             type: 'setting',
-            detail: `已将 ${sourceId} 调整到 ${targetId} 前后位置`,
+            detail: t('quickaction.haveSequenced', {
+                sourceId,
+                targetId
+            }),
             undoable: false
         });
     }
@@ -378,9 +427,17 @@ export class QuickActionBar {
         }
 
         HistoryManager.record({
-            action: `快捷操作：${action.label}`,
+            action: t('quickaction.triggerAction', {
+                action: action.label
+            }),
             type: action.category === 'export' ? 'export' : action.category === 'interpolation' ? 'kriging' : 'setting',
-            detail: `通过${source === 'click' ? '点击' : source === 'shortcut' ? '快捷键' : '推荐'}触发`,
+            detail: t('quickaction.triggeredBy', {
+                source: t(
+                    source === 'click' ? 'quickaction.source.click'
+                    : source === 'shortcut' ? 'quickaction.source.shortcut'
+                    : 'quickaction.source.recommend'
+                )
+            }),
             undoable: false
         });
 
@@ -427,13 +484,13 @@ export class QuickActionBar {
 
         this.settingsPanel.innerHTML = `
             <div class="quick-action-settings-header">
-                <strong>自定义快捷操作栏</strong>
+                <strong>${t('quickaction.settings.title')}</strong>
                 <button type="button" class="quick-action-settings-close">✕</button>
             </div>
-            <p class="quick-action-settings-tip">拖拽按钮可排序，勾选开关控制显示。</p>
+            <p class="quick-action-settings-tip">${t('quickaction.settings.tip')}</p>
             <div class="quick-action-settings-list">${listHtml}</div>
             <div class="quick-action-settings-actions">
-                <button type="button" class="quick-action-settings-reset">恢复默认</button>
+                <button type="button" class="quick-action-settings-reset">${t('quickaction.settings.reset')}</button>
             </div>
         `;
 
