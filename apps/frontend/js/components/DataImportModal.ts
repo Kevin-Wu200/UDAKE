@@ -130,9 +130,7 @@ export class DataImportModal {
         modal.setAttribute('aria-modal', 'true');
         modal.setAttribute('aria-label', I18n.t('dataImport.modal.ariaLabel'));
 
-        console.log('准备生成 HTML');
         const fieldOptions = this.renderFieldOptions();
-        console.log('字段选项已生成');
 
         modal.innerHTML = `
             <div class="modal-content">

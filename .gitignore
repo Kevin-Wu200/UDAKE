@@ -73,5 +73,7 @@ deep_learning/fusion/repository/
 *.dmg
 *.apk
 release/
+frontend/dist/
+apps/admin-frontend/dist
 android/app/build/outputs/
 apps/frontend/dist/

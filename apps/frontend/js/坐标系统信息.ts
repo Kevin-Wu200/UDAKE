@@ -4,6 +4,9 @@
  */
 
 import type { MapView } from '../types/app';
+import { I18n } from './utils/I18n.js';
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 /** 空间参考接口 */
 interface SpatialReference {
@@ -46,28 +49,28 @@ export class CoordinateSystemInfo {
         const panel = document.createElement('div');
         panel.className = 'panel coordinate-system-panel';
         panel.innerHTML = `
-            <h2 class="panel-title">坐标系统信息</h2>
+            <h2 class="panel-title">${t('dataImport.section.coordinateSystem')}</h2>
             <div class="panel-content">
                 <div class="coordinate-info">
                     <div class="info-item">
-                        <span class="info-label">投影坐标系</span>
-                        <span class="info-value" id="projection-name">加载中...</span>
+                        <span class="info-label">${t('dataImport.label.projectedCoordinateSystem')}</span>
+                        <span class="info-value" id="projection-name">${t('status.loading')}</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">投影 EPSG</span>
+                        <span class="info-label">${t('dataImport.label.projectedEPSG')}</span>
                         <span class="info-value" id="projection-epsg">-</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">地理坐标系</span>
+                        <span class="info-label">${t('dataImport.label.geographicCoordinateSystem')}</span>
                         <span class="info-value" id="geographic-name">-</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">地理 EPSG</span>
+                        <span class="info-label">${t('dataImport.label.geographicEPSG')}</span>
                         <span class="info-value" id="geographic-epsg">-</span>
                     </div>
                     <div class="info-item wkt-item">
-                        <span class="info-label">WKT</span>
-                        <button class="btn-collapse" id="wkt-toggle">展开</button>
+                        <span class="info-label">${t('dataImport.label.wkt')}</span>
+                        <button class="btn-collapse" id="wkt-toggle">${t('common.expand')}</button>
                     </div>
                     <div class="wkt-content" id="wkt-content" style="display: none;">
                         <pre id="wkt-text">-</pre>
@@ -94,7 +97,7 @@ export class CoordinateSystemInfo {
             toggleBtn.addEventListener('click', () => {
                 const isVisible = wktContent.style.display !== 'none';
                 wktContent.style.display = isVisible ? 'none' : 'block';
-                toggleBtn.textContent = isVisible ? '展开' : '收起';
+                toggleBtn.textContent = isVisible ? t('common.expand') : t('common.collapse');
             });
         }
     }
@@ -116,7 +119,7 @@ export class CoordinateSystemInfo {
         // 设置投影 EPSG
         const projectionEpsg = this.container?.querySelector('#projection-epsg') as HTMLSpanElement;
         if (projectionEpsg) {
-            projectionEpsg.textContent = wkid ? `EPSG:${wkid}` : '未识别';
+            projectionEpsg.textContent = wkid ? `EPSG:${wkid}` : t('status.unrecognized');
         }
 
         // 获取坐标系名称
@@ -129,7 +132,7 @@ export class CoordinateSystemInfo {
         } catch (error) {
             const projectionNameEl = this.container?.querySelector('#projection-name') as HTMLSpanElement;
             if (projectionNameEl) {
-                projectionNameEl.textContent = '未识别坐标系';
+                projectionNameEl.textContent = t('status.unrecognizedCoordinateSystem');
             }
         }
 
@@ -153,7 +156,7 @@ export class CoordinateSystemInfo {
         }
 
         // 设置 WKT
-        const wkt = sr.wkt || '无 WKT 信息';
+        const wkt = sr.wkt || t('dataImport.status.noWktInfo');
         const wktTextEl = this.container?.querySelector('#wkt-text') as HTMLElement;
         if (wktTextEl) {
             wktTextEl.textContent = wkt;
@@ -165,7 +168,7 @@ export class CoordinateSystemInfo {
      */
     private async getProjectionName(wkid?: number): Promise<string> {
         if (!wkid) {
-            return '未识别';
+            return t('status.unrecognized');
         }
 
         return this.commonProjections[wkid] || `EPSG:${wkid}`;
@@ -181,7 +184,7 @@ export class CoordinateSystemInfo {
         const geographicEpsgEl = this.container?.querySelector('#geographic-epsg') as HTMLSpanElement;
         const wktTextEl = this.container?.querySelector('#wkt-text') as HTMLElement;
 
-        if (projectionNameEl) projectionNameEl.textContent = '未识别坐标系';
+        if (projectionNameEl) projectionNameEl.textContent = t('status.unrecognizedCoordinateSystem');
         if (projectionEpsgEl) projectionEpsgEl.textContent = '-';
         if (geographicNameEl) geographicNameEl.textContent = '-';
         if (geographicEpsgEl) geographicEpsgEl.textContent = '-';
