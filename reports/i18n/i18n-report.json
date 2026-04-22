@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-04-22T00:43:22.239Z",
+  "generatedAt": "2026-04-22T03:44:25.068Z",
   "summary": {
-    "baseKeyCount": 436,
-    "usedKeyCount": 662,
-    "unusedKeyCount": 48,
+    "baseKeyCount": 492,
+    "usedKeyCount": 680,
+    "unusedKeyCount": 86,
     "baselineUnusedKeyCount": 131,
-    "hardcodedCount": 2021,
-    "baselineHardcodedCount": 79
+    "hardcodedCount": 2020,
+    "baselineHardcodedCount": 78
   },
   "coverage": [
     {
@@ -40,11 +40,43 @@
       "missingKeys": []
     }
   ],
-  "invalidNaming": [],
+  "invalidNaming": [
+    "dataImport.action.confirmImport",
+    "dataImport.error.coordinateTransformFailed",
+    "dataImport.error.pointDataNumeric",
+    "dataImport.field.pointData",
+    "dataImport.field.x",
+    "dataImport.field.y",
+    "dataImport.label.geographicCoordinateSystem",
+    "dataImport.label.geographicEPSG",
+    "dataImport.label.projectedCoordinateSystem",
+    "dataImport.label.projectedEPSG",
+    "dataImport.modal.ariaLabel",
+    "dataImport.option.select",
+    "dataImport.section.coordinateSystem",
+    "dataImport.section.fieldMapping",
+    "dataImport.title",
+    "dataImport.validation.selectPointData",
+    "dataImport.validation.selectX",
+    "dataImport.validation.selectY"
+  ],
   "unusedKeys": [
     "app.subtitle",
     "common.delete",
     "common.view",
+    "description.accountInfo",
+    "description.exportGeoJSON",
+    "description.exportWizard",
+    "description.importData",
+    "description.importWizard",
+    "description.interpolationWizard",
+    "description.mobileWizard",
+    "description.newProject",
+    "description.redoHistory",
+    "description.samplingWizard",
+    "description.startKriging",
+    "description.undoHistory",
+    "description.wizardCenter",
     "error.common.detailsButton",
     "error.common.helpButton",
     "error.common.icon.error",
@@ -89,7 +121,32 @@
     "explain.task.title",
     "kriging.help.parameter-relations.suggestion",
     "kriging.help.quick-start.suggestion",
-    "nav.language"
+    "nav.language",
+    "quickaction.Sequence",
+    "quickaction.accountInfo",
+    "quickaction.exportGeoJSON",
+    "quickaction.exportWizard",
+    "quickaction.haveSequenced",
+    "quickaction.importData",
+    "quickaction.importWizard",
+    "quickaction.interpolationWizard",
+    "quickaction.label",
+    "quickaction.mobileWizard",
+    "quickaction.newProject",
+    "quickaction.redoHistory",
+    "quickaction.samplingWizard",
+    "quickaction.settings.reset",
+    "quickaction.settings.tip",
+    "quickaction.settings.title",
+    "quickaction.source.click",
+    "quickaction.source.recommend",
+    "quickaction.source.shortcut",
+    "quickaction.startKriging",
+    "quickaction.title",
+    "quickaction.triggerAction",
+    "quickaction.triggeredby",
+    "quickaction.undoHistory",
+    "quickaction.wizardCenter"
   ],
   "hardcoded": {
     "html": [
@@ -9569,11 +9626,6 @@
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/ParameterImpactPreview.ts",
         "line": 220,
         "text": "'>点击“生成预览”查看参数影响对比</span>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/QuickActionBar.ts",
-        "line": 205,
-        "text": "'快捷操作栏'"
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRLPanel.ts",

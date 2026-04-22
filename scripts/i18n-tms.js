@@ -46,21 +46,29 @@ function loadInlineLocales() {
     throw new Error('未找到 apps/frontend/js/utils/I18n.ts');
   }
 
-  const blocks = {
-    'zh-CN': extractLocaleBlock(source, 'const ZH_CN: LocaleMessages = {', 'const EN_US: LocaleMessages = {'),
-    'en-US': extractLocaleBlock(source, 'const EN_US: LocaleMessages = {', 'const ZH_TW: LocaleMessages = {'),
-    'zh-TW': extractLocaleBlock(source, 'const ZH_TW: LocaleMessages = {', 'const JA_JP: LocaleMessages = {'),
-    'ja-JP': extractLocaleBlock(source, 'const JA_JP: LocaleMessages = {', 'const KO_KR: LocaleMessages = {'),
-    'ko-KR': extractLocaleBlock(source, 'const KO_KR: LocaleMessages = {', '// ========== 语言包注册表 ==========')
+  function extractKeysFromBlock(localeCode) {
+    const token = `const ${localeCode.replace(/-/g, '_')}: LocaleMessages = {`;
+    const start = source.indexOf(token);
+    if (start === -1) return {};
+    const end = source.indexOf('};', start);
+    if (end === -1) return {};
+    const block = source.slice(start, end);
+    return parseLocaleMapFromBlock(block);
+  }
+
+  const locales = {
+    'zh-CN': extractKeysFromBlock('ZH_CN'),
+    'en-US': extractKeysFromBlock('EN_US'),
+    'zh-TW': extractKeysFromBlock('ZH_TW'),
+    'ja-JP': extractKeysFromBlock('JA_JP'),
+    'ko-KR': extractKeysFromBlock('KO_KR')
   };
 
-  if (!blocks['zh-CN'] || !blocks['en-US']) {
+  if (Object.values(locales).some(l => Object.keys(l).length === 0)) {
     throw new Error('解析 I18n.ts 语言包失败');
   }
 
-  return Object.fromEntries(
-    Object.entries(blocks).map(([localeCode, block]) => [localeCode, parseLocaleMapFromBlock(block)])
-  );
+  return locales;
 }
 
 function loadBaseLocales() {
@@ -119,19 +127,14 @@ function cmdExport() {
 }
 
 function cmdValidate() {
-  const base = loadBaseLocales();
   const inlineLocales = loadInlineLocales();
-  const baseKeys = Object.keys(base['zh-CN']);
-  const locales = {
-    'en-US': base['en-US'],
-    'zh-TW': loadJsonLocale('zh-TW', inlineLocales['zh-TW']),
-    'ja-JP': loadJsonLocale('ja-JP', inlineLocales['ja-JP']),
-    'ko-KR': loadJsonLocale('ko-KR', inlineLocales['ko-KR'])
-  };
-
+  const baseKeys = Object.keys(inlineLocales['zh-CN']);
+  
   const results = [];
   let hasMissing = false;
-  for (const [locale, data] of Object.entries(locales)) {
+  for (const [locale, data] of Object.entries(inlineLocales)) {
+    if (locale === 'zh-CN') continue;
+    
     const keys = new Set(Object.keys(data));
     const missing = baseKeys.filter((key) => !keys.has(key));
     const extra = [...keys].filter((key) => !baseKeys.includes(key));

@@ -27,6 +27,17 @@ interface FieldSelection {
     pointData: string | null;
 }
 
+interface FieldErrorStateItem {
+    key: string | null;
+    message: string | null;
+}
+
+interface FieldErrorState {
+    x: FieldErrorStateItem;
+    y: FieldErrorStateItem;
+    pointData: FieldErrorStateItem;
+}
+
 interface TransformedData {
     data: Array<{ x: number; y: number; value: number }>;
     geojson: any;
@@ -39,7 +50,9 @@ export class DataImportModal {
     modal: HTMLDivElement | null;
     parseResult: ParseResult | null;
     _releaseFocusTrap: (() => void) | null;
+    _unsubscribeLocaleChange: (() => void) | null;
     fieldSelection: FieldSelection;
+    fieldErrors: FieldErrorState;
 
     constructor(onConfirm: ((data: TransformedData) => void) | null, view: any) {
         this.onConfirm = onConfirm;
@@ -47,11 +60,13 @@ export class DataImportModal {
         this.modal = null;
         this.parseResult = null;
         this._releaseFocusTrap = null;
+        this._unsubscribeLocaleChange = null;
         this.fieldSelection = {
             x: null,
             y: null,
             pointData: null
         };
+        this.fieldErrors = this.createEmptyFieldErrors();
     }
 
     show(parseResult: ParseResult): void {
@@ -69,6 +84,9 @@ export class DataImportModal {
             this.bindEvents();
             console.log('事件绑定完成');
 
+            this.subscribeToLocaleChange();
+            console.log('语言切换监听已绑定');
+
             this.animateIn();
             console.log('入场动画已触发');
         } catch (error) {
@@ -78,6 +96,14 @@ export class DataImportModal {
         }
     }
 
+    createEmptyFieldErrors(): FieldErrorState {
+        return {
+            x: { key: null, message: null },
+            y: { key: null, message: null },
+            pointData: { key: null, message: null }
+        };
+    }
+
     createModal(): void {
         try {
             console.log('createModal() 开始执行');
@@ -85,81 +111,7 @@ export class DataImportModal {
 
             const modal = document.createElement('div');
             modal.className = 'modal-overlay';
-            modal.setAttribute('role', 'dialog');
-            modal.setAttribute('aria-modal', 'true');
-            modal.setAttribute('aria-label', I18n.t('dataImport.modal.ariaLabel'));
-
-            console.log('准备生成 HTML');
-            const fieldOptions = this.renderFieldOptions();
-            console.log('字段选项已生成');
-
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <h2 class="modal-title">${I18n.t('dataImport.title')}</h2>
-
-                    <!-- 坐标系统信息 -->
-                    <div class="modal-section">
-                        <h3 class="section-title">${I18n.t('dataImport.section.coordinateSystem')}</h3>
-                        <div class="coordinate-info">
-                            <div class="info-item">
-                                <span class="info-label">${I18n.t('dataImport.label.projectedCoordinateSystem')}</span>
-                                <span class="info-value">${this.parseResult!.crsInfo.projectedName}</span>
-                            </div>
-                            ${this.parseResult!.crsInfo.projectedEPSG ? `
-                            <div class="info-item">
-                                <span class="info-label">${I18n.t('dataImport.label.projectedEPSG')}</span>
-                                <span class="info-value">EPSG:${this.parseResult!.crsInfo.projectedEPSG}</span>
-                            </div>
-                            ` : ''}
-                            <div class="info-item">
-                                <span class="info-label">${I18n.t('dataImport.label.geographicCoordinateSystem')}</span>
-                                <span class="info-value">${this.parseResult!.crsInfo.geographicName}</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">${I18n.t('dataImport.label.geographicEPSG')}</span>
-                                <span class="info-value">EPSG:${this.parseResult!.crsInfo.geographicEPSG}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 字段映射选择 -->
-                    <div class="modal-section">
-                        <h3 class="section-title">${I18n.t('dataImport.section.fieldMapping')}</h3>
-                        <div class="field-mapping">
-                            <div class="form-group">
-                                <label for="field-x">${I18n.t('dataImport.field.x')}</label>
-                                <select id="field-x" class="select">
-                                    <option value="">${I18n.t('dataImport.option.select')}</option>
-                                    ${fieldOptions}
-                                </select>
-                                <span class="error-message" id="error-field-x" role="alert"></span>
-                            </div>
-                            <div class="form-group">
-                                <label for="field-y">${I18n.t('dataImport.field.y')}</label>
-                                <select id="field-y" class="select">
-                                    <option value="">${I18n.t('dataImport.option.select')}</option>
-                                    ${fieldOptions}
-                                </select>
-                                <span class="error-message" id="error-field-y" role="alert"></span>
-                            </div>
-                            <div class="form-group">
-                                <label for="field-point-data">${I18n.t('dataImport.field.pointData')}</label>
-                                <select id="field-point-data" class="select">
-                                    <option value="">${I18n.t('dataImport.option.select')}</option>
-                                    ${fieldOptions}
-                                </select>
-                                <span class="error-message" id="error-field-point-data" role="alert"></span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 操作按钮 -->
-                    <div class="modal-actions">
-                        <button id="modal-cancel" class="btn btn-secondary">${I18n.t('common.cancel')}</button>
-                        <button id="modal-confirm" class="btn btn-primary">${I18n.t('dataImport.action.confirmImport')}</button>
-                    </div>
-                </div>
-            `;
+            this.renderModalContent(modal);
 
             console.log('弹窗 HTML 已生成');
             document.body.appendChild(modal);
@@ -171,6 +123,84 @@ export class DataImportModal {
             console.error('错误堆栈:', (error as Error).stack);
             throw error;
         }
+    }
+
+    renderModalContent(modal: HTMLDivElement): void {
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-label', I18n.t('dataImport.modal.ariaLabel'));
+
+        console.log('准备生成 HTML');
+        const fieldOptions = this.renderFieldOptions();
+        console.log('字段选项已生成');
+
+        modal.innerHTML = `
+            <div class="modal-content">
+                <h2 class="modal-title">${I18n.t('dataImport.title')}</h2>
+
+                <!-- 坐标系统信息 -->
+                <div class="modal-section">
+                    <h3 class="section-title">${I18n.t('dataImport.section.coordinateSystem')}</h3>
+                    <div class="coordinate-info">
+                        <div class="info-item">
+                            <span class="info-label">${I18n.t('dataImport.label.projectedCoordinateSystem')}</span>
+                            <span class="info-value">${this.parseResult!.crsInfo.projectedName}</span>
+                        </div>
+                        ${this.parseResult!.crsInfo.projectedEPSG ? `
+                        <div class="info-item">
+                            <span class="info-label">${I18n.t('dataImport.label.projectedEPSG')}</span>
+                            <span class="info-value">EPSG:${this.parseResult!.crsInfo.projectedEPSG}</span>
+                        </div>
+                        ` : ''}
+                        <div class="info-item">
+                            <span class="info-label">${I18n.t('dataImport.label.geographicCoordinateSystem')}</span>
+                            <span class="info-value">${this.parseResult!.crsInfo.geographicName}</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">${I18n.t('dataImport.label.geographicEPSG')}</span>
+                            <span class="info-value">EPSG:${this.parseResult!.crsInfo.geographicEPSG}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 字段映射选择 -->
+                <div class="modal-section">
+                    <h3 class="section-title">${I18n.t('dataImport.section.fieldMapping')}</h3>
+                    <div class="field-mapping">
+                        <div class="form-group">
+                            <label for="field-x">${I18n.t('dataImport.field.x')}</label>
+                            <select id="field-x" class="select">
+                                <option value="">${I18n.t('dataImport.option.select')}</option>
+                                ${fieldOptions}
+                            </select>
+                            <span class="error-message" id="error-field-x" role="alert"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="field-y">${I18n.t('dataImport.field.y')}</label>
+                            <select id="field-y" class="select">
+                                <option value="">${I18n.t('dataImport.option.select')}</option>
+                                ${fieldOptions}
+                            </select>
+                            <span class="error-message" id="error-field-y" role="alert"></span>
+                        </div>
+                        <div class="form-group">
+                            <label for="field-point-data">${I18n.t('dataImport.field.pointData')}</label>
+                            <select id="field-point-data" class="select">
+                                <option value="">${I18n.t('dataImport.option.select')}</option>
+                                ${fieldOptions}
+                            </select>
+                            <span class="error-message" id="error-field-point-data" role="alert"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 操作按钮 -->
+                <div class="modal-actions">
+                    <button id="modal-cancel" class="btn btn-secondary">${I18n.t('common.cancel')}</button>
+                    <button id="modal-confirm" class="btn btn-primary">${I18n.t('dataImport.action.confirmImport')}</button>
+                </div>
+            </div>
+        `;
     }
 
     renderFieldOptions(): string {
@@ -239,6 +269,29 @@ export class DataImportModal {
         try {
             console.log('bindEvents() 开始执行');
 
+            this.modal!.addEventListener('click', (e: MouseEvent) => {
+                if (e.target === this.modal) {
+                    this.close();
+                }
+            });
+
+            this.modal!.addEventListener('keydown', (e: KeyboardEvent) => {
+                if (e.key === 'Escape') {
+                    this.close();
+                }
+            });
+
+            this.bindFieldEvents();
+
+            console.log('bindEvents() 执行完成');
+        } catch (error) {
+            console.error('绑定事件时出错:', error);
+            console.error('错误堆栈:', (error as Error).stack);
+        }
+    }
+
+    bindFieldEvents(): void {
+        try {
             this.modal!.querySelector('#field-x')!.addEventListener('change', (e: Event) => {
                 this.fieldSelection.x = (e.target as HTMLSelectElement).value;
                 this.clearError('field-x');
@@ -261,24 +314,69 @@ export class DataImportModal {
             this.modal!.querySelector('#modal-confirm')!.addEventListener('click', () => {
                 this.handleConfirm();
             });
-
-            this.modal!.addEventListener('click', (e: MouseEvent) => {
-                if (e.target === this.modal) {
-                    this.close();
-                }
-            });
-
-            this.modal!.addEventListener('keydown', (e: KeyboardEvent) => {
-                if (e.key === 'Escape') {
-                    this.close();
-                }
-            });
-
-            console.log('bindEvents() 执行完成');
         } catch (error) {
-            console.error('绑定事件时出错:', error);
+            console.error('绑定字段事件时出错:', error);
             console.error('错误堆栈:', (error as Error).stack);
         }
+    }
+
+    subscribeToLocaleChange(): void {
+        if (this._unsubscribeLocaleChange) {
+            return;
+        }
+
+        this._unsubscribeLocaleChange = I18n.onChange(() => {
+            this.refreshLocale();
+        });
+    }
+
+    refreshLocale(): void {
+        if (!this.modal || !this.parseResult) {
+            return;
+        }
+
+        const currentSelection = { ...this.fieldSelection };
+
+        this.renderModalContent(this.modal);
+        this.fieldSelection = currentSelection;
+        this.restoreFieldSelection();
+        this.bindFieldEvents();
+        this.restoreErrors();
+    }
+
+    restoreFieldSelection(): void {
+        if (!this.modal) {
+            return;
+        }
+
+        const fieldX = this.modal.querySelector('#field-x') as HTMLSelectElement | null;
+        const fieldY = this.modal.querySelector('#field-y') as HTMLSelectElement | null;
+        const fieldPointData = this.modal.querySelector('#field-point-data') as HTMLSelectElement | null;
+
+        if (fieldX) {
+            fieldX.value = this.fieldSelection.x || '';
+        }
+        if (fieldY) {
+            fieldY.value = this.fieldSelection.y || '';
+        }
+        if (fieldPointData) {
+            fieldPointData.value = this.fieldSelection.pointData || '';
+        }
+    }
+
+    restoreErrors(): void {
+        const restoreFieldError = (fieldId: keyof FieldSelection, elementId: string): void => {
+            const error = this.fieldErrors[fieldId];
+            if (!error.message && !error.key) {
+                return;
+            }
+
+            this.showError(elementId, error.key ? I18n.t(error.key) : error.message!, error.key || undefined);
+        };
+
+        restoreFieldError('x', 'field-x');
+        restoreFieldError('y', 'field-y');
+        restoreFieldError('pointData', 'field-point-data');
     }
 
     async handleConfirm(): Promise<void> {
@@ -290,7 +388,11 @@ export class DataImportModal {
         }
 
         if (!FieldMatcher.isNumericField(this.parseResult!.geojson, this.fieldSelection.pointData!)) {
-            this.showError('field-point-data', I18n.t('dataImport.error.pointDataNumeric'));
+            this.showError(
+                'field-point-data',
+                I18n.t('dataImport.error.pointDataNumeric'),
+                'dataImport.error.pointDataNumeric'
+            );
             return;
         }
 
@@ -346,20 +448,25 @@ export class DataImportModal {
         };
     }
 
-    showError(fieldId: string, message: string): void {
+    showError(fieldId: string, message: string, translationKey?: string): void {
         const select = this.modal!.querySelector(`#${fieldId}`) as HTMLSelectElement;
         const errorSpan = this.modal!.querySelector(`#error-${fieldId}`) as HTMLSpanElement;
+        const stateKey = this.toFieldStateKey(fieldId);
 
         select.style.borderColor = '#ff453a';
         select.style.transition = 'border-color 200ms';
         errorSpan.textContent = message;
         errorSpan.style.display = 'block';
+        this.fieldErrors[stateKey] = {
+            key: translationKey || null,
+            message
+        };
     }
 
     showErrors(errors: Record<string, string>): void {
-        if (errors.x) this.showError('field-x', errors.x);
-        if (errors.y) this.showError('field-y', errors.y);
-        if (errors.pointData) this.showError('field-point-data', errors.pointData);
+        if (errors.x) this.showError('field-x', errors.x, 'dataImport.validation.selectX');
+        if (errors.y) this.showError('field-y', errors.y, 'dataImport.validation.selectY');
+        if (errors.pointData) this.showError('field-point-data', errors.pointData, 'dataImport.validation.selectPointData');
     }
 
     clearError(fieldId: string): void {
@@ -369,6 +476,20 @@ export class DataImportModal {
         select.style.borderColor = '';
         errorSpan.textContent = '';
         errorSpan.style.display = 'none';
+        this.fieldErrors[this.toFieldStateKey(fieldId)] = {
+            key: null,
+            message: null
+        };
+    }
+
+    toFieldStateKey(fieldId: string): keyof FieldSelection {
+        if (fieldId === 'field-x') {
+            return 'x';
+        }
+        if (fieldId === 'field-y') {
+            return 'y';
+        }
+        return 'pointData';
     }
 
     animateIn(): void {
@@ -381,6 +502,10 @@ export class DataImportModal {
     }
 
     close(): void {
+        if (this._unsubscribeLocaleChange) {
+            this._unsubscribeLocaleChange();
+            this._unsubscribeLocaleChange = null;
+        }
         if (this._releaseFocusTrap) {
             this._releaseFocusTrap();
             this._releaseFocusTrap = null;
@@ -391,6 +516,7 @@ export class DataImportModal {
                 this.modal.parentNode.removeChild(this.modal);
             }
             this.modal = null;
+            this.fieldErrors = this.createEmptyFieldErrors();
         }, 250);
     }
 }

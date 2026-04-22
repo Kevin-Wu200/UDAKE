@@ -1,12 +1,12 @@
 # 前端国际化检查报告
 
-- 生成时间: 2026-04-22T00:43:22.239Z
-- 基准语言总键数: 436
-- 检测到使用键数: 662
-- 未使用键数: 48
+- 生成时间: 2026-04-22T03:44:25.068Z
+- 基准语言总键数: 492
+- 检测到使用键数: 680
+- 未使用键数: 86
 - 基线保留键数: 131
-- 可疑硬编码数: 2021
-- 基线忽略硬编码数: 79
+- 可疑硬编码数: 2020
+- 基线忽略硬编码数: 78
 
 ## 语言覆盖率
 
@@ -18,13 +18,43 @@
 
 ## 命名规范问题
 
-- 无
+- dataImport.action.confirmImport
+- dataImport.error.coordinateTransformFailed
+- dataImport.error.pointDataNumeric
+- dataImport.field.pointData
+- dataImport.field.x
+- dataImport.field.y
+- dataImport.label.geographicCoordinateSystem
+- dataImport.label.geographicEPSG
+- dataImport.label.projectedCoordinateSystem
+- dataImport.label.projectedEPSG
+- dataImport.modal.ariaLabel
+- dataImport.option.select
+- dataImport.section.coordinateSystem
+- dataImport.section.fieldMapping
+- dataImport.title
+- dataImport.validation.selectPointData
+- dataImport.validation.selectX
+- dataImport.validation.selectY
 
 ## 未使用翻译键（最多 50 条）
 
 - app.subtitle
 - common.delete
 - common.view
+- description.accountInfo
+- description.exportGeoJSON
+- description.exportWizard
+- description.importData
+- description.importWizard
+- description.interpolationWizard
+- description.mobileWizard
+- description.newProject
+- description.redoHistory
+- description.samplingWizard
+- description.startKriging
+- description.undoHistory
+- description.wizardCenter
 - error.common.detailsButton
 - error.common.helpButton
 - error.common.icon.error
@@ -59,17 +89,6 @@
 - explain.status.queued
 - explain.status.retrying
 - explain.status.running
-- explain.status.selectTask
-- explain.status.taskUnavailable
-- explain.submit.title
-- explain.task.loadMore
-- explain.task.partial
-- explain.task.progress
-- explain.task.retry
-- explain.task.title
-- kriging.help.parameter-relations.suggestion
-- kriging.help.quick-start.suggestion
-- nav.language
 
 ## 可疑硬编码（最多 50 条）
 

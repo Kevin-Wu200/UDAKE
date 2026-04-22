@@ -49,9 +49,8 @@ jobs:
 
       - name: Verify key i18n files
         run: |
-          test -f apps/frontend/js/i18n/config.ts
           test -f apps/frontend/js/utils/I18n.ts
-          ls -la apps/frontend/js/i18n apps/frontend/js/utils
+          ls -la apps/frontend/js/utils
 
       - name: Run i18n quality check
         run: npm run i18n:check:strict

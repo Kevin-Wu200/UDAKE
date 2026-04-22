@@ -5,7 +5,6 @@ const path = require('path');
 
 const ROOT = process.cwd();
 const I18N_FILE = path.join(ROOT, 'apps/frontend/js/utils/I18n.ts');
-const I18N_CONFIG_FILE = path.join(ROOT, 'apps/frontend/js/i18n/config.ts');
 const FRONTEND_ROOT = path.join(ROOT, 'apps/frontend');
 const TEST_ROOT = path.join(ROOT, 'tests');
 const REPORT_DIR = path.join(ROOT, 'reports/i18n');
@@ -106,6 +105,25 @@ function extractBlockKeys(source, startToken, endToken) {
     keys.add(match[1]);
   }
   return [...keys];
+}
+
+function extractLocaleKeys(source, localeCode) {
+    const token = `const ${localeCode.replace(/-/g, '_')}: LocaleMessages = {`;
+    const start = source.indexOf(token);
+    if (start === -1) return new Set();
+    
+    // Find the end of the block by looking for the next '};'
+    const end = source.indexOf('};', start);
+    if (end === -1) return new Set();
+    
+    const block = source.slice(start, end);
+    const keys = new Set();
+    const keyRe = /^\s*'([^']+)'\s*:/gm;
+    let match;
+    while ((match = keyRe.exec(block)) !== null) {
+        keys.add(match[1]);
+    }
+    return keys;
 }
 
 function collectUsedKeys(files) {
@@ -347,7 +365,7 @@ function toMarkdown(report) {
 
 function main() {
   logDebug(`运行环境: node=${process.version}, platform=${process.platform}, cwd=${ROOT}`);
-  if (!ensureRequiredFiles([I18N_FILE, I18N_CONFIG_FILE])) {
+  if (!ensureRequiredFiles([I18N_FILE])) {
     process.exit(1);
   }
 
@@ -358,16 +376,12 @@ function main() {
   }
 
   const baseline = loadBaseline();
-  const zhKeys = extractBlockKeys(source, 'const ZH_CN', 'const EN_US');
-  const enKeys = extractBlockKeys(source, 'const EN_US', '// ========== 语言包注册表 ==========');
-  const baseKeySet = new Set(zhKeys);
-
   const localeMap = {
-    'zh-CN': new Set(zhKeys),
-    'en-US': new Set(enKeys),
-    'zh-TW': loadJsonLocale('zh-TW'),
-    'ja-JP': loadJsonLocale('ja-JP'),
-    'ko-KR': loadJsonLocale('ko-KR')
+    'zh-CN': extractLocaleKeys(source, 'ZH_CN'),
+    'en-US': extractLocaleKeys(source, 'EN_US'),
+    'zh-TW': extractLocaleKeys(source, 'ZH_TW'),
+    'ja-JP': extractLocaleKeys(source, 'JA_JP'),
+    'ko-KR': extractLocaleKeys(source, 'KO_KR')
   };
 
   const appFiles = walkFiles(FRONTEND_ROOT, new Set(['.ts', '.js', '.html']));
@@ -375,6 +389,7 @@ function main() {
   const scanFiles = [...appFiles, ...testFiles];
   logDebug(`扫描文件数: app=${appFiles.length}, test=${testFiles.length}, total=${scanFiles.length}`);
   const usedKeys = collectUsedKeys(scanFiles);
+  const baseKeySet = localeMap['zh-CN'];
   const rawUnusedKeys = [...baseKeySet].filter((key) => !usedKeys.has(key)).sort();
   const unusedKeys = rawUnusedKeys.filter((key) => !baseline.reservedUnusedKeys.has(key));
 
