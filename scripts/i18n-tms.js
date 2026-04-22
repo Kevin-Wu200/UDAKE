@@ -40,29 +40,42 @@ function parseLocaleMapFromBlock(block) {
   return map;
 }
 
-function loadBaseLocales() {
+function loadInlineLocales() {
   const source = readFileSafe(I18N_FILE);
   if (!source) {
     throw new Error('未找到 apps/frontend/js/utils/I18n.ts');
   }
 
-  const zhBlock = extractLocaleBlock(source, 'const ZH_CN: LocaleMessages = {', 'const EN_US: LocaleMessages = {');
-  const enBlock = extractLocaleBlock(source, 'const EN_US: LocaleMessages = {', '// ========== 语言包注册表 ==========');
-  if (!zhBlock || !enBlock) {
+  const blocks = {
+    'zh-CN': extractLocaleBlock(source, 'const ZH_CN: LocaleMessages = {', 'const EN_US: LocaleMessages = {'),
+    'en-US': extractLocaleBlock(source, 'const EN_US: LocaleMessages = {', 'const ZH_TW: LocaleMessages = {'),
+    'zh-TW': extractLocaleBlock(source, 'const ZH_TW: LocaleMessages = {', 'const JA_JP: LocaleMessages = {'),
+    'ja-JP': extractLocaleBlock(source, 'const JA_JP: LocaleMessages = {', 'const KO_KR: LocaleMessages = {'),
+    'ko-KR': extractLocaleBlock(source, 'const KO_KR: LocaleMessages = {', '// ========== 语言包注册表 ==========')
+  };
+
+  if (!blocks['zh-CN'] || !blocks['en-US']) {
     throw new Error('解析 I18n.ts 语言包失败');
   }
 
+  return Object.fromEntries(
+    Object.entries(blocks).map(([localeCode, block]) => [localeCode, parseLocaleMapFromBlock(block)])
+  );
+}
+
+function loadBaseLocales() {
+  const locales = loadInlineLocales();
   return {
-    'zh-CN': parseLocaleMapFromBlock(zhBlock),
-    'en-US': parseLocaleMapFromBlock(enBlock)
+    'zh-CN': locales['zh-CN'],
+    'en-US': locales['en-US']
   };
 }
 
-function loadJsonLocale(localeCode) {
+function loadJsonLocale(localeCode, fallback = {}) {
   const filePath = path.join(LOCALES_DIR, `${localeCode}.json`);
   const raw = readFileSafe(filePath);
   if (!raw) {
-    return {};
+    return fallback;
   }
   try {
     return JSON.parse(raw);
@@ -107,12 +120,13 @@ function cmdExport() {
 
 function cmdValidate() {
   const base = loadBaseLocales();
+  const inlineLocales = loadInlineLocales();
   const baseKeys = Object.keys(base['zh-CN']);
   const locales = {
     'en-US': base['en-US'],
-    'zh-TW': loadJsonLocale('zh-TW'),
-    'ja-JP': loadJsonLocale('ja-JP'),
-    'ko-KR': loadJsonLocale('ko-KR')
+    'zh-TW': loadJsonLocale('zh-TW', inlineLocales['zh-TW']),
+    'ja-JP': loadJsonLocale('ja-JP', inlineLocales['ja-JP']),
+    'ko-KR': loadJsonLocale('ko-KR', inlineLocales['ko-KR'])
   };
 
   const results = [];

@@ -6,6 +6,7 @@
 import { FieldMatcher } from '../utils/fieldMatcher.js';
 import { CoordinateTransformer } from '../utils/coordinateTransformer.js';
 import { KeyboardManager } from '../utils/KeyboardManager.js';
+import { I18n } from '../utils/I18n.js';
 
 interface CRSInfo {
     projectedName: string;
@@ -86,7 +87,7 @@ export class DataImportModal {
             modal.className = 'modal-overlay';
             modal.setAttribute('role', 'dialog');
             modal.setAttribute('aria-modal', 'true');
-            modal.setAttribute('aria-label', '数据字段配置');
+            modal.setAttribute('aria-label', I18n.t('dataImport.modal.ariaLabel'));
 
             console.log('准备生成 HTML');
             const fieldOptions = this.renderFieldOptions();
@@ -94,28 +95,28 @@ export class DataImportModal {
 
             modal.innerHTML = `
                 <div class="modal-content">
-                    <h2 class="modal-title">数据字段配置</h2>
+                    <h2 class="modal-title">${I18n.t('dataImport.title')}</h2>
 
                     <!-- 坐标系统信息 -->
                     <div class="modal-section">
-                        <h3 class="section-title">坐标系统信息</h3>
+                        <h3 class="section-title">${I18n.t('dataImport.section.coordinateSystem')}</h3>
                         <div class="coordinate-info">
                             <div class="info-item">
-                                <span class="info-label">投影坐标系</span>
+                                <span class="info-label">${I18n.t('dataImport.label.projectedCoordinateSystem')}</span>
                                 <span class="info-value">${this.parseResult!.crsInfo.projectedName}</span>
                             </div>
                             ${this.parseResult!.crsInfo.projectedEPSG ? `
                             <div class="info-item">
-                                <span class="info-label">投影 EPSG</span>
+                                <span class="info-label">${I18n.t('dataImport.label.projectedEPSG')}</span>
                                 <span class="info-value">EPSG:${this.parseResult!.crsInfo.projectedEPSG}</span>
                             </div>
                             ` : ''}
                             <div class="info-item">
-                                <span class="info-label">地理坐标系</span>
+                                <span class="info-label">${I18n.t('dataImport.label.geographicCoordinateSystem')}</span>
                                 <span class="info-value">${this.parseResult!.crsInfo.geographicName}</span>
                             </div>
                             <div class="info-item">
-                                <span class="info-label">地理 EPSG</span>
+                                <span class="info-label">${I18n.t('dataImport.label.geographicEPSG')}</span>
                                 <span class="info-value">EPSG:${this.parseResult!.crsInfo.geographicEPSG}</span>
                             </div>
                         </div>
@@ -123,28 +124,28 @@ export class DataImportModal {
 
                     <!-- 字段映射选择 -->
                     <div class="modal-section">
-                        <h3 class="section-title">字段映射选择</h3>
+                        <h3 class="section-title">${I18n.t('dataImport.section.fieldMapping')}</h3>
                         <div class="field-mapping">
                             <div class="form-group">
-                                <label for="field-x">X 字段</label>
+                                <label for="field-x">${I18n.t('dataImport.field.x')}</label>
                                 <select id="field-x" class="select">
-                                    <option value="">请选择</option>
+                                    <option value="">${I18n.t('dataImport.option.select')}</option>
                                     ${fieldOptions}
                                 </select>
                                 <span class="error-message" id="error-field-x" role="alert"></span>
                             </div>
                             <div class="form-group">
-                                <label for="field-y">Y 字段</label>
+                                <label for="field-y">${I18n.t('dataImport.field.y')}</label>
                                 <select id="field-y" class="select">
-                                    <option value="">请选择</option>
+                                    <option value="">${I18n.t('dataImport.option.select')}</option>
                                     ${fieldOptions}
                                 </select>
                                 <span class="error-message" id="error-field-y" role="alert"></span>
                             </div>
                             <div class="form-group">
-                                <label for="field-point-data">Point_Data 字段</label>
+                                <label for="field-point-data">${I18n.t('dataImport.field.pointData')}</label>
                                 <select id="field-point-data" class="select">
-                                    <option value="">请选择</option>
+                                    <option value="">${I18n.t('dataImport.option.select')}</option>
                                     ${fieldOptions}
                                 </select>
                                 <span class="error-message" id="error-field-point-data" role="alert"></span>
@@ -154,8 +155,8 @@ export class DataImportModal {
 
                     <!-- 操作按钮 -->
                     <div class="modal-actions">
-                        <button id="modal-cancel" class="btn btn-secondary">取消</button>
-                        <button id="modal-confirm" class="btn btn-primary">确认导入</button>
+                        <button id="modal-cancel" class="btn btn-secondary">${I18n.t('common.cancel')}</button>
+                        <button id="modal-confirm" class="btn btn-primary">${I18n.t('dataImport.action.confirmImport')}</button>
                     </div>
                 </div>
             `;
@@ -289,7 +290,7 @@ export class DataImportModal {
         }
 
         if (!FieldMatcher.isNumericField(this.parseResult!.geojson, this.fieldSelection.pointData!)) {
-            this.showError('field-point-data', 'point_data 必须为数值类型');
+            this.showError('field-point-data', I18n.t('dataImport.error.pointDataNumeric'));
             return;
         }
 
@@ -331,7 +332,7 @@ export class DataImportModal {
                     x = transformed.x;
                     y = transformed.y;
                 } catch (error) {
-                    throw new Error('坐标转换失败');
+                    throw new Error(I18n.t('dataImport.error.coordinateTransformFailed'));
                 }
             }
 

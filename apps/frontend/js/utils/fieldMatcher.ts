@@ -4,6 +4,7 @@
  */
 import type { GeoJSONFeatureCollection } from '../../types/core';
 import type { FieldMatchResult, FieldSelection, FieldValidationResult } from '../../types/geojson';
+import { I18n } from './I18n.js';
 
 export class FieldMatcher {
     /**
@@ -63,13 +64,13 @@ export class FieldMatcher {
         const errors: Partial<Record<keyof FieldSelection, string>> = {};
 
         if (!selection.x) {
-            errors.x = '请选择 X 字段';
+            errors.x = I18n.t('dataImport.validation.selectX');
         }
         if (!selection.y) {
-            errors.y = '请选择 Y 字段';
+            errors.y = I18n.t('dataImport.validation.selectY');
         }
         if (!selection.pointData) {
-            errors.pointData = '请选择 Point_Data 字段';
+            errors.pointData = I18n.t('dataImport.validation.selectPointData');
         }
 
         return {

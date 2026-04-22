@@ -1,54 +1,38 @@
 {
-  "generatedAt": "2026-04-20T01:56:40.018Z",
-  "baseKeyCount": 436,
+  "generatedAt": "2026-04-22T03:19:24.752Z",
+  "baseKeyCount": 492,
   "results": [
     {
       "locale": "en-US",
-      "total": 436,
-      "missingCount": 1,
-      "extraCount": 1,
-      "missing": [
-        "intelligent.recommend"
-      ],
-      "extra": [
-        "Intelligent.recommend"
-      ]
+      "total": 492,
+      "missingCount": 0,
+      "extraCount": 0,
+      "missing": [],
+      "extra": []
     },
     {
       "locale": "zh-TW",
-      "total": 436,
-      "missingCount": 1,
-      "extraCount": 1,
-      "missing": [
-        "intelligent.recommend"
-      ],
-      "extra": [
-        "Intelligent.recommend"
-      ]
+      "total": 492,
+      "missingCount": 0,
+      "extraCount": 0,
+      "missing": [],
+      "extra": []
     },
     {
       "locale": "ja-JP",
-      "total": 436,
-      "missingCount": 1,
-      "extraCount": 1,
-      "missing": [
-        "intelligent.recommend"
-      ],
-      "extra": [
-        "Intelligent.recommend"
-      ]
+      "total": 492,
+      "missingCount": 0,
+      "extraCount": 0,
+      "missing": [],
+      "extra": []
     },
     {
       "locale": "ko-KR",
-      "total": 436,
-      "missingCount": 1,
-      "extraCount": 1,
-      "missing": [
-        "intelligent.recommend"
-      ],
-      "extra": [
-        "Intelligent.recommend"
-      ]
+      "total": 492,
+      "missingCount": 0,
+      "extraCount": 0,
+      "missing": [],
+      "extra": []
     }
   ]
 }
