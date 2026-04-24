@@ -14,6 +14,9 @@ import {
     validateMapProvider,
     type MapProvider
 } from './map/MapEngineRegistry.js';
+import { I18n } from './utils/I18n'
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 /**
  * 地图引擎初始化超时
@@ -24,8 +27,11 @@ function withTimeout<T>(promise: Promise<T>, provider: MapProvider): Promise<T> 
     return Promise.race([
         promise,
         new Promise<never>((_, reject) => {
-            setTimeout(
-                () => reject(new Error(`地图引擎初始化超时(${Math.floor(MAP_INIT_TIMEOUT_MS / 1000)}秒): ${provider}`)),
+            setTimeout(() => 
+                reject(new Error(t('error.map.init.timeout', {
+                    timeout: Math.floor(MAP_INIT_TIMEOUT_MS / 1000), 
+                    provider: provider.toUpperCase()
+                }))),
                 MAP_INIT_TIMEOUT_MS
             );
         })
@@ -35,7 +41,9 @@ function withTimeout<T>(promise: Promise<T>, provider: MapProvider): Promise<T> 
 async function createAdapterAndInitialize(containerId: string, provider: MapProvider): Promise<IMapAdapter> {
     const engine = getMapEngine(provider);
     if (!engine) {
-        throw new Error(`未注册的地图引擎: ${provider}`);
+        throw new Error(t('error.map.unsigned', {
+            provider: provider
+        }));
     }
 
     const adapter = await engine.createAdapter();
@@ -60,7 +68,9 @@ export async function initializeMap(containerId: string): Promise<IMapAdapter> {
     const fallbackProvider = MapConfig.FALLBACK_PROVIDER || 'geoscene';
     const requestedProvider = MapConfig.getProvider();
     const provider = validateMapProvider(requestedProvider, fallbackProvider);
-    Logger.info('地图初始化', `使用地图引擎: ${provider}`);
+    Logger.info(t('dialog.map.init'), t('dialog.map.engine.use', {
+        provider: provider
+    }));
 
     try {
         const adapter = await createAdapterAndInitialize(containerId, provider);
@@ -71,7 +81,10 @@ export async function initializeMap(containerId: string): Promise<IMapAdapter> {
             throw error;
         }
 
-        Logger.warn('地图初始化', `引擎 ${provider} 初始化失败，回退到 ${fallbackProvider}`);
+        Logger.warn(t('dialog.map.init'), t('dialog.map.engine.use.failed', {
+            provider: provider,
+            fallbackProvider: fallbackProvider
+        }));
         const fallbackAdapter = await createAdapterAndInitialize(containerId, fallbackProvider);
         MapConfig.setProvider(fallbackProvider);
         return fallbackAdapter;
@@ -113,7 +126,9 @@ export async function reinitializeMap(
 
     const fallbackProvider = MapConfig.FALLBACK_PROVIDER || 'geoscene';
     const targetProvider = validateMapProvider(provider, fallbackProvider);
-    Logger.info('地图初始化', `重新初始化地图，使用引擎: ${targetProvider}`);
+    Logger.info(t('dialog.map.init'), t('dialog.map.engine.reinit', {
+        targetProvider: targetProvider
+    }));
 
     try {
         const adapter = await createAdapterAndInitialize(containerId, targetProvider);
@@ -124,7 +139,10 @@ export async function reinitializeMap(
             throw error;
         }
 
-        Logger.warn('地图初始化', `引擎 ${targetProvider} 初始化失败，回退到 ${fallbackProvider}`);
+        Logger.warn(t('dialog.map.init'), t('dialog.map.engine.use.failed', {
+            provider: targetProvider,
+            fallbackProvider: fallbackProvider
+        }));
         const fallbackAdapter = await createAdapterAndInitialize(containerId, fallbackProvider);
         MapConfig.setProvider(fallbackProvider);
         return fallbackAdapter;

@@ -13,6 +13,9 @@ import {
     ImportTaskExecutor
 } from './managers/TaskExecutors';
 import { APIService } from './services/API封装';
+import { I18n } from './utils/I18n';
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 /**
  * 初始化任务管理器
@@ -103,10 +106,10 @@ export async function createInterpolationTask(
 ) {
     return await taskManager.createTask(
         'interpolation',
-        options?.name || '空间插值',
+        options?.name || t('template.interpolation.name'),
         data,
         {
-            description: '执行空间插值分析',
+            description: t('template.interpolation.description'),
             priority: options?.priority || 'normal',
             allowBackgroundExecution: true,
             notifyOnCompletion: options?.notifyOnCompletion ?? true,
@@ -129,10 +132,10 @@ export async function createSamplingTask(
 ) {
     return await taskManager.createTask(
         'sampling',
-        options?.name || '自适应采样',
+        options?.name || t('template.sampling.name'),
         data,
         {
-            description: '生成自适应采样点',
+            description: t('template.sampling.description'),
             priority: options?.priority || 'normal',
             allowBackgroundExecution: true,
             notifyOnCompletion: options?.notifyOnCompletion ?? true,
@@ -155,10 +158,10 @@ export async function createAnalysisTask(
 ) {
     return await taskManager.createTask(
         'analysis',
-        options?.name || '数据分析',
+        options?.name || t('template.analysis.name'),
         data,
         {
-            description: '执行数据分析',
+            description: t('template.analysis.description'),
             priority: options?.priority || 'normal',
             allowBackgroundExecution: true,
             notifyOnCompletion: options?.notifyOnCompletion ?? true,
@@ -181,10 +184,10 @@ export async function createExportTask(
 ) {
     return await taskManager.createTask(
         'export',
-        options?.name || '数据导出',
+        options?.name || t('template.export.name'),
         data,
         {
-            description: '导出数据到文件',
+            description: t('template.export.description'),
             priority: options?.priority || 'low',
             allowBackgroundExecution: true,
             notifyOnCompletion: options?.notifyOnCompletion ?? true,
@@ -207,10 +210,12 @@ export async function createImportTask(
 ) {
     return await taskManager.createTask(
         'import',
-        options?.name || '数据导入',
+        options?.name || t('template.import.name'),
         { file },
         {
-            description: `导入文件: ${file.name}`,
+            description: t('template.import.description', {
+                filename: file.name
+            }),
             priority: options?.priority || 'normal',
             allowBackgroundExecution: false, // 导入任务不建议后台执行
             notifyOnCompletion: options?.notifyOnCompletion ?? true,
@@ -264,7 +269,7 @@ export async function monitorTask(
 
             if (!task) {
                 clearInterval(checkInterval);
-                reject(new Error('任务不存在'));
+                reject(new Error(t('template.monitor.error.unexist')));
                 return;
             }
 
@@ -279,10 +284,10 @@ export async function monitorTask(
                 resolve(task.result);
             } else if (task.status === 'failed') {
                 clearInterval(checkInterval);
-                reject(new Error(task.error || '任务失败'));
+                reject(new Error(task.error || t('template.monitor.error.failed')));
             } else if (task.status === 'cancelled') {
                 clearInterval(checkInterval);
-                reject(new Error('任务已取消'));
+                reject(new Error(t('template.monitor.error.canceled'));
             }
         }, 1000); // 每秒检查一次
     });
