@@ -9,6 +9,9 @@
 import { IMapAdapterExtended, MapView, MapGraphic, MapPoint } from '../types/app';
 import { ILayerManager, LayerManagerConfig, ViewportBounds } from '../types/layer';
 import { SamplingPoint, GeoJSONFeatureCollection } from '../types/core';
+import { I18n } from './utils/I18n';
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 /** 默认配置 */
 const DEFAULT_CONFIG: LayerManagerConfig = {
@@ -67,7 +70,7 @@ export class LayerManager implements ILayerManager {
     private _initLoadingIndicator(): void {
         this.loadingIndicator = document.createElement('div');
         this.loadingIndicator.className = 'map-loading-indicator';
-        this.loadingIndicator.innerHTML = '<div class="loading-spinner"></div><span>正在更新地图...</span>';
+        this.loadingIndicator.innerHTML = `<div class="loading-spinner"></div><span>${t('dialog.map.updating')}</span>`;
         this.loadingIndicator.style.cssText = `
             position: absolute;
             top: 50%;
@@ -305,7 +308,7 @@ export class LayerManager implements ILayerManager {
         }
 
         if (hiddenCount > 0) {
-            this.clusterHint.textContent = `视口内还有 ${hiddenCount} 个采样点未显示，请放大地图查看`;
+            this.clusterHint.textContent = t('dialog.map.hiddenCount', { hiddenCount: hiddenCount });
             this.clusterHint.style.display = 'block';
         } else {
             this.clusterHint.style.display = 'none';
@@ -368,7 +371,7 @@ export class LayerManager implements ILayerManager {
 
         if (!infoPanel || !infoContent) return;
 
-        let content = `<p><strong>坐标:</strong> ${mapPoint.longitude.toFixed(6)}, ${mapPoint.latitude.toFixed(6)}</p>`;
+        let content = `<p><strong>${t('common.location')}</strong> ${mapPoint.longitude.toFixed(6)}, ${mapPoint.latitude.toFixed(6)}</p>`;
 
         if (graphic && graphic.attributes) {
             for (const [key, value] of Object.entries(graphic.attributes)) {
