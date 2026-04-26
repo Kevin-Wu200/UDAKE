@@ -6,6 +6,9 @@
 import { ParameterRelationshipChart } from './ParameterRelationshipChart.js';
 import { ParameterImpactPreview, type KrigingPreviewConfig } from './ParameterImpactPreview.js';
 import { VariogramChart, type VariogramParams } from './VariogramChart.js';
+import { I18n } from '../utils/I18n.js'
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 type ParamName = 'grid-resolution' | 'nlags' | 'nugget' | 'sill' | 'range';
 

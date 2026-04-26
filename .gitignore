@@ -69,9 +69,8 @@ data/
 deep_learning/fusion/repository/
 
 # Build artifacts
-*.exe
 *.dmg
-*.apk
+*.exe
 release/
 frontend/dist/
 apps/admin-frontend/dist

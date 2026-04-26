@@ -83,6 +83,8 @@ import { TaskStatus } from '../types/core';
 import type { GeoJSONParseResult } from '../types/geojson';
 import type { SamplingPointValue } from '../types/sampling';
 
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
+
 function stripApiSuffix(baseUrl: string): string {
     const trimmed = baseUrl.trim().replace(/\/+$/, '');
     return trimmed.endsWith('/api') ? trimmed.slice(0, -4) : trimmed;
@@ -134,7 +136,11 @@ class StartupStepTimeoutError extends Error {
     public readonly timeoutMs: number;
 
     constructor(stepName: string, timeoutMs: number) {
-        super(`${stepName} 执行超时（>${timeoutMs}ms）`);
+        // super(`${stepName} 执行超时（>${timeoutMs}ms）`);
+        super(t('error.timeout_error.StartupStep', {
+            stepName: stepName,
+            timeoutMs: timeoutMs
+        }));
         this.name = 'StartupStepTimeoutError';
         this.stepName = stepName;
         this.timeoutMs = timeoutMs;
@@ -469,9 +475,9 @@ class App {
 
             // 设置启动画面为就绪状态
             this.splashScreen?.setStage('ready');
-            this.splashScreen?.updateStatus('准备就绪');
+            this.splashScreen?.updateStatus(t('splashScreen.updateStatus'));
             this.splashScreen?.updateProgress(100);
-            this.startupLoader?.stop('即将完成...');
+            this.startupLoader?.stop(t('splashScreen.stop'));
 
             // 隐藏启动画面
             await this.hideAllSplashLayers();
@@ -505,17 +511,19 @@ class App {
 
         } catch (error) {
             this.disarmStartupHardTimeout();
-            this.startupLoader?.stop('启动失败');
+            this.startupLoader?.stop(t('splashScreen.startupLoader.stop'));
 
             console.error('启动过程出错:', error);
             this.splashScreen?.setStage('error');
-            this.splashScreen?.updateStatus('启动失败，请重试');
+            this.splashScreen?.updateStatus(t('splashScreen.startupLoader.error'));
             await this.hideNativeSplash();
 
             const errorMessage = error instanceof Error ? error.message : '未知错误';
             this.startupDegradationView?.show('fatal', {
-                title: '启动失败',
-                message: `应用启动过程中发生致命错误：${errorMessage}`,
+                title: t('splashScreen.startupLoader.stop'),
+                message: t('splashScreen.startupLoader.error.message', {
+                    errorMessage: errorMessage
+                }),
                 onRetry: () => window.location.reload()
             });
             await this.reportStartupPerformance('startup_fatal', {
@@ -554,11 +562,11 @@ class App {
 
         this.startupHardDeadlineReached = true;
         this.startupHasFunctionalDegradation = true;
-        this.startupLoader?.stop('启动耗时较长，进入降级模式...');
-        this.splashScreen?.updateStatus('启动耗时较长，正在降级加载...');
+        this.startupLoader?.stop(t('splashScreen.startupLoader.stop.handle'));
+        this.splashScreen?.updateStatus(t('splashScreen.startupLoader.stop.handle.updateStatus'));
 
         this.startupDegradationView?.show('functional', {
-            message: '启动超过8秒，已切换为降级模式，核心功能将继续加载。'
+            message: t('splashScreen.startupDegradationView.message')
         });
         await this.hideAllSplashLayers();
 
@@ -613,7 +621,7 @@ class App {
             this.startupApiBaseUrl = resolveConfiguredApiBaseUrl();
             const normalized = stripApiSuffix(this.startupApiBaseUrl);
             if (!normalized) {
-                throw new Error('API 基础地址无效');
+                throw new Error(t('error.api.BaseUrl.invalid'));
             }
             return { apiBaseUrl: normalized };
         });
@@ -633,7 +641,9 @@ class App {
             await this.withTimeout('connectBackend:health', 2000, async () => {
                 const response = await fetch(healthUrl, { method: 'GET', cache: 'no-store' });
                 if (!response.ok) {
-                    throw new Error(`后端健康检查失败: ${response.status}`);
+                    throw new Error(t('error.backend.healthCheck.failed', {
+                        status: response.status
+                    }))
                 }
             });
 
@@ -676,7 +686,9 @@ class App {
             });
             return result;
         } catch (error) {
-            const message = error instanceof Error ? error.message : `${stepName} 失败`;
+            const message = error instanceof Error ? error.message : t('error.stepFailed', {
+                stepName: stepName
+            });
             await this.reportStartupPerformance('startup_step_failed', {
                 stepName,
                 priority,
@@ -804,7 +816,7 @@ class App {
                 if (!(payload instanceof FormData)) {
                     const uploadPayload = payload as UploadQueuePayload;
                     if (!uploadPayload.file) {
-                        throw new Error('离线上传缺少文件');
+                        throw new Error(t('error.offlineMessage.uploadPayload.file'));
                     }
                     formData.append('file', uploadPayload.file);
                 }
@@ -818,7 +830,7 @@ class App {
 
             OfflineManager.registerHandler('kriging', async (payload: unknown) => {
                 if (!isKrigingParams(payload)) {
-                    throw new Error('离线克里金参数无效');
+                    throw new Error(t('error.offlineMessage.Kriging.Parameter'));
                 }
                 if (this.apiService) {
                     await this.apiService.startKriging(payload);
@@ -1355,7 +1367,9 @@ class App {
 
         const uploadStatus = document.getElementById('upload-status');
         if (uploadStatus) {
-            uploadStatus.textContent = `向导 ${wizardId} 已完成，可继续执行下一步操作。`;
+            uploadStatus.textContent = t('dialog.wizard.finished', {
+                wizardId: wizardId
+            });
         }
     }
 
@@ -1381,7 +1395,10 @@ class App {
 
         const exportStatus = document.getElementById('export-status');
         if (exportStatus) {
-            exportStatus.textContent = `导出向导已完成：目标=${targetLayer}，格式=${format.toUpperCase()}。`;
+            exportStatus.textContent = t('dialog.wizard.export.finished', {
+                targetLayer: targetLayer,
+                format: format.toUpperCase()
+            })
         }
 
         if (exportButton) {
@@ -1446,7 +1463,7 @@ class App {
         const modal = new NewProjectModal(
             (project: IProject, config: unknown) => {
                 if (!isProjectConfig(config)) {
-                    throw new Error('项目配置无效');
+                    throw new Error(t('error.project.parameter.invalid'));
                 }
                 this.onProjectCreated(project, config);
             },
@@ -1461,9 +1478,13 @@ class App {
     private onProjectCreated(project: IProject, config: ProjectConfig): void {
         console.log('项目创建完成:', project);
         HistoryManager.record({
-            action: '新建项目',
+            action: t('nav.newProject'),
             type: 'project',
-            detail: `创建了${config.sampling_mode === 'free' ? '自由采样' : '区域采样'}项目`,
+            detail: t('dialog.newProject.detail', {
+                sampling_mode: config.sampling_mode == 'free' ?
+                t('project.mode.free') :
+                t('project.mode.region')
+            }),
             undoable: false
         });
 
@@ -1520,7 +1541,7 @@ class App {
         console.log('添加采样点:', pointData);
 
         if (!this.currentProject) {
-            throw new Error('没有当前项目');
+            throw new Error(t('error.project.unexist'));
         }
 
         const normalizedPoint: ExtendedSamplingPoint = {
@@ -1532,7 +1553,7 @@ class App {
         const success = this.currentProject.addPoint(normalizedPoint);
 
         if (!success) {
-            throw new Error('采样点超出区域边界');
+            throw new Error(t('error.project.sampling.overRegion'));
         }
 
         if (this.layerManager) {
@@ -1599,18 +1620,18 @@ class App {
         const file = fileInput?.files && fileInput.files.length > 0 ? fileInput.files[0] : null;
 
         if (!file) {
-            this.showStatus('请选择文件', 'error');
+            this.showStatus(t('error.file_unexist'), 'error');
             return;
         }
 
         if (!GeoJSONParser.validateFileType(file)) {
-            this.showStatus('仅支持 .geojson 或 .json 文件', 'error');
+            this.showStatus(t('error.file_format'), 'error');
             return;
         }
 
         try {
             console.log('开始解析 GeoJSON 文件');
-            LoadingManager.show('正在解析文件...');
+            LoadingManager.show(t('dialog.file.analysising'));
 
             const parseResult: GeoJSONParseResult = await GeoJSONParser.parseFile(file);
             console.log('GeoJSON 解析成功:', parseResult);
@@ -1653,7 +1674,9 @@ class App {
                     const preprocessResult = await this.computationService.preprocessSamplingPoints(transformedData.data);
                     importedPoints = preprocessResult.points as SamplingPoint[];
                     if (preprocessResult.removedCount > 0) {
-                        this.showStatus(`导入时自动过滤 ${preprocessResult.removedCount} 个无效/重复点`, 'warning');
+                        this.showStatus(t('dialog.preprocess.filter', {
+                            removedCount: preprocessResult.removedCount
+                        }), 'warning')
                     }
                 } catch (error) {
                     console.warn('[导入] Worker 预处理失败，继续使用原始点:', error);
@@ -1668,11 +1691,16 @@ class App {
                 }
             }
 
-            this.showStatus(`数据导入成功！点数: ${importedPoints.length}`, 'success');
+            this.showStatus(t('dialog.preprocess.success', {
+                countNum: importedPoints.length
+            }), 'success')
             HistoryManager.record({
-                action: '导入数据',
+                action: t('quickaction.importData'),
                 type: 'upload',
-                detail: `导入了 ${importedPoints.length} 个采样点`,
+                // detail: `导入了 ${importedPoints.length} 个采样点`,
+                detail: t('dialog.importSampling.num', {
+                    pointsNum: importedPoints.length
+                }),
                 undoable: false
             });
 
@@ -1681,8 +1709,10 @@ class App {
             this.validateGridResolution();
 
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : '未知错误';
-            this.showStatus(`导入失败: ${errorMessage}`, 'error');
+            const errorMessage = error instanceof Error ? error.message : t('error.common.unkown');
+            this.showStatus(t('error.import.failed', {
+                errorMessage: errorMessage
+            }), 'error');
         }
     }
 
@@ -1691,7 +1721,7 @@ class App {
      */
     private async handleStartKriging(): Promise<void> {
         if (!this.validateGridResolution()) {
-            this.showStatus('网格分辨率输入不合法', 'error');
+            this.showStatus(t('error.import.gridResolution.illegal'), 'error');
             return;
         }
 
@@ -1704,20 +1734,22 @@ class App {
         }
 
         if (!samplingPoints || samplingPoints.length === 0) {
-            this.showStatus('请先上传数据或添加采样点', 'error');
+            this.showStatus(t('error.import.data.unexist'), 'error');
             return;
         }
 
         if (samplingPoints.length < 3) {
-            this.showStatus('至少需要 3 个采样点才能进行插值', 'error');
+            this.showStatus(t('error.import.data.fewPoints', 'error');
             return;
         }
 
         const confirmed = await ConfirmDialog.confirm({
-            title: '开始插值计算',
-            message: `将使用 ${samplingPoints.length} 个采样点进行克里金插值，确认开始？`,
-            confirmText: '开始',
-            cancelText: '取消'
+            title: t('dialog.interpolation.confirm'),
+            message: t('dialog.interpolation.message', {
+                pointsNum: samplingPoints.length
+            }),
+            confirmText: t('common.confirm'),
+            cancelText: t('common.cancel')
         });
 
         if (!confirmed) return;
@@ -1731,14 +1763,16 @@ class App {
 
         const validation = parameterAdjustmentPanel.validateAll();
         if (!validation.valid) {
-            this.showStatus(`参数验证失败: ${validation.errors.join(', ')}`, 'error');
+            this.showStatus(t('error.parameter.verify.failed', {
+                validationErrors: validation.errors.join(', ')
+            }), 'error');
             return;
         }
 
         let processedSamplingPoints = samplingPoints;
         if (this.computationService.isWorkerEnabled()) {
             try {
-                LoadingManager.show('正在预处理采样点数据...', { type: 'progress' });
+                LoadingManager.show(t('dialog.progress.sampling'), { type: 'progress' });
                 const preprocessResult = await this.computationService.preprocessSamplingPoints(
                     samplingPoints,
                     (progress, message) => {
@@ -1751,17 +1785,19 @@ class App {
 
                 if (preprocessResult.points.length < 3) {
                     LoadingManager.hide();
-                    this.showStatus('预处理后可用采样点不足 3 个，无法执行插值', 'error');
+                    this.showStatus(t('error.preprocess.fewpoint'), 'error');
                     return;
                 }
 
                 processedSamplingPoints = preprocessResult.points as SamplingPoint[];
                 if (preprocessResult.removedCount > 0) {
-                    this.showStatus(`已自动过滤 ${preprocessResult.removedCount} 个无效/重复采样点`, 'warning');
+                    this.showStatus(t('dialog.preprocess.autoFilter', {
+                        removedCount: preprocessResult.removedCount
+                    }), 'warning')
                 }
             } catch (error) {
                 console.warn('[Kriging] Worker 预处理失败，回退主线程原始数据:', error);
-                this.showStatus('数据预处理失败，已回退为原始采样点继续计算', 'warning');
+                this.showStatus(t('error.preprocess.failed'), 'warning');
             } finally {
                 LoadingManager.hide();
             }
@@ -1782,27 +1818,32 @@ class App {
         parameterAdjustmentPanel.saveAsLastUsed();
 
         try {
-            LoadingManager.show('正在提交插值任务...');
+            LoadingManager.show(t('dialog.project.interpolation.submitting'));
             const response = await this.apiService!.startKriging(params);
             this.currentTaskId = response.task_id;
             this.stateManager.setState('currentTaskId', this.currentTaskId);
             LoadingManager.hide();
 
-            this.showStatus('任务已启动', 'success');
-            this.accessibilityManager?.announce('插值任务已启动，正在后台计算。');
+            this.showStatus(t('common.taskStart'), 'success');
+            this.accessibilityManager?.announce(t('dialog.project.interpolation.analysising'));
             this.lastAnnouncedProgressBucket = -1;
             HistoryManager.record({
-                action: '开始插值',
+                action: t('kriging.start'),
                 type: 'kriging',
-                detail: `使用 ${params.method} 方法，${processedSamplingPoints.length} 个采样点`,
+                detail: t('dialog.project.interpolation.detail', {
+                    method: params.method,
+                    pointsNum: processedSamplingPoints.length
+                }),
                 undoable: false
             });
             this.startTaskPolling();
 
         } catch (error) {
             LoadingManager.hide();
-            const errorMessage = error instanceof Error ? error.message : '未知错误';
-            this.showStatus(`启动失败: ${errorMessage}`, 'error');
+            const errorMessage = error instanceof Error ? error.message : t('error.common.unkown');
+            this.showStatus(t('error.startFailed', {
+                errorMessage: errorMessage
+            }), 'error');
         }
     }
 
@@ -1834,8 +1875,8 @@ class App {
 
         if (statusDiv) {
             statusDiv.innerHTML = `
-                <p>状态: ${status.status}</p>
-                <p>进度: ${status.progress.toFixed(1)}%</p>
+                <p>${t('common.status')}: ${status.status}</p>
+                <p>${t('common.progress')}: ${status.progress.toFixed(1)}%</p>
             `;
         }
 
@@ -1847,20 +1888,26 @@ class App {
 
         if (status.status === 'completed') {
             this.taskPoller?.stop();
-            this.showStatus('插值完成！', 'success');
-            this.accessibilityManager?.announce('插值任务已完成。');
-            LoadingManager.show('正在加载结果...');
+            this.showStatus(t('interpolation.success'), 'success');
+            this.accessibilityManager?.announce(t('interpolation.finished'));
+            LoadingManager.show(t('interpolation.loadingResult'));
             await this.loadResults();
             LoadingManager.hide();
         } else if (status.status === 'failed') {
             this.taskPoller?.stop();
-            this.showStatus(`任务失败: ${status.error}`, 'error');
-            this.accessibilityManager?.announce(`任务失败：${status.error || '未知错误'}`, 'assertive');
+            this.showStatus(t('interpolation.failed', {
+                errorMessage: status.error ?? t('error.common.unkown')
+            }), 'error');
+            this.accessibilityManager?.announce(t('interpolation.failed', {
+                errorMessage: status.error || t('error.common.unkown')
+            }), 'assertive');
         } else {
             const progressBucket = Math.floor(status.progress / 25);
             if (progressBucket > this.lastAnnouncedProgressBucket) {
                 this.lastAnnouncedProgressBucket = progressBucket;
-                this.accessibilityManager?.announce(`任务进度 ${Math.round(status.progress)}%`);
+                this.accessibilityManager?.announce(t('interpolation.progress', {
+                    progress: Math.round(status.progress)
+                }));
             }
         }
     }
@@ -1898,29 +1945,29 @@ class App {
      */
     private async handleExport(dataType: string, format: string): Promise<void> {
         if (!this.currentTaskId) {
-            this.showExportStatus('没有可导出的结果', 'error');
+            this.showExportStatus(t('error.export_failed.noResult'), 'error');
             return;
         }
 
         const filename = `${this.currentTaskId}_${dataType}.${format}`;
-        LoadingManager.show(`正在导出 ${filename}...`);
-        this.showExportStatus(`正在下载 ${filename}...`, 'success');
+        LoadingManager.show(t('dialog.export.loading', {filename: filename}));
+        this.showExportStatus(t('dialog.download.loading', {filename: filename}), 'success');
 
         try {
             await this.apiService!.downloadExportFile(this.currentTaskId, filename);
             LoadingManager.hide();
-            this.showExportStatus(`${filename} 下载完成`, 'success');
+            this.showExportStatus(t('dialog.download.success', {filename: filename}), 'success');
             HistoryManager.record({
-                action: '导出结果',
+                action: t('dialog.export.result.title'),
                 type: 'export',
-                detail: `导出了 ${filename}`,
+                detail: t('dialog.export.result.detail', {filename: filename}),
                 undoable: false
             });
         } catch (error) {
-            console.error('导出失败:', error);
+            console.error(t('dialog.export.failed.title'), error);
             LoadingManager.hide();
-            const errorMessage = error instanceof Error ? error.message : '未知错误';
-            this.showExportStatus(`导出失败: ${errorMessage}`, 'error');
+            const errorMessage = error instanceof Error ? error.message : t('error.commmon.unkown');
+            this.showExportStatus(t('dialog.export.failed.message', {errorMessage: errorMessage}), 'error');
         }
     }
 
@@ -1945,21 +1992,21 @@ class App {
         this.eventBinder.bindBySelector('#export-csv', 'click', () => {
             const points = this.currentProject?.points || this.layerManager?.getSamplingPoints() || [];
             if (points.length === 0) {
-                this.showExportStatus('没有可导出的采样点', 'error');
+                this.showExportStatus(t('dialog.export.failed.noResult'), 'error');
                 return;
             }
             ExportEnhancer.exportPointsCSV(points);
             HistoryManager.record({
-                action: '导出CSV',
+                action: t('dialog.export.CSV.title'),
                 type: 'export',
-                detail: `导出了 ${points.length} 个采样点`,
+                detail: t('dialog.export.pointsNum.detail', {pointNum: points.length}),
                 undoable: false
             });
         });
 
         this.eventBinder.bindBySelector('#export-report', 'click', () => {
             if (!this.currentTaskId) {
-                this.showExportStatus('没有可生成报告的任务', 'error');
+                this.showExportStatus(t('error.export.task.noReport'), 'error');
                 return;
             }
             const krigingMethodSelect = document.getElementById('kriging-method') as HTMLSelectElement;
@@ -1971,9 +2018,9 @@ class App {
                 gridResolution: parseInt(gridResolutionInput?.value || '10', 10)
             });
             HistoryManager.record({
-                action: '生成报告',
+                action: t('dialog.export.report.title'),
                 type: 'export',
-                detail: `生成了任务 ${this.currentTaskId} 的分析报告`,
+                detail: t('dialog.export.report.detail', {currentTaskId: this.currentTaskId}),
                 undoable: false
             });
         });
@@ -2042,13 +2089,13 @@ class App {
     private async handleMapEngineSwitch(newProvider: MapProvider): Promise<void> {
         // 检查是否正在切换，防止重复切换
         if (this.isSwitchingMap) {
-            Logger.warn('主程序', '地图引擎正在切换中，请稍候');
+            Logger.warn(t('common.main'), t('dialog.mapSwitch.loading'));
             return;
         }
 
         const previousProvider = MapConfig.getProvider() as MapProvider;
         if (newProvider === previousProvider) {
-            Logger.info('主程序', `当前已经是 ${getMapEngineDisplayName(newProvider)} 引擎，无需切换`);
+            Logger.info(t('common.main'), t('dialog.mapSwitch.noNeed', {currentMapEngine: getMapEngineDisplayName(newProvider)}))
             return;
         }
 
@@ -2068,12 +2115,12 @@ class App {
                 currentSwitchController.signal.aborted ||
                 currentSwitchSession !== this.mapSwitchSessionId
             ) {
-                throw new DOMException('地图切换已取消', 'AbortError');
+                throw new DOMException(t('dialog.mapSwitch.canceled'), 'AbortError');
             }
         };
 
         try {
-            LoadingManager.show('正在切换地图引擎...');
+            LoadingManager.show(t('dialog.mapSwitch.quietLoading'));
             ensureSwitchAlive();
 
             currentCenter = this.view ? (this.view as { getCenter?: () => [number, number] | { lng: number; lat: number } }).getCenter?.() || null : null;
@@ -2103,7 +2150,7 @@ class App {
                 const timeoutId = window.setTimeout(resolve, 300);
                 currentSwitchController.signal.addEventListener('abort', () => {
                     clearTimeout(timeoutId);
-                    reject(new DOMException('地图切换已取消', 'AbortError'));
+                    reject(new DOMException(t('dialog.mapSwitch.canceled'), 'AbortError'));
                 }, { once: true });
             });
             ensureSwitchAlive();
@@ -2117,7 +2164,9 @@ class App {
                 reinitializeMap('viewDiv', newProvider),
                 new Promise<never>((_, reject) => {
                     const timeoutMs = AppConfig.map.switchTimeoutMs;
-                    setTimeout(() => reject(new Error(`地图引擎切换超时（${Math.floor(timeoutMs / 1000)}秒）`)), timeoutMs);
+                    setTimeout(() => reject(new Error(t('dialog.mapSwitch.timeout', {
+                        timeoutMs: Math.floor(timeoutMs / 1000)
+                    }))), timeoutMs);
                 })
             ]);
             ensureSwitchAlive();
@@ -2146,28 +2195,30 @@ class App {
             }
 
             LoadingManager.hide();
-            this.showStatus(`已切换到 ${newProviderName} 地图引擎`, 'success');
+            this.showStatus(t('dialog.mapSwitch.success', {newProviderName: newProviderName}), 'success');
 
             HistoryManager.record({
-                action: '切换地图引擎',
+                action: t('dialog.mapSwitch.title'),
                 type: 'map',
-                detail: `切换到 ${newProviderName} 地图引擎`,
+                detail: t('dialog.mapSwitch.detail', {newProviderName: newProviderName}),
                 undoable: false
             });
 
         } catch (error) {
             LoadingManager.hide();
             if (error instanceof DOMException && error.name === 'AbortError') {
-                Logger.warn('主程序', '地图切换被取消');
+                Logger.warn(t('common.main'), t('dialog.mapSwitch.canceled'));
                 return;
             }
-            Logger.error('主程序', '地图引擎切换失败，尝试回滚', error);
+            Logger.error(t('common.main'), t('error.mapSwitch.rollBack'), error);
             try {
                 const rollbackAdapter = await Promise.race([
                     reinitializeMap('viewDiv', previousProvider),
                     new Promise<never>((_, reject) => {
                         const timeoutMs = AppConfig.map.switchTimeoutMs;
-                        setTimeout(() => reject(new Error(`地图引擎回滚超时（${Math.floor(timeoutMs / 1000)}秒）`)), timeoutMs);
+                        setTimeout(() => reject(new Error(t('error.mapSwitch.rollBack.timeout', {
+                            timeoutMs: Math.floor(timeoutMs / 1000)
+                        }))), timeoutMs);
                     })
                 ]);
                 this.view = rollbackAdapter.getView();
@@ -2188,10 +2239,10 @@ class App {
                     await this.layerManager.addSamplingPoint(point);
                 }
             } catch (rollbackError) {
-                Logger.error('主程序', '地图引擎回滚失败', rollbackError);
+                Logger.error(t('common.main'), t('error.mapSwitch.rollBack.failed'), rollbackError);
             }
-            const errorMessage = error instanceof Error ? error.message : '未知错误';
-            this.showStatus(`切换失败: ${errorMessage}`, 'error');
+            const errorMessage = error instanceof Error ? error.message : t('error.common.unkown');
+            this.showStatus(t('error.mapSwitch.failed', {errorMessage: errorMessage}), 'error');
             throw error;
         } finally {
             // 重置切换状态标志
@@ -2228,16 +2279,16 @@ class App {
             if (engine instanceof AMapEngine) {
                 const success = engine.panToLocation();
                 if (success) {
-                    this.showStatus('已回到当前位置', 'success');
+                    this.showStatus(t('dialog.resetMap.success'), 'success');
                 } else {
-                    this.showStatus('定位蓝点不存在，无法回到中心', 'warning');
+                    this.showStatus(t('dialog.resetMap.centerRequired'), 'warning');
                 }
             } else {
-                this.showStatus('当前地图引擎不支持回到中心功能', 'warning');
+                this.showStatus(t('dialog.resetMap.mapInvalid'), 'warning');
             }
         } catch (error) {
             console.error('❌ 回到中心失败:', error);
-            this.showStatus('回到中心失败', 'error');
+            this.showStatus(t('dialog.resetMap.failed'), 'error');
         }
     }
 
@@ -2292,7 +2343,7 @@ class App {
                 console.log('3D克里金面板初始化成功');
             } catch (error) {
                 console.error('3D克里金面板初始化失败:', error);
-                container.innerHTML = '<div class="status-message error">3D 克里金模块加载失败，请稍后重试</div>';
+                container.innerHTML = `<div class="status-message error">${t('error.kriging3D.Panel.load.failed')}</div>`;
             } finally {
                 SkeletonLoader.hide(skeleton);
             }
@@ -2330,7 +2381,7 @@ class App {
             console.log('深度学习面板初始化成功');
         } catch (error) {
             console.error('深度学习面板初始化失败:', error);
-            container.innerHTML = '<div class="status-message error">深度学习模块加载失败，请刷新后重试</div>';
+            container.innerHTML = `<div class="status-message error">${t('error.deepLearning.Panel.load.failed')}</div>`;
         } finally {
             SkeletonLoader.hide(skeleton);
         }
@@ -2359,7 +2410,7 @@ class App {
         } catch (error) {
             console.error('前端功能集成补齐面板初始化失败:', error);
             if (container) {
-                container.innerHTML = '<div class="status-message error">功能集成模块加载失败，请稍后重试</div>';
+                container.innerHTML = `<div class="status-message error">${t('error.integrationHub.Panel.load.failed')}</div>`;
             }
         } finally {
             SkeletonLoader.hide(skeleton);
@@ -2394,7 +2445,7 @@ class App {
         if (networkIcon && networkStatus) {
             const isOnline = OfflineManager.isOnline;
             networkIcon.className = `cache-status-icon ${isOnline ? 'online' : 'offline'}`;
-            networkStatus.textContent = isOnline ? '在线' : '离线';
+            networkStatus.textContent = isOnline ? t('common.online') : t('common.offline');
         }
 
         const storageFill = document.getElementById('cache-storage-fill');
@@ -2403,7 +2454,7 @@ class App {
             try {
                 const cacheInfo = await this.getCacheInfo();
                 const totalSize = cacheInfo.reduce((sum, info) => sum + info.size, 0);
-                const maxStorage = 50 * 1024 * 1024;
+                const maxStorage = 6 * 1024 * 1024 * 1024;
                 const percentage = (totalSize / maxStorage) * 100;
 
                 storageFill.style.width = `${Math.min(percentage, 100)}%`;
@@ -2414,7 +2465,7 @@ class App {
                     storageFill.classList.add('warning');
                 }
 
-                storageText.textContent = `${this.formatBytes(totalSize)} / 50 MB`;
+                storageText.textContent = `${this.formatBytes(totalSize)} / 6 GB`;
             } catch (error) {
                 console.error('更新存储状态失败:', error);
             }
@@ -2437,22 +2488,22 @@ class App {
     private async getCacheInfo(): Promise<{ name: string; size: number; count: number; description: string }[]> {
         return [
             {
-                name: '项目数据',
+                name: t('dialog.project.data.title'),
                 size: 1024 * 1024,
                 count: 3,
-                description: '本地保存的项目信息'
+                description: t('dialog.project.data.description')
             },
             {
-                name: '采样点',
+                name: t('dialog.project.sampling.title'),
                 size: 5 * 1024 * 1024,
                 count: 150,
-                description: '离线采样的点位数据'
+                description: t('dialog.project.sampling.description')
             },
             {
-                name: '结果缓存',
+                name: t('dialog.project.resultCache.title'),
                 size: 10 * 1024 * 1024,
                 count: 8,
-                description: '插值和计算结果'
+                description: t('dialog.project.resultCache.description')
             }
         ];
     }
@@ -2540,7 +2591,7 @@ function initRippleEffect(): void {
 function initKeyboardShortcuts(app: App): void {
     KeyboardManager.register({
         key: 'Escape',
-        description: '关闭弹窗/侧边栏',
+        description: t('dialog.shortcut.esc'),
         handler: () => {
             const sidebar = document.querySelector('.sidebar.mobile-open');
             if (sidebar) {
@@ -2568,14 +2619,14 @@ function initKeyboardShortcuts(app: App): void {
     KeyboardManager.register({
         key: 'n',
         ctrl: true,
-        description: '新建项目',
+        description: t('dialog.shortcut.newProject'),
         handler: () => app.handleNewProject()
     });
 
     KeyboardManager.register({
         key: 'u',
         ctrl: true,
-        description: '上传数据',
+        description: t('dialog.shortcut.inputFile'),
         handler: () => {
             const fileInput = document.getElementById('file-input') as HTMLInputElement;
             fileInput?.click();
@@ -2585,7 +2636,7 @@ function initKeyboardShortcuts(app: App): void {
     KeyboardManager.register({
         key: 'Enter',
         ctrl: true,
-        description: '开始插值',
+        description: t('dialog.shortcut.startInterpolation'),
         handler: () => {
             const btn = document.getElementById('start-kriging-btn') as HTMLButtonElement;
             if (btn && !btn.disabled) {
@@ -2597,7 +2648,7 @@ function initKeyboardShortcuts(app: App): void {
     KeyboardManager.register({
         key: 's',
         ctrl: true,
-        description: '导出结果',
+        description: t('dialog.shortcut.exportResult'),
         handler: () => {
             const exportPanel = document.getElementById('export-panel');
             if (exportPanel && exportPanel.style.display !== 'none') {
@@ -2611,14 +2662,14 @@ function initKeyboardShortcuts(app: App): void {
         key: 'd',
         ctrl: true,
         shift: true,
-        description: '切换主题',
+        description: t('dialog.shortcut.themeManager'),
         handler: () => ThemeManager.toggle()
     });
 
     KeyboardManager.register({
         key: 'z',
         ctrl: true,
-        description: '撤销',
+        description: t('dialog.shortcut.undo'),
         handler: () => HistoryManager.undo()
     });
 
@@ -2626,7 +2677,7 @@ function initKeyboardShortcuts(app: App): void {
         key: 'z',
         ctrl: true,
         shift: true,
-        description: '重做',
+        description: t('dialog.shortcut.redo'),
         handler: () => HistoryManager.redo()
     });
 
@@ -2652,7 +2703,10 @@ window.addEventListener('load', () => {
             localStorage.setItem('udake-offline-fallback-enabled', 'true');
             localStorage.setItem(
                 'udake-offline-fallback-reason',
-                `SW 不可用，协议: ${protocol}, 安全上下文: ${String(window.isSecureContext)}`
+                `${t('error.SW.unavailable', {
+                    protocol: protocol,
+                    isSecureContext: String(window.isSecureContext)
+                })}`
             );
         } catch {
             // localStorage 不可用时静默降级
@@ -2664,7 +2718,7 @@ window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch((error) => {
         try {
             localStorage.setItem('udake-offline-fallback-enabled', 'true');
-            localStorage.setItem('udake-offline-fallback-reason', 'SW 注册失败');
+            localStorage.setItem('udake-offline-fallback-reason', t('error.SW.regist.failed'));
         } catch {
             // localStorage 不可用时静默降级
         }

@@ -3,6 +3,10 @@
  * 支持动态发现的多引擎切换
  */
 
+import { I18n } from "../utils/I18n";
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
+
 export interface MapEngineOption {
     provider: string;
     displayName: string;
@@ -52,7 +56,7 @@ export class MapEngineSwitcher {
         if (deduplicated.size === 0) {
             return [
                 { provider: 'geoscene', displayName: 'GeoScene' },
-                { provider: 'amap', displayName: '高德' }
+                { provider: 'amap', displayName: t('map.name.amap') }
             ];
         }
 
@@ -87,7 +91,7 @@ export class MapEngineSwitcher {
     createButton(): HTMLElement {
         this.button = document.createElement('div');
         this.button.className = 'map-engine-switcher';
-        this.button.title = '切换地图引擎';
+        this.button.title = t('map.switcherBtn.title');
 
         // 样式
         this.button.style.cssText = `
@@ -236,7 +240,7 @@ export class MapEngineSwitcher {
 
         const textElement = this.button.querySelector('.switcher-text') as HTMLElement;
         if (textElement) {
-            textElement.textContent = '✅ 已切换';
+            textElement.textContent = t('map.switcherBtn.success');
             textElement.style.color = '#10B981';
         }
 
@@ -251,7 +255,7 @@ export class MapEngineSwitcher {
 
         const textElement = this.button.querySelector('.switcher-text') as HTMLElement;
         if (textElement) {
-            textElement.textContent = '❌ 失败';
+            textElement.textContent = t('map.switcherBtn.failed');
             textElement.style.color = '#EF4444';
         }
 
