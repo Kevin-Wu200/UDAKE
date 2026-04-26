@@ -58,8 +58,8 @@ const PARAM_META: Record<ParamName, { min: number; max: number; step: number }> 
 const BUILTIN_TEMPLATES: Record<string, TemplateConfig> = {
     'quick-estimate': {
         id: 'quick-estimate',
-        name: '快速估算模式',
-        description: '牺牲部分精度，优先缩短计算时间',
+        name: t('template.config.quick-estimate.name'),
+        description: t('template.config.quick-estimate.description'),
         params: {
             'grid-resolution': 80,
             nlags: 8,
@@ -72,8 +72,8 @@ const BUILTIN_TEMPLATES: Record<string, TemplateConfig> = {
     },
     'high-precision': {
         id: 'high-precision',
-        name: '高精度模式',
-        description: '提高网格细节与拟合能力，计算更慢',
+        name: t('template.config.high-precision.name'),
+        description: t('template.config.high-precision.description'),
         params: {
             'grid-resolution': 220,
             nlags: 18,
@@ -86,8 +86,8 @@ const BUILTIN_TEMPLATES: Record<string, TemplateConfig> = {
     },
     balanced: {
         id: 'balanced',
-        name: '平衡模式',
-        description: '速度与精度折中，适合大多数场景',
+        name: t('template.config.balanced.name'),
+        description: t('template.config.balanced.description'),
         params: {
             'grid-resolution': 120,
             nlags: 12,
@@ -100,8 +100,8 @@ const BUILTIN_TEMPLATES: Record<string, TemplateConfig> = {
     },
     'large-dataset': {
         id: 'large-dataset',
-        name: '大数据集模式',
-        description: '控制计算资源消耗，避免大规模数据阻塞',
+        name: t('template.config.large-dataset.name'),
+        description: t('template.config.large-dataset.description'),
         params: {
             'grid-resolution': 90,
             nlags: 10,
@@ -114,8 +114,8 @@ const BUILTIN_TEMPLATES: Record<string, TemplateConfig> = {
     },
     'terrain-analysis': {
         id: 'terrain-analysis',
-        name: '地形分析模式',
-        description: '强调空间连续地形变化',
+        name: t('template.config.terrain-analysis.name'),
+        description: t('template.config.terrain-analysis.description'),
         params: {
             'grid-resolution': 150,
             nlags: 14,
@@ -232,7 +232,7 @@ export class ParameterAdjustmentPanel {
             const templateId = select?.value || 'balanced';
             const applied = this.applyTemplate(templateId);
             this.showTemplateOperationResult(
-                applied ? '已应用模板配置' : '模板不存在，已回退到平衡模式',
+                applied ? t('template.operate.success') : t('template.operate.warning'),
                 applied ? 'success' : 'warning'
             );
         });
@@ -297,9 +297,9 @@ export class ParameterAdjustmentPanel {
                 container: variogramContainer,
                 empiricalData: this.buildEmpiricalVariogramData(),
                 models: [],
-                selectedModel: 'spherical-实时拟合',
+                selectedModel: t('variogram.selectedModel'),
                 showLegend: true,
-                title: '实时变异函数拟合预览'
+                title: t('variogram.title')
             });
         }
     }
@@ -318,7 +318,7 @@ export class ParameterAdjustmentPanel {
             }
             const hidden = panel.classList.toggle('collapsed');
             panel.setAttribute('aria-hidden', hidden ? 'true' : 'false');
-            toggleButton.textContent = hidden ? '显示可视化' : '隐藏可视化';
+            toggleButton.textContent = hidden ? t('dialog.visualization.show') : t('dialog.visualization.hide');
         });
 
         generatePreviewBtn?.addEventListener('click', async () => {
@@ -355,38 +355,38 @@ export class ParameterAdjustmentPanel {
         section.className = 'kriging-visualization-wrapper';
         section.innerHTML = `
             <div class="kriging-visualization-toolbar">
-                <h3>参数可视化</h3>
+                <h3>${t('dialog.parameter.visualization.name')}</h3>
                 <div class="kriging-template-actions">
-                    <button id="generate-impact-preview-btn" class="btn btn-secondary" type="button">生成预览</button>
-                    <button id="toggle-kriging-visualization" class="btn btn-secondary" type="button">隐藏可视化</button>
+                    <button id="generate-impact-preview-btn" class="btn btn-secondary" type="button">${t('dialog.parameter.visualization.generate-preview')}</button>
+                    <button id="toggle-kriging-visualization" class="btn btn-secondary" type="button">${t('dialog.visualization.hide')}</button>
                 </div>
             </div>
             <div id="kriging-visualization-panel">
                 <div class="kriging-visual-card">
                     <div class="kriging-visual-card-head">
-                        <div id="parameter-relationship-title" class="kriging-visual-card-title">参数关系图（nugget-sill）</div>
+                        <div id="parameter-relationship-title" class="kriging-visual-card-title">${t('dialog.parameter.relationship.title')}</div>
                         <div class="kriging-relationship-actions">
-                            <span id="relationship-constraint-label" class="relationship-constraint-label">约束: nugget ≤ sill</span>
-                            <span id="relationship-status-badge" class="relationship-status-badge valid">有效</span>
-                            <button id="restore-recommended-center-btn" class="btn btn-secondary" type="button">恢复到推荐区</button>
+                            <span id="relationship-constraint-label" class="relationship-constraint-label">${t('dialog.parameter.relationship.constraint')}nugget ≤ sill</span>
+                            <span id="relationship-status-badge" class="relationship-status-badge valid">${t('dialog.parameter.relationship.status.valid')}</span>
+                            <button id="restore-recommended-center-btn" class="btn btn-secondary" type="button">${t('dialog.parameter.restore-recommend-center')}</button>
                         </div>
                         <label class="kriging-relationship-switch" for="relationship-chart-select">
-                            <span>关系类型</span>
+                            <span>${t('kriging.relationship.switch-button.title')}</span>
                             <select id="relationship-chart-select">
-                                <option value="nugget-sill">nugget-sill（块金值-基台值）</option>
-                                <option value="range-spatial">range-spatial（范围值-空间范围）</option>
-                                <option value="grid-performance">grid-performance（网格分辨率-性能）</option>
+                                <option value="nugget-sill">nugget-sill${t('kriging.relationship.nugget-sill')}</option>
+                                <option value="range-spatial">range-spatial${t('kriging.relationship.range-spatial')}</option>
+                                <option value="grid-performance">grid-performance${t('kriging.relationship.grid-performance')}</option>
                             </select>
                         </label>
                     </div>
                     <div id="parameter-relationship-chart" class="kriging-visual-chart"></div>
                 </div>
                 <div class="kriging-visual-card">
-                    <div class="kriging-visual-card-title">参数影响预览</div>
+                    <div class="kriging-visual-card-title">${t('kriging.visual-card-title.parameter')}</div>
                     <div id="parameter-impact-preview"></div>
                 </div>
                 <div class="kriging-visual-card">
-                    <div class="kriging-visual-card-title">实时变异函数拟合</div>
+                    <div class="kriging-visual-card-title">${t('kriging.visual-card-title.variogram')}</div>
                     <div id="variogram-fitting-chart" class="kriging-variogram-chart"></div>
                 </div>
             </div>
@@ -462,7 +462,7 @@ export class ParameterAdjustmentPanel {
         const configs: Record<RelationshipType, RelationshipChartViewConfig> = {
             'nugget-sill': {
                 id: 'nugget-sill',
-                title: '参数关系图（nugget-sill）',
+                title: t('kriging.visual-card-title.type', { type: "nugget-sill"}),
                 axisX: { key: 'nugget', label: 'nugget', min: PARAM_META.nugget.min, max: PARAM_META.nugget.max },
                 axisY: { key: 'sill', label: 'sill', min: PARAM_META.sill.min, max: PARAM_META.sill.max },
                 constraint: {
@@ -472,26 +472,26 @@ export class ParameterAdjustmentPanel {
             },
             'range-spatial': {
                 id: 'range-spatial',
-                title: '参数关系图（range-spatial）',
+                title: t('kriging.visual-card-title.type', { type: "range-spatial" }),
                 axisX: { key: 'range', label: 'range', min: PARAM_META.range.min, max: PARAM_META.range.max },
-                axisY: { key: 'spatialRange', label: '空间范围', min: 0, max: maxSpatialAxis },
+                axisY: { key: 'spatialRange', label: t('kriging.spatial-range'), min: 0, max: maxSpatialAxis },
                 constraint: {
-                    label: '推荐范围: 15%-40%',
+                    label: t('kriging.range-spatial.recommend-range'),
                     validate: (x, y) => y <= 0 ? x === 0 : x >= y * 0.15 && x <= y * 0.4
                 }
             },
             'grid-performance': {
                 id: 'grid-performance',
-                title: '参数关系图（grid-performance）',
+                title: t('kriging.visual-card-title.type', { type: "grid-performance" }),
                 axisX: {
                     key: 'gridResolution',
-                    label: '网格分辨率',
+                    label: t('kriging.gridResolution'),
                     min: PARAM_META['grid-resolution'].min,
                     max: PARAM_META['grid-resolution'].max
                 },
-                axisY: { key: 'estimatedTime', label: '预估耗时(s)', min: 0, max: 30 },
+                axisY: { key: 'estimatedTime', label: t('common.estimatedTime'), min: 0, max: 30 },
                 constraint: {
-                    label: '推荐耗时 < 10s',
+                    label: t('common.recommendTime', { time: "< 10"}),
                     validate: (_x, y) => y < 10
                 }
             }
@@ -617,26 +617,26 @@ export class ParameterAdjustmentPanel {
         const relationPoint = this.getRelationshipPoint(this.relationshipType);
         this.relationshipChart?.update(relationPoint.x, relationPoint.y);
         this.relationshipChart?.highlightRegion(relationPoint.region);
-        this.updateRelationshipActions(relationshipConfig.constraint?.label || '未设置约束', relationPoint.region);
+        this.updateRelationshipActions(relationshipConfig.constraint?.label || t('dialog.parameter.relationship.constraintRequired'), relationPoint.region);
         this.variogramChart?.updateFitting(this.buildVariogramParams());
     }
 
     private updateRelationshipActions(constraintLabel: string, region: 'valid' | 'invalid' | 'warning'): void {
         const label = document.getElementById('relationship-constraint-label');
         if (label) {
-            label.textContent = `约束: ${constraintLabel}`;
+            label.textContent = `${t('dialog.parameter.relationship.constraint')}${constraintLabel}`;
         }
 
         const badge = document.getElementById('relationship-status-badge');
         if (badge) {
             badge.className = `relationship-status-badge ${region}`;
-            badge.textContent = region === 'valid' ? '有效' : region === 'warning' ? '警告' : '无效';
+            badge.textContent = region === 'valid' ? t('common.valid') : region === 'warning' ? t('common.warning') : t('common.invalid') ;
         }
 
         const restoreBtn = document.getElementById('restore-recommended-center-btn') as HTMLButtonElement | null;
         if (restoreBtn) {
             restoreBtn.disabled = region === 'valid';
-            restoreBtn.textContent = region === 'valid' ? '已在推荐区' : '恢复到推荐区';
+            restoreBtn.textContent = region === 'valid' ? t('dialog.parameter.recommend-center-already-set') : t('dialog.parameter.restore-recommend-center');
         }
     }
 
@@ -644,25 +644,25 @@ export class ParameterAdjustmentPanel {
         const config = this.buildRelationshipConfig(this.relationshipType);
         const center = this.calculateRecommendedCenter(config);
         if (!center) {
-            this.showTemplateOperationResult('未找到推荐区中心点', 'warning');
+            this.showTemplateOperationResult(t('dialog.parameter.restore-recommend-center.pointLost'), 'warning');
             return;
         }
 
         if (this.relationshipType === 'nugget-sill') {
             this.animateParameter('nugget', center.x);
             this.animateParameter('sill', center.y);
-            this.showTemplateOperationResult('已恢复到推荐区中心点', 'success');
+            this.showTemplateOperationResult(t('dialog.parameter.restore-recommend-center.success'), 'success');
             return;
         }
 
         if (this.relationshipType === 'range-spatial') {
             this.animateParameter('range', center.x);
-            this.showTemplateOperationResult('已恢复到推荐区中心点', 'success');
+            this.showTemplateOperationResult(t('dialog.parameter.restore-recommend-center.success'), 'success');
             return;
         }
 
         this.animateParameter('grid-resolution', center.x);
-        this.showTemplateOperationResult('已恢复到推荐区中心点', 'success');
+        this.showTemplateOperationResult(t('dialog.parameter.restore-recommend-center.success'), 'success');
     }
 
     private calculateRecommendedCenter(config: RelationshipChartViewConfig): { x: number; y: number } | null {
@@ -770,7 +770,10 @@ export class ParameterAdjustmentPanel {
 
         if (value < min || value > max) {
             input.classList.add('error');
-            this.showParameterWarning(paramName, `参数值必须在 ${min} 到 ${max} 之间`);
+            this.showParameterWarning(paramName, t('dialog.parameter.range-required', {
+                min: min,
+                max: max
+            }));
             return;
         }
 
@@ -780,8 +783,8 @@ export class ParameterAdjustmentPanel {
         const nugget = this.parameters.get('nugget') ?? 0;
         const sill = this.parameters.get('sill') ?? 1;
         if (nugget > sill) {
-            this.showParameterWarning('nugget', '块金值不能大于基台值');
-            this.showParameterWarning('sill', '基台值应大于或等于块金值');
+            this.showParameterWarning('nugget', t('dialog.parameter.warning.nugget'));
+            this.showParameterWarning('sill', t('dialog.parameter.warning.sill'));
         } else {
             this.hideParameterWarning('nugget');
             this.hideParameterWarning('sill');
@@ -826,8 +829,8 @@ export class ParameterAdjustmentPanel {
             return;
         }
 
-        const errorPrefix = validation.errors.length > 0 ? `错误: ${validation.errors.join('；')}` : '';
-        const warningPrefix = validation.warnings.length > 0 ? `警告: ${validation.warnings.join('；')}` : '';
+        const errorPrefix = validation.errors.length > 0 ? `${t('common.error')}: ${validation.errors.join('；')}` : '';
+        const warningPrefix = validation.warnings.length > 0 ? `${t('common.warning')}: ${validation.warnings.join('；')}` : '';
         const merged = [errorPrefix, warningPrefix].filter(Boolean).join(' | ');
 
         warningPanel.style.display = 'block';
@@ -855,32 +858,32 @@ export class ParameterAdjustmentPanel {
         const range = this.parameters.get('range') ?? 10;
 
         if (gridResolution <= 0) {
-            issues.push({ level: 'error', message: '网格分辨率必须大于 0' });
+            issues.push({ level: 'error', message: t('dialog.parameter.warning.gird.mustPositive') });
         }
 
         if (nugget > sill) {
-            issues.push({ level: 'error', message: '块金值不能大于基台值' });
+            issues.push({ level: 'error', message: t('dialog.parameter.warning.nugget') });
         }
 
         if (sill <= 0) {
-            issues.push({ level: 'error', message: '基台值必须大于 0' });
+            issues.push({ level: 'error', message: t('dialog.parameter.warning.sill.mustPositive') });
         }
 
         if (range <= 0) {
-            issues.push({ level: 'error', message: '范围值必须大于 0' });
+            issues.push({ level: 'error', message: t('dialog.parameter.warning.range.mustPositive') });
         }
 
         if (range > sill) {
-            issues.push({ level: 'warning', message: '范围值大于基台值，可能导致过度平滑' });
+            issues.push({ level: 'warning', message: t('dialog.parameter.warning.range-larger-than-sill') });
         }
 
         if (this.samplingContext.length > 0) {
             if (gridResolution > 280 && this.samplingContext.length < 20) {
-                issues.push({ level: 'warning', message: '采样点较少时高分辨率可能引入伪细节' });
+                issues.push({ level: 'warning', message: t('dialog.parameter.warning.fewPoints-and-highGrid') });
             }
 
             if (nlags > Math.max(6, Math.floor(this.samplingContext.length / 2))) {
-                issues.push({ level: 'warning', message: '滞后数偏高，建议降低以避免分组过稀' });
+                issues.push({ level: 'warning', message: t('dialog.parameter.warning.highNlags') });
             }
         }
 
@@ -931,7 +934,7 @@ export class ParameterAdjustmentPanel {
         const records = this.getHistoryRecords();
         records.unshift({
             id: Date.now().toString(),
-            name: name || `参数组合 ${records.length + 1}`,
+            name: name || t('dialog.parameter.combination', { recordsNum: records.length + 1 }),
             parameters: this.getParameters(),
             timestamp: new Date().toISOString()
         });
@@ -958,7 +961,7 @@ export class ParameterAdjustmentPanel {
 
     public saveAsLastUsed(): void {
         localStorage.setItem('lastUsedParameters', JSON.stringify(this.getParameters()));
-        this.recordHistory('最近使用', this.getParameters());
+        this.recordHistory(t('common.nearbyUsed'), this.getParameters());
     }
 
     public validateAll(): { valid: boolean; errors: string[]; warnings: string[] } {
@@ -999,13 +1002,13 @@ export class ParameterAdjustmentPanel {
             this.setSelectValue('variogram-model', chosen.variogram_model);
         }
 
-        this.recordHistory(`应用模板:${chosen.name}`, this.getParameters());
+        this.recordHistory(`${t('template.used')}:${chosen.name}`, this.getParameters());
         return Boolean(template);
     }
 
     private recommendParametersFromSampling(): void {
         if (this.samplingContext.length === 0) {
-            this.showTemplateOperationResult('暂无采样上下文，已回退为平衡模式', 'warning');
+            this.showTemplateOperationResult(t('dialog.sampling.contextRequired'), 'warning');
             this.applyTemplate('balanced');
             return;
         }
@@ -1043,12 +1046,12 @@ export class ParameterAdjustmentPanel {
         this.setSelectValue('variogram-model', model);
         this.setSelectValue('kriging-method', method);
 
-        this.recordHistory('智能推荐', this.getParameters());
-        this.showTemplateOperationResult(`已按 ${pointCount} 个采样点完成智能推荐`, 'success');
+        this.recordHistory(t('dialog.parameter.intelligent.recommend'), this.getParameters());
+        this.showTemplateOperationResult(t('dialog.parameter.intelligent.recommend.success', { pointCount: pointCount}), 'success');
     }
 
     private saveCurrentAsTemplate(): void {
-        const name = window.prompt('请输入模板名称');
+        const name = window.prompt(t('dialog.parameter.template.nameRequired'));
         if (!name) {
             return;
         }
@@ -1059,7 +1062,7 @@ export class ParameterAdjustmentPanel {
         const template: TemplateConfig = {
             id,
             name,
-            description: '用户自定义模板',
+            description: t('template.config.userCustomize'),
             params: {
                 'grid-resolution': this.parameters.get('grid-resolution') ?? 100,
                 nlags: this.parameters.get('nlags') ?? 12,
@@ -1074,7 +1077,7 @@ export class ParameterAdjustmentPanel {
         this.customTemplates[id] = template;
         this.persistCustomTemplates();
         this.refreshTemplateSelector(id);
-        this.showTemplateOperationResult(`模板“${name}”已保存`, 'success');
+        this.showTemplateOperationResult(t('template.save.success', { name: name }), 'success');
     }
 
     private exportTemplates(): void {
@@ -1092,7 +1095,7 @@ export class ParameterAdjustmentPanel {
         anchor.click();
         document.body.removeChild(anchor);
         URL.revokeObjectURL(url);
-        this.showTemplateOperationResult('模板导出成功', 'success');
+        this.showTemplateOperationResult(t('template.export.success'), 'success');
     }
 
     private importTemplates(): void {
@@ -1119,10 +1122,10 @@ export class ParameterAdjustmentPanel {
 
                 this.persistCustomTemplates();
                 this.refreshTemplateSelector();
-                this.showTemplateOperationResult('模板导入成功', 'success');
+                this.showTemplateOperationResult(t('template.import.success'), 'success');
             } catch (error) {
-                console.error('导入模板失败:', error);
-                this.showTemplateOperationResult('模板导入失败，文件格式不正确', 'error');
+                console.error(t('template.import.failed'), error);
+                this.showTemplateOperationResult(t('template.import.failed.fileFormat-incorrect'), 'error');
             }
         });
 
@@ -1144,7 +1147,7 @@ export class ParameterAdjustmentPanel {
             return `<option value="${templateId}">${template.name}</option>`;
         });
 
-        options.push('<option value="custom">自定义模板</option>');
+        options.push(`<option value="custom">${t('template.config.customize')}</option>`);
         select.innerHTML = options.join('');
 
         const finalValue = templateIds.includes(preferred) ? preferred : 'balanced';

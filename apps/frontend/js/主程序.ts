@@ -1739,7 +1739,7 @@ class App {
         }
 
         if (samplingPoints.length < 3) {
-            this.showStatus(t('error.import.data.fewPoints', 'error');
+            this.showStatus(t('error.import.data.fewPoints'), 'error');
             return;
         }
 

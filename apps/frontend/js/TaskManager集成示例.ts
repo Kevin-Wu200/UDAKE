@@ -287,7 +287,7 @@ export async function monitorTask(
                 reject(new Error(task.error || t('template.monitor.error.failed')));
             } else if (task.status === 'cancelled') {
                 clearInterval(checkInterval);
-                reject(new Error(t('template.monitor.error.canceled'));
+                reject(new Error(t('template.monitor.error.canceled')));
             }
         }, 1000); // 每秒检查一次
     });
