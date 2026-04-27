@@ -9,6 +9,9 @@ import type {
     SpatialReference,
     PointWithValue
 } from '../../types/coordinate';
+import { I18n } from './I18n';
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 export class CoordinateTransformer {
     /**
@@ -49,7 +52,7 @@ export class CoordinateTransformer {
         const targetPoint = projection.project(sourcePoint, targetSR);
 
         if (!targetPoint) {
-            throw new Error('坐标转换失败');
+            throw new Error(t('coordinate.transform.error'));
         }
 
         return { x: targetPoint.x, y: targetPoint.y };
@@ -75,7 +78,7 @@ export class CoordinateTransformer {
             const targetPoint = projection.project(sourcePoint, targetSR);
 
             if (!targetPoint) {
-                throw new Error('坐标转换失败');
+                throw new Error(t('coordinate.transform.error'));
             }
 
             transformedPoints.push({ x: targetPoint.x, y: targetPoint.y, value: point.value });
