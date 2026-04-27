@@ -2,6 +2,9 @@
  * 数据对比功能
  * 支持两组数据集的差异计算、可视化和对比报告
  */
+import { I18n } from './I18n';
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 interface DataSet {
     name: string;
@@ -68,7 +71,7 @@ export class DataComparison {
     /** 生成对比报告 HTML */
     generateReport(field = 'value'): string {
         const result = this.compare(field);
-        if (!result || !this.datasetA || !this.datasetB) return '<p>无法生成对比报告</p>';
+        if (!result || !this.datasetA || !this.datasetB) return `<p>${t('datacomparison.report.error')}</p>`;
 
         const stats = result.fieldStats[field];
         const diffClass = stats.diff.meanDiff > 0 ? 'diff-positive' : stats.diff.meanDiff < 0 ? 'diff-negative' : 'diff-neutral';
@@ -78,46 +81,46 @@ export class DataComparison {
                 <table class="comparison-table">
                     <thead>
                         <tr>
-                            <th>指标</th>
+                            <th>${t('datacomparison.report.target')}</th>
                             <th>${this.datasetA.name}</th>
                             <th>${this.datasetB.name}</th>
-                            <th>差异</th>
+                            <th>${t('datacomparison.report.diff')}</th>
                         </tr>
                     </thead>
                     <tbody>
                         <tr>
-                            <td>点数</td>
+                            <td>${t('datacomparison.report.points')}</td>
                             <td>${this.datasetA.points.length}</td>
                             <td>${this.datasetB.points.length}</td>
                             <td>${this.datasetB.points.length - this.datasetA.points.length}</td>
                         </tr>
                         <tr>
-                            <td>最小值</td>
+                            <td>${t('datacomparison.report.min')}</td>
                             <td>${stats.datasetA.min.toFixed(4)}</td>
                             <td>${stats.datasetB.min.toFixed(4)}</td>
                             <td class="${diffClass}">${(stats.datasetB.min - stats.datasetA.min).toFixed(4)}</td>
                         </tr>
                         <tr>
-                            <td>最大值</td>
+                            <td>${t('datacomparison.report.max')}</td>
                             <td>${stats.datasetA.max.toFixed(4)}</td>
                             <td>${stats.datasetB.max.toFixed(4)}</td>
                             <td class="${diffClass}">${(stats.datasetB.max - stats.datasetA.max).toFixed(4)}</td>
                         </tr>
                         <tr>
-                            <td>均值</td>
+                            <td>${t('datacomparison.report.mean')}</td>
                             <td>${stats.datasetA.mean.toFixed(4)}</td>
                             <td>${stats.datasetB.mean.toFixed(4)}</td>
                             <td class="${diffClass}">${stats.diff.meanDiff.toFixed(4)} (${stats.diff.percentChange.toFixed(1)}%)</td>
                         </tr>
                         <tr>
-                            <td>标准差</td>
+                            <td>${t('datacomparison.report.std')}</td>
                             <td>${stats.datasetA.std.toFixed(4)}</td>
                             <td>${stats.datasetB.std.toFixed(4)}</td>
                             <td>${(stats.datasetB.std - stats.datasetA.std).toFixed(4)}</td>
                         </tr>
                         <tr>
-                            <td>匹配点</td>
-                            <td colspan="3">${result.matchedPoints} 个重合点</td>
+                            <td>${t('datacomparison.report.matchedPoints')}</td>
+                            <td colspan="3">${t('datacomparison.report.matchedPoints.detail', { count: result.matchedPoints })}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -130,26 +133,26 @@ export class DataComparison {
         const panel = document.createElement('div');
         panel.className = 'panel';
         panel.innerHTML = `
-            <h2 class="panel-title">数据对比</h2>
+            <h2 class="panel-title">${t('datacomparison.panel.title')}</h2>
             <div class="panel-content">
                 <p style="font-size:13px;color:var(--text-secondary);margin-bottom:12px;">
-                    选择两组数据集进行对比分析
+                    ${t('datacomparison.panel.description')}
                 </p>
                 <div style="display:flex;gap:8px;margin-bottom:12px;">
                     <div style="flex:1;">
-                        <label style="font-size:12px;color:var(--text-secondary);">数据集 A</label>
+                        <label style="font-size:12px;color:var(--text-secondary);">${t('datacomparison.panel.datasetA')}</label>
                         <select class="select" id="compare-dataset-a" style="width:100%;margin-top:4px;">
-                            <option value="">选择数据集</option>
+                            <option value="">${t('datacomparison.panel.selectDataset')}</option>
                         </select>
                     </div>
                     <div style="flex:1;">
-                        <label style="font-size:12px;color:var(--text-secondary);">数据集 B</label>
+                        <label style="font-size:12px;color:var(--text-secondary);">${t('datacomparison.panel.datasetB')}</label>
                         <select class="select" id="compare-dataset-b" style="width:100%;margin-top:4px;">
-                            <option value="">选择数据集</option>
+                            <option value="">${t('datacomparison.panel.selectDataset')}</option>
                         </select>
                     </div>
                 </div>
-                <button class="btn btn-primary" id="compare-btn" style="width:100%;height:36px;font-size:13px;" disabled>开始对比</button>
+                <button class="btn btn-primary" id="compare-btn" style="width:100%;height:36px;font-size:13px;" disabled>${t('datacomparison.panel.startBtn')}</button>
                 <div id="compare-result" style="margin-top:12px;max-height:300px;overflow-y:auto;"></div>
             </div>
         `;
