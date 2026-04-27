@@ -1,4 +1,7 @@
 import { AppExitHandler } from './AppExitHandler.js';
+import { I18n } from './I18n.js';
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 export class ExitHandler {
     public static async exitProgram(): Promise<void> {
@@ -13,6 +16,6 @@ export class ExitHandler {
             // 忽略浏览器阻止关闭的异常
         }
 
-        window.alert('当前环境不允许脚本直接关闭页面，请手动关闭此标签页。');
+        window.alert(t('error.exit.failed'));
     }
 }

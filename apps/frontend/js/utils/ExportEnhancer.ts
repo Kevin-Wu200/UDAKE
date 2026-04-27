@@ -2,6 +2,9 @@
  * 数据导出增强
  * PDF 报告生成、图表导出、批量导出
  */
+import { I18n } from "./I18n";
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 interface ExportOptions {
     format: 'geojson' | 'csv' | 'pdf';
@@ -57,14 +60,14 @@ export class ExportEnhancer {
     }): void {
         const { taskId, method, pointCount, gridResolution, stats, crossValidation } = reportData;
         const methodNames: Record<string, string> = {
-            ordinary: '普通克里金', universal: '泛克里金', block: '分块克里金'
+            ordinary: t('kriging.ordinary'), universal: t('kriging.universal'), block: t('kriging.block')
         };
 
         const html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>插值分析报告 - ${taskId}</title>
+    <title>${t('export.report.interpolation')} - ${taskId}</title>
     <style>
         body { font-family: -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 0 20px; color: #333; }
         h1 { border-bottom: 2px solid #007aff; padding-bottom: 10px; }
@@ -81,19 +84,19 @@ export class ExportEnhancer {
     </style>
 </head>
 <body>
-    <h1>插值分析报告</h1>
-    <p class="meta">任务ID: ${taskId} | 生成时间: ${new Date().toLocaleString('zh-CN')}</p>
+    <h1>${t('export.report.interpolation')}</h1>
+    <p class="meta">${t('export.report.interpolation.detail', { taskId: taskId, generatedTime: new Date().toLocaleString('zh-CN') })}</p>
 
-    <h2>参数配置</h2>
+    <h2>${t('export.report.parameter.config')}</h2>
     <table>
-        <tr><th>参数</th><th>值</th></tr>
-        <tr><td>克里金方法</td><td>${methodNames[method] || method}</td></tr>
-        <tr><td>采样点数量</td><td>${pointCount}</td></tr>
-        <tr><td>网格分辨率</td><td>${gridResolution}</td></tr>
+        <tr><th>${t('export.report.parameter.config.parameter')}</th><th>${t('export.report.parameter.config.value')}</th></tr>
+        <tr><td>${t('export.report.parameter.config.kriging')}</td><td>${methodNames[method] || method}</td></tr>
+        <tr><td>${t('export.report.parameter.config.samplingPoints')}</td><td>${pointCount}</td></tr>
+        <tr><td>${t('export.report.parameter.config.gridResolution')}</td><td>${gridResolution}</td></tr>
     </table>
 
     ${stats ? `
-    <h2>统计摘要</h2>
+    <h2>${t('export.report.stats')}</h2>
     <div class="stat-grid">
         ${Object.entries(stats).map(([k, v]) => `
             <div class="stat-card">
@@ -104,16 +107,16 @@ export class ExportEnhancer {
     </div>` : ''}
 
     ${crossValidation ? `
-    <h2>交叉验证</h2>
+    <h2>${t('export.report.crossValidation')}</h2>
     <table>
-        <tr><th>指标</th><th>值</th></tr>
+        <tr><th>${t('export.report.crossValidation.target')}</th><th>${t('export.report.crossValidation.value')}</th></tr>
         ${Object.entries(crossValidation).map(([k, v]) => `
             <tr><td>${k}</td><td>${typeof v === 'number' ? v.toFixed(6) : v}</td></tr>
         `).join('')}
     </table>` : ''}
 
     <p class="meta" style="margin-top:40px;text-align:center;">
-        UDAKE - 智能不确定性驱动空间决策平台
+        UDAKE - ${t('app.title')}
     </p>
 </body>
 </html>`;

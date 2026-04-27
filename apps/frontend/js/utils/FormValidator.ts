@@ -4,6 +4,9 @@
  */
 
 import type { FormValidationRules, FieldState } from '../../types/core';
+import { I18n } from "./I18n";
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 interface FieldEntry {
     input: HTMLInputElement;
@@ -77,7 +80,7 @@ export class FormValidator {
         }
 
         if (rules.pattern && !rules.pattern.test(value)) {
-            this._setState(field, 'error', rules.patternMsg || '格式不正确');
+            this._setState(field, 'error', rules.patternMsg || t('formvalidator.error.format'));
             return { valid: false };
         }
 
