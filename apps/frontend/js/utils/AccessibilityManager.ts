@@ -2,6 +2,9 @@
  * 无障碍管理器
  * 统一管理键盘、屏幕阅读器、视觉辅助、语音与手势增强
  */
+import { I18n } from './i18n';
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 type ColorBlindMode = 'none' | 'protanopia' | 'deuteranopia' | 'tritanopia' | 'grayscale';
 
@@ -78,7 +81,7 @@ export class AccessibilityManager {
         this.createToolbar();
         this.applyPreferences();
         this.bindCustomAnnouncementEvent();
-        this.announce('无障碍增强已启用。按 Alt + 1 可跳转主内容，按 Ctrl + / 查看快捷键。');
+        this.announce(t('accessibility.welcome'));
     }
 
     public refresh(): void {
@@ -154,20 +157,20 @@ export class AccessibilityManager {
         }
 
         const sidebar = document.querySelector('.sidebar');
-        sidebar?.setAttribute('aria-label', '主控制面板');
+        sidebar?.setAttribute('aria-label', t('accessibility.panel.main'));
 
         const rightSidebar = document.getElementById('right-sidebar');
-        rightSidebar?.setAttribute('aria-label', '推荐与辅助面板');
+        rightSidebar?.setAttribute('aria-label', t('accessibility.panel.recommend'));
 
         const mapContainer = document.querySelector('.map-container');
         mapContainer?.setAttribute('role', 'region');
-        mapContainer?.setAttribute('aria-label', '地图展示区域');
+        mapContainer?.setAttribute('aria-label', t('accessibility.panel.mapShow'));
 
         const mapView = document.getElementById('viewDiv');
         if (mapView) {
             mapView.setAttribute('tabindex', '0');
             mapView.setAttribute('role', 'application');
-            mapView.setAttribute('aria-label', '空间地图视图');
+            mapView.setAttribute('aria-label', t('accessibility.panel.mapSpatial'));
             mapView.setAttribute('aria-keyshortcuts', 'ArrowUp ArrowDown ArrowLeft ArrowRight + -');
         }
 
@@ -244,7 +247,7 @@ export class AccessibilityManager {
                 const labelHtml = labelSpan
                     ? labelSpan.outerHTML
                     : (toggle.textContent || '').replace(/[▾▸]/g, '').trim();
-                toggle.innerHTML = `${labelHtml || '面板'} ${isOpen ? '▸' : '▾'}`;
+                toggle.innerHTML = `${labelHtml || t('accessibility.panel.name')} ${isOpen ? '▸' : '▾'}`;
             });
         });
     }
@@ -268,7 +271,7 @@ export class AccessibilityManager {
                 return;
             }
             lastText = text;
-            const isError = target.classList.contains('error') || text.includes('失败') || text.includes('错误');
+            const isError = target.classList.contains('error') || text.includes(t('common.failed')) || text.includes(t('common.error'));
             this.announce(text, isError ? 'assertive' : 'polite');
         });
 
@@ -354,21 +357,21 @@ export class AccessibilityManager {
                 const main = document.getElementById('main-content');
                 if (main instanceof HTMLElement) {
                     main.focus();
-                    this.announce('已跳转到主内容区域');
+                    this.announce(t('accessibility.jump.main.success'));
                 }
             } else if (event.key === '2') {
                 event.preventDefault();
                 const map = document.getElementById('viewDiv');
                 if (map instanceof HTMLElement) {
                     map.focus();
-                    this.announce('已跳转到地图区域');
+                    this.announce(t('accessibility.jump.map.success'));
                 }
             } else if (event.key === '3') {
                 event.preventDefault();
                 const sidebarToggle = document.getElementById('sidebar-toggle');
                 if (sidebarToggle instanceof HTMLElement) {
                     sidebarToggle.focus();
-                    this.announce('已跳转到右侧面板切换按钮');
+                    this.announce(t('accessibility.jump.right-panel.switch-btn.success'));
                 }
             }
         });
@@ -429,13 +432,13 @@ export class AccessibilityManager {
                 sidebar.classList.add('mobile-open');
                 overlay?.classList.add('visible');
                 overlay?.setAttribute('aria-hidden', 'false');
-                this.announce('手势已打开侧边栏');
+                this.announce(t('accessibility.mobile-open.sidebar.success'));
             } else {
                 sidebar.classList.remove('active');
                 sidebar.classList.remove('mobile-open');
                 overlay?.classList.remove('visible');
                 overlay?.setAttribute('aria-hidden', 'true');
-                this.announce('手势已关闭侧边栏');
+                this.announce(t('accessibility.mobile-close.sidebar.success'));
             }
         }, { passive: true });
     }
@@ -474,7 +477,7 @@ export class AccessibilityManager {
         }
 
         const placeholder = control.getAttribute('placeholder');
-        return placeholder?.trim() || '输入控件';
+        return placeholder?.trim() || t('accessibility.inputControl');
     }
 
     private enhanceChartAccessibility(): void {
@@ -488,8 +491,8 @@ export class AccessibilityManager {
             }
             if (!node.getAttribute('aria-label')) {
                 const titleNode = node.closest('.panel')?.querySelector('.panel-title, h2, h3');
-                const titleText = titleNode?.textContent?.trim() || `图表 ${index + 1}`;
-                node.setAttribute('aria-label', `${titleText}，可通过表单参数调整`);
+                const titleText = titleNode?.textContent?.trim() || t('accessibility.titleText', { index: index + 1 });
+                node.setAttribute('aria-label', t('accessibility.setAttribute', { titleText: titleText}));
             }
         });
     }
@@ -508,8 +511,8 @@ export class AccessibilityManager {
         trigger.id = 'a11y-toolbar-trigger';
         trigger.className = 'btn a11y-toolbar-trigger';
         trigger.type = 'button';
-        trigger.textContent = '无障碍';
-        trigger.setAttribute('aria-label', '打开无障碍设置');
+        trigger.textContent = t('accessibility.name');
+        trigger.setAttribute('aria-label', t('accessibility.open-settings'));
         trigger.setAttribute('aria-expanded', 'false');
         trigger.setAttribute('aria-controls', 'a11y-toolbar');
         headerRight.appendChild(trigger);
@@ -520,51 +523,51 @@ export class AccessibilityManager {
         panel.hidden = true;
         panel.setAttribute('role', 'dialog');
         panel.setAttribute('aria-modal', 'false');
-        panel.setAttribute('aria-label', '无障碍设置面板');
+        panel.setAttribute('aria-label', t('accessibility.settings-panel.title'));
         panel.innerHTML = `
-            <h3 class="a11y-toolbar-title">无障碍设置</h3>
+            <h3 class="a11y-toolbar-title">${t('accessibility.settings')}</h3>
             <div class="a11y-toolbar-group">
                 <div class="a11y-toolbar-item">
-                    <label for="a11y-high-contrast">高对比度模式</label>
+                    <label for="a11y-high-contrast">${t('accessibility.high-constract')}</label>
                     <input id="a11y-high-contrast" type="checkbox">
                 </div>
                 <div class="a11y-toolbar-item">
-                    <label for="a11y-dark-optimize">暗色模式优化</label>
+                    <label for="a11y-dark-optimize">${t('accessibility.dark-optimize')}</label>
                     <input id="a11y-dark-optimize" type="checkbox">
                 </div>
                 <div class="a11y-toolbar-item">
-                    <label for="a11y-reduce-motion">减少动画</label>
+                    <label for="a11y-reduce-motion">${t('accessibility.reduce-motion')}</label>
                     <input id="a11y-reduce-motion" type="checkbox">
                 </div>
                 <div class="a11y-toolbar-item">
-                    <label for="a11y-font-scale">字体缩放</label>
+                    <label for="a11y-font-scale">${t('accessibility.font-scale')}</label>
                     <input id="a11y-font-scale" type="range" min="0.9" max="1.4" step="0.1">
                 </div>
                 <div class="a11y-toolbar-hint" id="a11y-font-scale-value">100%</div>
             </div>
             <div class="a11y-toolbar-group">
-                <label for="a11y-color-blind">色盲模式</label>
+                <label for="a11y-color-blind">${t('accessibility.color-blind')}</label>
                 <select id="a11y-color-blind" class="a11y-toolbar-select">
-                    <option value="none">关闭</option>
-                    <option value="protanopia">红色弱化</option>
-                    <option value="deuteranopia">绿色弱化</option>
-                    <option value="tritanopia">蓝色弱化</option>
-                    <option value="grayscale">灰度模式</option>
+                    <option value="none">${t('accessibility.color-blind.none')}</option>
+                    <option value="protanopia">${t('accessibility.color-blind.protanopia')}</option>
+                    <option value="deuteranopia">${t('accessibility.color-blind.deuteranopia')}</option>
+                    <option value="tritanopia">${t('accessibility.color-blind.tritanopia')}</option>
+                    <option value="grayscale">${t('accessibility.color-blind.grayscale')}</option>
                 </select>
             </div>
             <div class="a11y-toolbar-group">
                 <div class="a11y-toolbar-item">
-                    <label for="a11y-voice-control">语音控制（Web Speech API）</label>
+                    <label for="a11y-voice-control">${t('accessibility.voice-control')}</label>
                     <input id="a11y-voice-control" type="checkbox">
                 </div>
                 <div class="a11y-toolbar-item">
-                    <label for="a11y-smart-assist">智能辅助提示</label>
+                    <label for="a11y-smart-assist">${t('accessibility.smart-assist')}</label>
                     <input id="a11y-smart-assist" type="checkbox">
                 </div>
-                <button class="a11y-toolbar-button" id="a11y-shortcuts-help" type="button">查看键盘快捷键</button>
+                <button class="a11y-toolbar-button" id="a11y-shortcuts-help" type="button">${t('accessibility.shortcuts-help')}</button>
             </div>
-            <p class="a11y-toolbar-hint">语音命令示例：新建项目、上传数据、开始插值、打开设置、切换主题。</p>
-            <p class="a11y-toolbar-hint">快捷跳转：Alt+1 主内容，Alt+2 地图，Alt+3 侧边栏。</p>
+            <p class="a11y-toolbar-hint">${t('accessibility.voice-control.template')}</p>
+            <p class="a11y-toolbar-hint">${t('accessibility.shortcuts-jump.template')}</p>
         `;
         document.body.appendChild(panel);
 
@@ -777,7 +780,7 @@ export class AccessibilityManager {
             this.preferences.voiceControlEnabled = false;
             this.savePreferences();
             this.syncToolbarFromPreferences();
-            this.announce('当前浏览器不支持语音识别', 'assertive');
+            this.announce(t('accessibility.voice-control.invalid'), 'assertive');
             return;
         }
 
@@ -785,7 +788,8 @@ export class AccessibilityManager {
             this.speechRecognition = new SpeechRecognitionCtor();
             this.speechRecognition.continuous = true;
             this.speechRecognition.interimResults = false;
-            this.speechRecognition.lang = document.documentElement.lang || 'zh-CN';
+            this.speechRecognition.lang = document.documentElement.lang || 'zh-CN' || 'en-US' || 'ja-JP' || 'ko-KR' || 'zh-TW';
+            this.speechRecognition.maxAlternatives = 1
 
             this.speechRecognition.onresult = (event: any) => {
                 const result = event.results?.[event.results.length - 1]?.[0]?.transcript;
@@ -812,7 +816,7 @@ export class AccessibilityManager {
             try {
                 this.speechRecognition.start();
                 this.isVoiceRunning = true;
-                this.announce('语音控制已开启');
+                this.announce(t('accessibility.voice-control.start'));
             } catch {
                 this.isVoiceRunning = false;
             }
@@ -841,79 +845,79 @@ export class AccessibilityManager {
             return true;
         };
 
-        if (normalized.includes('新建项目')) {
+        if (normalized.includes(t('accessibility.newProject.title'))) {
             executeClick('new-project-btn');
-            this.announce('已执行新建项目');
+            this.announce(t('accessibility.newProject.success'));
             return;
         }
 
-        if (normalized.includes('上传数据') || normalized.includes('上传文件')) {
+        if (normalized.includes(t('accessibility.submit.data.title')) || normalized.includes(t('accessibility.submit.file.title'))) {
             executeClick('upload-btn');
-            this.announce('已执行上传数据');
+            this.announce(t('accessibility.submit.data.success'));
             return;
         }
 
-        if (normalized.includes('开始插值') || normalized.includes('开始计算')) {
+        if (normalized.includes(t('accessibility.interpolation.start.title')) || normalized.includes(t('accessibility.calculate.start.title'))) {
             const ok = executeClick('start-kriging-btn');
-            this.announce(ok ? '已开始插值' : '当前条件不足，无法开始插值', ok ? 'polite' : 'assertive');
+            this.announce(ok ? t('accessibility.interpolation.start.success') : t('accessibility.interpolation.start.failed'), ok ? 'polite' : 'assertive');
             return;
         }
 
-        if (normalized.includes('打开设置') || normalized === '设置') {
+        if (normalized.includes(t('accessibility.settings.open.title')) || normalized === t('accessibility.settings.title')) {
             executeClick('settings-btn');
-            this.announce('已打开设置');
+            this.announce(t('accessibility.settings.open.success'));
             return;
         }
 
-        if (normalized.includes('切换主题')) {
+        if (normalized.includes(t('accessibility.theme-toggle.title'))) {
             executeClick('theme-toggle-btn');
-            this.announce('已切换主题');
+            this.announce(t('accessibility.theme-toggle.success'));
             return;
         }
 
-        if (normalized.includes('快捷键')) {
+        if (normalized.includes(t('accessibility.shortcuts.panel.title'))) {
             if (this.options.onShowShortcutHelp) {
                 this.options.onShowShortcutHelp();
             } else {
                 document.dispatchEvent(new KeyboardEvent('keydown', { key: '/', ctrlKey: true, bubbles: true }));
             }
-            this.announce('已打开快捷键面板');
+            this.announce(t('accessibility.shortcuts.panel.open.success'));
             return;
         }
 
-        if (normalized.includes('高对比')) {
-            this.preferences.highContrast = !normalized.includes('关闭');
+        if (normalized.includes(t('accessibility.high-constract.title'))) {
+            this.preferences.highContrast = !normalized.includes(t('common.close'));
             this.savePreferences();
             this.applyPreferences();
-            this.announce(this.preferences.highContrast ? '高对比度模式已开启' : '高对比度模式已关闭');
+            this.announce(this.preferences.highContrast ? t('accessibility.high-constract.open') : t('accessibility.high-constract.close'));
             return;
         }
 
-        if (normalized.includes('放大字体')) {
+        if (normalized.includes(t('accessibility.fontScale.larger.title'))) {
             this.preferences.fontScale = Math.min(1.4, this.preferences.fontScale + 0.1);
             this.savePreferences();
             this.applyPreferences();
-            this.announce(`字体已调整为 ${Math.round(this.preferences.fontScale * 100)}%`);
+            this.announce(t('accessibility.fontScale.change.success', { fontScale: Math.round(this.preferences.fontScale * 100) }));
             return;
         }
 
-        if (normalized.includes('缩小字体')) {
+        if (normalized.includes(t('accessibility.fontScale.smaller.title'))) {
             this.preferences.fontScale = Math.max(0.9, this.preferences.fontScale - 0.1);
             this.savePreferences();
             this.applyPreferences();
-            this.announce(`字体已调整为 ${Math.round(this.preferences.fontScale * 100)}%`);
+            this.announce(t('accessibility.fontScale.change.success', { fontScale: Math.round(this.preferences.fontScale * 100) }));
             return;
         }
 
-        if (normalized.includes('关闭语音') || normalized.includes('停止语音')) {
+        if (normalized.includes(t('accessibility.voice-control.close.title')) || normalized.includes(t('accessibility.voice-control.stop.title'))) {
             this.preferences.voiceControlEnabled = false;
             this.savePreferences();
             this.applyPreferences();
-            this.announce('语音控制已关闭');
+            this.announce(t('accessibility.voice-control.close.success'));
             return;
         }
 
-        this.announce(`未识别语音命令：${transcript}`);
+        this.announce(t('accessibility.voice-control.invalid-command', { transcript: transcript }));
     }
 
     private toggleSmartAssist(enabled: boolean): void {
@@ -935,17 +939,17 @@ export class AccessibilityManager {
             const projectPanel = document.getElementById('project-panel');
 
             if (startButton?.disabled) {
-                this.announce('提示：可先上传数据或添加至少 3 个采样点后开始插值。');
+                this.announce(t('accessibility.prompt.upload-data'));
                 return;
             }
 
             if (uploadStatus?.classList.contains('error')) {
-                this.announce('提示：上传出现错误，可检查文件格式是否为 GeoJSON。', 'assertive');
+                this.announce(t('accessibility.prompt.upload-failed'), 'assertive');
                 return;
             }
 
             if (projectPanel?.style.display === 'none') {
-                this.announce('提示：可按 Ctrl + N 快速新建项目。');
+                this.announce(t('accessibility.prompt.newProject'));
             }
         };
 
