@@ -27,7 +27,7 @@
   },
   "android": {
     "buildOptions": {
-      "keystorePath": ".android_keystore/UDAKE.jks",
+      "keystorePath": "android_keystore/.android_keystore/UDAKE.jks",
       "keystoreAlias": "UDAKE",
       "keystoreAliasPassword": "",
       "keystorePassword": ""

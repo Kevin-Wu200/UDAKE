@@ -10,6 +10,7 @@ Thumbs.db
 # Dependencies and local caches
 node_modules/
 venv/
+guming/
 .pytest_cache/
 coverage/
 htmlcov/
@@ -75,3 +76,4 @@ deep_learning/fusion/repository/
 release/
 android/app/build/outputs/
 apps/frontend/dist/
+apps/admin-frontend/dist/

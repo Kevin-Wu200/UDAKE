@@ -1,0 +1,1254 @@
+--------- beginning of (HKS)5DB23361683C5F016FAADF92BAF9C7C7BDA8F8C1A38E4F33B48B463B213CEF95C2DE1B810039C72C5257283C67B0BBC8EF38E71EAD73A22A6C17820021E65B36188DEF74613A2CCB08B950C63203D77A78C18A72424ABEEC6AF3F21D33E5B8A97B6B4E5D668A1F1CD283FDBB307F4566C819AEDF4C8C36E4E0BDF65ECDB869EA24FA966AF935CEE616AFC2B8E6AF3C5FE21672360C5930FAB3764343DFAB6937B9975F289121B2FC559D81DEA6F84D57A33C04A70F29E1B2CDEE71F4D6EFD92009BAD179E6ED0D3B7D52E3A7C73F3AEF1970F74F0E4DA894F6FC0FEE36E14A3D7BA33B2E9E6576CF0B84A663671BC2BAAD60E2BE97002AE9E10F6F840E05D45F(HKE)
+--------- beginning of main
+04-17 16:26:08.975  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:08.975  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:08.975  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:08.975  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:08.975  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:08.986  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:08.986  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:08.986  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:08.986  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:08.986  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:08.994  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24826593548512, lux = 48, cct=30880, aod=17608
+04-17 16:26:09.009  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.009  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.009  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.009  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.010  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.020  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.020  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.020  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.020  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.020  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.043  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.044  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.044  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.044  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.044  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+--------- beginning of system
+04-17 16:26:09.050  2720  2760 I PowerManagerService: wakeLock.mDisabled:false, mDeviceIdleMode:false, mProcState:0
+04-17 16:26:09.051  2720  2760 I PowerManagerService: need acquire WakeLockSuspendBlocker
+04-17 16:26:09.051  2720  2760 I PowerManagerService: Acquiring suspend blocker "PowerManagerService.WakeLocks".
+04-17 16:26:09.051  1362  1365 I android.system.suspend-service: incSuspendCounter++ success,name:PowerManagerService.WakeLocks mUseSuspendCounter:1 mSuspendCounter:2: Success
+04-17 16:26:09.052  2720  2760 I power   : acquire wakelock: PowerManagerService.WakeLocks
+04-17 16:26:09.054  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.054  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.055  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.055  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.055  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.055  6983  7180 V MSF.C.MSFCore[@PS]: [Event] MSFPacketStatistics.cpp(300)::DoCheckRequestTimeout->current rtts:98.142
+04-17 16:26:09.058  2720  3350 I WifiNl80211Manager: Noise: -96, Snr: 52, Chload: 126, rssi: -44, txBitrate: 960, rxBitrate: 1080, frequency: 5745, UlDelay: 2, currentTxBytes: 20187059, currentTxPackets: 126194, currentTxFailed: 0, currentRxBytes: 252786833, currentRxPackets: 221782
+04-17 16:26:09.059  2720  3350 D WifiEnhanceUtils: isGmsBuildin is true
+04-17 16:26:09.059  2720  3350 D WifiEnhanceUtils: nowParts is [6, 1]
+04-17 16:26:09.059  2720  3350 D WifiClientModeImpl: noise -96 snr 52 chload 126 ulDelay 2
+04-17 16:26:09.059  2720  3350 D WifiClientModeImpl: smoothTxLinkSpeed 960 signalPoolTxSpeed 960 mloTxSpeed 0
+04-17 16:26:09.060  2720  3350 I WifiClientModeImpl: updateLinkLayerStatsRssiSpeedFrequencyCapabilities, update rssi is -44
+04-17 16:26:09.061  2720  3350 I WifiMetrics: handlePollResult, update rssi is:-44
+04-17 16:26:09.064  3502  3502 I HnWifiViewBinder: wifiInOutState:3
+04-17 16:26:09.065  3502  3502 I HnIconDrawableUtils: setEveryLayerColor: color from TypedArray = -1
+04-17 16:26:09.065  3502  3502 I HnIconDrawableUtils: setEveryLayerColor: color from TypedArray = -8421505
+04-17 16:26:09.065  3502  3502 I HnIconDrawableUtils: setEveryLayerColor: color from TypedArray = -11711155
+04-17 16:26:09.068  2720  2760 I PowerManagerService: need release WakeLockSuspendBlocker
+04-17 16:26:09.069  2720  2760 I PowerManagerService: Releasing suspend blocker "PowerManagerService.WakeLocks".
+04-17 16:26:09.069  2720  2760 I power   : release wakelock: PowerManagerService.WakeLocks
+04-17 16:26:09.069  1362  3935 I android.system.suspend-service: decSuspendCounter-- success,name:PowerManagerService.WakeLocks mUseSuspendCounter:1 mSuspendCounter:3: Success
+04-17 16:26:09.076  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.076  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.076  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.076  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.076  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.087  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.087  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.087 14040 16054 V AudioManager: isMusicActive...
+04-17 16:26:09.087  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.087  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.087  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.087  1953  3528 W AudioPolicyService:  [1000] is the service
+04-17 16:26:09.097  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.098  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.098  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.098  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.098  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.101  3995 28593 W HSM_BG  : TrafficNotifyDelegate:Current data imsi is null, so return.
+04-17 16:26:09.108  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.108  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.108  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.108  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.108  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.119  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.119  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.119  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.119  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.119  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.142  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.142  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.142  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.142  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.142  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.153  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.153  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.153  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.153  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.153  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.158  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24826759545960, lux = 48, cct=30880, aod=17608
+04-17 16:26:09.170 28595 28595 I cmd     : Is commercial user: 1
+04-17 16:26:09.175  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.175  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.176  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.176  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.176  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.176  2720  2760 I HwStartWindowRecord: windowModeChange is ing pkg: com.android.shell
+04-17 16:26:09.178  2720  2760 I ActivityTaskManager: START u0 {flg=0x10000000 xflg=0x5 cmp=com.udake.app/.MainActivity} with LAUNCH_SINGLE_TASK from uid 2000
+04-17 16:26:09.178  2315  3147 D PipelineWatcher: onInputBufferReleased: frameIndex not found (219632); ignored
+04-17 16:26:09.180  2720  2760 W ActivityTaskManager: callingPackage for (uid=2000, pid=28595) has no WPC
+04-17 16:26:09.180  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 0
+04-17 16:26:09.180  2720  2760 E ProcessInfoCollector: getProcessInfo: failed to find this proc: 28595
+04-17 16:26:09.181  2720  2760 I ActivityTaskManager: TaskLauncParamsModifier activity is null
+04-17 16:26:09.181  2720  2760 D ActivityTaskManager: TaskLaunchParamsModifier:task=null activity=null display-area-from-current-params=null display-area-from-default-fallback=DefaultTaskDisplayArea@33354765 display-id=0 task-display-area-windowing-mode=1 suggested-display-area=DefaultTaskDisplayArea@33354765
+04-17 16:26:09.181  2720  2760 I PackageManager: generatePackageInfo error, user not exists:128
+04-17 16:26:09.181  3762  4252 E TransportLayerUtils: performQueryWithTimeout exception = java.util.concurrent.ExecutionException: java.lang.ArrayIndexOutOfBoundsException: length=0; index=0, caller = getLinkLayerVersion, timeout = 1, EXECUTOR  = java.util.concurrent.ThreadPoolExecutor@6d9df10[Running, pool size = 1, active threads = 0, queued tasks = 0, completed tasks = 6134]
+04-17 16:26:09.182  3762  4252 D Booster_OllieChrManager: sendDataToChrApk msdId: 30
+04-17 16:26:09.182  3762  4252 I Booster_OllieChrManager: ChrService is null
+04-17 16:26:09.182  1866  1984 D vendor.honor.hardware.aoservice-service: [AO_SVC] (reopen_timer_handler:52):enter reopen handler
+04-17 16:26:09.182  2367  2397 E AwareLog: iolimit: pid[4212] cgroup 1:blkio:/background could iolimit.
+04-17 16:26:09.182  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 0
+04-17 16:26:09.183  2720  2760 D HwGameAssistantController: isGameForeground? false
+04-17 16:26:09.183  2720  2760 I ActivityTaskManager: ActivityRecord info: ActivityInfo{90a0e0 com.udake.app.MainActivity}
+04-17 16:26:09.183  2720  2760 V GrammaticalInflectionUtils: AttributionSource: android.content.AttributionSource@a057832b does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+04-17 16:26:09.183  2367  2397 E AwareLog: iolimit: pid[4662] cgroup 1:blkio:/background could iolimit.
+04-17 16:26:09.184  2720  2760 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_RESIZEABLE_ACTIVITY_OVERRIDES
+04-17 16:26:09.184  2720  2760 D ActivityTaskManager: setEnterOrExitFullScreenVideo isEnterOrExitFullScreenVideo = false
+04-17 16:26:09.184  2720  2760 W OptProp : Cannot read opt property android.window.PROPERTY_COMPAT_ALLOW_MIN_ASPECT_RATIO_OVERRIDE
+04-17 16:26:09.184  2367  2397 E AwareLog: iolimit: pid[13237] cgroup 1:blkio:/background could iolimit.
+04-17 16:26:09.184  2367  2397 E AwareLog: iolimit: pid[13686] cgroup 1:blkio:/background could iolimit.
+04-17 16:26:09.184  2720  2760 I HwActivityStarterEx: createTransition isInHnDesktopMode, use HN_TRANSIT_OPEN_IN_DESKTOPMODE
+04-17 16:26:09.185  2367  2397 E AwareLog: iolimit: pid[16308] cgroup 1:blkio:/background could iolimit.
+04-17 16:26:09.185  2720  2760 I TransitionController: first create transition: TransitionRecord{ca663f id=-1 type=FIRST_CUSTOM+1011 flags=0x0}, caller: com.android.server.wm.ActivityStarter.executeRequest:2018 com.android.server.wm.HwActivityStarter.executeRequest:370 com.android.server.wm.ActivityStarter.execute:1137 com.android.server.wm.HwActivityStarter.execute:745 com.android.server.wm.ActivityTaskManagerService.startActivityAsUser:1622 
+04-17 16:26:09.185  2720  2760 I HwActivityStarterEx: setLaunchStartSourceFromIfNeed start_source_from empty
+04-17 16:26:09.185  3683  3699 I PGServer: android calls fast HApps
+04-17 16:26:09.185  3683  3699 I AppFastHibernation: fast H duration: 1000 reason: start activity
+04-17 16:26:09.185  3683  3699 I AppFastHibernation: call fast hibernation app: 
+04-17 16:26:09.185  3683  3699 I AppFastHibernation: AppInfo{u10030 com.hihonor.contacts p[4212]}
+04-17 16:26:09.185  3683  3699 I AppFastHibernation: AppInfo{u10192 com.hihonor.health p[10002]}
+04-17 16:26:09.185  3683  3699 I AppFastHibernation: AppInfo{u10061 com.hihonor.servicecenter p[27233]}
+04-17 16:26:09.185  3683  3699 I AppFastHibernation: AppInfo{u10210 com.tencent.mm p[15260, 14040, 15728]}
+04-17 16:26:09.185  3683  3699 I AppFastHibernation: AppInfo{u10211 com.tencent.mobileqq p[7043, 6983]}
+04-17 16:26:09.185  2367  2397 E AwareLog: iolimit: pid[16658] cgroup 1:blkio:/background could iolimit.
+04-17 16:26:09.185  2720  2760 I HWMW_HwMagicActivityStarter: ### Execute overrideIntentFlagForHwMagicWin focus ActivityRecord{70518194 u0 com.udake.app/.MainActivity t360}, next: ActivityRecord{198766489 u0 com.udake.app/.MainActivity, options: null
+04-17 16:26:09.185  2720  2760 I HWMW_HwMagicWinAmsPolicy: overrideIntentFlagForHwMagicWin result: Bundle[{RESULT_IS_DRAG_TO_FULL_AND_START_RELATE_ACTIVITY=false}]
+04-17 16:26:09.185  2720  2760 D ActivityTaskManager: TaskLaunchParamsModifier:task=null activity=ActivityRecord{198766489 u0 com.udake.app/.MainActivity t-1} display-area-from-current-params=null display-area-for-record=DefaultTaskDisplayArea@33354765 display-id=0 task-display-area-windowing-mode=1 suggested-display-area=DefaultTaskDisplayArea@33354765
+04-17 16:26:09.186  2367  2397 E AwareLog: iolimit: pid[20072] cgroup 1:blkio:/background could iolimit.
+04-17 16:26:09.186  2720  2760 I ActivityStarter: shouldShowFreeformWindow realCallingPackage = isRes= true rotation= 1 orientation = -1 isPortarait = false sourceRecord = null isMagicWin = false isForceRotation = false r.packageName = com.udake.app isAE= false sourceLaunchedFromPackage=  isInBlackList= false isInPartialSplitScreen= false r.info = ActivityInfo{90a0e0 com.udake.app.MainActivity}
+04-17 16:26:09.186  3683  4374 I AppFastHibernation: fast hibernate app: 
+04-17 16:26:09.186  3683  4374 I AppFastHibernation: AppInfo{u10030 com.hihonor.contacts p[4212]}
+04-17 16:26:09.186  3683  4374 I AppFastHibernation: AppInfo{u10192 com.hihonor.health p[10002]}
+04-17 16:26:09.186  3683  4374 I AppFastHibernation: AppInfo{u10061 com.hihonor.servicecenter p[27233]}
+04-17 16:26:09.186  3683  4374 I AppFastHibernation: AppInfo{u10210 com.tencent.mm p[15260, 14040, 15728]}
+04-17 16:26:09.186  2720  2760 I HWMW_HwMagicWinAmsPolicy: ### Execute -> resizeSplitStackBeforeResume pkgName com.udake.app, resumeActivity: ActivityRecord{70518194 u0 com.udake.app/.MainActivity t360}
+04-17 16:26:09.186  3683  4374 I AppFastHibernation: AppInfo{u10211 com.tencent.mobileqq p[7043, 6983]}
+04-17 16:26:09.186  2720  2760 E HWMW_HwMagicWinSplitManager: getMainActivityStack return, stackId is null
+04-17 16:26:09.186  2720  2760 W HWMW_HwMagicWinSplitManager: resizeSplitStackBeforeResume return, mainStack: null, resumeStack: Task{a9c025f #360 type=standard A=10257:com.udake.app}
+04-17 16:26:09.186  3683  4374 I AppFastHibernation: fast F_Z uid=10030 pkg=com.hihonor.contacts pids=[4212]
+04-17 16:26:09.186  2720  2760 I HwPCUtils#HwActivityStarterEx: not car cast mode, no need to start activity abort, is cast mode,preferredDisplayId:0
+04-17 16:26:09.186  3683  4374 I AppFastHibernation: fast F_Z uid=10192 pkg=com.hihonor.health pids=[10002]
+04-17 16:26:09.186  3683  4374 I AppFastHibernation: fast F_Z uid=10061 pkg=com.hihonor.servicecenter pids=[27233]
+04-17 16:26:09.186  3683  4374 I AppFastHibernation: fast F_Z uid=10210 pkg=com.tencent.mm pids=[15260, 14040, 15728]
+04-17 16:26:09.186  3683  4374 I AppFastHibernation: fast F_Z uid=10211 pkg=com.tencent.mobileqq pids=[7043, 6983]
+04-17 16:26:09.186  2720  2760 D ActivityTaskManager: TaskLaunchParamsModifier:task=Task{a9c025f #360 type=standard A=10257:com.udake.app} activity=ActivityRecord{198766489 u0 com.udake.app/.MainActivity t-1} display-from-task=0 display-id=0 task-display-area-windowing-mode=1 suggested-display-area=DefaultTaskDisplayArea@33354765 inherit-from-task=freeform non-freeform-task-display-area display-area=DefaultTaskDisplayArea@33354765
+04-17 16:26:09.186  2367  5667 I Pged-IPgedBinderService: ****action is 1, pid num is 9***
+04-17 16:26:09.186  2367  2397 E AwareLog: iolimit: pid[23551] cgroup 1:blkio:/background could iolimit.
+04-17 16:26:09.186  2367  5667 I Pged-Freezer: freezePids
+04-17 16:26:09.186  2720  2760 I HwActivityTaskManagerServiceEx: isAppIsImportingData AMS return -> isCloningAppCloning=false
+04-17 16:26:09.187  2720  2760 D ActivityTaskManager: TaskLaunchParamsModifier:task=Task{a9c025f #360 type=standard A=10257:com.udake.app} activity=ActivityRecord{198766489 u0 com.udake.app/.MainActivity t360} display-from-task=0 display-id=0 task-display-area-windowing-mode=1 suggested-display-area=DefaultTaskDisplayArea@33354765 inherit-from-task=freeform non-freeform-task-display-area display-area=DefaultTaskDisplayArea@33354765
+04-17 16:26:09.187  2367  2397 E AwareLog: iolimit: pid[30162] cgroup 1:blkio:/top-app couldn't iolimit.
+04-17 16:26:09.187  2367  5667 I Pged-CGroup: attach pid ok, pid: 4212, path: Group_1652548376
+04-17 16:26:09.187  2367  2397 D AwareLog: iawared: set /proc/3683/task/4374/static_vip vip
+04-17 16:26:09.188  2720  2760 D HnDesktopTaskManagerEx: moveToFrontEx: reason=intentActivityFound, task=Task{a9c025f #360 type=standard A=10257:com.udake.app}, windowMode=5
+04-17 16:26:09.188  3762  4252 E TransportLayerUtils: performQueryWithTimeout exception = java.util.concurrent.ExecutionException: java.lang.ArrayIndexOutOfBoundsException: length=0; index=0, caller = getLinkLayerVersion, timeout = 1, EXECUTOR  = java.util.concurrent.ThreadPoolExecutor@6d9df10[Running, pool size = 1, active threads = 0, queued tasks = 0, completed tasks = 6135]
+04-17 16:26:09.188  3762  4252 D Booster_OllieChrManager: sendDataToChrApk msdId: 30
+04-17 16:26:09.188  3762  4252 I Booster_OllieChrManager: ChrService is null
+04-17 16:26:09.188  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 1
+04-17 16:26:09.188  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 1
+04-17 16:26:09.189  2367  5667 I Pged-CGroup: attach pid ok, pid: 10002, path: Group_3710102780
+04-17 16:26:09.189  3762  4253 D Advanced_Booster_Qoe: channel Index:6
+04-17 16:26:09.189  2720  2760 I HwTaskEx: setIsTaskStartFromFloatballRecentForDesktop mStack: Task{a9c025f #360 type=standard A=10257:com.udake.app} isTaskStartFromFloatballRecentForDesktop:false
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, alpha is: 0.500000.
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, smoothed data, chload: 63, rssi: -43, phyRxRate: 10806 100kbps, phyTxRate: 9606 100kbps.
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 1, rateInTable: 673.601990 Mbps, calculated result: 6311.650391 100kbps.
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 0, rateInTable: 634.069946 Mbps, calculated result: 5941.235352 100kbps.
+04-17 16:26:09.189  3762  4253 I Advanced_Booster_Qoe: AdaBoostPredict,index:6,NisPsSlow:0,NProba:306,rsrp(rssi):-44,rsrq(noise):-96,rtt(chload):126,buffhigh(uldelay):2,buffcomm(rtt):0
+04-17 16:26:09.189  3762  4253 D Advanced_Booster_Qoe: DetectLinkBandwidthLvlLow switch off.
+04-17 16:26:09.189  3762  4253 D Advanced_Booster_Qoe: DetectLinkUlDelayLvlLow switch off.
+04-17 16:26:09.189  3762  4253 D Advanced_Booster_Qoe: channel Index:2
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, alpha is: 0.500000.
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, smoothed data, chload: 94, rssi: -43, phyRxRate: 10806 100kbps, phyTxRate: 9606 100kbps.
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 1, rateInTable: 673.601990 Mbps, calculated result: 6102.833984 100kbps.
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:09.189  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 0, rateInTable: 634.069946 Mbps, calculated result: 5744.673828 100kbps.
+04-17 16:26:09.189  3762  4253 I Advanced_Booster_Qoe: AdaBoostPredict,index:2,NisPsSlow:0,NProba:306,rsrp(rssi):-44,rsrq(noise):-96,rtt(chload):126,buffhigh(uldelay):2,buffcomm(rtt):0
+04-17 16:26:09.189  3762  4253 D Advanced_Booster_Qoe: DetectLinkBandwidthLvlLow switch off.
+04-17 16:26:09.189  3762  4253 D Advanced_Booster_Qoe: DetectLinkUlDelayLvlLow switch off.
+04-17 16:26:09.189  3762  4253 I Advanced_Booster_Qoe: AdvancedQoeInfo: 10257,4,0,306,1,2,4,0,306,960700,1080600,12,10,0,0,0,0,0,2,0,0,-44; subReason: 0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0,0,0; detectedRules: 0,0,0,0,1,2,0,0,0,0
+04-17 16:26:09.190  2367  5667 I Pged-CGroup: attach pid ok, pid: 27233, path: Group_4247002873
+04-17 16:26:09.190  2720  2760 E ActivityTaskManager: START {flg=0x10000000 xflg=0x5 hwFlg=0x10 cmp=com.udake.app/.MainActivity} result: 3
+04-17 16:26:09.190  2367  5667 I Pged-CGroup: attach pid ok, pid: 15260, path: Group_1389623531
+04-17 16:26:09.190  2720  2760 I ActivityTaskManager:  (BAL_ALLOW_PERMISSION) result code=3
+04-17 16:26:09.191 20771 20771 D Capacitor: App paused
+04-17 16:26:09.192 20771 20771 W ServiceManagerCppClient: Failed to get isDeclared for vendor.honor.hardware.iawareperf.IUniPerfAidlInterface/default: Status(-1, EX_SECURITY): 'SELinux denied for service.'
+04-17 16:26:09.192 20771 20771 E uniperf client: vendor.honor.hardware.iawareperf.IUniPerfAidlInterface/default is not Declared
+04-17 16:26:09.192  2367  5667 I Pged-CGroup: attach pid ok, pid: 14040, path: Group_1086797860
+04-17 16:26:09.192  3762  4047 I ChannelQoeData: dumpChannelData: ModelBaseInfo:0,10257,512,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,0,1,0,0,1,0,0,0,0 DnsInfo:0,0,0 WifiId:0 WifiInfo:2,1,60,73,9607,10806,1,1,0,2,-44,-96,50,126,2,2,2,255 AppUid:1051 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 AppUid:999 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 AppUid:0 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 AppUid:10257 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+04-17 16:26:09.192  3762  4047 D NetworkQoeRca: appQoeInfo set faultType: 0
+04-17 16:26:09.192  3762  4047 D NetworkQoeRca: appQoeInfo set faultDomain: 0
+04-17 16:26:09.192  1249  1249 E SELinux : avc:  denied  { find } for interface=vendor.honor.hardware.iawareperf::IUniPerf sid=u:r:untrusted_app:s0:c1,c257,c512,c768 pid=20771 scontext=u:r:untrusted_app:s0:c1,c257,c512,c768 tcontext=u:object_r:hal_iawareperf_hwservice:s0 tclass=hwservice_manager permissive=0
+04-17 16:26:09.192  3762  4045 I Booster_OllieObserver: notify registrants event: EVENT_QOE_INFO_CHANGED
+04-17 16:26:09.193 20771 20771 D uniperf client: get uniperf service failed!
+04-17 16:26:09.194  3762  4047 D Linkturbo_NetworkQoeManager: getChannelQuality: {"channelId":0,"qoeLevel":4,"reason":0}
+04-17 16:26:09.194  3762  4047 I Linkturbo_EmcomUtils: multipathPolicy is null
+04-17 16:26:09.194  3762  4047 D Linkturbo_PolicyCenter: update rssi from qoe
+04-17 16:26:09.194  3762  4047 I NetworkQoeMonitor: dataQualityReport:10257,4,0,306,1,2,4,0,306,960700,1080600,12,10,0,0,0,0,0,2,-1,-1,-44; channelQos: 1,2,7,7,7,0,0,0; subReason: 0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0,0,0; appDetectedRules: 0,0,0,0; flowQuality: 10257,2,-1,-1,-1; faultType: 0; faultDomain: 0; appQoe confidence: -1
+04-17 16:26:09.194  2367  5667 I Pged-CGroup: attach pid ok, pid: 15728, path: Group_4224753941
+04-17 16:26:09.194  3762  4047 D UserSceneNetworkSpeedStats: handleQoeInfoChanged, uid: 10257, qoeSpeedRecordNum: 1023, RX: 0 kbps, TX: 0 kbps
+04-17 16:26:09.194  3762  4047 I DataDecisionManager: monitorDataFaultRecovery, data fault recovery reset all param
+04-17 16:26:09.194  3762  4047 D DataDecisionManager: updateDataFaultPhenomenon dataFaultPhenomenon: 0
+04-17 16:26:09.194  3762  4047 D DataDecisionManager: isNeedNotifyDualCardHSRFenceFault return false, it isn't HSR fence fault Phenomenon
+04-17 16:26:09.194  3762  4047 E SmartDualCardUtils: isActiveSlotId error, invalid slotId
+04-17 16:26:09.194  3762  4047 D DataDecisionManager: isNeedNotifyLinkLayerFault return false,  the fault type and the channelId are not change
+04-17 16:26:09.194  3762  4047 D DataDecisionManager: isNeedNotifyTransportLayerFault return false, the default network link isn't cellular
+04-17 16:26:09.194  3762  4047 E SmartDualCardUtils: isActiveSlotId error, invalid slotId
+04-17 16:26:09.194  3762  4047 D DataDecisionManager: handleSmartDualCardFaultTypeNotify exit, because high speed rail fence is active or default network link isn't Cellular
+04-17 16:26:09.195  2367  5667 I Pged-CGroup: attach pid ok, pid: 7043, path: Group_1651271270
+04-17 16:26:09.196  3502  3733 V WindowManagerShell: Transition requested (#64): android.os.BinderProxy@15b4190 TransitionRequestInfo { type = FIRST_CUSTOM+1011, triggerTask = TaskInfo{userId=0 taskId=360 effectiveUid=10257 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.udake.app/.MainActivity } baseActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} topActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} origActivity=null realActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} launchedFromPackage=com.hihonor.android.launcher forceRotateMode=-1 numActivities=1 lastActiveTime=23781503 isSupportsHwFreeForm=true supportsHnSplitScreenMultiWindow=true supportsHnTopBotSplitScreenfalse supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@734fa89} topActivityType=1 pictureInPictureParams=null isAutoRemoveRecents=false shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{4da9a8e com.udake.app.MainActivity} windowMode=5 launchCookies=[] positionInParent=Point(1165, 253) parentTaskId=-1 isFocused=true isVisible=true isFreeformEnterPip=false isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(1165, 253 - 3443, 1790) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= false isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(1165, 253 - 3443, 1790) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null hnTaskInfoEx=HnTaskInfoEx{freeformPaddingType=0 shouldFreeformSetSurfaceCorner=true affinity=10257:com.udake.app shouldBeVisible=true appOrientationPolicy=1 gridLimitedPolicy=-1 forceResize=-1 extraPackageName=null extraUserId=0 shouldExitMiniWindow=false mIsCustomizedFreeformWindow=false mCustomizedWindowProp=null isDeskTopFreeformAlive=false isSupportDesktopModeFreeform=true isCallerRecents=false isNeedLaunchInSamePosition=false isDisableNotSupportToast=false isNeedLaunchInCaller=false isExitDesktopModeWhenStart=false isSupportLandScapeFreeform=true isSupportLandScapeFreeformLikePC=false isEmptyTaskStartFromRecentForDesktop=false mIsLauncherFromHnEmbedded=false isSupportForceLandscapeFreeformForPad=false mCallerPackageName=com.android.shell mIsTempSplitScreen=false mIsCreatedByOrganizer=false isSupportSave=true isSupportForceLaunchInFreeformInDesktopMode=false shouldHideWindowDecorForDesktop=false desktopTemplateSteplessRatio=-1 mShouldNotHandledForDesktop=0 mNotSupportExpandSplitScreen=false isNotAllowFreeSplitScreen=false isSupportsHnFreeform=true isTopClearAndUnSupportExpandSplitScreen=false mTopActivityName=null mNotSupportMagicWinInExtendedSplit=false mIsReorderLayerPendingSplit=false mIsFullToFreeformSpecialTask=false isDesktopFirstStartMode=-1 isTopActivityImmersive=false isActivityUnSupportHnDesktopModeFreeForm=false mIgnoreLandscapeFreeformSwitch=false mMiniProgramKeyAppIAd=null mMiniProgramId=null mSupportAdjustSplitScreenRatioAtPhoneLand=false isDesktopEnableDensityMode:-1} targetScaleForVerticalInwardFold=1.0}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 64, dis
+04-17 16:26:09.197  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.197  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.197  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.197  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.197  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.197 20771 20771 D Capacitor: App resumed
+04-17 16:26:09.198  2720  3346 I NetworkQoeUtils: handleNetworkQoeUpdated. rtt: 0, maxRatioChannelId: 2
+04-17 16:26:09.198  2720  3346 I NetworkQoeUtils: getQoeEntityFromBundle. qoeString: 10257,4,0,306,1,2,4,0,306,960700,1080600,12,10,0,0,0,0, subReason: 0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0,0,0
+04-17 16:26:09.198 20771 20771 I DecorView[]: set decor visibility 0
+04-17 16:26:09.198 20771 20771 E RtgSchedManager: endActivityTransaction: margin state not match
+04-17 16:26:09.198  2367  5667 I Pged-CGroup: attach pid ok, pid: 6983, path: Group_2748015533
+04-17 16:26:09.198  3683  4019 D CpuGovernor: handleAction: action id=532 time=1776414369195 Flag=3 name=top_activity_resumed pkg=com.udake.app
+04-17 16:26:09.198  3683  4399 D FrameAwareSchedManager: set frame status check: 1004098 ,key: com.udake.app#0
+04-17 16:26:09.199  3762  4253 I Collector: HandleRawWifiInfoVer2: flag:0, netId:0!
+04-17 16:26:09.199  2720  5856 I SysPgAppThreadManager: check Fas frame status, key: com.udake.app#0 ,cmdId: 1004098
+04-17 16:26:09.199  3683  4374 D PgedBinderAdapter: F_Z ok, pid: [4212, 10002, 27233, 15260, 14040, 15728, 7043, 6983]
+04-17 16:26:09.201  2720  5856 V ActivityTaskManager: Activity idle: ActivityRecord{70518194 u0 com.udake.app/.MainActivity t360}
+04-17 16:26:09.202  2720  2792 I OomAdjuster: Set 6983 com.tencent.mobileqq:MSF adj 905: cch-started-servicesstate.getSetAdj() :905state.getAdjSource() :null reason :1 state.getCurProcState() :10 state.getSetProcState :10
+04-17 16:26:09.202  2720  2792 I OomAdjuster: Set 5360 com.google.android.gms adj 915: servicestate.getSetAdj() :905state.getAdjSource() :ProcessRecord{755d16a 14040:com.tencent.mm/u0a210} reason :1 state.getCurProcState() :10 state.getSetProcState :10
+04-17 16:26:09.203  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.203  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.203  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.203  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.203  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.203  3502  3733 I PendingSplitTransitionHandler: handleRequest : animatingType = -1, isFromLauncherOrSearch = false
+04-17 16:26:09.204  2720  2792 I ActivityManager: sync unfroze 5360 com.google.android.gms for 1
+04-17 16:26:09.204  2720  2792 I OomAdjuster: Set 4662 com.hihonor.parentcontrol:service adj 955: cch-started-servicesstate.getSetAdj() :975state.getAdjSource() :null reason :1 state.getCurProcState() :10 state.getSetProcState :10
+04-17 16:26:09.204  2720  2792 I OomAdjuster: Set 10002 com.hihonor.health:DaemonService adj 965: cch-started-servicesstate.getSetAdj() :975state.getAdjSource() :null reason :1 state.getCurProcState() :10 state.getSetProcState :10
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.204  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  3502  3733 I PendingSplitController: getCorrepondingIndexBySamePackage: -1
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.205  2720  3434 D BackgroundInstallControlService: Package event received: 0
+04-17 16:26:09.207  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.207  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.208  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.208  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.208  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.209  3502 20129 I HnDesktopModeBdReport: handle open app ,caller package : com.android.shell, open package: com.udake.app, existingNum: 1, devicetype: 1 ,screenType :0
+04-17 16:26:09.210  3502  3733 I PipTransition: handle PiP enter request type:(FIRST_CUSTOM+1011)
+04-17 16:26:09.211  3502  3733 I StageCoordinator: in HnDesktopMode, StageCoordinator don't handleRequest
+04-17 16:26:09.211  3502  3733 I ShellDesktopMode: DesktopTasksController: handleRequest request=TransitionRequestInfo { type = FIRST_CUSTOM+1011, triggerTask = TaskInfo{userId=0 taskId=360 effectiveUid=10257 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.udake.app/.MainActivity } baseActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} topActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} origActivity=null realActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} launchedFromPackage=com.hihonor.android.launcher forceRotateMode=-1 numActivities=1 lastActiveTime=23781503 isSupportsHwFreeForm=true supportsHnSplitScreenMultiWindow=true supportsHnTopBotSplitScreenfalse supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@734fa89} topActivityType=1 pictureInPictureParams=null isAutoRemoveRecents=false shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{4da9a8e com.udake.app.MainActivity} windowMode=5 launchCookies=[] positionInParent=Point(1165, 253) parentTaskId=-1 isFocused=true isVisible=true isFreeformEnterPip=false isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(1165, 253 - 3443, 1790) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= false isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(1165, 253 - 3443, 1790) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null hnTaskInfoEx=HnTaskInfoEx{freeformPaddingType=0 shouldFreeformSetSurfaceCorner=true affinity=10257:com.udake.app shouldBeVisible=true appOrientationPolicy=1 gridLimitedPolicy=-1 forceResize=-1 extraPackageName=null extraUserId=0 shouldExitMiniWindow=false mIsCustomizedFreeformWindow=false mCustomizedWindowProp=null isDeskTopFreeformAlive=false isSupportDesktopModeFreeform=true isCallerRecents=false isNeedLaunchInSamePosition=false isDisableNotSupportToast=false isNeedLaunchInCaller=false isExitDesktopModeWhenStart=false isSupportLandScapeFreeform=true isSupportLandScapeFreeformLikePC=false isEmptyTaskStartFromRecentForDesktop=false mIsLauncherFromHnEmbedded=false isSupportForceLandscapeFreeformForPad=false mCallerPackageName=com.android.shell mIsTempSplitScreen=false mIsCreatedByOrganizer=false isSupportSave=true isSupportForceLaunchInFreeformInDesktopMode=false shouldHideWindowDecorForDesktop=false desktopTemplateSteplessRatio=-1 mShouldNotHandledForDesktop=0 mNotSupportExpandSplitScreen=false isNotAllowFreeSplitScreen=false isSupportsHnFreeform=true isTopClearAndUnSupportExpandSplitScreen=false mTopActivityName=null mNotSupportMagicWinInExtendedSplit=false mIsReorderLayerPendingSplit=false mIsFullToFreeformSpecialTask=false isDesktopFirstStartMode=-1 isTopActivityImmersive=false isActivityUnSupportHnDesktopModeFreeForm=false mIgnoreLandscapeFreeformSwitch=false mMiniProgramKeyAppIAd=null mMiniProgramId=null mSupportAdjustSplitScreenRatioAtPhoneLand=false isDesktopEnableDensityMode:-1} targetScaleForVerticalInwardFold=1.0}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 64, displayMode = 0, m
+04-17 16:26:09.215  3502  3733 D HnDesktopTemplate-HnTemplateController: handleRequest: request=TransitionRequestInfo { type = FIRST_CUSTOM+1011, triggerTask = TaskInfo{userId=0 taskId=360 effectiveUid=10257 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.udake.app/.MainActivity } baseActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} topActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} origActivity=null realActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} launchedFromPackage=com.hihonor.android.launcher forceRotateMode=-1 numActivities=1 lastActiveTime=23781503 isSupportsHwFreeForm=true supportsHnSplitScreenMultiWindow=true supportsHnTopBotSplitScreenfalse supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{android.window.IWindowContainerToken$Stub$Proxy@734fa89} topActivityType=1 pictureInPictureParams=null isAutoRemoveRecents=false shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{4da9a8e com.udake.app.MainActivity} windowMode=5 launchCookies=[] positionInParent=Point(1165, 253) parentTaskId=-1 isFocused=true isVisible=true isFreeformEnterPip=false isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(1165, 253 - 3443, 1790) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= false isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(1165, 253 - 3443, 1790) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null hnTaskInfoEx=HnTaskInfoEx{freeformPaddingType=0 shouldFreeformSetSurfaceCorner=true affinity=10257:com.udake.app shouldBeVisible=true appOrientationPolicy=1 gridLimitedPolicy=-1 forceResize=-1 extraPackageName=null extraUserId=0 shouldExitMiniWindow=false mIsCustomizedFreeformWindow=false mCustomizedWindowProp=null isDeskTopFreeformAlive=false isSupportDesktopModeFreeform=true isCallerRecents=false isNeedLaunchInSamePosition=false isDisableNotSupportToast=false isNeedLaunchInCaller=false isExitDesktopModeWhenStart=false isSupportLandScapeFreeform=true isSupportLandScapeFreeformLikePC=false isEmptyTaskStartFromRecentForDesktop=false mIsLauncherFromHnEmbedded=false isSupportForceLandscapeFreeformForPad=false mCallerPackageName=com.android.shell mIsTempSplitScreen=false mIsCreatedByOrganizer=false isSupportSave=true isSupportForceLaunchInFreeformInDesktopMode=false shouldHideWindowDecorForDesktop=false desktopTemplateSteplessRatio=-1 mShouldNotHandledForDesktop=0 mNotSupportExpandSplitScreen=false isNotAllowFreeSplitScreen=false isSupportsHnFreeform=true isTopClearAndUnSupportExpandSplitScreen=false mTopActivityName=null mNotSupportMagicWinInExtendedSplit=false mIsReorderLayerPendingSplit=false mIsFullToFreeformSpecialTask=false isDesktopFirstStartMode=-1 isTopActivityImmersive=false isActivityUnSupportHnDesktopModeFreeForm=false mIgnoreLandscapeFreeformSwitch=false mMiniProgramKeyAppIAd=null mMiniProgramId=null mSupportAdjustSplitScreenRatioAtPhoneLand=false isDesktopEnableDensityMode:-1} targetScaleForVerticalInwardFold=1.0}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0, debugId = 64, displayMode = 0, mC
+04-17 16:26:09.218  3502  3733 I HnTaskbarDesktopModeWindowBoundsCalculator: needCalculateWindowBounds mReplacedTaskBounds=Rect(0, 0 - 0, 0) mDropPosition=Point(-1, -1)
+04-17 16:26:09.218  3502  3733 I ShellDesktopMode: DesktopTasksController: handleFullscreenTaskLaunch
+04-17 16:26:09.218  3502  3733 D ShellDesktopMode: DesktopTaskRepo: visibleTaskCount= 1
+04-17 16:26:09.218  3502  3733 D ShellDesktopMode: DesktopTasksController: switch fullscreen task to freeform on transition taskId=360
+04-17 16:26:09.218  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.218  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.219  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.219  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.219  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.225  3502  3733 I HnFreeFormAssistant: get appRecord:com.udake.app-0 isFullScreen:false
+04-17 16:26:09.225  3502  3733 I HnFreeFormAssistant: get taskRecord:com.udake.app-0 isFullScreen:false
+04-17 16:26:09.225  3502  3733 I HnFreeFormAssistant: get firstStartRecord:com.udake.app-0 isFullScreen:false
+04-17 16:26:09.225  3502  3733 I ShellDesktopMode: DesktopTasksController: tdaWindowingMode: 1, targetWindowingMode: 5, taskWindowingMode: 5
+04-17 16:26:09.227  3502 20129 D HiView.HiEvent: mTime.getTime() = 0 : currentTime = 1776414369227
+04-17 16:26:09.227  3502 20129 I HiView.HiEvent: Flatten done:991311072
+04-17 16:26:09.227  3502  3733 I ShellDesktopMode: setTaskDensityDpiIfNeed getHnDesktopModeOverrideDensityEnable false, set default dpi400
+04-17 16:26:09.227  3502  3733 I ShellDesktopMode: DesktopTasksController: addMinimizeBackTaskChangesIfNeeded, newFrontTask=360
+04-17 16:26:09.230  3502  3733 I ShellDesktopMode: DesktopTasksController: no need to minimize; tasks below limit
+04-17 16:26:09.230  3502  3733 D ShellDesktopMode: DesktopTasksController: launch apps with template=false
+04-17 16:26:09.230  3502  3733 I ShellDesktopMode: DesktopTasksController: handleRequest result=WindowContainerTransaction { changes= {} hops= [] errorCallbackToken=null taskFragmentOrganizer=null }
+04-17 16:26:09.231  3502  3733 V WindowManagerShell: Transition (#64): request handled by HnDesktopTasksController
+04-17 16:26:09.233  2720  2793 I HnTransitionEx: skipAddLauncherForFreeformScene, visibleFreeformTaskNum:1
+04-17 16:26:09.233  2720  2793 I HnTransitionEx: skipAddLauncherForFreeformScene, visibleFreeformTaskNum:1
+04-17 16:26:09.233  2720  2793 I WMTransition: Rejecting as detached: ActivityRecord{198766489 u0 com.udake.app/.MainActivity t-1}
+04-17 16:26:09.233  2720  2789 V WindowManager: Sent Transition (#64) createdAt=04-17 16:26:09.185 via request=TransitionRequestInfo { type = FIRST_CUSTOM+1011, triggerTask = TaskInfo{userId=0 taskId=360 effectiveUid=10257 displayId=0 isRunning=true baseIntent=Intent { act=android.intent.action.MAIN cat=[android.intent.category.LAUNCHER] flg=0x10200000 cmp=com.udake.app/.MainActivity } baseActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} topActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} origActivity=null realActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity} launchedFromPackage=com.hihonor.android.launcher forceRotateMode=-1 numActivities=1 lastActiveTime=23781503 isSupportsHwFreeForm=true supportsHnSplitScreenMultiWindow=true supportsHnTopBotSplitScreenfalse supportsMultiWindow=true resizeMode=1 isResizeable=true minWidth=-1 minHeight=-1 defaultMinSize=220 token=WCT{RemoteToken{840df98 Task{a9c025f #360 type=standard A=10257:com.udake.app}}} topActivityType=1 pictureInPictureParams=null isAutoRemoveRecents=false shouldDockBigOverlays=false launchIntoPipHostTaskId=-1 lastParentTaskIdBeforePip=-1 displayCutoutSafeInsets=Rect(0, 0 - 0, 0) topActivityInfo=ActivityInfo{fda4bbd com.udake.app.MainActivity} windowMode=5 launchCookies=[] positionInParent=Point(1165, 253) parentTaskId=-1 isFocused=true isVisible=true isFreeformEnterPip=false isVisibleRequested=true isTopActivityNoDisplay=false isSleeping=false locusId=null displayAreaFeatureId=1 isTopActivityTransparent=false isActivityStackTransparent=false lastNonFullscreenBounds=Rect(1165, 253 - 3443, 1790) capturedLink=null capturedLinkTimestamp=0 requestedVisibleTypes=-9 topActivityRequestOpenInBrowserEducationTimestamp=0 appCompatTaskInfo=AppCompatTaskInfo { topActivityInSizeCompat=false eligibleForLetterboxEducation= false isLetterboxEducationEnabled= false isLetterboxDoubleTapEnabled= false eligibleForUserAspectRatioButton= false topActivityBoundsLetterboxed= false isFromLetterboxDoubleTap= false topActivityLetterboxVerticalPosition= -1 topActivityLetterboxHorizontalPosition= -1 topActivityLetterboxWidth=-1 topActivityLetterboxHeight=-1 topActivityAppBounds=Rect(1165, 253 - 3443, 1790) isUserFullscreenOverrideEnabled=false isSystemFullscreenOverrideEnabled=false hasMinAspectRatioOverride=false topActivityLetterboxBounds=null cameraCompatTaskInfo=CameraCompatTaskInfo { freeformCameraCompatMode=inactive}} topActivityMainWindowFrame=null hnTaskInfoEx=HnTaskInfoEx{freeformPaddingType=0 shouldFreeformSetSurfaceCorner=true affinity=10257:com.udake.app shouldBeVisible=true appOrientationPolicy=1 gridLimitedPolicy=-1 forceResize=-1 extraPackageName=null extraUserId=0 shouldExitMiniWindow=false mIsCustomizedFreeformWindow=false mCustomizedWindowProp=null isDeskTopFreeformAlive=false isSupportDesktopModeFreeform=true isCallerRecents=false isNeedLaunchInSamePosition=false isDisableNotSupportToast=false isNeedLaunchInCaller=false isExitDesktopModeWhenStart=false isSupportLandScapeFreeform=true isSupportLandScapeFreeformLikePC=false isEmptyTaskStartFromRecentForDesktop=false mIsLauncherFromHnEmbedded=false isSupportForceLandscapeFreeformForPad=false mCallerPackageName=com.android.shell mIsTempSplitScreen=false mIsCreatedByOrganizer=false isSupportSave=true isSupportForceLaunchInFreeformInDesktopMode=false shouldHideWindowDecorForDesktop=false desktopTemplateSteplessRatio=-1 mShouldNotHandledForDesktop=0 mNotSupportExpandSplitScreen=false isNotAllowFreeSplitScreen=false isSupportsHnFreeform=true isTopClearAndUnSupportExpandSplitScreen=false mTopActivityName=null mNotSupportMagicWinInExtendedSplit=false mIsReorderLayerPendingSplit=false mIsFullToFreeformSpecialTask=false isDesktopFirstStartMode=-1 isTopActivityImmersive=false isActivityUnSupportHnDesktopModeFreeForm=false mIgnoreLandscapeFreeformSwitch=false mMiniProgramKeyAppIAd=null mMiniProgramId=null mSupportAdjustSplitScreenRatioAtPhoneLand=false isDesktopEnableDensityMode:-1} targetScaleForVerticalInwardFold=1.0}, pipChange = null, remoteTransition = null, displayChange = null, flags = 0
+04-17 16:26:09.233  3502  3948 V WindowManagerShell: onTransitionReady(transaction=11682311049797)
+04-17 16:26:09.233  2720  2789 V WindowManager:     startWCT=WindowContainerTransaction { changes= {} hops= [] errorCallbackToken=null taskFragmentOrganizer=null }
+04-17 16:26:09.233  3502  3733 D WindowManagerShell: onActivityRestartAttempt: topActivity=ComponentInfo{com.udake.app/com.udake.app.MainActivity}, wasVisible=true
+04-17 16:26:09.233  2720  2789 V WindowManager:     info={id=64 t=FIRST_CUSTOM+1011 f=0x0 trk=0 includeEmbeddedWindow=false isKeyGuardLocked=false r=[] c=[]}
+04-17 16:26:09.235  3502  3733 V WindowManagerShell: onTransitionReady (#64) android.os.BinderProxy@15b4190: {id=64 t=FIRST_CUSTOM+1011 f=0x0 trk=0 includeEmbeddedWindow=false isKeyGuardLocked=false r=[] c=[]}
+04-17 16:26:09.236  3502  3733 V ShellDesktopMode: DesktopModeLogger: taskInfo map after processing changes 1
+04-17 16:26:09.237  3502  3733 I WindowManagerShell: No transition roots in (#64) android.os.BinderProxy@15b4190@0 so abort
+04-17 16:26:09.237  3502  3733 I ShellTransitions: Transition ready: (#64) android.os.BinderProxy@15b4190@0 abort? true and playing: null
+04-17 16:26:09.237  3502  3733 I ShellTransitions: Active animation finished=(#64) android.os.BinderProxy@15b4190@0, merged=null, aborted=true
+04-17 16:26:09.237  3502  3733 I HnFreeformController: setIsFreeformAnimRunning taskId354freeformAnimRunning:false
+04-17 16:26:09.237  3502  3733 I HnFreeformController: setIsFreeformAnimRunning taskId360freeformAnimRunning:false
+04-17 16:26:09.237  3502  3733 I HnFreeformController: onTransitionFinished: isMiniformTransition = false
+04-17 16:26:09.237  3502  3733 I HnFreeformController: taskId 354 has gotten captionHeight: 80
+04-17 16:26:09.237  3502  3733 I HnFreeformController: onTransitionFinished: setWindowCrop: Rect(-1, -81 - 2279, 1538), setCornerRadius for task id = 354
+04-17 16:26:09.238  1960  1960 I VariableRefreshRateHandler: setCurrentSignals: scored layer size: 1
+04-17 16:26:09.238  1960  1960 I VariableRefreshRateHandler: setCurrentSignals: layerName Wallpaper BBQ wrapper#203, type Min, desiredRefreshRate 0.00
+04-17 16:26:09.239  2720  5856 I BLASTSyncEngine: transaction commit callback: 64
+04-17 16:26:09.239  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.239  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.239  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.239  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.239  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.240  3502  3733 I SurfaceControl: setWindowCrop sc Surface(name=Task=354)/@0xabd5da2 crop Rect(-1, -81 - 2279, 1538) callers com.android.wm.shell.hnfreeform.HnFreeformController.onTransitionFinished:356 com.android.wm.shell.freeform.FreeformTaskTransitionObserver.lambda$onHnFreeformTransitionFinished$18:1 com.android.wm.shell.freeform.FreeformTaskTransitionObserver.$r8$lambda$baLsxvI1tPmnoIl5aG8rz_myqzo:1 com.android.wm.shell.freeform.FreeformTaskTransitionObserver$$ExternalSyntheticLambda16.accept:9 
+04-17 16:26:09.240  3502  3733 I HnRunningFreeformTaskInfo: getRunningTransition: mRunningTaskInfo354null
+04-17 16:26:09.240  3502  3733 I HnFreeformController: onTransitionFinished: isMiniformTransition = false
+04-17 16:26:09.240  3502  3733 I HnFreeformController: taskId 360 has gotten captionHeight: 80
+04-17 16:26:09.240  3502  3733 I HnFreeformController: onTransitionFinished: setWindowCrop: Rect(-1, -81 - 2279, 1538), setCornerRadius for task id = 360
+04-17 16:26:09.240  3502  3733 I SurfaceControl: setWindowCrop sc Surface(name=Task=360)/@0xdc27242 crop Rect(-1, -81 - 2279, 1538) callers com.android.wm.shell.hnfreeform.HnFreeformController.onTransitionFinished:356 com.android.wm.shell.freeform.FreeformTaskTransitionObserver.lambda$onHnFreeformTransitionFinished$18:1 com.android.wm.shell.freeform.FreeformTaskTransitionObserver.$r8$lambda$baLsxvI1tPmnoIl5aG8rz_myqzo:1 com.android.wm.shell.freeform.FreeformTaskTransitionObserver$$ExternalSyntheticLambda16.accept:9 
+04-17 16:26:09.241  3502  3733 I HnRunningFreeformTaskInfo: getRunningTransition: mRunningTaskInfo360null
+04-17 16:26:09.241  3502  3733 I HnFreeformController: ensureTaskVisibility taskId:360
+04-17 16:26:09.241  3502  3733 I MixedWindowDecorViewModel: ensureTaskVisibility, isHnDesktopMode=true,taskId=360,updateAsync=false,force=false
+04-17 16:26:09.241  3502  3733 I HnFreeformController: freeform_tag, removeRecentsTransition: android.os.BinderProxy@15b4190
+04-17 16:26:09.242  3502  3733 I HnFreeformController: freeform_tag, setRecentsTransitionToHome transition: android.os.BinderProxy@15b4190, toHome: false
+04-17 16:26:09.242  3502  3733 I HnDesktopTasksTransitionObserver: DesktopModeLogger: onTransitionFinished, setHnDeskTopActiveTaskToFull(-1)
+04-17 16:26:09.242  3502  3733 D HnFreeformController: mNoticedTaskInfos = []
+04-17 16:26:09.242  3502  3733 D HnFreeformController: overlapTaskInfos = []
+04-17 16:26:09.242  3502  3502 I HnDesktopModeGuidanceHelper: info:{id=64 t=FIRST_CUSTOM+1011 f=0x0 trk=0 includeEmbeddedWindow=false isKeyGuardLocked=false r=[] c=[]}
+04-17 16:26:09.242  3502  3502 I HnDesktopModeGuidanceHelper: TASKBAR:true
+04-17 16:26:09.242  3502  3502 I HnDesktopModeGuidanceHelper: User has used desktopMode
+04-17 16:26:09.242  3502  3733 V WindowManagerShell: Transition animation finished (aborted=true), notifying core (#64) android.os.BinderProxy@15b4190@0
+04-17 16:26:09.243  3502  3733 I ShellTransitions: onFinish, SwipeToHome = false, BackRemote = false, LaunchRemote = false
+04-17 16:26:09.243  2720  5856 I TransitionController: finishTransition TransitionRecord{ca663f id=64 type=FIRST_CUSTOM+1011 flags=0x0 c=[
+04-17 16:26:09.243  2720  5856 I TransitionController:    ChangeInfo{a3fec55 container=ActivityRecord{198766489 u0 com.udake.app/.MainActivity t-1} flags=0x0}
+04-17 16:26:09.243  2720  5856 I TransitionController: ]
+04-17 16:26:09.243  2720  5856 I TransitionController: }
+04-17 16:26:09.244  2720  5856 D HnMultiWindowAnimation: getDoingHnAnimType: 0
+04-17 16:26:09.244  2720  2789 V WindowManager: Finish Transition (#64): created at 04-17 16:26:09.185 collect-started=0.291ms request-sent=4.674ms started=46.63ms ready=46.511ms sent=48.214ms commit=5.93ms finished=58.695ms
+04-17 16:26:09.244  3502  3733 I WindowManagerShell: Track 0 became idle
+04-17 16:26:09.244  3502  3733 I WindowManagerShell: All active transition animations finished
+04-17 16:26:09.250  1960  1960 I VariableRefreshRateHandler: setCurrentSignals: scored layer size: 1
+04-17 16:26:09.250  1960  1960 I VariableRefreshRateHandler: setCurrentSignals: layerName Wallpaper BBQ wrapper#203, type ExplicitExactOrMultiple, desiredRefreshRate 60.00
+04-17 16:26:09.250  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.250  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.251  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.251  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.251  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.252  2720  5856 E InputDispatcher: Embedded{TaskInputSink of Surface(name=DesktopMode Decor container of Task=360)/@0xc2f0445} has feature NO_INPUT_WINDOW, but a non-null token. Clearing
+04-17 16:26:09.272  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.272  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.273  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.273  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.273  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.285  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.285  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.285  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.285  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.285  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.308  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.308  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.308  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.308  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.308  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.319  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.319  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.319  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.319  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.319  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.326  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24826925551168, lux = 48, cct=30864, aod=17640
+04-17 16:26:09.341  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.341  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.341  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.341  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.342  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.352  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.352  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.352  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.352  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.353  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.374  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.374  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.375  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.375  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.375  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.385  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.385  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.385  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.386  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.386  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.408  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.408  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.408  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.408  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.408  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.411  3683  4019 D CpuGovernor: handleAction: action id=537 time=1776414369410 Flag=3 name=frame_status pkg=com.udake.app#1004098
+04-17 16:26:09.411  3683  4019 D BoostCtrlManager: receive FAS check res, type: 1 ,pkg: com.udake.app ,cmdId: 4098, fg pkg: com.udake.app
+04-17 16:26:09.418  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.419  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.419  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.419  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.419  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.441  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.441  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.442  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.442  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.442  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.452  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.452  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.452  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.452  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.452  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.474  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.475  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.475  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.475  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.475  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.480  2720  2795 I AppEyeFwkBlock: do monitor
+04-17 16:26:09.485  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.485  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.485  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.485  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.486  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.490  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24827091544137, lux = 48, cct=30864, aod=17640
+04-17 16:26:09.508  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.508  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.508  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.508  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.508  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.518  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.518  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.519  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.519  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.519  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.522  1806  4976 I vendor.qti.bluetooth@1.1-ibs_handler: DeviceSleep: TX Awake, Sending SLEEP_IND
+04-17 16:26:09.522  1806  4976 D vendor.qti.bluetooth@1.1-ibs_handler: SerialClockVote: vote for UART CLK OFF
+04-17 16:26:09.541  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.541  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.541  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.541  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.542  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.543  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [13 668]
+04-17 16:26:09.545  4269 11562 I nStackXDMultiPath: PrintNetIfconfigCounts:[317] :[DEV[2]: rx[221782 0 0] tx[126019 0 0] sndStat 1_4167748 recvQOF[0,0,0]]
+04-17 16:26:09.552  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.552  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.552  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.552  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.552  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.553  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [6 414]
+04-17 16:26:09.574  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.574  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.575  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.575  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.575  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.576  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [3 303]
+04-17 16:26:09.582  3502 10247 D HnDesktopModeHighLoadPresenter: getCpuLoadInfo: mTaskNum <= NUM_TASK_THRESHOLD
+04-17 16:26:09.582  3502 10247 D HnDesktopModeHighLoadPresenter: has set same level
+04-17 16:26:09.585  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.585  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.585  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.585  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.585  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.586  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [1 204]
+04-17 16:26:09.608  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.609  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.609  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.609  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.609  1924  1924 I SDM     : HWCDisplayBuiltIn::NeedsLargeCompPerfHint: Found skip_layer:1 or is_multidisplay:0. Set perf hint for large comp cycle
+04-17 16:26:09.609  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.610  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [0 0]
+04-17 16:26:09.623  2720  3346 E TcpInfoMonitor: obtain valid average rtt failed.
+04-17 16:26:09.623  2720  3346 I TcpInfoMonitor: Tcp result: average rtt = 0, rtt pkt = 0, tcp_rx = 0, tcp_tx = 0, tcp_retran = 0, tcp_rtRate = 0.00%.
+04-17 16:26:09.624  2720  3346 D SelfCureDnsMonitor: NewInfo: tcpTxPkts: 97938, tcpRxPkts: 108062, dnsTxPkts: 0, dnsRxPkts: 0, LastInfo: lastTcpTxPkts: 97938, lastTcpRxPkts: 108062, lastDnsTxPkts: 0, lastDnsRxPkts: 0
+04-17 16:26:09.624  2720  3346 D SelfCureDnsMonitor: handleNetworkResultUpdate: Dns Tx Total increase is less
+04-17 16:26:09.624  2720  3346 I SelfCureIpv6Monitor: not satisfied v4 with tx && rx && retrans-ratio and faultResult, do not execute ipv6Selfcure
+04-17 16:26:09.624  2720  3346 I UxDisplayManager: computeQosLevel, rtt is 0 and speed is 0
+04-17 16:26:09.624  2720  3346 I UxDisplayManager: reviseQosLevelByRssi, no tcpinfo return mLastEvaluateQosLevel: 3
+04-17 16:26:09.630  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.630  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.631  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.631  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.631  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.641  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.641  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.641  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.641  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.642  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.658  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24827257646585, lux = 48, cct=30992, aod=17696
+04-17 16:26:09.664  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.664  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.664  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.664  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.664  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.672  1806  4885 D vendor.qti.bluetooth@1.1-wake_lock: Release wakelock is released 
+04-17 16:26:09.674  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.674  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.674  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.675  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.675  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.683  1866  1984 D vendor.honor.hardware.aoservice-service: [AO_SVC] (reopen_timer_handler:52):enter reopen handler
+04-17 16:26:09.688  4269  4848 I DurboThread: PrintHeartBeat:[114] :magiclink runState 1 tState 1 devNum 1 serverNum 17 sessionNum 2
+04-17 16:26:09.690  2720  9708 D HnDesktopTaskManagerEx: executeRemoveStrategy by msg=2
+04-17 16:26:09.690  2720  9708 D HnDesktopTaskManagerEx: executeRemoveStrategy: ExecuteInfo{packageName=com.udake.app, uid=10257, pid=20771, mLayerRank=1, mNonOccludedFreeformAreaRatio=100, limitFps=-1, reClaim=false, isRemovePackage=false, appType=-1}
+04-17 16:26:09.690  2720  9708 D HnDesktopTaskManagerEx: moveTaskToBack: memAvailable=1574236, mem theshold=1228800
+04-17 16:26:09.691  2720  9708 D HnDesktopTaskManagerEx: manageWindowMemAndFps: ExecuteInfos{packageName=com.udake.app, infos=1, limitFps=-1, reClaim=false}
+04-17 16:26:09.691  2720  9708 D HnDesktopTaskManagerEx: notifyAgpLimitFps: size=1, game=0, cost time = 1
+04-17 16:26:09.691  2720  9708 D HnDesktopTaskManagerEx: executeRemoveStrategy: cost time = 2
+04-17 16:26:09.697  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.697  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.698  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.698  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.698  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.708  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.708  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.708  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.708  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.708  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.712  2315  3144 D BufferPoolAccessor2.0: bufferpool2 0xb4000071e750dbb8 : 8(56623104 size) total buffers - 5(35389440 size) used buffers - 219647/219669 (recycle/alloc) - 410/219548 (fetch/transfer)
+04-17 16:26:09.731  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.731  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.731  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.731  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.732  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.733  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [13 668]
+04-17 16:26:09.741  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.741  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.742  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.742  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.742  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.742  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [6 414]
+04-17 16:26:09.764  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.764  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.764  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.764  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.764  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.766  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [3 303]
+04-17 16:26:09.774  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.774  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.774  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.775  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.775  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.775  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [1 204]
+04-17 16:26:09.798  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.798  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.798  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.798  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.798  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.799  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [0 0]
+04-17 16:26:09.808  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.808  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.808  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.808  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.808  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.822  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24827423548668, lux = 48, cct=30992, aod=17696
+04-17 16:26:09.831  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.831  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.831  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.831  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.831  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.836  3803  5282 E CHR_RilRadioRadarManager: RilRadioRadarManager is null
+04-17 16:26:09.842  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.842  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.842  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.842  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.842  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.863  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.864  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.864  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.864  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.864  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.874  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.874  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.874  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.874  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.874  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.897  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.897  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.897  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.898  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.898  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.908  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.908  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.908  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.908  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.908  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.914  2315  8968 W TraceLog: onQueueInputBuffer(c2.qti.avc.decoder:0xb400007277507380) Queued: 59.9/s Done: 59.9/s Rendered: 59.9/s Discarded: 0.0/s
+04-17 16:26:09.930  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.930  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.930  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.930  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.931  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.941  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.941  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.941  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.941  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.941  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.964  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.964  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.964  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.964  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.964  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.974  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.975  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.975  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.975  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.975  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.990  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24827589549345, lux = 48, cct=31136, aod=17700
+04-17 16:26:09.996  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.996  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.996  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.996  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:09.997  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.007  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.007  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.008  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.008  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.008  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.011  2315  3144 D PipelineWatcher: onInputBufferReleased: frameIndex not found (219682); ignored
+04-17 16:26:10.030  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.030  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.030  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.030  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.030  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.040  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.040  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.041  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.041  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.041  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.063  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.063  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.063  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.063  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.064  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.074  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.074  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.074  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.074  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.074  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.097  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.097  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.097  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.097  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.097  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.107  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.108  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.108  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.108  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.108  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.129  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.129  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.129  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.129  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.129  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.141  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.141  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.141  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.141  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.141  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.154  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24827755548095, lux = 48, cct=31136, aod=17700
+04-17 16:26:10.163  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.163  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.163  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.163  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.163  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.174  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.174  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.174  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.174  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.174  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.184  1866  1984 D vendor.honor.hardware.aoservice-service: [AO_SVC] (reopen_timer_handler:52):enter reopen handler
+04-17 16:26:10.196  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.196  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.196  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.196  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.196  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.200  3683  4374 I AppFastHibernation: wakeup all fast H for timeout
+04-17 16:26:10.201  3683  4374 I AppFastHibernation: fast unF_Z uid=10030 pkgs=[com.hihonor.contacts]
+04-17 16:26:10.202  3683  4374 W AppFastHibernation: fast H pid:4212 but RDH not F_Z it
+04-17 16:26:10.203  3683  4374 I AppFastHibernation: fast unF_Z uid=10211 pkgs=[com.tencent.mobileqq]
+04-17 16:26:10.203  3683  4374 W AppFastHibernation: fast H pid:6983 but RDH not F_Z it
+04-17 16:26:10.203  3683  4374 I AppFastHibernation: fast unF_Z uid=10211 pkgs=[com.tencent.mobileqq]
+04-17 16:26:10.204  3683  4374 W AppFastHibernation: fast H pid:7043 but RDH not F_Z it
+04-17 16:26:10.204  3683  4374 I AppFastHibernation: fast unF_Z uid=10192 pkgs=[com.hihonor.health]
+04-17 16:26:10.204  3683  4374 W AppFastHibernation: fast H pid:10002 but RDH not F_Z it
+04-17 16:26:10.204  3683  4374 I AppFastHibernation: fast unF_Z uid=10210 pkgs=[com.tencent.mm]
+04-17 16:26:10.205  3683  4374 W AppFastHibernation: fast H pid:14040 but RDH not F_Z it
+04-17 16:26:10.205  3683  4374 I AppFastHibernation: fast unF_Z uid=10210 pkgs=[com.tencent.mm]
+04-17 16:26:10.205  3683  4374 W AppFastHibernation: fast H pid:15260 but RDH not F_Z it
+04-17 16:26:10.205  3683  4374 I AppFastHibernation: fast unF_Z uid=10210 pkgs=[com.tencent.mm]
+04-17 16:26:10.205  3683  4374 W AppFastHibernation: fast H pid:15728 but RDH not F_Z it
+04-17 16:26:10.205  3683  4374 I AppFastHibernation: fast unF_Z uid=10061 pkgs=[com.hihonor.servicecenter]
+04-17 16:26:10.205  3683  4374 W AppFastHibernation: fast H pid:27233 but RDH not F_Z it
+04-17 16:26:10.206  2367  5667 I Pged-IPgedBinderService: ****action is 2, pid num is 9***
+04-17 16:26:10.206  2367  5667 I Pged-Freezer: thawPids
+04-17 16:26:10.207  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.207  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.207  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.207  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.207  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.208  2367  5667 I Pged-CGroup: detach pid ok, pid: 4212, path: Group_1652548376
+04-17 16:26:10.209  2367  5667 I Pged-CGroup: detach pid ok, pid: 6983, path: Group_2748015533
+04-17 16:26:10.209  6983  7180 V MSF.C.MSFCore[@PS]: [Event] MSFPacketStatistics.cpp(300)::DoCheckRequestTimeout->current rtts:98.142
+04-17 16:26:10.210  6983  7185 V MSF.C.MSFCore[@DD]: [Event] MSFDragonDiagno.cpp(47)::onCheckTimeout->maybe msf thread is block! now:1776414370210, lastcheckTimestamp:1776414368301
+04-17 16:26:10.210  6983  7185 V MSF.C.MSFCore[@DD]: [Event] MSFDragonDiagno.cpp(50)::onCheckTimeout->maybe msf callback thread is block! now:1776414370210, lastcheckTimestamp:1776414368302
+04-17 16:26:10.212  2367  5667 I Pged-CGroup: detach pid ok, pid: 7043, path: Group_1651271270
+04-17 16:26:10.213  2367  5667 I Pged-CGroup: detach pid ok, pid: 10002, path: Group_3710102780
+04-17 16:26:10.216  2367  5667 I Pged-CGroup: detach pid ok, pid: 14040, path: Group_1086797860
+04-17 16:26:10.217  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 0
+04-17 16:26:10.217  2367  5667 I Pged-CGroup: detach pid ok, pid: 15260, path: Group_1389623531
+04-17 16:26:10.217  2367  5667 I Pged-CGroup: detach pid ok, pid: 15728, path: Group_4224753941
+04-17 16:26:10.218  3762  4252 E TransportLayerUtils: performQueryWithTimeout exception = java.util.concurrent.ExecutionException: java.lang.ArrayIndexOutOfBoundsException: length=0; index=0, caller = getLinkLayerVersion, timeout = 1, EXECUTOR  = java.util.concurrent.ThreadPoolExecutor@6d9df10[Running, pool size = 1, active threads = 0, queued tasks = 0, completed tasks = 6136]
+04-17 16:26:10.218  3762  4252 D Booster_OllieChrManager: sendDataToChrApk msdId: 30
+04-17 16:26:10.218  3762  4252 I Booster_OllieChrManager: ChrService is null
+04-17 16:26:10.218  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 0
+04-17 16:26:10.218  3762  4252 E TransportLayerUtils: performQueryWithTimeout exception = java.util.concurrent.ExecutionException: java.lang.ArrayIndexOutOfBoundsException: length=0; index=0, caller = getLinkLayerVersion, timeout = 1, EXECUTOR  = java.util.concurrent.ThreadPoolExecutor@6d9df10[Running, pool size = 1, active threads = 0, queued tasks = 0, completed tasks = 6137]
+04-17 16:26:10.219  3762  4252 D Booster_OllieChrManager: sendDataToChrApk msdId: 30
+04-17 16:26:10.219  3762  4252 I Booster_OllieChrManager: ChrService is null
+04-17 16:26:10.219  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 1
+04-17 16:26:10.219  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 1
+04-17 16:26:10.219  2367  5667 I Pged-CGroup: detach pid ok, pid: 27233, path: Group_4247002873
+04-17 16:26:10.219  3683  4374 D PgedBinderAdapter: unF_Z ok, pid: [4212, 6983, 7043, 10002, 14040, 15260, 15728, 27233]
+04-17 16:26:10.220  3762  4253 D Advanced_Booster_Qoe: channel Index:6
+04-17 16:26:10.220  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, alpha is: 0.500000.
+04-17 16:26:10.220  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, smoothed data, chload: 47, rssi: -43, phyRxRate: 10806 100kbps, phyTxRate: 9606 100kbps.
+04-17 16:26:10.220  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:10.220  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 1, rateInTable: 673.601990 Mbps, calculated result: 6419.426758 100kbps.
+04-17 16:26:10.220  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:10.220  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 0, rateInTable: 634.069946 Mbps, calculated result: 6042.686523 100kbps.
+04-17 16:26:10.221  3762  4047 I ChannelQoeData: dumpChannelData: ModelBaseInfo:0,10257,512,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,0,1,0,0,1,0,0,0,0 DnsInfo:0,0,0 WifiId:0 WifiInfo:2,1,0,0,9607,10806,0,0,0,2,-44,-96,50,0,0,2,2,255 AppUid:1051 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 AppUid:999 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 AppUid:0 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 AppUid:10257 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+04-17 16:26:10.221  3762  4253 I Advanced_Booster_Qoe: AdaBoostPredict,index:6,NisPsSlow:0,NProba:350,rsrp(rssi):-44,rsrq(noise):-96,rtt(chload):0,buffhigh(uldelay):0,buffcomm(rtt):0
+04-17 16:26:10.221  3762  4253 D Advanced_Booster_Qoe: DetectLinkBandwidthLvlLow switch off.
+04-17 16:26:10.221  3762  4253 D Advanced_Booster_Qoe: DetectLinkUlDelayLvlLow switch off.
+04-17 16:26:10.221  3762  4253 D Advanced_Booster_Qoe: channel Index:2
+04-17 16:26:10.221  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, alpha is: 0.500000.
+04-17 16:26:10.221  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, smoothed data, chload: 23, rssi: -43, phyRxRate: 10806 100kbps, phyTxRate: 9606 100kbps.
+04-17 16:26:10.221  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:10.221  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 1, rateInTable: 673.601990 Mbps, calculated result: 6581.091309 100kbps.
+04-17 16:26:10.221  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:10.221  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 0, rateInTable: 634.069946 Mbps, calculated result: 6194.863281 100kbps.
+04-17 16:26:10.221  3762  4253 I Advanced_Booster_Qoe: AdaBoostPredict,index:2,NisPsSlow:0,NProba:350,rsrp(rssi):-44,rsrq(noise):-96,rtt(chload):0,buffhigh(uldelay):0,buffcomm(rtt):0
+04-17 16:26:10.221  3762  4253 D Advanced_Booster_Qoe: DetectLinkBandwidthLvlLow switch off.
+04-17 16:26:10.221  3762  4253 D Advanced_Booster_Qoe: DetectLinkUlDelayLvlLow switch off.
+04-17 16:26:10.222  3762  4253 I Advanced_Booster_Qoe: AdvancedQoeInfo: 10257,4,0,350,1,2,4,0,350,960700,1080600,10,10,0,0,0,0,0,2,0,0,-44; subReason: 0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0,0,0; detectedRules: 0,0,0,0,1,2,0,0,0,0
+04-17 16:26:10.222  3762  4253 I Collector: HandleRawWifiInfoVer2: flag:0, netId:0!
+04-17 16:26:10.222  3762  4047 D NetworkQoeRca: appQoeInfo set faultType: 0
+04-17 16:26:10.222  3762  4047 D NetworkQoeRca: appQoeInfo set faultDomain: 0
+04-17 16:26:10.222  3762  4045 I Booster_OllieObserver: notify registrants event: EVENT_QOE_INFO_CHANGED
+04-17 16:26:10.223  3762  4047 D Linkturbo_NetworkQoeManager: getChannelQuality: {"channelId":0,"qoeLevel":4,"reason":0}
+04-17 16:26:10.223  3762  4047 I Linkturbo_EmcomUtils: multipathPolicy is null
+04-17 16:26:10.223  3762  4047 D Linkturbo_PolicyCenter: update rssi from qoe
+04-17 16:26:10.223  3762  4047 I NetworkQoeMonitor: dataQualityReport:10257,4,0,350,1,2,4,0,350,960700,1080600,10,10,0,0,0,0,0,2,-1,-1,-44; channelQos: 1,2,7,7,7,0,0,0; subReason: 0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0,0,0; appDetectedRules: 0,0,0,0; flowQuality: 10257,2,-1,-1,-1; faultType: 0; faultDomain: 0; appQoe confidence: -1
+04-17 16:26:10.223  3762  4047 D UserSceneNetworkSpeedStats: handleQoeInfoChanged, uid: 10257, qoeSpeedRecordNum: 1024, RX: 0 kbps, TX: 0 kbps
+04-17 16:26:10.224  3762  4047 I DataDecisionManager: monitorDataFaultRecovery, data fault recovery reset all param
+04-17 16:26:10.224  3762  4047 D DataDecisionManager: updateDataFaultPhenomenon dataFaultPhenomenon: 0
+04-17 16:26:10.224  3762  4047 D DataDecisionManager: isNeedNotifyDualCardHSRFenceFault return false, it isn't HSR fence fault Phenomenon
+04-17 16:26:10.224  3762  4047 E SmartDualCardUtils: isActiveSlotId error, invalid slotId
+04-17 16:26:10.224  3762  4047 D DataDecisionManager: isNeedNotifyLinkLayerFault return false,  the fault type and the channelId are not change
+04-17 16:26:10.224  3762  4047 D DataDecisionManager: isNeedNotifyTransportLayerFault return false, the default network link isn't cellular
+04-17 16:26:10.224  3762  4047 E SmartDualCardUtils: isActiveSlotId error, invalid slotId
+04-17 16:26:10.224  3762  4047 D DataDecisionManager: handleSmartDualCardFaultTypeNotify exit, because high speed rail fence is active or default network link isn't Cellular
+04-17 16:26:10.224  2720  3346 I NetworkQoeUtils: handleNetworkQoeUpdated. rtt: 0, maxRatioChannelId: 2
+04-17 16:26:10.224  2720  3346 I NetworkQoeUtils: getQoeEntityFromBundle. qoeString: 10257,4,0,350,1,2,4,0,350,960700,1080600,10,10,0,0,0,0, subReason: 0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0,0,0
+04-17 16:26:10.229  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.229  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.229  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.229  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.229  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.239  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.240  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.240  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.240  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.240  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.263  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.263  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.263  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.263  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.263  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.274  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.274  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.275  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.275  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.275  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.296  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.296  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.296  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.296  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.296  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.307  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.307  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.307  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.307  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.307  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.322  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24827921557262, lux = 48, cct=31040, aod=17728
+04-17 16:26:10.329  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.330  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.330  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.330  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.330  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.339  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.339  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.339  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.340  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.340  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.362  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.363  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.363  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.363  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.363  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.373  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.373  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.374  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.374  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.374  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.396  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.396  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.396  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.396  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.396  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.407  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.407  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.407  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.407  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.407  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.429  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.429  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.429  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.429  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.429  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.451  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.451  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.452  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.452  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.452  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.462  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.462  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.462  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.462  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.462  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.472  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[1960]'s frequency to [13 668]
+04-17 16:26:10.473  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.473  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.473  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.474  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.474  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.483  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[1960]'s frequency to [6 414]
+04-17 16:26:10.483  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.483  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.484  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.484  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.484  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.486  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24828087552626, lux = 48, cct=31040, aod=17728
+04-17 16:26:10.494  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[1960]'s frequency to [3 303]
+04-17 16:26:10.494  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.495  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.495  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.495  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.495  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.505  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[1960]'s frequency to [1 204]
+04-17 16:26:10.505  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.505  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.506  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.506  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.506  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.527  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[1960]'s frequency to [0 0]
+04-17 16:26:10.528  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.528  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.528  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.528  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.528  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.539  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.539  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.539  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.539  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.539  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.558  4269 11562 D nStackXQoS: QoSMonitorOnMaxSendRateChanged:[365] :enter
+04-17 16:26:10.562  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.562  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.562  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.562  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.562  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.564  4269 11562 I nStackXDMultiPath: UpdatePeerInfoDestinationMaxSendRate:[159] :DEV[2]:[10.x.x.26 1 456 380 456]
+04-17 16:26:10.566  4269 11562 I nStackXDMultiPath: PrintNetIfconfigCounts:[317] :[DEV[2]: rx[221782 0 0] tx[126019 0 0] sndStat 1_4167749 recvQOF[0,0,0]]
+04-17 16:26:10.583  3502 10247 D HnDesktopModeHighLoadPresenter: getCpuLoadInfo: mTaskNum <= NUM_TASK_THRESHOLD
+04-17 16:26:10.583  3502 10247 D HnDesktopModeHighLoadPresenter: has set same level
+04-17 16:26:10.585  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.585  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.585  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.585  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.585  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.594  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.594  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.594  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.594  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.594  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.605  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.605  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.605  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.605  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.605  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.629  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.629  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.629  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.629  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.629  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.640  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.640  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.640  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.640  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.640  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.654  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24828253544345, lux = 48, cct=31136, aod=17664
+04-17 16:26:10.662  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.662  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.662  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.662  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.663  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.673  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.673  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.673  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.673  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.673  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.686  1866  1984 D vendor.honor.hardware.aoservice-service: [AO_SVC] (reopen_timer_handler:52):enter reopen handler
+04-17 16:26:10.695  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.695  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.696  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.696  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.696  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.717  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.717  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.718  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.718  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.718  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.728  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.728  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.728  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.728  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.728  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.738  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.738  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.739  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.739  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.739  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.762  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.762  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.762  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.762  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.762  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.773  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.773  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.773  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.773  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.773  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.795  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.795  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.795  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.795  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.795  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.805  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.806  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.806  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.806  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.806  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.818  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24828419649137, lux = 48, cct=31136, aod=17664
+04-17 16:26:10.828  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.828  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.828  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.828  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.828  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.839  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.839  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.839  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.839  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.839  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.846  2720  2797 W Watchdog: waitState=[0] waitedHalf=[false]
+04-17 16:26:10.846  2720  2797 W Watchdog: watchdogKick kickCounter=[150]
+04-17 16:26:10.847  2720  2797 I AES     : hangdetect userpet kick to kernel
+04-17 16:26:10.847  2720  2788 I InputReader: monitor lock
+04-17 16:26:10.847  2720  2788 I EventHub: wake() called
+04-17 16:26:10.849  2720  2788 I EventHub: monitor lock
+04-17 16:26:10.862  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.862  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.862  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.862  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.862  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.864  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [13 668]
+04-17 16:26:10.872  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.872  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.872  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.872  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.872  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.873  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [6 414]
+04-17 16:26:10.895  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.895  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.895  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.895  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.895  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.896  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [3 303]
+04-17 16:26:10.905  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.905  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.905  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.905  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.905  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.906  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [1 204]
+04-17 16:26:10.916  2315  8968 W TraceLog: onReleaseOutputBuffer(c2.qti.avc.decoder:0xb400007277507380) Queued: 59.9/s Done: 60.9/s Rendered: 60.9/s Discarded: 0.0/s
+04-17 16:26:10.928  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.928  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.928  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.928  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.928  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.929  1960  2102 I BackgroundExecutor: [FrameScheduler] set thread[2101]'s frequency to [0 0]
+04-17 16:26:10.938  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.938  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.939  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.939  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.939  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.961  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.962  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.962  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.962  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.962  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.973  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.973  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.973  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.973  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.973  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.986  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24828585550803, lux = 49, cct=31264, aod=17760
+04-17 16:26:10.994  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.995  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.995  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.995  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:10.995  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.017  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.017  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.017  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.017  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.017  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.027  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.027  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.027  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.027  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.027  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.050  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.050  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.050  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.050  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.051  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.061  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.061  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.061  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.061  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.061  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.072  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.072  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.072  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.072  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.072  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.094  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.094  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.094  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.094  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.095  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.105  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.105  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.105  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.105  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.106  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.127  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.127  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.128  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.128  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.128  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.138  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.138  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.138  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.138  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.138  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.150  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24828751545699, lux = 49, cct=31264, aod=17760
+04-17 16:26:11.161  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.161  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.161  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.161  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.161  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.171  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.171  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.171  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.171  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.172  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.187  1866  1984 D vendor.honor.hardware.aoservice-service: [AO_SVC] (reopen_timer_handler:52):enter reopen handler
+04-17 16:26:11.194  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.194  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.194  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.194  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.194  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.206  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.206  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.206  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.206  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.206  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.210  6983  7180 V MSF.C.MSFCore[@PS]: [Event] MSFPacketStatistics.cpp(300)::DoCheckRequestTimeout->current rtts:98.142
+04-17 16:26:11.225  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 0
+04-17 16:26:11.226  3762  4252 E TransportLayerUtils: performQueryWithTimeout exception = java.util.concurrent.ExecutionException: java.lang.ArrayIndexOutOfBoundsException: length=0; index=0, caller = getLinkLayerVersion, timeout = 1, EXECUTOR  = java.util.concurrent.ThreadPoolExecutor@6d9df10[Running, pool size = 1, active threads = 0, queued tasks = 0, completed tasks = 6138]
+04-17 16:26:11.226  3762  4252 D Booster_OllieChrManager: sendDataToChrApk msdId: 30
+04-17 16:26:11.226  3762  4252 I Booster_OllieChrManager: ChrService is null
+04-17 16:26:11.227  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 0
+04-17 16:26:11.227  3762  4252 E TransportLayerUtils: performQueryWithTimeout exception = java.util.concurrent.ExecutionException: java.lang.ArrayIndexOutOfBoundsException: length=0; index=0, caller = getLinkLayerVersion, timeout = 1, EXECUTOR  = java.util.concurrent.ThreadPoolExecutor@6d9df10[Running, pool size = 1, active threads = 0, queued tasks = 0, completed tasks = 6139]
+04-17 16:26:11.227  3762  4252 D Booster_OllieChrManager: sendDataToChrApk msdId: 30
+04-17 16:26:11.227  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.227  3762  4252 I Booster_OllieChrManager: ChrService is null
+04-17 16:26:11.228  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 1
+04-17 16:26:11.228  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.228  3762  4252 D TransportToLinkCommunication: getLinkLayerVersion module = 1
+04-17 16:26:11.228  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.228  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.228  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.228  3762  4253 D Advanced_Booster_Qoe: channel Index:6
+04-17 16:26:11.229  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, alpha is: 0.500000.
+04-17 16:26:11.229  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, smoothed data, chload: 11, rssi: -43, phyRxRate: 10806 100kbps, phyTxRate: 9606 100kbps.
+04-17 16:26:11.229  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:11.229  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 1, rateInTable: 673.601990 Mbps, calculated result: 6661.923828 100kbps.
+04-17 16:26:11.229  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:11.229  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 0, rateInTable: 634.069946 Mbps, calculated result: 6270.952148 100kbps.
+04-17 16:26:11.229  3762  4253 I Advanced_Booster_Qoe: AdaBoostPredict,index:6,NisPsSlow:0,NProba:350,rsrp(rssi):-44,rsrq(noise):-96,rtt(chload):0,buffhigh(uldelay):0,buffcomm(rtt):0
+04-17 16:26:11.229  3762  4253 D Advanced_Booster_Qoe: DetectLinkBandwidthLvlLow switch off.
+04-17 16:26:11.229  3762  4253 D Advanced_Booster_Qoe: DetectLinkUlDelayLvlLow switch off.
+04-17 16:26:11.230  3762  4253 D Advanced_Booster_Qoe: channel Index:2
+04-17 16:26:11.230  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, alpha is: 0.500000.
+04-17 16:26:11.230  3762  4253 D Calculate_Wifi_Bandwidth: SmoothWifiChannelParameters, smoothed data, chload: 5, rssi: -43, phyRxRate: 10806 100kbps, phyTxRate: 9606 100kbps.
+04-17 16:26:11.230  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:11.230  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 1, rateInTable: 673.601990 Mbps, calculated result: 6702.339844 100kbps.
+04-17 16:26:11.230  3762  4253 D Calculate_Wifi_Bandwidth: GetThroughputByLinearInter, left index is: 2, current rssi is: -43 dBm, higher rssi is: -40 dBm, lower rssi is: -45 dBm!
+04-17 16:26:11.230  3762  4047 I ChannelQoeData: dumpChannelData: ModelBaseInfo:0,10257,512,1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,-1,0,0,1,0,0,1,0,0,0,0 DnsInfo:0,0,0 WifiId:0 WifiInfo:2,1,0,0,9607,10806,0,0,0,2,-44,-96,50,0,0,2,2,255 AppUid:1051 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 AppUid:999 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 AppUid:0 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 AppUid:10257 ChannelId:2 TcpData:0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+04-17 16:26:11.230  3762  4253 D Calculate_Wifi_Bandwidth: CalcChannelBandwidthByTable, isDownLink: 0, rateInTable: 634.069946 Mbps, calculated result: 6308.996094 100kbps.
+04-17 16:26:11.230  3762  4253 I Advanced_Booster_Qoe: AdaBoostPredict,index:2,NisPsSlow:0,NProba:350,rsrp(rssi):-44,rsrq(noise):-96,rtt(chload):0,buffhigh(uldelay):0,buffcomm(rtt):0
+04-17 16:26:11.230  3762  4253 D Advanced_Booster_Qoe: DetectLinkBandwidthLvlLow switch off.
+04-17 16:26:11.230  3762  4253 D Advanced_Booster_Qoe: DetectLinkUlDelayLvlLow switch off.
+04-17 16:26:11.231  3762  4253 I Advanced_Booster_Qoe: AdvancedQoeInfo: 10257,4,0,350,1,2,4,0,350,960700,1080600,10,10,0,0,0,0,0,2,0,0,-44; subReason: 0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0,0,0; detectedRules: 0,0,0,0,1,2,0,0,0,0
+04-17 16:26:11.231  3762  4047 D NetworkQoeRca: appQoeInfo set faultType: 0
+04-17 16:26:11.232  3762  4047 D NetworkQoeRca: appQoeInfo set faultDomain: 0
+04-17 16:26:11.233  3762  4045 I Booster_OllieObserver: notify registrants event: EVENT_QOE_INFO_CHANGED
+04-17 16:26:11.234  3762  4047 D Linkturbo_NetworkQoeManager: getChannelQuality: {"channelId":0,"qoeLevel":4,"reason":0}
+04-17 16:26:11.235  3762  4047 I Linkturbo_EmcomUtils: multipathPolicy is null
+04-17 16:26:11.235  3762  4047 D Linkturbo_PolicyCenter: update rssi from qoe
+04-17 16:26:11.235  3762  4047 I NetworkQoeMonitor: dataQualityReport:10257,4,0,350,1,2,4,0,350,960700,1080600,10,10,0,0,0,0,0,2,-1,-1,-44; channelQos: 1,2,7,7,7,0,0,0; subReason: 0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0,0,0; appDetectedRules: 0,0,0,0; flowQuality: 10257,2,-1,-1,-1; faultType: 0; faultDomain: 0; appQoe confidence: -1
+04-17 16:26:11.236  3762  4047 D UserSceneNetworkSpeedStats: handleQoeInfoChanged, uid: 10257, qoeSpeedRecordNum: 1025, RX: 0 kbps, TX: 0 kbps
+04-17 16:26:11.236  3762  4047 I DataDecisionManager: monitorDataFaultRecovery, data fault recovery reset all param
+04-17 16:26:11.237  3762  4047 D DataDecisionManager: updateDataFaultPhenomenon dataFaultPhenomenon: 0
+04-17 16:26:11.237  3762  4047 D DataDecisionManager: isNeedNotifyDualCardHSRFenceFault return false, it isn't HSR fence fault Phenomenon
+04-17 16:26:11.237  3762  4047 E SmartDualCardUtils: isActiveSlotId error, invalid slotId
+04-17 16:26:11.237  3762  4047 D DataDecisionManager: isNeedNotifyLinkLayerFault return false,  the fault type and the channelId are not change
+04-17 16:26:11.237  3762  4047 D DataDecisionManager: isNeedNotifyTransportLayerFault return false, the default network link isn't cellular
+04-17 16:26:11.237  3762  4047 E SmartDualCardUtils: isActiveSlotId error, invalid slotId
+04-17 16:26:11.238  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.238  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.238  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.238  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.238  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.237  3762  4047 D DataDecisionManager: handleSmartDualCardFaultTypeNotify exit, because high speed rail fence is active or default network link isn't Cellular
+04-17 16:26:11.238  2720  3346 I NetworkQoeUtils: handleNetworkQoeUpdated. rtt: 0, maxRatioChannelId: 2
+04-17 16:26:11.239  2720  3346 I NetworkQoeUtils: getQoeEntityFromBundle. qoeString: 10257,4,0,350,1,2,4,0,350,960700,1080600,10,10,0,0,0,0, subReason: 0,0,0,0,0,0,0,0,1,2,0,0,0,0,0,0,0,0
+04-17 16:26:11.242  3762  4253 I Collector: HandleRawWifiInfoVer2: flag:0, netId:0!
+04-17 16:26:11.260  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.261  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.261  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.261  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.261  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.271  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.271  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.272  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.272  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.272  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.293  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.294  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.294  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.294  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.294  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.305  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.305  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.305  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.305  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.305  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.316  1816  3404 I sensors-hal: handle_sns_std_sensor_event:140, ambient_light_event: ts=24828917553199, lux = 49, cct=31264, aod=17760
+04-17 16:26:11.327  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.327  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.327  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.327  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.327  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.338  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.338  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.338  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.338  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.338  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.360  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.360  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.360  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.361  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.361  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.371  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.371  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.371  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.371  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.371  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.393  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.393  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.393  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.393  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.393  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.403  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.403  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.403  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.404  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.404  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.426  1960  2101 D RenderEngine: [Task=360#733] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.426  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#746] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.426  1960  2101 D RenderEngine: [Dim Layer for - Task=360#761] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.426  1960  2101 D RenderEngine: [com.udake.app/com.udake.app.MainActivity#759] set isRequiresLinearEffect false when dimming ratio equals 1.
+04-17 16:26:11.426  1960  2101 D RenderEngine: [DesktopMode of Task=360#742] set isRequiresLinearEffect false when dimming ratio equals 1.

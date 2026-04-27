@@ -1,1 +1,0 @@
-import{n as e}from"./pinia-CQWHB3L0.js";var t=`admin_language`,n=e(`app`,{state:()=>({language:localStorage.getItem(t)||`zh-CN`}),actions:{setLanguage(e){this.language=e,localStorage.setItem(t,e)}}});export{n as t};

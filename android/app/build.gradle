@@ -3,12 +3,6 @@ apply plugin: 'com.android.application'
 android {
     namespace = "com.udake.app"
     compileSdk = rootProject.ext.compileSdkVersion
-
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_21
-        targetCompatibility JavaVersion.VERSION_21
-    }
-
     defaultConfig {
         applicationId "com.udake.app"
         minSdkVersion rootProject.ext.minSdkVersion
@@ -22,21 +16,10 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-
-    signingConfigs {
-        release {
-            storeFile file('../../.android_keystore/UDAKE.jks')
-            storePassword System.getenv('KEYSTORE_PASSWORD') ?: project.hasProperty('KEYSTORE_PASSWORD') ? project.KEYSTORE_PASSWORD : ''
-            keyAlias 'UDAKE'
-            keyPassword System.getenv('KEYSTORE_ALIAS_PASSWORD') ?: project.hasProperty('KEYSTORE_ALIAS_PASSWORD') ? project.KEYSTORE_ALIAS_PASSWORD : ''
-        }
-    }
-
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig signingConfigs.release
         }
     }
 }

@@ -16,6 +16,13 @@
           <div class="desc">{{ authStore.user?.email || authStore.username }}</div>
         </div>
         <div class="actions">
+          <el-select :model-value="appStore.language" style="width: 120px" @change="onLanguageChange">
+            <el-option label="简体中文" value="zh-CN" />
+            <el-option label="English" value="en-US" />
+            <el-option label="日本語" value="ja-JP"/>
+            <el-option label="繁體中文" value="zh-TW"/>
+            <el-option label="한국어" value="ko-KR"/>
+          </el-select>
           <el-button plain @click="router.push('/dashboard')">管理员后台</el-button>
           <el-button type="danger" @click="onLogout">退出登录</el-button>
         </div>
@@ -29,18 +36,25 @@
 </template>
 
 <script setup lang="ts">
+import type { AppLanguage } from '../stores/app';
 import { ElMessage } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useAppStore } from '../stores/app';
 
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const appStore = useAppStore();
 
 const onLogout = async () => {
   await authStore.logoutWithApi();
   ElMessage.success('已退出登录');
   router.replace('/user/login');
+};
+
+const onLanguageChange = (language: AppLanguage) => {
+  appStore.setLanguage(language);
 };
 </script>
 

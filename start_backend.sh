@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-PROJECT_ROOT="/Users/wuchenkai/UDAKE"
-VENV_PATH="$PROJECT_ROOT/venv/bin/activate"
+PROJECT_ROOT="."
+VENV_PATH="$PROJECT_ROOT/guming/bin/activate"
 BACKEND_DIR="$PROJECT_ROOT/services/backend"
 
 if [ ! -f "$VENV_PATH" ]; then
