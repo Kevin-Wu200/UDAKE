@@ -3,6 +3,9 @@
  * 使用 Sentry SDK（兼容 GlitchTip 自托管）
  * 提供：错误捕获、上报、用户行为追踪、性能监控
  */
+import { I18n } from './I18n';
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 export interface SentryConfig {
     dsn: string;
@@ -79,7 +82,7 @@ export class ErrorMonitor {
             script.src = 'https://browser.sentry-cdn.com/7.108.0/bundle.tracing.min.js';
             script.crossOrigin = 'anonymous';
             script.onload = () => resolve();
-            script.onerror = () => reject(new Error('Sentry SDK 加载失败'));
+            script.onerror = () => reject(new Error(t('error.monitor.sentry.loadFailed')));
             document.head.appendChild(script);
         });
     }
