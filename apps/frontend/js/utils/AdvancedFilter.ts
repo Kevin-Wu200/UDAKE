@@ -2,6 +2,9 @@
  * 高级筛选和搜索组件
  * 多条件筛选、筛选条件保存、全文搜索、搜索高亮、搜索历史
  */
+import { I18n } from './I18n'
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 interface FilterCondition {
     field: string;
@@ -151,21 +154,21 @@ export class AdvancedFilter {
         const panel = document.createElement('div');
         panel.className = 'panel filter-panel';
         panel.innerHTML = `
-            <h2 class="panel-title">高级筛选</h2>
+            <h2 class="panel-title">${t('advanced.filter.title')}</h2>
             <div class="panel-content">
                 <div class="filter-search-bar" style="margin-bottom:12px;">
-                    <input type="text" class="input filter-search-input" placeholder="搜索..." aria-label="全文搜索" style="width:100%;">
+                    <input type="text" class="input filter-search-input" :placeholder="${t('advanced.filter.search.placeholder')}" :aria-label="${t('advanced.filter.search.label')}" style="width:100%;">
                     <div class="search-history-dropdown" style="display:none;"></div>
                 </div>
                 <div class="filter-conditions" id="filter-conditions"></div>
                 <div style="display:flex;gap:8px;margin-top:8px;">
-                    <button class="btn btn-export" id="filter-add" style="flex:1;height:32px;font-size:12px;">添加条件</button>
-                    <button class="btn btn-export" id="filter-apply" style="flex:1;height:32px;font-size:12px;">应用筛选</button>
-                    <button class="btn btn-export" id="filter-clear" style="flex:1;height:32px;font-size:12px;">清除</button>
+                    <button class="btn btn-export" id="filter-add" style="flex:1;height:32px;font-size:12px;">${t('advanced.filter.add')}')}</button>
+                    <button class="btn btn-export" id="filter-apply" style="flex:1;height:32px;font-size:12px;">${t('advanced.filter.apply')}</button>
+                    <button class="btn btn-export" id="filter-clear" style="flex:1;height:32px;font-size:12px;">${t('advanced.filter.clear')}</button>
                 </div>
                 <div class="filter-saved" style="margin-top:8px;">
                     <details>
-                        <summary style="cursor:pointer;font-size:12px;color:var(--text-secondary);">已保存的筛选</summary>
+                        <summary style="cursor:pointer;font-size:12px;color:var(--text-secondary);">${t('advanced.filter.saved')}</summary>
                         <div id="saved-filters-list" style="margin-top:4px;"></div>
                     </details>
                 </div>
@@ -225,9 +228,9 @@ export class AdvancedFilter {
                     <option value="lt">&lt;</option>
                     <option value="gte">≥</option>
                     <option value="lte">≤</option>
-                    <option value="contains">包含</option>
+                    <option value="contains">${t('advanced.filter.contains')}</option>
                 </select>
-                <input type="text" class="input filter-val" style="flex:1;height:28px;font-size:11px;" placeholder="值">
+                <input type="text" class="input filter-val" style="flex:1;height:28px;font-size:11px;" :placeholder="${t('advanced.filter.value')}">
                 <button class="filter-remove" style="width:24px;height:24px;border:none;background:none;cursor:pointer;color:var(--text-secondary);">✕</button>
             `;
             row.querySelector('.filter-remove')!.addEventListener('click', () => row.remove());
