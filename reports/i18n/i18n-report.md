@@ -1,12 +1,12 @@
 # 前端国际化检查报告
 
-- 生成时间: 2026-04-22T03:44:25.068Z
-- 基准语言总键数: 492
+- 生成时间: 2026-04-27T02:07:26.143Z
+- 基准语言总键数: 755
 - 检测到使用键数: 680
-- 未使用键数: 86
+- 未使用键数: 349
 - 基线保留键数: 131
-- 可疑硬编码数: 2020
-- 基线忽略硬编码数: 78
+- 可疑硬编码数: 1998
+- 基线忽略硬编码数: 72
 
 ## 语言覆盖率
 
@@ -18,77 +18,60 @@
 
 ## 命名规范问题
 
-- dataImport.action.confirmImport
-- dataImport.error.coordinateTransformFailed
-- dataImport.error.pointDataNumeric
-- dataImport.field.pointData
-- dataImport.field.x
-- dataImport.field.y
-- dataImport.label.geographicCoordinateSystem
-- dataImport.label.geographicEPSG
-- dataImport.label.projectedCoordinateSystem
-- dataImport.label.projectedEPSG
-- dataImport.modal.ariaLabel
-- dataImport.option.select
-- dataImport.section.coordinateSystem
-- dataImport.section.fieldMapping
-- dataImport.title
-- dataImport.validation.selectPointData
-- dataImport.validation.selectX
-- dataImport.validation.selectY
+- 无
 
 ## 未使用翻译键（最多 50 条）
 
-- app.subtitle
-- common.delete
-- common.view
-- description.accountInfo
-- description.exportGeoJSON
-- description.exportWizard
-- description.importData
-- description.importWizard
-- description.interpolationWizard
-- description.mobileWizard
-- description.newProject
-- description.redoHistory
-- description.samplingWizard
-- description.startKriging
-- description.undoHistory
-- description.wizardCenter
-- error.common.detailsButton
-- error.common.helpButton
-- error.common.icon.error
-- error.common.icon.success
-- error.common.icon.warning
-- error.common.refreshButton
-- explain.action.refresh
-- explain.action.submit
-- explain.action.verify
-- explain.method.hybrid
-- explain.method.lime
-- explain.method.shap
-- explain.method.switchAria
-- explain.monitor.active
-- explain.monitor.avgDuration
-- explain.monitor.cache
-- explain.monitor.errorRate
-- explain.monitor.queue
-- explain.monitor.successRate
-- explain.panel.subtitle
-- explain.panel.title
-- explain.result.tab.compare
-- explain.result.tab.lime
-- explain.result.tab.shap
-- explain.result.tab.spatiotemporal
-- explain.result.title
-- explain.status.cancelled
-- explain.status.completed
-- explain.status.emptyResult
-- explain.status.failed
-- explain.status.noTask
-- explain.status.queued
-- explain.status.retrying
-- explain.status.running
+- accessibility.calculate.start.title
+- accessibility.color-blind
+- accessibility.color-blind.deuteranopia
+- accessibility.color-blind.grayscale
+- accessibility.color-blind.none
+- accessibility.color-blind.protanopia
+- accessibility.color-blind.tritanopia
+- accessibility.dark-optimize
+- accessibility.font-scale
+- accessibility.fontScale.change.success
+- accessibility.fontScale.larger.title
+- accessibility.fontScale.smaller.title
+- accessibility.high-constract
+- accessibility.high-contrast.closed
+- accessibility.high-contrast.open
+- accessibility.high-contrast.title
+- accessibility.inputControl
+- accessibility.interpolation.start.failed
+- accessibility.interpolation.start.success
+- accessibility.interpolation.start.title
+- accessibility.jump.main.success
+- accessibility.jump.map.success
+- accessibility.jump.right-panel.switch-btn.success
+- accessibility.mobile-close.sidebar.success
+- accessibility.mobile-open.sidebar.success
+- accessibility.name
+- accessibility.newProject.success
+- accessibility.newProject.title
+- accessibility.open-settings
+- accessibility.panel.main
+- accessibility.panel.mapShow
+- accessibility.panel.mapSpatial
+- accessibility.panel.name
+- accessibility.panel.recommend
+- accessibility.prompt.newProject
+- accessibility.prompt.upload-data
+- accessibility.prompt.upload-failed
+- accessibility.reduce-motion
+- accessibility.setAttribute
+- accessibility.settings
+- accessibility.settings-panel.title
+- accessibility.settings.open.success
+- accessibility.settings.open.title
+- accessibility.settings.title
+- accessibility.shortcut.panel.open.success
+- accessibility.shortcut.panel.title
+- accessibility.shortcuts-help
+- accessibility.shortcuts-jump.template
+- accessibility.smart-assist
+- accessibility.submit.data.success
 
 ## 可疑硬编码（最多 50 条）
 

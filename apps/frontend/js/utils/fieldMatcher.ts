@@ -64,13 +64,13 @@ export class FieldMatcher {
         const errors: Partial<Record<keyof FieldSelection, string>> = {};
 
         if (!selection.x) {
-            errors.x = I18n.t('dataImport.validation.selectX');
+            errors.x = I18n.t('dataimport.validation.select_x');
         }
         if (!selection.y) {
-            errors.y = I18n.t('dataImport.validation.selectY');
+            errors.y = I18n.t('dataimport.validation.select_y');
         }
         if (!selection.pointData) {
-            errors.pointData = I18n.t('dataImport.validation.selectPointData');
+            errors.pointData = I18n.t('dataimport.validation.select_point_data');
         }
 
         return {

@@ -128,34 +128,34 @@ export class DataImportModal {
     renderModalContent(modal: HTMLDivElement): void {
         modal.setAttribute('role', 'dialog');
         modal.setAttribute('aria-modal', 'true');
-        modal.setAttribute('aria-label', I18n.t('dataImport.modal.ariaLabel'));
+        modal.setAttribute('aria-label', I18n.t('dataimport.modal.aria_label'));
 
         const fieldOptions = this.renderFieldOptions();
 
         modal.innerHTML = `
             <div class="modal-content">
-                <h2 class="modal-title">${I18n.t('dataImport.title')}</h2>
+                <h2 class="modal-title">${I18n.t('dataimport.title')}</h2>
 
                 <!-- 坐标系统信息 -->
                 <div class="modal-section">
-                    <h3 class="section-title">${I18n.t('dataImport.section.coordinateSystem')}</h3>
+                    <h3 class="section-title">${I18n.t('dataimport.section.coordinate_system')}</h3>
                     <div class="coordinate-info">
                         <div class="info-item">
-                            <span class="info-label">${I18n.t('dataImport.label.projectedCoordinateSystem')}</span>
+                            <span class="info-label">${I18n.t('dataimport.label.projected_coordinate_system')}</span>
                             <span class="info-value">${this.parseResult!.crsInfo.projectedName}</span>
                         </div>
                         ${this.parseResult!.crsInfo.projectedEPSG ? `
                         <div class="info-item">
-                            <span class="info-label">${I18n.t('dataImport.label.projectedEPSG')}</span>
+                            <span class="info-label">${I18n.t('dataimport.label.projected_epsg')}</span>
                             <span class="info-value">EPSG:${this.parseResult!.crsInfo.projectedEPSG}</span>
                         </div>
                         ` : ''}
                         <div class="info-item">
-                            <span class="info-label">${I18n.t('dataImport.label.geographicCoordinateSystem')}</span>
+                            <span class="info-label">${I18n.t('dataimport.label.geographic_coordinate_system')}</span>
                             <span class="info-value">${this.parseResult!.crsInfo.geographicName}</span>
                         </div>
                         <div class="info-item">
-                            <span class="info-label">${I18n.t('dataImport.label.geographicEPSG')}</span>
+                            <span class="info-label">${I18n.t('dataimport.label.geographic_epsg')}</span>
                             <span class="info-value">EPSG:${this.parseResult!.crsInfo.geographicEPSG}</span>
                         </div>
                     </div>
@@ -163,28 +163,28 @@ export class DataImportModal {
 
                 <!-- 字段映射选择 -->
                 <div class="modal-section">
-                    <h3 class="section-title">${I18n.t('dataImport.section.fieldMapping')}</h3>
+                    <h3 class="section-title">${I18n.t('dataimport.section.field_mapping')}</h3>
                     <div class="field-mapping">
                         <div class="form-group">
-                            <label for="field-x">${I18n.t('dataImport.field.x')}</label>
+                            <label for="field-x">${I18n.t('dataimport.field.x')}</label>
                             <select id="field-x" class="select">
-                                <option value="">${I18n.t('dataImport.option.select')}</option>
+                                <option value="">${I18n.t('dataimport.option.select')}</option>
                                 ${fieldOptions}
                             </select>
                             <span class="error-message" id="error-field-x" role="alert"></span>
                         </div>
                         <div class="form-group">
-                            <label for="field-y">${I18n.t('dataImport.field.y')}</label>
+                            <label for="field-y">${I18n.t('dataimport.field.y')}</label>
                             <select id="field-y" class="select">
-                                <option value="">${I18n.t('dataImport.option.select')}</option>
+                                <option value="">${I18n.t('dataimport.option.select')}</option>
                                 ${fieldOptions}
                             </select>
                             <span class="error-message" id="error-field-y" role="alert"></span>
                         </div>
                         <div class="form-group">
-                            <label for="field-point-data">${I18n.t('dataImport.field.pointData')}</label>
+                            <label for="field-point-data">${I18n.t('dataimport.field.point_data')}</label>
                             <select id="field-point-data" class="select">
-                                <option value="">${I18n.t('dataImport.option.select')}</option>
+                                <option value="">${I18n.t('dataimport.option.select')}</option>
                                 ${fieldOptions}
                             </select>
                             <span class="error-message" id="error-field-point-data" role="alert"></span>
@@ -195,7 +195,7 @@ export class DataImportModal {
                 <!-- 操作按钮 -->
                 <div class="modal-actions">
                     <button id="modal-cancel" class="btn btn-secondary">${I18n.t('common.cancel')}</button>
-                    <button id="modal-confirm" class="btn btn-primary">${I18n.t('dataImport.action.confirmImport')}</button>
+                    <button id="modal-confirm" class="btn btn-primary">${I18n.t('dataimport.action.confirmimport')}</button>
                 </div>
             </div>
         `;
@@ -388,8 +388,8 @@ export class DataImportModal {
         if (!FieldMatcher.isNumericField(this.parseResult!.geojson, this.fieldSelection.pointData!)) {
             this.showError(
                 'field-point-data',
-                I18n.t('dataImport.error.pointDataNumeric'),
-                'dataImport.error.pointDataNumeric'
+                I18n.t('dataimport.error.point_data_numeric'),
+                'dataimport.error.point_data_numeric'
             );
             return;
         }
@@ -432,7 +432,7 @@ export class DataImportModal {
                     x = transformed.x;
                     y = transformed.y;
                 } catch (error) {
-                    throw new Error(I18n.t('dataImport.error.coordinateTransformFailed'));
+                    throw new Error(I18n.t('dataimport.error.coordinate_transform_failed'));
                 }
             }
 
@@ -462,9 +462,9 @@ export class DataImportModal {
     }
 
     showErrors(errors: Record<string, string>): void {
-        if (errors.x) this.showError('field-x', errors.x, 'dataImport.validation.selectX');
-        if (errors.y) this.showError('field-y', errors.y, 'dataImport.validation.selectY');
-        if (errors.pointData) this.showError('field-point-data', errors.pointData, 'dataImport.validation.selectPointData');
+        if (errors.x) this.showError('field-x', errors.x, 'dataimport.validation.select_x');
+        if (errors.y) this.showError('field-y', errors.y, 'dataimport.validation.select_y');
+        if (errors.pointData) this.showError('field-point-data', errors.pointData, 'dataimport.validation.select_point_data');
     }
 
     clearError(fieldId: string): void {

@@ -49,27 +49,27 @@ export class CoordinateSystemInfo {
         const panel = document.createElement('div');
         panel.className = 'panel coordinate-system-panel';
         panel.innerHTML = `
-            <h2 class="panel-title">${t('dataImport.section.coordinateSystem')}</h2>
+            <h2 class="panel-title">${t('dataimport.section.coordinate_system')}</h2>
             <div class="panel-content">
                 <div class="coordinate-info">
                     <div class="info-item">
-                        <span class="info-label">${t('dataImport.label.projectedCoordinateSystem')}</span>
+                        <span class="info-label">${t('dataimport.label.projected_coordinate_system')}</span>
                         <span class="info-value" id="projection-name">${t('status.loading')}</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">${t('dataImport.label.projectedEPSG')}</span>
+                        <span class="info-label">${t('dataimport.label.projected_epsg')}</span>
                         <span class="info-value" id="projection-epsg">-</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">${t('dataImport.label.geographicCoordinateSystem')}</span>
+                        <span class="info-label">${t('dataimport.label.geographic_coordinate_system')}</span>
                         <span class="info-value" id="geographic-name">-</span>
                     </div>
                     <div class="info-item">
-                        <span class="info-label">${t('dataImport.label.geographicEPSG')}</span>
+                        <span class="info-label">${t('dataimport.label.geographic_epsg')}</span>
                         <span class="info-value" id="geographic-epsg">-</span>
                     </div>
                     <div class="info-item wkt-item">
-                        <span class="info-label">${t('dataImport.label.wkt')}</span>
+                        <span class="info-label">${t('dataimport.label.wkt')}</span>
                         <button class="btn-collapse" id="wkt-toggle">${t('common.expand')}</button>
                     </div>
                     <div class="wkt-content" id="wkt-content" style="display: none;">
@@ -156,7 +156,7 @@ export class CoordinateSystemInfo {
         }
 
         // 设置 WKT
-        const wkt = sr.wkt || t('dataImport.status.noWktInfo');
+        const wkt = sr.wkt || t('dataimport.status.noWktInfo');
         const wktTextEl = this.container?.querySelector('#wkt-text') as HTMLElement;
         if (wktTextEl) {
             wktTextEl.textContent = wkt;

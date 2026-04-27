@@ -2,7 +2,7 @@
  * 无障碍管理器
  * 统一管理键盘、屏幕阅读器、视觉辅助、语音与手势增强
  */
-import { I18n } from './i18n';
+import { I18n } from './I18n';
 
 const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
