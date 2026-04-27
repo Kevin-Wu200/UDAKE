@@ -5,6 +5,8 @@
 import type { ErrorType, ErrorDetail, ErrorLogEntry, ValidationResult, ErrorLevel } from '../../types/core';
 import { I18n } from './I18n';
 
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
+
 interface ToastAction {
     key: string;
     label: string;
@@ -107,128 +109,128 @@ export class ErrorHandler {
             code: 'E-GEOJSON-001',
             level: 'WARNING',
             icon: '🧩',
-            message: 'GeoJSON 格式错误',
-            suggestion: '请确保文件是标准的 GeoJSON 格式，包含 type 和 features 字段。',
-            solutions: ['检查 GeoJSON 的 type 字段', '确认 FeatureCollection 包含 features 数组'],
+            message: t('error.geojson_format.message'),
+            suggestion: t('error.geojson_format.suggestion'),
+            solutions: [t('error.geojson_format.solution1'), t('error.geojson_format.solution2')],
             helpLink: '/help/data-format/geojson',
-            example: '示例: {"type": "FeatureCollection", "features": [...]}'
+            example: t('error.geojson_format.example')
         },
         coordinate_format: {
             code: 'E-COORD-001',
             level: 'WARNING',
             icon: '📍',
-            message: '坐标格式错误',
-            suggestion: '请输入有效的经纬度坐标，经度范围 -180~180，纬度范围 -90~90。',
-            solutions: ['检查经纬度是否为数字', '确认经度和纬度范围正确'],
+            message: t('error.coordinate_format.message'),
+            suggestion: t('error.coordinate_format.suggestion'),
+            solutions: [t('error.coordinate_format.solution1'), t('error.coordinate_format.solution2')],
             helpLink: '/help/location/coordinate',
-            example: '示例: 经度 116.397428, 纬度 39.90923'
+            example: t('error.coordinate_format.example')
         },
         point_out_of_bounds: {
             code: 'E-POINT-001',
             level: 'WARNING',
             icon: '🗺️',
-            message: '采样点超出区域边界',
-            suggestion: '请确保采样点在已设定的区域边界内，或切换到自由采样模式。',
-            solutions: ['将点位移动到边界内部', '检查边界是否上传正确']
+            message: t('error.point_out_of_bounds.message'),
+            suggestion: t('error.point_out_of_bounds.suggestion'),
+            solutions: [t('error.point_out_of_bounds.solution1'), t('error.point_out_of_bounds.solution2')]
         },
         geolocation_failed: {
             code: 'E-GEOLOC-001',
             level: 'SEVERE',
             icon: '📡',
-            message: '设备定位失败',
-            suggestion: '请检查设备GPS是否开启，或尝试在室外环境重新定位。',
-            solutions: ['开启定位服务', '切换到信号更好的区域后重试']
+            message: t('error.geolocation_failed.message'),
+            suggestion: t('error.geolocation_failed.suggestion'),
+            solutions: [t('error.geolocation_failed.solution1'), t('error.geolocation_failed.solution2')],
         },
         permission_denied: {
             code: 'E-PERM-001',
             level: 'SEVERE',
             icon: '🔒',
-            message: '定位权限被拒绝',
-            suggestion: '请在浏览器设置中允许本站访问位置信息，然后刷新页面重试。',
-            solutions: ['打开浏览器权限设置', '允许位置权限后刷新页面']
+            message: t('error.permission_denied.message'),
+            suggestion: t('error.permission_denied.suggestion'),
+            solutions: [t('error.permission_denied.solution1'), t('error.permission_denied.solution2')]
         },
         invalid_polygon: {
             code: 'E-POLY-001',
             level: 'WARNING',
             icon: '🔷',
-            message: '无效的多边形数据',
-            suggestion: '仅支持 Polygon 或 MultiPolygon 类型，请检查 GeoJSON 几何类型。',
-            solutions: ['确认 geometry.type 为 Polygon 或 MultiPolygon']
+            message: t('error.invalid_polygon.message'),
+            suggestion: t('error.invalid_polygon.suggestion'),
+            solutions: [t('error.invalid_polygon.solution')]
         },
         network_error: {
             code: 'E-NET-001',
             level: 'SEVERE',
             icon: '📶',
-            message: '网络连接失败',
-            suggestion: '请检查网络连接和后端服务是否正常运行。',
-            solutions: ['检查网络连接是否正常', '确认后端服务已启动', '点击重试重新发起请求'],
+            message: t('error.network_error.message'),
+            suggestion: t('error.network_error.suggestion'),
+            solutions: [t('error.network_error.solution1'), t('error.network_error.solution2'), t('error.network_error.solution3')],
             retryable: true
         },
         validation_error: {
             code: 'E-VALID-001',
             level: 'WARNING',
             icon: '✅',
-            message: '数据验证失败',
-            suggestion: '请检查输入数据是否符合要求。',
-            solutions: ['检查必填项', '按示例数据格式输入']
+            message: t('error.validation_error.message'),
+            suggestion: t('error.validation_error.suggestion'),
+            solutions: [t('error.validation_error.solution1'), t('error.validation_error.solution2')]
         },
         server_error: {
             code: 'E-SERVER-001',
             level: 'FATAL',
             icon: '🛠️',
-            message: '服务器内部错误',
-            suggestion: '服务器处理请求时出错，请稍后重试。如问题持续，请联系管理员。',
-            solutions: ['稍后重试', '刷新页面后重试', '联系管理员并附上错误码'],
+            message: t('error.server_error.message'),
+            suggestion: t('error.server_error.suggestion'),
+            solutions: [t('error.server_error.solution1'), t('error.server_error.solution2'), t('error.server_error.solution3')],
             retryable: true
         },
         timeout_error: {
             code: 'E-TIMEOUT-001',
             level: 'SEVERE',
             icon: '⏱️',
-            message: '请求超时',
-            suggestion: '服务器响应时间过长，可能是数据量较大。请稍后重试或减小数据规模。',
-            solutions: ['稍后重试', '减少单次处理数据量'],
+            message: t('error.timeout_error.message'),
+            suggestion: t('error.timeout_error.suggestion'),
+            solutions: [t('error.timeout_error.solution1'), t('error.timeout_error.solution2')],
             retryable: true
         },
         file_too_large: {
             code: 'E-FILE-001',
             level: 'INFO',
             icon: '📦',
-            message: '文件过大',
-            suggestion: '上传文件不能超过 50MB，请压缩数据或分批上传。',
-            solutions: ['压缩文件', '拆分后分批上传']
+            message: t('error.file_too_large.message'),
+            suggestion: t('error.file_too_large.suggestion'),
+            solutions: [t('error.file_too_large.solution1'), t('error.file_too_large.solution2')]
         },
         unsupported_format: {
             code: 'E-FORMAT-001',
             level: 'INFO',
             icon: '📄',
-            message: '不支持的文件格式',
-            suggestion: '仅支持 .geojson 和 .json 格式的文件。',
-            solutions: ['将文件转换为 .geojson 或 .json']
+            message: t('error.unsupported_format.message'),
+            suggestion: t('error.unsupported_format.suggestion'),
+            solutions: [t('error.unsupported_format.solution')]
         },
         interpolation_failed: {
             code: 'E-INTP-001',
             level: 'SEVERE',
             icon: '📉',
-            message: '插值计算失败',
-            suggestion: '可能是采样点分布不合理或参数设置有误，请尝试调整变异函数模型或网格分辨率。',
-            solutions: ['增加采样点数量', '调整参数后重试']
+            message: t('error.interpolation_failed.message'),
+            suggestion: t('error.interpolation_failed.suggestion'),
+            solutions: [t('error.interpolation_failed.solution1'), t('error.interpolation_failed.solution2')]
         },
         insufficient_points: {
             code: 'E-POINT-002',
             level: 'INFO',
             icon: '➕',
-            message: '采样点不足',
-            suggestion: '克里金插值至少需要 3 个采样点，请继续添加采样数据。',
-            solutions: ['至少添加 3 个采样点']
+            message: t('error.insufficient_points.message'),
+            suggestion: t('error.insufficient_points.suggestion'),
+            solutions: [t('error.insufficient_points.solution')]
         },
         export_failed: {
             code: 'E-EXPORT-001',
             level: 'WARNING',
             icon: '📤',
-            message: '导出失败',
-            suggestion: '文件生成出错，请确认插值任务已完成后重试。',
-            solutions: ['确认任务已完成', '点击重试重新导出'],
+            message: t('error.export_failed.message'),
+            suggestion: t('error.export_failed.suggestion'),
+            solutions: [t('error.export_failed.solution1'), t('error.export_failed.solution2')],
             retryable: true
         }
     };
@@ -246,7 +248,7 @@ export class ErrorHandler {
     }
 
     static getErrorDetail(errorType: ErrorType): ErrorDetail {
-        const fallback = ErrorHandler._fallbackErrorDetails[errorType] || { message: '未知错误' };
+        const fallback = ErrorHandler._fallbackErrorDetails[errorType] || { message: t('error.common.unknown') };
         const detail: ErrorDetail = {
             code: fallback.code || ErrorHandler.ErrorCodes[errorType],
             level: fallback.level || ErrorHandler.ErrorLevels[errorType],
