@@ -12,6 +12,9 @@ import type {
     SampleValueParseResult,
     InternalParseResult
 } from '../../types/coordinate';
+import { I18n } from './I18n';
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 export class CoordinateParser {
     /**
@@ -19,7 +22,7 @@ export class CoordinateParser {
      */
     static parseCoordinate(inputString: string, type: CoordinateType = 'longitude'): CoordinateParseResult {
         if (!inputString || typeof inputString !== 'string') {
-            return { valid: false, value: null, format: null, error: '请输入坐标值' };
+            return { valid: false, value: null, format: null, error: t('coordinate.error.valueRequired') };
         }
 
         let cleaned = inputString.trim();
@@ -43,7 +46,7 @@ export class CoordinateParser {
             return this.validateRange(result.value!, type, 'DD');
         }
 
-        return { valid: false, value: null, format: null, error: '无法识别的坐标格式' };
+        return { valid: false, value: null, format: null, error: t('coordinate.error.invalidFormat') };
     }
 
     /**
@@ -132,11 +135,11 @@ export class CoordinateParser {
     static validateRange(value: number, type: CoordinateType, format: CoordinateFormat): CoordinateParseResult {
         if (type === 'longitude') {
             if (value < -180 || value > 180) {
-                return { valid: false, value: null, format: null, error: '经度超出合法范围 (-180 ~ 180)' };
+                return { valid: false, value: null, format: null, error: t('coordinate.error.invalidRange.longitude') };
             }
         } else if (type === 'latitude') {
             if (value < -90 || value > 90) {
-                return { valid: false, value: null, format: null, error: '纬度超出合法范围 (-90 ~ 90)' };
+                return { valid: false, value: null, format: null, error: t('coordinate.error.invalidRange.latitude') };
             }
         }
         return { valid: true, value, format, error: null };
@@ -147,15 +150,15 @@ export class CoordinateParser {
      */
     static parseSampleValue(inputString: string): SampleValueParseResult {
         if (!inputString || typeof inputString !== 'string') {
-            return { valid: false, value: null, error: '请输入采样值' };
+            return { valid: false, value: null, error: t('coordinate.error.sampling.valueRequired') };
         }
         const cleaned = inputString.trim();
         if (cleaned === '') {
-            return { valid: false, value: null, error: '采样值不能为空' };
+            return { valid: false, value: null, error: t('coordinate.error.sampling.valueEmpty') };
         }
         const value = parseFloat(cleaned);
         if (isNaN(value)) {
-            return { valid: false, value: null, error: '采样值必须为数值' };
+            return { valid: false, value: null, error: t('coordinate.error.sampling.mustNum') };
         }
         return { valid: true, value, error: null };
     }
