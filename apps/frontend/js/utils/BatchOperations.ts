@@ -2,6 +2,9 @@
  * 批量操作管理器
  * 批量导入、导出、删除、更新采样点
  */
+import { I18n } from './I18n.js';
+
+const t = (key: string, params?: Record<string, string | number>): string => I18n.t(key, params);
 
 interface BatchResult {
     total: number;
@@ -25,7 +28,7 @@ export class BatchOperations {
                 const file = files[i];
                 if (!file.name.match(/\.(geojson|json)$/i)) {
                     result.failed++;
-                    result.errors.push(`${file.name}: 不支持的文件格式`);
+                    result.errors.push(t('batchoperations.file.format.invalid', { filename: file.name }));
                     continue;
                 }
                 const text = await file.text();
@@ -106,15 +109,15 @@ export class BatchOperations {
             overlay.innerHTML = `
                 <div class="modal" style="max-width:400px;">
                     <div class="modal-header">
-                        <h2 class="modal-title">批量操作确认</h2>
+                        <h2 class="modal-title">${t('batchoperations.operate.confirm.title')}</h2>
                     </div>
                     <div class="modal-body" style="padding:16px 24px;">
-                        <p>确定要对 <strong>${count}</strong> 个项目执行「${action}」操作吗？</p>
-                        <p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">此操作可能无法撤销</p>
+                        <p>${t('batchoperations.operate.confirm.message.title')} <strong>${count}</strong> ${t('batchoperations.operate.confirm.message.point', { action: action })}</p>
+                        <p style="color:var(--text-secondary);font-size:13px;margin-top:8px;">${t('batchoperations.operate.confirm.message.warning')}</p>
                     </div>
                     <div class="modal-footer">
-                        <button class="btn" id="batch-cancel">取消</button>
-                        <button class="btn btn-primary" id="batch-confirm">确认执行</button>
+                        <button class="btn" id="batch-cancel">${t('common.cancel')}</button>
+                        <button class="btn btn-primary" id="batch-confirm">${t('batchoperations.operate.confirm.confirmButton')}</button>
                     </div>
                 </div>
             `;
