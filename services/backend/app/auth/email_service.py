@@ -62,6 +62,22 @@ class SMTPEmailService:
 
     @classmethod
     def from_env(cls) -> "SMTPEmailService":
+        # 统一从后端配置对象读取，避免仅依赖 os.environ 导致读取不到 configs/env 下的 .env 文件值
+        # （Pydantic 会读取 env_file，但不会把值回写到进程环境变量）
+        settings = None
+        try:
+            from app.config import settings as app_settings
+            settings = app_settings
+        except Exception:
+            settings = None
+
+        def _get_setting(name: str, default: str) -> str:
+            if settings is not None and hasattr(settings, name):
+                value = getattr(settings, name)
+                if value is not None:
+                    return str(value).strip()
+            return os.getenv(name, default).strip()
+
         accounts: List[SMTPAccount] = []
         accounts_json = os.getenv("SMTP_ACCOUNTS")
         if accounts_json:
@@ -85,10 +101,10 @@ class SMTPEmailService:
                 logger.warning("SMTP_ACCOUNTS JSON 解析失败，将使用默认环境变量")
 
         if not accounts:
-            host = os.getenv("SMTP_HOST", "smtp.qq.com").strip()
-            user = os.getenv("SMTP_USER", "").strip()
-            password = os.getenv("SMTP_PASSWORD", "").strip()
-            port = int(os.getenv("SMTP_PORT", "587"))
+            host = _get_setting("SMTP_HOST", "smtp.qq.com")
+            user = _get_setting("SMTP_USER", "")
+            password = _get_setting("SMTP_PASSWORD", "")
+            port = int(_get_setting("SMTP_PORT", "587"))
             if user and password:
                 accounts.append(
                     SMTPAccount(
@@ -101,10 +117,10 @@ class SMTPEmailService:
                     )
                 )
 
-            backup_host = os.getenv("SMTP_BACKUP_HOST", "smtp.gmail.com").strip()
-            backup_user = os.getenv("SMTP_BACKUP_USER", "").strip()
-            backup_password = os.getenv("SMTP_BACKUP_PASSWORD", "").strip()
-            backup_port = int(os.getenv("SMTP_BACKUP_PORT", "587"))
+            backup_host = _get_setting("SMTP_BACKUP_HOST", "smtp.gmail.com")
+            backup_user = _get_setting("SMTP_BACKUP_USER", "")
+            backup_password = _get_setting("SMTP_BACKUP_PASSWORD", "")
+            backup_port = int(_get_setting("SMTP_BACKUP_PORT", "587"))
             if backup_user and backup_password:
                 accounts.append(
                     SMTPAccount(

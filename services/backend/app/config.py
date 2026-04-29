@@ -446,8 +446,19 @@ backend_env_file_map = {
     "production": str(ENV_DIR_PATH / ".env.backend.production")
 }
 
-# 优先使用后端专用的环境配置文件，如果不存在则使用默认 .env
-current_env_file = backend_env_file_map.get(environment, str(ENV_DIR_PATH / ".env"))
+# 选择配置文件优先级：
+# 1) 后端专用环境文件 .env.backend.<env>
+# 2) 通用环境文件 .env.<env>
+# 3) 默认 .env
+standard_env_file_map = {
+    "development": str(ENV_DIR_PATH / ".env.development"),
+    "testing": str(ENV_DIR_PATH / ".env.testing"),
+    "production": str(ENV_DIR_PATH / ".env.production"),
+}
+
+current_env_file = backend_env_file_map.get(environment, "")
+if not current_env_file or not Path(current_env_file).exists():
+    current_env_file = standard_env_file_map.get(environment, str(ENV_DIR_PATH / ".env"))
 if not Path(current_env_file).exists():
     current_env_file = str(ENV_DIR_PATH / ".env")
 

@@ -43,13 +43,13 @@ def upgrade() -> None:
             "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.CheckConstraint("role IN ('user', 'admin', 'enterprise')", name="ck_users_role_enum"),
         sa.CheckConstraint(
@@ -74,7 +74,7 @@ def upgrade() -> None:
             "issued_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.Column("activated_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=True),
@@ -83,13 +83,13 @@ def upgrade() -> None:
             "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.CheckConstraint(
@@ -118,7 +118,7 @@ def upgrade() -> None:
             "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.CheckConstraint(
@@ -161,7 +161,7 @@ def upgrade() -> None:
             "changed_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.CheckConstraint(
@@ -198,13 +198,13 @@ def upgrade() -> None:
             "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="CASCADE"),
         sa.CheckConstraint(
@@ -233,7 +233,7 @@ def upgrade() -> None:
             "requested_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("processed_at", sa.DateTime(timezone=True), nullable=True),
@@ -276,13 +276,13 @@ def upgrade() -> None:
             "created_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.Column(
             "updated_at",
             sa.DateTime(timezone=True),
             nullable=False,
-            server_default=sa.text("NOW()"),
+            server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
         sa.CheckConstraint(
             "scope IN ('ip', 'user', 'api_key', 'device')",
@@ -318,7 +318,7 @@ def upgrade() -> None:
             user_agent VARCHAR(255),
             request_id VARCHAR(64),
             details JSONB,
-            operated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            operated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
             CONSTRAINT ck_audit_logs_operation_type_enum CHECK (
                 operation_type IN (
                     'create', 'read', 'update', 'delete',
@@ -356,7 +356,7 @@ def upgrade() -> None:
         LANGUAGE plpgsql
         AS $$
         DECLARE
-            base_month DATE := date_trunc('month', NOW() AT TIME ZONE 'UTC')::date;
+            -- base_month DATE
             idx INTEGER;
             part_start DATE;
             part_end DATE;

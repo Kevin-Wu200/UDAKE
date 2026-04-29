@@ -361,7 +361,10 @@ def hash_password(
 def verify_password(password: str, encoded_hash: str) -> bool:
     """Verify password by encoded hash string."""
     try:
-        parts = encoded_hash.split("$")
+        normalized_hash = str(encoded_hash or "").strip()
+        # Tolerate accidental wrapping/trailing quotes in persisted hash values.
+        normalized_hash = normalized_hash.strip("'\"")
+        parts = normalized_hash.split("$")
         if len(parts) != 8 or parts[0] != "argon2id":
             return False
         params = {}

@@ -57,6 +57,8 @@ def test_password_hash_and_verify_and_parallel_hashing():
     encoded = hash_password("StrongPass123")
     assert verify_password("StrongPass123", encoded)
     assert not verify_password("bad-pass", encoded)
+    assert verify_password("StrongPass123", f"{encoded}'")
+    assert verify_password("StrongPass123", f"'{encoded}'")
 
     results = hash_passwords_parallel(["Aa111111", "Bb222222", "Cc333333"], max_workers=2)
     assert len(results) == 3

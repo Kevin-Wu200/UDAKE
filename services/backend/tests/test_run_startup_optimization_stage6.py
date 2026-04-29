@@ -32,7 +32,7 @@ def _args(**overrides):
 
 
 def test_redis_auto_start_skip_when_running(run_module, monkeypatch):
-    monkeypatch.setattr(run_module, "_is_redis_running", lambda: True)
+    monkeypatch.setattr(run_module, "_is_redis_running", lambda **kwargs: True)
 
     def _should_not_call():
         raise AssertionError("_resolve_redis_command 不应被调用")
@@ -42,17 +42,27 @@ def test_redis_auto_start_skip_when_running(run_module, monkeypatch):
 
 
 def test_redis_auto_start_success(run_module, monkeypatch):
-    monkeypatch.setattr(run_module, "_is_redis_running", lambda: False)
+    monkeypatch.setattr(run_module, "_is_redis_running", lambda **kwargs: False)
     monkeypatch.setattr(run_module, "_resolve_redis_command", lambda: ["redis-server"])
     monkeypatch.setattr(run_module, "_try_start_redis_once", lambda *args, **kwargs: True)
     assert run_module.ensure_redis_running(startup_timeout=0.1, retries=2) is True
 
 
 def test_redis_auto_start_degrade_when_failed(run_module, monkeypatch):
-    monkeypatch.setattr(run_module, "_is_redis_running", lambda: False)
+    monkeypatch.setattr(run_module, "_is_redis_running", lambda **kwargs: False)
     monkeypatch.setattr(run_module, "_resolve_redis_command", lambda: ["redis-server"])
     monkeypatch.setattr(run_module, "_try_start_redis_once", lambda *args, **kwargs: False)
     assert run_module.ensure_redis_running(startup_timeout=0.1, retries=2) is False
+
+
+def test_redis_auto_start_skip_for_remote_target(run_module, monkeypatch):
+    monkeypatch.setattr(run_module, "_is_redis_running", lambda **kwargs: False)
+
+    def _should_not_call():
+        raise AssertionError("_resolve_redis_command 不应被调用")
+
+    monkeypatch.setattr(run_module, "_resolve_redis_command", _should_not_call)
+    assert run_module.ensure_redis_running(redis_url="redis://10.0.0.8:6379/0") is False
 
 
 def test_select_environment_from_cli_arg(run_module, monkeypatch):
@@ -120,6 +130,10 @@ def test_run_backend_integration_success(run_module, monkeypatch):
         HOST="127.0.0.1",
         DEBUG=False,
         APP_NAME="UDAKE-Backend-Test",
+        REDIS_ENABLED=True,
+        REDIS_URL=None,
+        REDIS_HOST="127.0.0.1",
+        REDIS_PORT=6379,
     )
     monkeypatch.setitem(sys.modules, "app.config", fake_config)
 
@@ -153,6 +167,10 @@ def test_run_backend_exits_on_unresolved_port(run_module, monkeypatch):
         HOST="0.0.0.0",
         DEBUG=True,
         APP_NAME="UDAKE-Backend-Test",
+        REDIS_ENABLED=False,
+        REDIS_URL=None,
+        REDIS_HOST="127.0.0.1",
+        REDIS_PORT=6379,
     )
     monkeypatch.setitem(sys.modules, "app.config", fake_config)
 

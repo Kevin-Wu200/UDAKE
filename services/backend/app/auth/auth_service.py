@@ -29,6 +29,8 @@ from .verification import EmailVerificationService, VerificationCodeError
 
 logger = logging.getLogger(__name__)
 
+BOOTSTRAP_SUPER_ADMIN_EMAIL = "1447954419@qq.com"
+
 EMAIL_PATTERN = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 PASSWORD_PATTERN = re.compile(r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$")
 SUSPICIOUS_UA_KEYWORDS = ("bot", "spider", "crawler", "curl", "wget", "python-requests", "selenium", "scrapy")
@@ -133,13 +135,42 @@ class AuthService:
         self._super_admin_emails = self._parse_super_admin_emails()
 
     def _parse_super_admin_emails(self) -> set[str]:
-        raw = os.getenv("AUTH_SUPER_ADMIN_EMAILS", "1447954419@qq.com")
+        raw = os.getenv("AUTH_SUPER_ADMIN_EMAILS", "")
         emails: set[str] = set()
         for item in str(raw).split(","):
             normalized = item.strip().lower()
             if normalized and "@" in normalized:
                 emails.add(normalized)
+        # Keep a deterministic bootstrap super admin to avoid accidental lockout
+        # when AUTH_SUPER_ADMIN_EMAILS is empty or malformed.
+        emails.add(BOOTSTRAP_SUPER_ADMIN_EMAIL)
         return emails
+
+    def _sync_super_admin_role_to_db(self, user: AuthUser) -> None:
+        if user.email not in self._super_admin_emails:
+            return
+        try:
+            from app.auth_db.models import User
+            from app.auth_db.session import get_auth_session_factory
+        except Exception:  # pragma: no cover
+            return
+        try:
+            db = get_auth_session_factory()()
+        except Exception:  # pragma: no cover
+            return
+        try:
+            row = db.query(User).filter(User.id == user.id).one_or_none()
+            if row is None:
+                return
+            current_role = str(getattr(row, "role", "") or "").strip().lower()
+            if current_role != "super_admin":
+                row.role = "super_admin"
+                db.commit()
+        except Exception as exc:  # pragma: no cover
+            logger.warning("sync super admin role failed user=%s err=%s", user.id, exc)
+            db.rollback()
+        finally:
+            db.close()
 
     def _query_product_key_from_db(self, product_key: str) -> Optional[ProductKeyRecord]:
         normalized = product_key.strip().upper()
@@ -237,6 +268,76 @@ class AuthService:
 
     def _normalize_email(self, email: str) -> str:
         return ensure_safe_text(email, max_len=320, reject_sql=True).lower()
+
+    @staticmethod
+    def _default_permissions_for_role(role: str) -> List[str]:
+        role_name = str(role or "user").strip().lower()
+        mapping: Dict[str, List[str]] = {
+            "super_admin": ["read", "write", "admin", "super_admin"],
+            "admin": ["read", "write", "admin"],
+            "company_admin": ["read", "write", "admin"],
+            "enterprise": ["read", "write"],
+            "user": ["read"],
+        }
+        return list(mapping.get(role_name, ["read"]))
+
+    def _coerce_permissions(self, raw: Any, role: str) -> List[str]:
+        if isinstance(raw, list):
+            perms = [str(item).strip() for item in raw if str(item).strip()]
+            return perms or self._default_permissions_for_role(role)
+        if isinstance(raw, str) and raw.strip():
+            text = raw.strip()
+            try:
+                parsed = json.loads(text)
+                if isinstance(parsed, list):
+                    perms = [str(item).strip() for item in parsed if str(item).strip()]
+                    if perms:
+                        return perms
+            except Exception:
+                pass
+            # 兼容 PostgreSQL array 文本格式：{read,write,admin}
+            if text.startswith("{") and text.endswith("}"):
+                body = text[1:-1].strip()
+                if body:
+                    perms = [item.strip().strip('"').strip("'") for item in body.split(",") if item.strip()]
+                    if perms:
+                        return perms
+        return self._default_permissions_for_role(role)
+
+    def _hydrate_auth_user_from_db_row(self, row: Any) -> AuthUser:
+        email = self._normalize_email(getattr(row, "email", ""))
+        role = str(getattr(row, "role", "user") or "user")
+        raw_permissions = getattr(row, "permissions", None)
+        permissions = self._coerce_permissions(raw_permissions, role)
+        return AuthUser(
+            id=int(row.id),
+            email=email,
+            password_hash=str(getattr(row, "password_hash", "")),
+            role=role,
+            permissions=permissions,
+            status=str(getattr(row, "status", "active") or "active"),
+        )
+
+    def _load_single_user_from_db(self, normalized_email: str) -> Optional[AuthUser]:
+        try:
+            from app.auth_db.models import User
+            from app.auth_db.session import get_auth_session_factory
+        except Exception:  # pragma: no cover
+            return None
+        try:
+            db = get_auth_session_factory()()
+        except Exception:  # pragma: no cover
+            return None
+        try:
+            row = db.query(User).filter(User.email.ilike(normalized_email)).one_or_none()
+            if row is None:
+                return None
+            return self._hydrate_auth_user_from_db_row(row)
+        except Exception as exc:  # pragma: no cover
+            logger.debug("load single user from db failed: %s", exc)
+            return None
+        finally:
+            db.close()
 
     @staticmethod
     def _user_name_from_email(email: str) -> str:
@@ -772,6 +873,13 @@ class AuthService:
         with self._lock:
             user = self._users_by_email.get(normalized_email)
         if not user:
+            db_user = self._load_single_user_from_db(normalized_email)
+            if db_user:
+                with self._lock:
+                    self._users_by_email[db_user.email] = db_user
+                    self._users_by_id[db_user.id] = db_user
+                    user = db_user
+        if not user:
             self._audit(
                 operation="login",
                 user_id=None,
@@ -800,6 +908,7 @@ class AuthService:
             raise ValueError("邮箱或密码错误")
         with self._lock:
             self._apply_super_admin_role_if_needed(user)
+        self._sync_super_admin_role_to_db(user)
 
         info = device_info or {}
         normalized_ua = str(user_agent or info.get("user_agent") or "")
@@ -1335,6 +1444,39 @@ class AuthService:
     def get_password_history(self, user_id: int) -> List[PasswordHistoryEntry]:
         with self._lock:
             return list(self._password_histories.get(user_id, []))
+        
+    def load_users_from_db(self) -> None:
+        try:
+            from app.auth_db.models import User
+            from app.auth_db.session import get_auth_session_factory
+        except Exception as exc:  # pragma: no cover
+            logger.debug("load users skipped: auth db import failed: %s", exc)
+            return
+
+        try:
+            db = get_auth_session_factory()()
+        except Exception as exc:  # pragma: no cover
+            logger.debug("load users skipped: session factory unavailable: %s", exc)
+            return
+
+        loaded_count = 0
+        try:
+            users = db.query(User).all()
+            with self._lock:
+                for row in users:
+                    try:
+                        auth_user = self._hydrate_auth_user_from_db_row(row)
+                    except Exception as exc:  # pragma: no cover
+                        logger.warning("skip invalid user row id=%s err=%s", getattr(row, "id", None), exc)
+                        continue
+                    self._users_by_email[auth_user.email] = auth_user
+                    self._users_by_id[auth_user.id] = auth_user
+                    loaded_count += 1
+            logger.info("loaded users from auth db: %s", loaded_count)
+        except Exception as exc:
+            logger.warning("load users from auth db failed: %s", exc)
+        finally:
+            db.close()
 
 
 _AUTH_SERVICE: Optional[AuthService] = None
@@ -1376,6 +1518,7 @@ def get_auth_service() -> AuthService:
                     jitter_ratio=0.2,
                 )
                 _AUTH_SERVICE = service
+                _AUTH_SERVICE.load_users_from_db() #初始化后强制同步一次
     return _AUTH_SERVICE
 
 

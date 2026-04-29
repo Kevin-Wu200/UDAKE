@@ -15,12 +15,14 @@ import subprocess
 import sys
 import time
 import warnings
+from urllib.parse import urlparse
 from typing import List, Optional
 
 # 尽早配置 warning 过滤，避免导入期噪声污染启动日志。
 warnings.filterwarnings("ignore", message=".*urllib3.*LibreSSL.*")
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="urllib3")
 
+import sys; print(f'DEBUG PATH: {sys.path}')
 import uvicorn
 
 ENV_CHOICES = ("development", "testing", "production")
@@ -145,10 +147,40 @@ def _try_start_redis_once(start_command: list[str], startup_timeout: float) -> b
     return _is_redis_running()
 
 
-def ensure_redis_running(startup_timeout: float = 6.0, retries: int = 2) -> bool:
-    if _is_redis_running():
-        print("✓ Redis 已运行")
+def _is_local_redis_host(host: str) -> bool:
+    normalized = (host or "").strip().lower()
+    return normalized in {"127.0.0.1", "localhost", "::1"}
+
+
+def _resolve_redis_target(
+    redis_url: Optional[str],
+    redis_host: str,
+    redis_port: int,
+) -> tuple[str, int]:
+    if redis_url:
+        parsed = urlparse(redis_url)
+        if parsed.hostname:
+            return parsed.hostname, int(parsed.port or 6379)
+    return redis_host, int(redis_port)
+
+
+def ensure_redis_running(
+    startup_timeout: float = 6.0,
+    retries: int = 2,
+    redis_url: Optional[str] = None,
+    redis_host: str = "127.0.0.1",
+    redis_port: int = 6379,
+) -> bool:
+    target_host, target_port = _resolve_redis_target(redis_url, redis_host, redis_port)
+    if _is_redis_running(host=target_host, port=target_port):
+        print(f"✓ Redis 已运行 ({target_host}:{target_port})")
         return True
+
+    if not _is_local_redis_host(target_host):
+        print(
+            f"ℹ️ Redis({target_host}:{target_port}) 未就绪，跳过本地 redis-server 自动拉起，将继续启动并按运行时策略回退"
+        )
+        return False
 
     start_command = _resolve_redis_command()
     if not start_command:
@@ -429,6 +461,12 @@ def run_backend(cli_args: Optional[argparse.Namespace] = None) -> int:
 
     # 在设置 ENVIRONMENT 后再导入配置，确保读取到正确环境配置文件。
     from app.config import settings
+    # 同步关键配置到进程环境变量，避免子模块仅从 os.environ 读取时与 settings 不一致。
+    os.environ["REDIS_ENABLED"] = "true" if bool(getattr(settings, "REDIS_ENABLED", False)) else "false"
+    os.environ["REDIS_URL"] = str(getattr(settings, "REDIS_URL", "") or "")
+    os.environ["REDIS_HOST"] = str(getattr(settings, "REDIS_HOST", "") or "")
+    os.environ["REDIS_PORT"] = str(getattr(settings, "REDIS_PORT", 6379) or 6379)
+    os.environ["REDIS_DB"] = str(getattr(settings, "REDIS_DB", 0) or 0)
 
     configured_port = int(cli_args.port or settings.PORT)
     startup_port = _resolve_port_conflict(
@@ -441,10 +479,21 @@ def run_backend(cli_args: Optional[argparse.Namespace] = None) -> int:
         print("✗ 端口冲突未解决，服务退出")
         return 1
 
-    ensure_redis_running(
-        startup_timeout=cli_args.redis_timeout,
-        retries=cli_args.redis_retries,
-    )
+    redis_enabled = bool(getattr(settings, "REDIS_ENABLED", False))
+    redis_url = getattr(settings, "REDIS_URL", None)
+    redis_host = str(getattr(settings, "REDIS_HOST", "127.0.0.1"))
+    redis_port = int(getattr(settings, "REDIS_PORT", 6379))
+
+    if redis_enabled or redis_url:
+        ensure_redis_running(
+            startup_timeout=cli_args.redis_timeout,
+            retries=cli_args.redis_retries,
+            redis_url=redis_url,
+            redis_host=redis_host,
+            redis_port=redis_port,
+        )
+    else:
+        print("ℹ️ REDIS_ENABLED=False 且未配置 REDIS_URL，跳过 Redis 自动拉起检查")
 
     print(f"🚀 启动 {settings.APP_NAME}")
     print(f"🌍 环境: {selected_env}")

@@ -1,0 +1,31 @@
+INFO:     Will watch for changes in these directories: ['/Users/wuchenkai/UDAKE']
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process [7069] using WatchFiles
+DEBUG PATH: ['/Users/wuchenkai/UDAKE/services/backend', '/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python39.zip', '/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9', '/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/lib-dynload', '/Users/wuchenkai/UDAKE/venv/lib/python3.9/site-packages']
+✓ 使用命令行环境: development
+🚀 当前环境: development
+📝 配置文件: /Users/wuchenkai/UDAKE/configs/env/.env
+🔧 调试模式: True
+⚠️ 未找到 redis-server 可执行文件，将继续启动并使用内存后端
+🚀 启动 智能不确定性驱动空间决策平台
+🌍 环境: development
+📍 地址: http://0.0.0.0:8000
+📖 API文档: http://0.0.0.0:8000/docs
+smart workflow DAO fallback to memory: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: server does not support SSL, but SSL was required
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Redis 不可用，回退内存后端: Error 61 connecting to localhost:6379. Connection refused.
+INFO:     Started server process [7071]
+INFO:     Waiting for application startup.
+2026-04-28 12:03:09,291 - root - INFO - 启动流程完成: {'status': 'ready', 'ready': True, 'degradation_level': 'none', 'fatal_error': None, 'startup_duration_ms': 0, 'current_status_text': '正在加载配置...', 'task_reports': [{'task_id': 'loadConfig', 'label': '加载基础配置', 'priority': 'P0', 'status_text': '正在加载配置...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1777348989.291357, 'finished_at': 1777348989.291425, 'error': None, 'payload': {'environment': 'development', 'debug': True, 'version': '1.0.0'}}, {'task_id': 'connectBackend', 'label': '检查后端依赖', 'priority': 'P1', 'status_text': '正在连接服务器...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1777348989.291431, 'finished_at': 1777348989.2915351, 'error': None, 'payload': {'results_dir_exists': True, 'data_dir_exists': True, 'results_dir_writable': True}}, {'task_id': 'loadUserData', 'label': '预加载业务数据', 'priority': 'P1', 'status_text': '正在准备地图数据...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1777348989.2915368, 'finished_at': 1777348989.291772, 'error': None, 'payload': {'template_count': 18}}, {'task_id': 'initPushService', 'label': '初始化推送服务', 'priority': 'P2', 'status_text': '即将完成...', 'success': True, 'degraded': False, 'degradation_level': 'none', 'duration_ms': 0, 'started_at': 1777348989.291776, 'finished_at': 1777348989.2918348, 'error': None, 'payload': {'push_service': 'disabled'}}], 'preloaded_context': {'template_count': 18}}
+2026-04-28 12:03:09,292 - app.scheduler.key_expiry_scheduler - INFO - 密钥调度器已启动，任务=['expiry_check', 'expiry_reminder']
+INFO:     Application startup complete.
+2026-04-28 12:03:16,235 - app.auth.auth_service - INFO - audit op=login user=None details={'result': 'failed', 'reason': 'user_not_found', 'email': '1447954419@qq.com'}
+DEBUG PATH: ['/Users/wuchenkai/UDAKE', '/Users/wuchenkai/UDAKE/services/backend', '/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python39.zip', '/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9', '/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/lib-dynload', '/Users/wuchenkai/UDAKE/venv/lib/python3.9/site-packages']
+🚀 当前环境: development
+📝 配置文件: /Users/wuchenkai/UDAKE/configs/env/.env
+🔧 调试模式: True
+DEBUG: Load users failed: (psycopg2.OperationalError) connection to server at "localhost" (::1), port 5432 failed: server does not support SSL, but SSL was required
+
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+INFO:     127.0.0.1:51972 - "POST /api/auth/login HTTP/1.1" 401 Unauthorized

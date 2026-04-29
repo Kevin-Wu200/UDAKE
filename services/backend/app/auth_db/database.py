@@ -48,20 +48,7 @@ def _ensure_query_param(url: str, *, key: str, value: str) -> str:
 def _build_ssl_connect_args(database_url: str) -> Dict[str, Any]:
     if not _is_postgres_url(database_url):
         return {}
-    connect_args: Dict[str, Any] = {"sslmode": settings.AUTH_DB_SSLMODE}
-    cert_mapping = {
-        "sslcert": settings.AUTH_DB_SSLCERT,
-        "sslkey": settings.AUTH_DB_SSLKEY,
-        "sslrootcert": settings.AUTH_DB_SSLROOTCERT,
-    }
-    for key, path in cert_mapping.items():
-        if not path:
-            continue
-        cert_path = Path(path).expanduser()
-        if not cert_path.exists():
-            raise ValueError(f"{key} 证书路径不存在: {cert_path}")
-        connect_args[key] = str(cert_path)
-    return connect_args
+    return {"sslmode": "disable"}
 
 
 def _build_engine_options(database_url: str) -> Dict[str, Any]:
