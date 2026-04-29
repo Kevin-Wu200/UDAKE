@@ -76,3 +76,6 @@ frontend/dist/
 apps/admin-frontend/dist
 android/app/build/outputs/
 apps/frontend/dist/
+
+# Privacy
+configs/env/
