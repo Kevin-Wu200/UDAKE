@@ -8,6 +8,7 @@ import { Comment } from 'vue';
 const messages: Record<AppLanguage, Record<string, string>> = {
   'zh-CN': {
     appTitle: '管理员后台',
+    subTitle: '管理员后台登录',
     dashboard: '统计概览',
     productKeys: '产品密钥管理',
     smtpconfig: 'SMTP 配置',
@@ -546,6 +547,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
   },
   'en-US': {
     appTitle: 'Admin Console',
+    subTitle: 'Admin Console Login',
     dashboard: 'Dashboard',
     productKeys: 'Product Keys',
     smtpconfig: 'SMTP Config',
@@ -1076,6 +1078,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
   },
   'ja-JP': {
     appTitle: '管理者コンソール',
+    subTitle: '管理者コンソールログイン',
     dashboard: 'ダッシュボード',
     productKeys: 'プロダクトキー管理',
     smtpconfig: 'SMTP設定',
@@ -1613,6 +1616,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
   },
   'ko-KR': {
     appTitle: '관리자 콘솔',
+    subTitle: '관리자 콘솔 로그인',
     dashboard: '통계 개요',
     productKeys: '제품 키 관리',
     smtpconfig: 'SMTP 설정',
@@ -2150,6 +2154,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
   },
   'zh-TW': {
     appTitle: '管理員後台',
+    subTitle: '管理員後台登入',
     dashboard: '統計概覽',
     productKeys: '產品金鑰管理',
     smtpconfig: 'SMTP 設定',

@@ -1,8 +1,17 @@
 <template>
   <div class="login-page">
     <div class="login-panel">
-      <h1>{{ t('appTitle') }}</h1>
-      <p class="sub-title">管理员后台登录</p>
+      <div style="display: flex; align-items: center;">
+        <h1 style="width: 80%;">{{ t('appTitle') }}</h1>
+        <el-select :model-value="appStore.language" style="width: 120px;" @change="onLanguageChange">
+          <el-option label="简体中文" value="zh-CN" />
+          <el-option label="English" value="en-US" />
+          <el-option label="日本語" value="ja-JP"/>
+          <el-option label="繁體中文" value="zh-TW"/>
+          <el-option label="한국어" value="ko-KR"/>
+        </el-select>
+      </div>
+      <p class="sub-title">{{ t('subTitle') }}</p>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
         <el-form-item :label="t('email')" prop="email">
           <el-input v-model="form.email" :placeholder="t('email')" />
@@ -29,6 +38,7 @@
 
 <script setup lang="ts">
 import type { FormInstance, FormRules } from 'element-plus';
+import type { AppLanguage } from '../stores/app';
 import { reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
@@ -36,6 +46,9 @@ import { isAdminRole, useAuthStore } from '../stores/auth';
 import { loginUser } from '../services/userAuthApi';
 import { useI18nText } from '../i18n/useI18n';
 import { decodeRememberPassword, encodeRememberPassword } from '../utils/auth';
+import { useAppStore } from '../stores/app';
+
+const appStore = useAppStore();
 
 interface LoginForm {
   email: string;
@@ -56,6 +69,10 @@ const formRef = ref<FormInstance>();
 const submitting = ref(false);
 const rememberedEmail = localStorage.getItem(REMEMBER_EMAIL_KEY) ?? '';
 const rememberedPasswordRaw = localStorage.getItem(REMEMBER_PASSWORD_KEY) ?? '';
+
+const onLanguageChange = (language: AppLanguage) => {
+  appStore.setLanguage(language);
+};
 
 const form = reactive<LoginForm>({
   email: rememberedEmail,
