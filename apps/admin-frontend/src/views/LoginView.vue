@@ -47,6 +47,7 @@ import { loginUser } from '../services/userAuthApi';
 import { useI18nText } from '../i18n/useI18n';
 import { decodeRememberPassword, encodeRememberPassword } from '../utils/auth';
 import { useAppStore } from '../stores/app';
+import { computed } from 'vue';
 
 const appStore = useAppStore();
 
@@ -80,7 +81,7 @@ const form = reactive<LoginForm>({
   rememberPassword: Boolean(rememberedEmail && rememberedPasswordRaw)
 });
 
-const rules: FormRules<LoginForm> = {
+const rules = computed<FormRules<LoginForm>>(() => ({
   email: [
     { required: true, message: t('requiredEmail'), trigger: 'blur' },
     { type: 'email', message: t('invalidEmail'), trigger: ['blur', 'change'] }
@@ -98,7 +99,7 @@ const rules: FormRules<LoginForm> = {
       trigger: ['blur', 'change']
     }
   ]
-};
+}));
 
 const onSubmit = async () => {
   if (!formRef.value) {

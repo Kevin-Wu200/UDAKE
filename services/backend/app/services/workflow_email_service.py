@@ -19,6 +19,8 @@ from itertools import count
 from queue import LifoQueue, Empty, Full
 from typing import Any, Deque, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
+from ..config import settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -45,22 +47,22 @@ class SMTPSettings:
 
     @classmethod
     def from_env(cls) -> "SMTPSettings":
-        host = str(os.getenv("SMTP_HOST", "smtp.qq.com")).strip()
-        port = int(os.getenv("SMTP_PORT", "587"))
-        use_tls = str(os.getenv("SMTP_USE_TLS", "true")).strip().lower() in {"1", "true", "yes", "on"}
-        use_ssl = str(os.getenv("SMTP_USE_SSL", "false")).strip().lower() in {"1", "true", "yes", "on"}
-        if port == 465 and os.getenv("SMTP_USE_SSL") is None:
+        host = str(getattr(settings, "SMTP_HOST", "smtp.qq.com")).strip()
+        port = int(getattr(settings, "SMTP_PORT", 587))
+        use_tls = bool(getattr(settings, "SMTP_USE_TLS", True))
+        use_ssl = bool(getattr(settings, "SMTP_USE_SSL", False))
+        if port == 465 and not bool(getattr(settings, "SMTP_USE_SSL", False)):
             use_ssl = True
             use_tls = False
         return cls(
             host=host,
             port=port,
-            user=str(os.getenv("SMTP_USER", "")).strip(),
-            password=str(os.getenv("SMTP_PASSWORD", "")).strip(),
+            user=str(getattr(settings, "SMTP_USER", "")).strip(),
+            password=str(getattr(settings, "SMTP_PASSWORD", "")).strip(),
             use_tls=use_tls,
             use_ssl=use_ssl,
-            timeout_seconds=max(5, int(os.getenv("SMTP_TIMEOUT_SECONDS", "15"))),
-            pool_size=max(1, int(os.getenv("SMTP_POOL_SIZE", "4"))),
+            timeout_seconds=max(5, int(getattr(settings, "SMTP_TIMEOUT_SECONDS", 15))),
+            pool_size=max(1, int(getattr(settings, "SMTP_POOL_SIZE", 4))),
         )
 
 
@@ -744,7 +746,7 @@ _workflow_email_service: Optional[WorkflowEmailNotificationService] = None
 def get_workflow_email_service() -> WorkflowEmailNotificationService:
     global _workflow_email_service
     if _workflow_email_service is None:
-        retry_env = str(os.getenv("WORKFLOW_EMAIL_RETRY_BACKOFF_SECONDS", "")).strip()
+        retry_env = str(getattr(settings, "WORKFLOW_EMAIL_RETRY_BACKOFF_SECONDS", "")).strip()
         if retry_env:
             retry_list = [int(item.strip()) for item in retry_env.split(",") if item.strip()]
         else:
@@ -752,13 +754,19 @@ def get_workflow_email_service() -> WorkflowEmailNotificationService:
 
         _workflow_email_service = WorkflowEmailNotificationService(
             retry_backoff_seconds=retry_list,
-            user_rate_limit_per_hour=max(1, int(os.getenv("WORKFLOW_EMAIL_USER_LIMIT_PER_HOUR", "10"))),
+            user_rate_limit_per_hour=max(1, int(getattr(settings, "WORKFLOW_EMAIL_USER_LIMIT_PER_HOUR", 10))),
             event_type_rate_limit_per_hour=max(
                 1,
-                int(os.getenv("WORKFLOW_EMAIL_EVENT_LIMIT_PER_HOUR", str(DEFAULT_EVENT_TYPE_RATE_LIMIT_PER_HOUR))),
+                int(
+                    getattr(
+                        settings,
+                        "WORKFLOW_EMAIL_EVENT_LIMIT_PER_HOUR",
+                        DEFAULT_EVENT_TYPE_RATE_LIMIT_PER_HOUR,
+                    )
+                ),
             ),
-            dedup_window_seconds=max(30, int(os.getenv("WORKFLOW_EMAIL_DEDUP_SECONDS", "300"))),
-            worker_count=max(1, int(os.getenv("WORKFLOW_EMAIL_WORKERS", "2"))),
+            dedup_window_seconds=max(30, int(getattr(settings, "WORKFLOW_EMAIL_DEDUP_SECONDS", 300))),
+            worker_count=max(1, int(getattr(settings, "WORKFLOW_EMAIL_WORKERS", 2))),
         )
     return _workflow_email_service
 

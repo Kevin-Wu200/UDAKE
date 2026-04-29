@@ -159,7 +159,7 @@ const onLanguageChange = (language: AppLanguage) => {
 
 const onLogout = () => {
   authStore.logout();
-  ElMessage.success(t('logoutSuccess'));
+  ElMessage.success(t('logoutsuccess'));
   router.push('/login');
 };
 </script>

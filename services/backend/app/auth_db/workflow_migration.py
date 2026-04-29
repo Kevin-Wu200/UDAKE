@@ -188,11 +188,6 @@ class WorkflowMigrationToolkit:
 
     def __init__(self, session_factory: Optional[sessionmaker] = None) -> None:
         self._session_factory = session_factory
-
-    def _is_sqlite(self, session: Session) -> bool:
-        bind = session.bind
-        return bool(bind and bind.dialect and bind.dialect.name == "sqlite")
-
     def _next_id(self, session: Session, model: Any) -> int:
         max_id = session.query(model.id).order_by(model.id.desc()).limit(1).scalar()
         return int(max_id or 0) + 1
@@ -482,7 +477,6 @@ class WorkflowMigrationToolkit:
         result = {str(item.username): int(item.id) for item in existed}
 
         missing = [uid for uid in ids if uid not in result]
-        sqlite_mode = self._is_sqlite(session)
         for uid in missing:
             payload: Dict[str, Any] = dict(
                 username=uid,
@@ -492,8 +486,6 @@ class WorkflowMigrationToolkit:
                 status="active",
                 is_email_verified=True,
             )
-            if sqlite_mode:
-                payload["id"] = self._next_id(session, User)
             user = User(**payload)
             session.add(user)
             session.flush()
@@ -522,7 +514,6 @@ class WorkflowMigrationToolkit:
         existing = self._load_existing_workflows(session)
         result: Dict[str, int] = {}
         rows = list(snapshot.get("workflows", []) or [])
-        sqlite_mode = self._is_sqlite(session)
 
         for row in rows:
             item = dict(_ensure_mapping(row, section="workflows"))
@@ -563,8 +554,6 @@ class WorkflowMigrationToolkit:
                     owner_id=owner_id,
                     is_public=bool(item.get("is_public", False)),
                 )
-                if sqlite_mode:
-                    payload["id"] = self._next_id(session, Workflow)
                 record = Workflow(**payload)
                 session.add(record)
                 session.flush()
@@ -593,8 +582,6 @@ class WorkflowMigrationToolkit:
                     created_by_id=created_by_id,
                     created_at=_to_dt(v.get("created_at")),
                 )
-                if sqlite_mode:
-                    payload["id"] = self._next_id(session, WorkflowVersion)
                 row_ver = WorkflowVersion(**payload)
                 session.add(row_ver)
                 session.flush()
@@ -618,7 +605,6 @@ class WorkflowMigrationToolkit:
     ) -> Dict[str, int]:
         existing = {(row.name, int(row.owner_id)): row for row in session.query(Team).all()}
         team_map: Dict[str, int] = {}
-        sqlite_mode = self._is_sqlite(session)
         for row in snapshot.get("teams", []) or []:
             item = dict(_ensure_mapping(row, section="teams"))
             legacy_team_id = str(item["team_id"])
@@ -648,8 +634,6 @@ class WorkflowMigrationToolkit:
                     owner_id=owner_id,
                     created_at=_to_dt(item.get("created_at")),
                 )
-                if sqlite_mode:
-                    payload["id"] = self._next_id(session, Team)
                 team = Team(**payload)
                 session.add(team)
                 session.flush()
@@ -672,7 +656,6 @@ class WorkflowMigrationToolkit:
         counts: Dict[str, int],
     ) -> None:
         existed = {(int(row.team_id), int(row.user_id)) for row in session.query(TeamMember).all()}
-        sqlite_mode = self._is_sqlite(session)
         for row in snapshot.get("members", []) or []:
             item = dict(_ensure_mapping(row, section="members"))
             team_id = int(team_map.get(str(item.get("team_id") or "")) or 0)
@@ -688,8 +671,6 @@ class WorkflowMigrationToolkit:
                 role=str(item.get("role") or "member"),
                 joined_at=_to_dt(item.get("joined_at")),
             )
-            if sqlite_mode:
-                payload["id"] = self._next_id(session, TeamMember)
             member = TeamMember(**payload)
             session.add(member)
             session.flush()
@@ -712,7 +693,6 @@ class WorkflowMigrationToolkit:
         counts: Dict[str, int],
     ) -> None:
         rows = list(snapshot.get("delegations", []) or [])
-        sqlite_mode = self._is_sqlite(session)
         for row in rows:
             item = dict(_ensure_mapping(row, section="delegations"))
             workflow_id = int(workflow_map.get(str(item.get("workflow_id") or "")) or 0)
@@ -728,8 +708,6 @@ class WorkflowMigrationToolkit:
                 granted_at=_to_dt(item.get("created_at")),
                 expires_at=_to_dt(item.get("expires_at")),
             )
-            if sqlite_mode:
-                payload["id"] = self._next_id(session, Delegation)
             delegation = Delegation(**payload)
             session.add(delegation)
             session.flush()
@@ -761,7 +739,6 @@ class WorkflowMigrationToolkit:
         counts: Dict[str, int],
     ) -> None:
         rows = list(snapshot.get("operations", []) or [])
-        sqlite_mode = self._is_sqlite(session)
 
         def mapper(row: Mapping[str, Any]) -> Optional[CollaborationOperation]:
             item = dict(_ensure_mapping(row, section="operations"))
@@ -776,15 +753,11 @@ class WorkflowMigrationToolkit:
                 operation_data=copy.deepcopy(item.get("data") or {}),
                 created_at=_to_dt(item.get("created_at")),
             )
-            if sqlite_mode:
-                payload["id"] = 0
             return CollaborationOperation(**payload)
 
         for batch in _iter_chunks(rows, opt.batch_size):
             entities = self._map_rows_parallel([dict(_ensure_mapping(r, section="operations")) for r in batch], mapper, opt.workers)
             for entity in entities:
-                if sqlite_mode:
-                    entity.id = self._next_id(session, CollaborationOperation)
                 session.add(entity)
             session.flush()
             for entity in entities:
@@ -810,7 +783,6 @@ class WorkflowMigrationToolkit:
             key=lambda item: (_to_dt(item.get("created_at")), str(item.get("comment_id"))),
         )
         source_to_db: Dict[str, int] = {}
-        sqlite_mode = self._is_sqlite(session)
 
         for batch in _iter_chunks(rows, opt.batch_size):
             for item in batch:
@@ -828,8 +800,6 @@ class WorkflowMigrationToolkit:
                     created_at=_to_dt(item.get("created_at")),
                     updated_at=_to_dt(item.get("created_at")),
                 )
-                if sqlite_mode:
-                    payload["id"] = self._next_id(session, Comment)
                 comment = Comment(**payload)
                 session.add(comment)
                 session.flush()
@@ -851,7 +821,6 @@ class WorkflowMigrationToolkit:
         counts: Dict[str, int],
     ) -> None:
         rows = list(snapshot.get("notifications", []) or [])
-        sqlite_mode = self._is_sqlite(session)
         for batch in _iter_chunks(rows, opt.batch_size):
             for row in batch:
                 item = dict(_ensure_mapping(row, section="notifications"))
@@ -867,8 +836,6 @@ class WorkflowMigrationToolkit:
                     created_at=_to_dt(item.get("created_at")),
                     reference_id=None,
                 )
-                if sqlite_mode:
-                    payload["id"] = self._next_id(session, Notification)
                 notification = Notification(**payload)
                 session.add(notification)
                 session.flush()

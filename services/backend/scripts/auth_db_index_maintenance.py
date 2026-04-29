@@ -1,7 +1,7 @@
 """Auth DB index maintenance script for product key validation workload.
 
 Usage:
-  python services/backend/scripts/auth_db_index_maintenance.py --db-url sqlite:///services/backend/auth.db
+  python services/backend/scripts/auth_db_index_maintenance.py --db-url postgresql+psycopg2://user:password@localhost:5432/udake_auth
   python services/backend/scripts/auth_db_index_maintenance.py --execute
 """
 
@@ -36,7 +36,7 @@ def _resolve_db_url(value: Optional[str]) -> str:
     env_url = os.getenv("AUTH_DATABASE_URL") or os.getenv("DATABASE_URL")
     if env_url:
         return env_url
-    return "sqlite:///services/backend/auth.db"
+    return "postgresql+psycopg2://localhost:5432/udake_auth"
 
 
 def _existing_indexes(engine, table_name: str) -> Dict[str, Dict[str, Any]]:
@@ -68,17 +68,13 @@ def _create_index_sql(dialect: str, table_name: str, idx: RequiredIndex) -> str:
     cols = ", ".join(idx.columns)
     if dialect == "postgresql":
         return f"CREATE {unique}INDEX IF NOT EXISTS {idx.name} ON {table_name} ({cols})"
-    if dialect == "sqlite":
-        return f"CREATE {unique}INDEX IF NOT EXISTS {idx.name} ON {table_name} ({cols})"
     return f"CREATE {unique}INDEX {idx.name} ON {table_name} ({cols})"
 
 
 def _explain_query(engine, sql: str, params: Dict[str, Any]) -> List[Any]:
     dialect = engine.dialect.name
     explain_sql = sql
-    if dialect == "sqlite":
-        explain_sql = f"EXPLAIN QUERY PLAN {sql}"
-    elif dialect == "postgresql":
+    if dialect == "postgresql":
         explain_sql = f"EXPLAIN {sql}"
     else:
         explain_sql = f"EXPLAIN {sql}"

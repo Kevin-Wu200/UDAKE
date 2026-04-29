@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 from app.config import settings
+from sqlalchemy import func
 
 from .cache import AuthCacheManager
 from .input_sanitizer import ensure_safe_text
@@ -234,6 +235,88 @@ class AuthService:
             user.permissions.append("admin")
         if "super_admin" not in user.permissions:
             user.permissions.append("super_admin")
+
+    @staticmethod
+    def _build_permissions_for_role(role: str) -> List[str]:
+        normalized_role = str(role or "user").strip().lower()
+        if normalized_role == "super_admin":
+            return ["read", "write", "admin", "super_admin"]
+        if normalized_role in {"admin", "company_admin", "enterprise"}:
+            return ["read", "write", "admin"]
+        return ["read"]
+
+    @staticmethod
+    def _datetime_to_epoch(value: Any) -> Optional[int]:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=timezone.utc)
+            return int(value.timestamp())
+        return None
+
+    def _upsert_user_cache_locked(self, user: AuthUser) -> AuthUser:
+        existing = self._users_by_id.get(user.id)
+        if existing:
+            old_email = existing.email
+            existing.email = user.email
+            existing.password_hash = user.password_hash
+            existing.role = user.role
+            existing.permissions = list(user.permissions)
+            existing.status = user.status
+            existing.last_login_at = user.last_login_at
+            existing.is_email_verified = bool(user.is_email_verified)
+            existing.failed_login_attempts = int(user.failed_login_attempts or 0)
+            existing.lock_until = user.lock_until
+            existing.lock_reason = user.lock_reason
+            if old_email != existing.email:
+                self._users_by_email.pop(old_email, None)
+            self._users_by_email[existing.email] = existing
+            return existing
+        self._users_by_id[user.id] = user
+        self._users_by_email[user.email] = user
+        self._next_user_id = max(self._next_user_id, user.id + 1)
+        return user
+
+    def _query_user_from_db(self, normalized_email: str) -> Optional[AuthUser]:
+        try:
+            from app.auth_db.models import User
+            from app.auth_db.session import get_auth_session_factory
+        except Exception:
+            return None
+
+        try:
+            session_factory = get_auth_session_factory()
+        except Exception:
+            return None
+
+        db = session_factory()
+        try:
+            row = db.query(User).filter(func.lower(User.email) == normalized_email).one_or_none()
+            if row is None:
+                return None
+            role = str(row.role or "user")
+            user = AuthUser(
+                id=int(row.id),
+                email=str(row.email).strip().lower(),
+                password_hash=str(row.password_hash or ""),
+                role=role,
+                permissions=self._build_permissions_for_role(role),
+                status=str(row.status or "pending"),
+                is_email_verified=bool(row.is_email_verified),
+                failed_login_attempts=int(row.failed_login_attempts or 0),
+                lock_until=self._datetime_to_epoch(row.lock_until),
+                lock_reason=row.lock_reason,
+                last_login_at=self._datetime_to_epoch(row.last_login_at),
+                created_at=self._datetime_to_epoch(row.created_at) or int(time.time()),
+            )
+            with self._lock:
+                return self._upsert_user_cache_locked(user)
+        except Exception as exc:
+            logger.debug("query user from db skipped: %s", exc)
+            return None
+        finally:
+            db.close()
 
     def _normalize_email(self, email: str) -> str:
         return ensure_safe_text(email, max_len=320, reject_sql=True).lower()
@@ -769,8 +852,10 @@ class AuthService:
         if ip_address and not self._is_whitelisted_ip(ip_address):
             self._ensure_rate_limit(identity=f"ip:{ip_address}", action="login_ip")
 
-        with self._lock:
-            user = self._users_by_email.get(normalized_email)
+        user = self._query_user_from_db(normalized_email)
+        if user is None:
+            with self._lock:
+                user = self._users_by_email.get(normalized_email)
         if not user:
             self._audit(
                 operation="login",

@@ -4,18 +4,15 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 BACKUP_DIR="${ROOT_DIR}/deployment/migration/backups"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-DB_PATH_DEFAULT="${ROOT_DIR}/services/backend/auth.db"
-DB_PATH="${AUTH_DB_FILE:-$DB_PATH_DEFAULT}"
+AUTH_DB_URL="${AUTH_DATABASE_URL:-${DATABASE_URL:-postgresql+psycopg2://udake:change_me@localhost:5432/udake_auth}}"
 
 mkdir -p "${BACKUP_DIR}"
 
 backup_db() {
-  if [[ ! -f "${DB_PATH}" ]]; then
-    echo "[WARN] 数据库文件不存在: ${DB_PATH}"
-    return 0
-  fi
-  cp "${DB_PATH}" "${BACKUP_DIR}/auth_${TIMESTAMP}.db"
-  echo "[OK] 备份完成: ${BACKUP_DIR}/auth_${TIMESTAMP}.db"
+  local backup_file="${BACKUP_DIR}/auth_${TIMESTAMP}.dump"
+  echo "[INFO] 使用 pg_dump 备份认证数据库"
+  pg_dump --format=custom --file="${backup_file}" "${AUTH_DB_URL}"
+  echo "[OK] 备份完成: ${backup_file}"
 }
 
 run_migration() {
@@ -42,8 +39,9 @@ rollback_db() {
     echo "[ERR] 备份文件不存在: ${backup_file}"
     exit 1
   fi
-  cp "${backup_file}" "${DB_PATH}"
-  echo "[OK] 数据库已回滚: ${DB_PATH}"
+  echo "[INFO] 执行 pg_restore 回滚"
+  pg_restore --clean --if-exists --no-owner --no-privileges --dbname="${AUTH_DB_URL}" "${backup_file}"
+  echo "[OK] 数据库已回滚: ${AUTH_DB_URL}"
 }
 
 case "${1:-}" in
