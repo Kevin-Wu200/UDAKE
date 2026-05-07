@@ -257,10 +257,6 @@ const onSendCode = async () => {
   }
 
   await onValidateProductKey(true);
-  if (keyValidation.valid !== true) {
-    ElMessage.error(keyValidation.message || '产品密钥无效');
-    return;
-  }
 
   try {
     await formRef.value.validateField(['email', 'password', 'confirmPassword', 'productKey']);

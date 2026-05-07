@@ -54,14 +54,19 @@ import { useTicketStore } from '../stores/ticket';
 import StatusTag from '../components/StatusTag.vue';
 import ApprovalDialog from '../components/ApprovalDialog.vue';
 import { ElMessage } from 'element-plus';
+import type { Ticket, TicketListParams } from '../types/ticket';
 
 const router = useRouter();
 const ticketStore = useTicketStore();
-const filters = reactive({ status: '', ticket_type: '', search: '' });
+const filters = reactive<{
+  status?: TicketListParams['status'];
+  ticket_type?: TicketListParams['ticket_type'];
+  search: string;
+}>({ status: undefined, ticket_type: undefined, search: '' });
 const pagination = reactive({ page: 1, page_size: 10 });
 const approveDialog = ref();
 const rejectDialog = ref();
-const currentActionTicket = ref<any>(null);
+const currentActionTicket = ref<Ticket | null>(null);
 
 const loadData = () => {
   ticketStore.fetchTickets({ ...pagination, ...filters });
@@ -69,17 +74,20 @@ const loadData = () => {
 
 const viewDetail = (id: number) => router.push(`/admin/tickets/${id}`);
 
-const openApprove = (row: any) => {
+const openApprove = (row: Ticket) => {
   currentActionTicket.value = row;
   approveDialog.value.open();
 };
 
-const openReject = (row: any) => {
+const openReject = (row: Ticket) => {
   currentActionTicket.value = row;
   rejectDialog.value.open();
 };
 
 const onApprove = async (notes: string) => {
+  if (!currentActionTicket.value) {
+    return;
+  }
   await ticketStore.approve(currentActionTicket.value.id, notes);
   ElMessage.success('批准成功');
   approveDialog.value.close();
@@ -87,6 +95,9 @@ const onApprove = async (notes: string) => {
 };
 
 const onReject = async (reason: string) => {
+  if (!currentActionTicket.value) {
+    return;
+  }
   await ticketStore.reject(currentActionTicket.value.id, reason);
   ElMessage.success('拒绝成功');
   rejectDialog.value.close();

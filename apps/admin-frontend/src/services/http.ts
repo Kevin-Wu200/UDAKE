@@ -2,7 +2,20 @@ import axios from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ElMessage } from 'element-plus';
 import { useAuthStore } from '../stores/auth';
-import type { CompanyAdmin, KeyStatus, KeyType, ProductKey, ProductKeyCreateForm } from '../types/admin';
+import type {
+  AuditEventType,
+  AuditLog,
+  CompanyAdmin,
+  DashboardStats,
+  EmailLog,
+  EmailSendStatus,
+  KeyStatus,
+  KeyType,
+  ProductKey,
+  ProductKeyCreateForm,
+  UserItem,
+  UserRole
+} from '../types/admin';
 
 interface RetryConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
@@ -304,24 +317,45 @@ export async function fetchUsers(params: {
   status?: 'enabled' | 'disabled';
   keyword?: string;
 }): Promise<{ total: number; items: UserItem[] }> {
-  const response = await http.get<BackendResponse<{ users: UserItem[]; total: number }>>('/admin/users', {
+  const response = await http.get<BackendResponse<{ users: Array<Record<string, unknown>>; total: number; pagination?: { total?: number } }>>(
+    '/admin/users',
+    {
     params: {
       page: params.page,
       page_size: params.pageSize,
       role: params.role,
-      status: params.status,
+      status: params.status === 'enabled' ? 'active' : params.status === 'disabled' ? 'disabled' : undefined,
       search: params.keyword
     }
-  });
+  }
+  );
   const data = unwrapData(response.data);
+  const items: UserItem[] = Array.isArray(data.users)
+    ? data.users.map((raw) => {
+      const role = String(raw.role ?? '');
+      const statusText = String(raw.status ?? '');
+      const status = ['active', 'enabled', 'true', '1'].includes(statusText.toLowerCase());
+      return {
+        id: Number(raw.id ?? 0),
+        username: String(raw.username ?? ''),
+        email: String(raw.email ?? ''),
+        role,
+        status,
+        createdAt: String(raw.createdAt ?? raw.created_at ?? ''),
+        lastLoginAt: String(raw.lastLoginAt ?? raw.last_login_at ?? ''),
+        devices: [],
+        loginLogs: []
+      };
+    })
+    : [];
   return {
-    total: data.total || 0,
-    items: data.users || []
+    total: Number(data.total ?? data.pagination?.total ?? 0),
+    items
   };
 }
 
 export async function updateUserStatus(id: number, enabled: boolean) {
-  await http.put(`/admin/users/${id}/status`, { status: enabled ? 'enabled' : 'disabled' });
+  await http.post(`/admin/users/${id}/toggle-status`, { status: enabled ? 'active' : 'disabled' });
 }
 
 export async function resetUserPassword(id: number) {

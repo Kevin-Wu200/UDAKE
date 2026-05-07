@@ -119,13 +119,16 @@ const filters = reactive<{
 const drawerVisible = ref(false);
 const selectedUser = ref<UserItem | null>(null);
 
-const roleText = (role: UserRole) => {
-  const map: Record<UserRole, string> = {
+const roleText = (role: UserRole | string) => {
+  const map: Record<string, string> = {
     admin: t('admin'),
     auditor: t('auditor'),
-    viewer: t('viewer')
+    viewer: t('viewer'),
+    super_admin: t('admin'),
+    company_admin: t('admin'),
+    user: t('viewer')
   };
-  return map[role];
+  return map[role] || role || '-';
 };
 
 const loadList = async () => {

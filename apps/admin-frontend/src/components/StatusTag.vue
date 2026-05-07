@@ -3,17 +3,18 @@
 </template>
 
 <script setup lang="ts">
+import type { TagProps } from 'element-plus';
 import { computed } from 'vue';
 
 const props = defineProps<{ status: 'pending' | 'approved' | 'rejected' | 'completed' }>();
 
-const tagType = computed(() => {
+const tagType = computed<TagProps['type']>(() => {
   switch (props.status) {
     case 'pending': return 'info';
     case 'approved': return 'primary';
     case 'rejected': return 'danger';
     case 'completed': return 'success';
-    default: return '';
+    default: return 'info';
   }
 });
 

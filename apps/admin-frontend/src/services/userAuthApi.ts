@@ -271,7 +271,7 @@ export async function validateProductKey(productKey: string): Promise<KeyValidat
       product_key: normalized || productKey
     });
     const result = mapValidateResult(unwrap(response.data));
-    if (normalized) {
+    if (normalized && result.valid) {
       setValidationCacheEntry(normalized, result);
     }
     return result;

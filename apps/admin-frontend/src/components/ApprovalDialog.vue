@@ -13,6 +13,7 @@
 </template>
 
 <script setup lang="ts">
+import type { FormInstance, FormRules } from 'element-plus';
 import { ref, reactive } from 'vue';
 
 const props = defineProps<{ type: 'approve' | 'reject' }>();
@@ -21,7 +22,10 @@ const emit = defineEmits(['confirm']);
 const visible = ref(false);
 const loading = ref(false);
 const form = reactive({ content: '' });
-const formRef = ref();
+const formRef = ref<FormInstance>();
+const rules: FormRules<{ content: string }> = {
+  content: [{ required: true, message: '此项必填', trigger: 'blur' }]
+};
 
 const title = props.type === 'approve' ? '确认批准' : '确认拒绝';
 const label = props.type === 'approve' ? '审批备注' : '拒绝原因';
@@ -32,7 +36,7 @@ const open = () => {
 };
 
 const submit = async () => {
-  await formRef.value.validate();
+  await formRef.value?.validate();
   loading.value = true;
   emit('confirm', form.content);
 };

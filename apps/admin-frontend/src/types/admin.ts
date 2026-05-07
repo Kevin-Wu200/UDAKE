@@ -72,7 +72,7 @@ export interface ProductKeyCreateForm {
   metadata?: ProductKeyMetadata;
 }
 
-export type UserRole = 'admin' | 'auditor' | 'viewer';
+export type UserRole = 'admin' | 'auditor' | 'viewer' | 'super_admin' | 'company_admin' | 'user';
 
 export interface UserDevice {
   name: string;
@@ -90,7 +90,7 @@ export interface UserItem {
   id: number;
   username: string;
   email: string;
-  role: UserRole;
+  role: UserRole | string;
   status: boolean;
   createdAt: string;
   lastLoginAt: string;
