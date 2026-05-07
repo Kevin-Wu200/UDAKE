@@ -159,6 +159,21 @@ def _serialize_key(record: Any) -> Dict[str, Any]:
     }
 
 
+def _find_product_key_record(service: Any, normalized_key: str) -> Any:
+    registry = getattr(service, "product_keys", None)
+    record = registry.get_record(normalized_key) if registry else None
+    if record is not None:
+        return record
+
+    db_query_func = getattr(service, "_query_product_key_from_db", None)
+    if callable(db_query_func):
+        try:
+            return db_query_func(normalized_key)
+        except Exception:
+            return None
+    return None
+
+
 def _enforce_sliding_window_limit(
     service: Any,
     *,
@@ -520,7 +535,7 @@ def validate_product_key(payload: ValidateRequest, request: Request):
     try:
         registry.validate_key_format(normalized_key)
         registry.validate_checksum(normalized_key)
-        record = registry.get_record(normalized_key)
+        record = _find_product_key_record(service, normalized_key)
         if not record:
             response = ValidateResponse(valid=False, key_type=None, message="密钥不存在")
         else:

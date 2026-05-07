@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from app.config import settings
 
 from ..auth import (
+    CSRFValidationError,
     JWTValidationError,
     ProductKeyValidationError,
     RateLimitExceededError,
@@ -134,6 +135,16 @@ def _extract_client_ip(request: Request) -> Optional[str]:
 def register(payload: RegisterRequest, request: Request):
     service = get_auth_service()
     try:
+        if settings.AUTH_CSRF_ENABLED:
+            cookie_token = request.cookies.get(settings.AUTH_CSRF_COOKIE_NAME)
+            header_token = request.headers.get(settings.AUTH_CSRF_HEADER_NAME)
+            require_csrf = settings.AUTH_CSRF_PROTECT_ALL or bool(cookie_token)
+            if require_csrf:
+                _csrf_manager().verify_token(
+                    subject=_csrf_manager().build_subject(request),
+                    cookie_token=cookie_token,
+                    header_token=header_token,
+                )
         result = service.register(
             email=ensure_safe_text(payload.email, max_len=settings.AUTH_XSS_MAX_INPUT_LEN, reject_sql=True),
             password=payload.password,
@@ -147,6 +158,8 @@ def register(payload: RegisterRequest, request: Request):
     except RateLimitExceededError as exc:
         raise _fail(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
     except PermissionError as exc:
+        raise _fail(status.HTTP_403_FORBIDDEN, str(exc)) from exc
+    except CSRFValidationError as exc:
         raise _fail(status.HTTP_403_FORBIDDEN, str(exc)) from exc
     except ValueError as exc:
         raise _fail(status.HTTP_400_BAD_REQUEST, str(exc)) from exc

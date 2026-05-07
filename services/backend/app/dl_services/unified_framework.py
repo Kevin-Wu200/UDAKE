@@ -9,7 +9,13 @@ from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
-from enum import StrEnum
+from enum import Enum
+try:
+    from enum import StrEnum
+except ImportError:  # pragma: no cover - Python < 3.11 compatibility
+    class StrEnum(str, Enum):
+        def __str__(self) -> str:
+            return str.__str__(self)
 import hashlib
 import importlib
 import inspect

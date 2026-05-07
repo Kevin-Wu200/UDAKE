@@ -74,6 +74,7 @@
           </el-breadcrumb>
         </div>
         <div class="actions">
+          
           <el-select :model-value="appStore.language" style="width: 120px" @change="onLanguageChange">
             <el-option label="简体中文" value="zh-CN" />
             <el-option label="English" value="en-US" />
@@ -82,6 +83,7 @@
             <el-option label="한국어" value="ko-KR"/>
           </el-select>
           <span class="user">{{ authStore.username }}</span>
+          <el-button plain @click="router.push('/user')">{{ t('userCenter') }}</el-button>
           <el-button type="danger" plain @click="onLogout">{{ t('logout') }}</el-button>
         </div>
       </header>

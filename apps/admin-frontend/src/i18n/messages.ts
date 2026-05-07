@@ -543,7 +543,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     fetchauditlogfailed: '获取审计日志失败',
     exportlimit: '导出已被限制为最多 10000 条',
     exportfailed: '导出失败',
-
+    userCenter: '用户中心',
   },
   'en-US': {
     appTitle: 'Admin Console',
@@ -1075,6 +1075,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     fetchauditlogfailed: 'Failed to Fetch Audit Log',
     exportlimit: 'Export is limited to a maximum of 10,000 records',
     exportfailed: 'Export Failed',
+    userCenter: 'User Center',
   },
   'ja-JP': {
     appTitle: '管理者コンソール',
@@ -1613,6 +1614,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     fetchauditlogfailed: '監査ログの取得に失敗しました',
     exportlimit: 'エクスポートは最大10000件までに制限されています',
     exportfailed: 'エクスポートに失敗しました',
+    userCenter: 'ユーザーセンター',
   },
   'ko-KR': {
     appTitle: '관리자 콘솔',
@@ -2151,6 +2153,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     fetchauditlogfailed: '감사 로그 가져오기 실패',
     exportlimit: '내보내기는 최대 10,000건으로 제한됩니다',
     exportfailed: '내보내기 실패',
+    userCenter: '사용자 센터',
   },
   'zh-TW': {
     appTitle: '管理員後台',
@@ -2689,6 +2692,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     fetchauditlogfailed: '取得稽核日誌失敗',
     exportlimit: '匯出已被限制為最多 10000 筆',
     exportfailed: '匯出失敗',
+    userCenter: '使用者中心',
   },
 };
 
