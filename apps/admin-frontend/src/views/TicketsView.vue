@@ -1,35 +1,35 @@
 <template>
   <div class="ticket-management">
     <div class="filter-area">
-      <el-select v-model="filters.status" placeholder="状态" clearable style="width: 150px">
-        <el-option label="待处理" value="pending" />
-        <el-option label="已批准" value="approved" />
-        <el-option label="已拒绝" value="rejected" />
-        <el-option label="已完成" value="completed" />
+      <el-select v-model="filters.status" :placeholder="tc('status')" clearable style="width: 150px">
+        <el-option :label="tc('pending')" value="pending" />
+        <el-option :label="tc('approved')" value="approved" />
+        <el-option :label="tc('rejected')" value="rejected" />
+        <el-option :label="tc('completed')" value="completed" />
       </el-select>
-      <el-select v-model="filters.ticket_type" placeholder="类型" clearable style="width: 150px">
-        <el-option label="密钥申请" value="key_request" />
-        <el-option label="密钥延期" value="key_extension" />
+      <el-select v-model="filters.ticket_type" :placeholder="tc('type')" clearable style="width: 150px">
+        <el-option :label="tc('keyRequest')" value="key_request" />
+        <el-option :label="tc('keyExtension')" value="key_extension" />
       </el-select>
-      <el-input v-model="filters.search" placeholder="搜索邮箱/ID" style="width: 200px" />
-      <el-button type="primary" @click="loadData">查询</el-button>
+      <el-input v-model="filters.search" :placeholder="tc('searchEmail')" style="width: 200px" />
+      <el-button type="primary" @click="loadData">{{ tc('query') }}</el-button>
     </div>
 
     <el-table v-loading="ticketStore.loading" :data="ticketStore.tickets" border style="width: 100%">
       <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="type" label="类型">
-        <template #default="{ row }">{{ row.type === 'key_request' ? '密钥申请' : '密钥延期' }}</template>
+      <el-table-column prop="type" :label="tc('type')">
+        <template #default="{ row }">{{ row.type === 'key_request' ? tc('keyRequest') : tc('keyExtension') }}</template>
       </el-table-column>
-      <el-table-column prop="applicant_email" label="申请者" />
-      <el-table-column prop="status" label="状态">
+      <el-table-column prop="applicant_email" :label="tc('applicant')" />
+      <el-table-column prop="status" :label="tc('status')">
         <template #default="{ row }"><StatusTag :status="row.status" /></template>
       </el-table-column>
-      <el-table-column prop="created_at" label="创建时间" />
-      <el-table-column label="操作" width="200">
+      <el-table-column prop="created_at" :label="tc('createAt')" />
+      <el-table-column :label="tc('action')" width="200">
         <template #default="{ row }">
-          <el-button link @click="viewDetail(row.id)">查看</el-button>
-          <el-button v-if="row.status === 'pending'" link type="primary" @click="openApprove(row)">批准</el-button>
-          <el-button v-if="row.status === 'pending'" link type="danger" @click="openReject(row)">拒绝</el-button>
+          <el-button link @click="viewDetail(row.id)">{{ tc('check') }}</el-button>
+          <el-button v-if="row.status === 'pending'" link type="primary" @click="openApprove(row)">{{tc('approve')}}</el-button>
+          <el-button v-if="row.status === 'pending'" link type="danger" @click="openReject(row)">{{tc('reject')}}</el-button>
         </template>
       </el-table-column>
     </el-table>
@@ -55,7 +55,9 @@ import StatusTag from '../components/StatusTag.vue';
 import ApprovalDialog from '../components/ApprovalDialog.vue';
 import { ElMessage } from 'element-plus';
 import type { Ticket, TicketListParams } from '../types/ticket';
+import { useI18nText } from '../i18n/useI18n';
 
+const { tc } = useI18nText();
 const router = useRouter();
 const ticketStore = useTicketStore();
 const filters = reactive<{
@@ -89,7 +91,7 @@ const onApprove = async (notes: string) => {
     return;
   }
   await ticketStore.approve(currentActionTicket.value.id, notes);
-  ElMessage.success('批准成功');
+  ElMessage.success(tc('approveSuccess'));
   approveDialog.value.close();
   loadData();
 };
@@ -99,7 +101,7 @@ const onReject = async (reason: string) => {
     return;
   }
   await ticketStore.reject(currentActionTicket.value.id, reason);
-  ElMessage.success('拒绝成功');
+  ElMessage.success(tc('rejectSuccess'));
   rejectDialog.value.close();
   loadData();
 };

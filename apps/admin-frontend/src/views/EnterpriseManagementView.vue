@@ -2,30 +2,30 @@
   <div class="enterprise-management-page">
     <section class="overview-grid">
       <el-card>
-        <template #header>企业成员数</template>
+        <template #header>{{ tc('companymenbernum') }}</template>
         <div class="value">{{ members.length }}</div>
       </el-card>
       <el-card>
-        <template #header>工作流任务总量</template>
+        <template #header>{{ tc('workflowtotalnum') }}</template>
         <div class="value">{{ resource.totalTasks }}</div>
       </el-card>
       <el-card>
-        <template #header>转移中任务</template>
+        <template #header>{{ tc('transmittingmission') }}</template>
         <div class="value">{{ resource.transferringTasks }}</div>
       </el-card>
     </section>
 
     <section class="panel-grid">
       <el-card>
-        <template #header>成员管理</template>
+        <template #header>{{ tc('menbermanage') }}</template>
         <el-table :data="members" border>
-          <el-table-column prop="user_id" label="用户ID" width="160" />
-          <el-table-column prop="display_name" label="姓名" min-width="140" />
-          <el-table-column prop="role" label="权限" width="140">
+          <el-table-column prop="user_id" :label="tc('userid')" width="160" />
+          <el-table-column prop="display_name" :label="tc('name')" min-width="140" />
+          <el-table-column prop="role" :label="tc('rights')" width="140">
             <template #default="scope">
               <el-select v-model="scope.row.role" @change="onRoleChange(scope.row)">
-                <el-option label="普通成员" value="member" />
-                <el-option label="管理人员" value="manager" />
+                <el-option :label="tc('menber')" value="member" />
+                <el-option :label="tc('manager')" value="manager" />
               </el-select>
             </template>
           </el-table-column>
@@ -33,12 +33,12 @@
       </el-card>
 
       <el-card>
-        <template #header>资源看板</template>
+        <template #header>{{ tc('sourceband') }}</template>
         <el-descriptions :column="1" border>
-          <el-descriptions-item label="待处理">{{ resource.pendingTasks }}</el-descriptions-item>
-          <el-descriptions-item label="运行中">{{ resource.runningTasks }}</el-descriptions-item>
-          <el-descriptions-item label="已完成">{{ resource.completedTasks }}</el-descriptions-item>
-          <el-descriptions-item label="失败">{{ resource.failedTasks }}</el-descriptions-item>
+          <el-descriptions-item :label="tc('processhold')">{{ resource.pendingTasks }}</el-descriptions-item>
+          <el-descriptions-item :label="tc('processing')">{{ resource.runningTasks }}</el-descriptions-item>
+          <el-descriptions-item :label="tc('processdone')">{{ resource.completedTasks }}</el-descriptions-item>
+          <el-descriptions-item :label="tc('processfailed')">{{ resource.failedTasks }}</el-descriptions-item>
         </el-descriptions>
       </el-card>
     </section>
@@ -49,6 +49,9 @@
 import { onMounted, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { workflowService } from '../services/WorkflowService';
+import { useI18nText } from '../i18n/useI18n';
+
+const { tc } = useI18nText();
 
 type EnterpriseMember = {
   user_id: string;
@@ -110,7 +113,7 @@ const loadData = async () => {
     resource.completedTasks = completedTasks;
     resource.failedTasks = failedTasks;
   } catch (e) {
-    ElMessage.error('加载企业管理数据失败');
+    ElMessage.error(tc('companydataloadfailed'));
   }
 };
 
@@ -130,9 +133,9 @@ const onRoleChange = async (member: EnterpriseMember) => {
       });
       await workflowService.updateCollaborators(wf.workflow_id, collaborators);
     }
-    ElMessage.success('权限更新成功');
+    ElMessage.success(tc('rightschangedsuccess'));
   } catch {
-    ElMessage.error('权限更新失败');
+    ElMessage.error(tc('rightschangedfailed'));
   }
 };
 

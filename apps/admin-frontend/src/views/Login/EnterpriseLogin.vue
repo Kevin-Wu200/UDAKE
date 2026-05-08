@@ -4,7 +4,7 @@
       <div class="header-row">
         <div>
           <p class="entry-tag">ENTERPRISE PORTAL</p>
-          <h1>{{ t('appTitle') }}</h1>
+          <h1>{{ t('appTitle_enterprise') }}</h1>
         </div>
         <el-select :model-value="appStore.language" style="width: 120px;" @change="onLanguageChange">
           <el-option label="简体中文" value="zh-CN" />
@@ -14,7 +14,7 @@
           <el-option label="한국어" value="ko-KR" />
         </el-select>
       </div>
-      <p class="sub-title">{{ t('subTitle') }}</p>
+      <p class="sub-title">{{ t('subTitle_enterprise') }}</p>
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
         <el-form-item :label="t('email')" prop="email">
           <el-input v-model="form.email" :placeholder="t('email')" />

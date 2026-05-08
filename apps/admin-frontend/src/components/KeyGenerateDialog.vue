@@ -1,7 +1,7 @@
 <template>
-  <el-dialog v-model="visible" title="批量生成企业密钥" width="600px" @close="handleClose">
+  <el-dialog v-model="visible" :title="tc('batchGenerateCompanyKeys')" width="600px" @close="handleClose">
     <el-form ref="formRef" :model="form" :rules="rules" label-width="120px">
-      <el-form-item label="密钥类型" prop="type">
+      <el-form-item :label="tc('keyType')" prop="type">
         <el-radio-group v-model="form.type">
           <el-radio
             v-for="item in availableTypes"
@@ -13,21 +13,21 @@
         </el-radio-group>
       </el-form-item>
 
-      <el-form-item label="生成数量" prop="count">
+      <el-form-item :label="tc('generateNum')" prop="count">
         <el-input-number v-model="form.count" :min="1" :max="maxCountPerCreate" :step="10" />
-        <div class="form-tip">企业试用配额：500次/密钥；企业标准配额：1000次/密钥</div>
-        <div class="form-tip">当前剩余可创建：{{ remainingQuota }}</div>
+        <div class="form-tip">{{ tc('keyQuota') }}</div>
+        <div class="form-tip">{{ tc('keyLimit') }}{{ remainingQuota }}</div>
       </el-form-item>
 
-      <el-form-item label="企业信息">
+      <el-form-item :label="tc('companyInfo')">
         <el-descriptions :column="1" border>
-          <el-descriptions-item label="企业名称">{{ company.name }}</el-descriptions-item>
-          <el-descriptions-item label="企业ID">{{ company.id }}</el-descriptions-item>
+          <el-descriptions-item :label="tc('companyName')">{{ company.name }}</el-descriptions-item>
+          <el-descriptions-item :label="tc('companyId')">{{ company.id }}</el-descriptions-item>
         </el-descriptions>
       </el-form-item>
 
-      <el-form-item label="生成预览">
-        <el-button @click="handlePreview" :disabled="!form.type">生成预览</el-button>
+      <el-form-item :label="tc('preview')">
+        <el-button @click="handlePreview" :disabled="!form.type">{{ tc('preview') }}</el-button>
         <div v-if="previewKeys.length > 0" class="preview-keys">
           <div v-for="key in previewKeys" :key="key" class="preview-key">{{ key }}</div>
         </div>
@@ -35,8 +35,8 @@
     </el-form>
 
     <template #footer>
-      <el-button @click="handleClose">取消</el-button>
-      <el-button type="primary" :loading="loading" :disabled="createDisabledByQuota" @click="handleConfirm">确认生成</el-button>
+      <el-button @click="handleClose">{{ tc('cancel') }}</el-button>
+      <el-button type="primary" :loading="loading" :disabled="createDisabledByQuota" @click="handleConfirm">{{ tc('confirm') }}</el-button>
     </template>
   </el-dialog>
 </template>
@@ -47,7 +47,9 @@ import { computed, reactive, ref, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useAuthStore } from '../stores/auth';
 import { batchGenerateCompanyKeys, previewCompanyKeys } from '../services/http';
+import { useI18nText } from '../i18n/useI18n';
 
+const { tc } = useI18nText();
 const props = defineProps<{
   modelValue: boolean;
   availableTypes?: Array<'enterprise_trial' | 'enterprise_standard'>;
@@ -78,7 +80,7 @@ const availableTypes = computed(() => {
     : ['enterprise_trial', 'enterprise_standard'];
   return current.map((item) => ({
     value: item,
-    label: item === 'enterprise_trial' ? '企业试用' : '企业标准'
+    label: item === 'enterprise_trial' ? tc('companyTrail') : tc('companyStandard')
   }));
 });
 const remainingQuota = computed(() => Math.max(0, props.remainingQuota ?? 0));
@@ -97,13 +99,13 @@ watch(
 );
 
 const rules: FormRules<typeof form> = {
-  type: [{ required: true, message: '请选择密钥类型', trigger: 'change' }],
+  type: [{ required: true, message: tc('keyTypeRequired'), trigger: 'change' }],
   count: [
-    { required: true, message: '请输入生成数量', trigger: 'blur' },
+    { required: true, message: tc('keyNumRequired'), trigger: 'blur' },
     {
       validator: (_rule, value, callback) => {
         if (typeof value !== 'number' || value < 1 || value > maxCountPerCreate.value) {
-          callback(new Error(`数量范围为 1-${maxCountPerCreate.value}`));
+          callback(new Error(`${tc('numScope')} 1-${maxCountPerCreate.value}`));
           return;
         }
         callback();
@@ -120,7 +122,7 @@ const handlePreview = async () => {
       count: form.count
     });
   } catch {
-    ElMessage.error('预览生成失败');
+    ElMessage.error(tc('previewFailed'));
   }
 };
 
@@ -131,11 +133,11 @@ const handleConfirm = async () => {
   try {
     await formRef.value.validate();
     if (createDisabledByQuota.value) {
-      ElMessage.warning('已达到当前企业管理员配额上限');
+      ElMessage.warning(tc('quotaLimited'));
       return;
     }
     if (form.count > remainingQuota.value) {
-      ElMessage.warning('生成数量超过剩余配额');
+      ElMessage.warning(tc('quotaOvered'));
       return;
     }
     loading.value = true;
@@ -144,14 +146,14 @@ const handleConfirm = async () => {
       type: form.type,
       count: form.count
     });
-    ElMessage.success(`已生成 ${created.length} 个密钥`);
+    ElMessage.success(tc('generateSuccess', { createNum: created.length }));
     emit(
       'success',
       created.map((item) => item.product_key)
     );
     handleClose();
   } catch {
-    ElMessage.error('生成失败');
+    ElMessage.error(tc('generateFailed'));
   } finally {
     loading.value = false;
   }

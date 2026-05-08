@@ -1,60 +1,31 @@
 <template>
-  <div class="admin-layout">
+  <div class="enterprise-layout">
     <aside class="sidebar">
-      <div class="brand">{{ t('appTitle') }}</div>
+      <div class="brand">{{ t('appTitle_enterprise') || '企业门户' }}</div>
       <el-menu
         :default-active="activePath"
-        :default-openeds="defaultOpeneds"
         class="menu"
         router
       >
-        <el-menu-item index="/dashboard">
+        <el-menu-item index="/enterprise/dashboard">
           <el-icon><Histogram /></el-icon>
           <span>{{ t('dashboard') }}</span>
         </el-menu-item>
-        <el-menu-item v-if="!authStore.isCompanyAdmin" index="/product-keys">
-          <el-icon><Key /></el-icon>
-          <span>{{ t('productKeys') }}</span>
-        </el-menu-item>
-        <el-menu-item v-else index="/company/product-keys">
-          <el-icon><Key /></el-icon>
-          <span>{{ t('companyProductKeys') }}</span>
-        </el-menu-item>
-        <el-menu-item v-if="authStore.isCompanyAdmin" index="/company/profile">
+        <el-menu-item index="/enterprise/management">
           <el-icon><UserFilled /></el-icon>
-          <span>{{ t('companyProfile') }}</span>
+          <span>{{ t('companymanage') }}</span>
         </el-menu-item>
-        <el-menu-item v-if="!authStore.isCompanyAdmin" index="/smtp-settings">
-          <el-icon><Setting /></el-icon>
-          <span>{{ t('smtpconfig') }}</span>
-        </el-menu-item>
-        <el-menu-item v-if="!authStore.isCompanyAdmin" index="/email-logs">
-          <el-icon><Message /></el-icon>
-          <span>{{ t('emaillog') }}</span>
-        </el-menu-item>
-        <el-menu-item index="/workflows">
+        <el-menu-item index="/enterprise/workflows">
           <el-icon><Operation /></el-icon>
           <span>{{ t('workflowEngine') }}</span>
         </el-menu-item>
-        <el-sub-menu index="/history-analysis">
-          <template #title>
-            <el-icon><DataAnalysis /></el-icon>
-            <span>{{ t('historyAnalysis') }}</span>
-          </template>
-          <el-menu-item index="/history-analysis/snapshots">{{ t('historyAnalysisSnapshots') }}</el-menu-item>
-          <el-menu-item index="/history-analysis/compare">{{ t('historyAnalysisCompare') }}</el-menu-item>
-          <el-menu-item index="/history-analysis/trend">{{ t('historyAnalysisTrend') }}</el-menu-item>
-          <el-menu-item index="/history-analysis/anomaly">{{ t('historyAnalysisAnomaly') }}</el-menu-item>
-          <el-menu-item index="/history-analysis/forecast">{{ t('historyAnalysisForecast') }}</el-menu-item>
-          <el-menu-item index="/history-analysis/reports">{{ t('historyAnalysisReports') }}</el-menu-item>
-        </el-sub-menu>
-        <el-menu-item index="/users">
+        <el-menu-item index="/enterprise/users">
           <el-icon><UserFilled /></el-icon>
           <span>{{ t('users') }}</span>
         </el-menu-item>
-        <el-menu-item index="/audit-logs">
+        <el-menu-item index="/enterprise/tickets">
           <el-icon><Document /></el-icon>
-          <span>{{ t('auditLogs') }}</span>
+          <span>{{ t('tickets') }}</span>
         </el-menu-item>
       </el-menu>
     </aside>
@@ -74,7 +45,6 @@
           </el-breadcrumb>
         </div>
         <div class="actions">
-          
           <el-select :model-value="appStore.language" style="width: 120px" @change="onLanguageChange">
             <el-option label="简体中文" value="zh-CN" />
             <el-option label="English" value="en-US" />
@@ -83,15 +53,14 @@
             <el-option label="한국어" value="ko-KR"/>
           </el-select>
           <span class="user">{{ authStore.username }}</span>
-          <el-button plain @click="router.push('/user')">{{ t('userCenter') }}</el-button>
           <el-button type="danger" plain @click="onLogout">{{ t('logout') }}</el-button>
         </div>
       </header>
       <main class="content">
         <router-view v-slot="{ Component, route: currentRoute }">
-          <keep-alive :include="cachedRouteNames">
+          <transition name="fade-transform" mode="out-in">
             <component :is="Component" :key="currentRoute.path" />
-          </keep-alive>
+          </transition>
         </router-view>
       </main>
     </section>
@@ -102,7 +71,7 @@
 import type { AppLanguage } from '../stores/app';
 import { computed } from 'vue';
 import { ElMessage } from 'element-plus';
-import { DataAnalysis, Document, Histogram, Key, Message, Operation, Setting, UserFilled } from '@element-plus/icons-vue';
+import { Document, Histogram, Operation, UserFilled } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useAppStore } from '../stores/app';
@@ -115,7 +84,6 @@ const appStore = useAppStore();
 const { t } = useI18nText();
 
 const activePath = computed(() => route.path);
-const defaultOpeneds = ['/history-analysis'];
 
 const currentTitle = computed(() => {
   const titleKey = typeof route.meta.titleKey === 'string' ? route.meta.titleKey : '';
@@ -123,7 +91,7 @@ const currentTitle = computed(() => {
     return t(titleKey);
   }
   const title = typeof route.meta.title === 'string' ? route.meta.title : '';
-  return title || t('appTitle');
+  return title || t('appTitle_enterprise');
 });
 
 const breadcrumbs = computed(() => {
@@ -136,7 +104,7 @@ const breadcrumbs = computed(() => {
           : typeof record.meta.titleKey === 'string'
             ? record.meta.titleKey
             : '';
-      const label = key ? t(key) : String(record.meta.title || t('appTitle'));
+      const label = key ? t(key) : String(record.meta.title || t('appTitle_enterprise'));
       return {
         path: record.path,
         label,
@@ -146,15 +114,6 @@ const breadcrumbs = computed(() => {
     .filter((item) => item.path !== '/');
 });
 
-const cachedRouteNames = [
-  'history-analysis-snapshots',
-  'history-analysis-compare',
-  'history-analysis-trend',
-  'history-analysis-anomaly',
-  'history-analysis-forecast',
-  'history-analysis-reports'
-];
-
 const onLanguageChange = (language: AppLanguage) => {
   appStore.setLanguage(language);
 };
@@ -162,20 +121,20 @@ const onLanguageChange = (language: AppLanguage) => {
 const onLogout = () => {
   authStore.logout();
   ElMessage.success(t('logoutsuccess'));
-  router.push('/login/admin');
+  router.push('/login/enterprise');
 };
 </script>
 
 <style scoped>
-.admin-layout {
+.enterprise-layout {
   display: grid;
   grid-template-columns: 220px 1fr;
   height: 100vh;
-  background: linear-gradient(180deg, #f6fbff 0%, #f2f5fb 100%);
+  background: #f8fafc;
 }
 
 .sidebar {
-  background: #102a43;
+  background: #0f172a;
   color: #fff;
   padding: 18px 12px;
 }
@@ -183,8 +142,9 @@ const onLogout = () => {
 .brand {
   font-size: 20px;
   font-weight: 700;
-  margin-bottom: 16px;
+  margin-bottom: 24px;
   padding: 0 12px;
+  color: #10b981;
 }
 
 .menu {
@@ -193,37 +153,19 @@ const onLogout = () => {
 }
 
 .menu :deep(.el-menu-item) {
-  color: #dbe8f4;
+  color: #94a3b8;
   border-radius: 8px;
-  margin-bottom: 8px;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.menu :deep(.el-sub-menu__title) {
-  color: #dbe8f4;
-  border-radius: 8px;
-  margin-bottom: 8px;
-  font-size: 15px;
-  font-weight: 500;
-}
-
-.menu :deep(.el-sub-menu .el-menu-item) {
-  font-size: 14px;
-  font-weight: 400;
-  color: #333333;
+  margin-bottom: 4px;
 }
 
 .menu :deep(.el-menu-item:hover) {
-  color: #1D4ED8;
-  background: #F3F6FA;
-  font-weight: 500;
+  color: #fff;
+  background: #1e293b;
 }
 
 .menu :deep(.el-menu-item.is-active) {
-  color: #102a43;
-  background: #e7f0ff;
-  font-weight: 500;
+  color: #fff;
+  background: #10b981;
 }
 
 .content-wrap {
@@ -234,60 +176,55 @@ const onLogout = () => {
 
 .topbar {
   height: 64px;
-  padding: 0 20px;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid #dde6ef;
+  border-bottom: 1px solid #e2e8f0;
   background: #fff;
 }
 
 .title-wrap {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .title {
   font-size: 18px;
   font-weight: 600;
-  color: #0f172a;
+  color: #1e293b;
 }
 
 .actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
 }
 
 .user {
-  color: #334155;
+  color: #64748b;
   font-weight: 500;
 }
 
 .content {
   flex: 1;
-  padding: 20px;
+  padding: 24px;
   overflow: auto;
 }
 
-@media (max-width: 960px) {
-  .admin-layout {
-    grid-template-columns: 1fr;
-  }
+.fade-transform-enter-active,
+.fade-transform-leave-active {
+  transition: all 0.2s;
+}
 
-  .sidebar {
-    padding: 10px;
-  }
+.fade-transform-enter-from {
+  opacity: 0;
+  transform: translateX(-10px);
+}
 
-  .menu {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .menu :deep(.el-menu-item) {
-    margin-bottom: 0;
-  }
+.fade-transform-leave-to {
+  opacity: 0;
+  transform: translateX(10px);
 }
 </style>

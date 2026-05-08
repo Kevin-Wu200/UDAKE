@@ -20,6 +20,7 @@ const WorkflowEditorView = () => import('../views/workflow/WorkflowEditor.vue');
 const HistoryAnalysisLayoutView = () => import('../views/history-analysis/HistoryAnalysisLayout.vue');
 const HistorySectionView = () => import('../views/history-analysis/HistorySectionView.vue');
 const AdminLayout = () => import('../layouts/AdminLayout.vue');
+const EnterpriseLayout = () => import('../layouts/EnterpriseLayout.vue');
 
 const UserCenterLayout = () => import('../layouts/UserCenterLayout.vue');
 const ForbiddenView = () => import('../views/ForbiddenView.vue');
@@ -32,7 +33,7 @@ const DeviceManagementView = () => import('../views/user/DeviceManagementView.vu
 
 const USER_ALLOWED_ROLES = ['user', 'company_admin', 'super_admin', 'admin'];
 const ADMIN_ALLOWED_ROLES = ['company_admin', 'super_admin', 'admin'];
-const CONSOLE_ALLOWED_ROLES = [...ADMIN_ALLOWED_ROLES, 'enterprise'];
+const CONSOLE_ALLOWED_ROLES = [...ADMIN_ALLOWED_ROLES]; // Removed enterprise from here
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
@@ -86,7 +87,7 @@ const router = createRouter({
           name: 'user-devices',
           component: DeviceManagementView,
           meta: {
-            title: '设备管理', // was t('devicemanage')
+            title: '设备管理',
             requiresUserAuth: true,
             requiredRoles: USER_ALLOWED_ROLES
           }
@@ -96,7 +97,7 @@ const router = createRouter({
           name: 'user-change-password',
           component: ChangePasswordView,
           meta: {
-            title: '修改密码', // was t('changepassword')
+            title: '修改密码',
             requiresUserAuth: true,
             requiredRoles: USER_ALLOWED_ROLES
           }
@@ -106,7 +107,7 @@ const router = createRouter({
           name: 'user-change-email',
           component: ChangeEmailView,
           meta: {
-            title: '修改邮箱', // was t('changeemail')
+            title: '修改邮箱',
             requiresUserAuth: true,
             requiredRoles: USER_ALLOWED_ROLES
           }
@@ -114,16 +115,65 @@ const router = createRouter({
       ]
     },
     {
+      path: '/enterprise',
+      component: EnterpriseLayout,
+      meta: { requiresAuth: true, roles: ['enterprise'], requiredRoles: ['enterprise'] },
+      redirect: '/enterprise/dashboard',
+      children: [
+        {
+          path: 'dashboard',
+          name: 'enterprise-dashboard',
+          component: DashboardView,
+          meta: { titleKey: 'dashboard', breadcrumbKey: 'dashboard', roles: ['enterprise'] }
+        },
+        {
+          path: 'management',
+          name: 'enterprise-management',
+          component: EnterpriseManagementView,
+          meta: {
+            title: '企业管理',
+            breadcrumbKey: 'dashboard',
+            roles: ['enterprise'],
+            requiredRoles: ['enterprise']
+          }
+        },
+        {
+          path: 'workflows',
+          name: 'enterprise-workflows',
+          component: WorkflowListView,
+          meta: { titleKey: 'workflowEngine', breadcrumbKey: 'workflowEngine', roles: ['enterprise'] }
+        },
+        {
+          path: 'users',
+          name: 'enterprise-users',
+          component: UsersView,
+          meta: { titleKey: 'users', breadcrumbKey: 'users', roles: ['enterprise'] }
+        },
+        {
+          path: 'tickets',
+          name: 'enterprise-tickets',
+          component: TicketsView,
+          meta: { titleKey: 'tickets', breadcrumbKey: 'tickets', roles: ['enterprise'] }
+        },
+        {
+          path: 'tickets/:id',
+          name: 'enterprise-ticket-detail',
+          component: TicketDetailView,
+          meta: { titleKey: 'ticketDetail', breadcrumbKey: 'ticketDetail', roles: ['enterprise'] }
+        }
+      ]
+    },
+    {
       path: '/',
       component: AdminLayout,
-      meta: { requiresAuth: true, roles: CONSOLE_ALLOWED_ROLES, requiredRoles: CONSOLE_ALLOWED_ROLES },
+      meta: { requiresAuth: true, roles: ADMIN_ALLOWED_ROLES, requiredRoles: ADMIN_ALLOWED_ROLES },
       redirect: '/dashboard',
       children: [
         {
           path: '/dashboard',
           name: 'dashboard',
           component: DashboardView,
-          meta: { titleKey: 'dashboard', breadcrumbKey: 'dashboard', roles: CONSOLE_ALLOWED_ROLES }
+          meta: { titleKey: 'dashboard', breadcrumbKey: 'dashboard', roles: ADMIN_ALLOWED_ROLES }
         },
         {
           path: '/product-keys',
@@ -183,13 +233,13 @@ const router = createRouter({
           path: '/workflows',
           name: 'workflows',
           component: WorkflowListView,
-          meta: { titleKey: 'workflowEngine', breadcrumbKey: 'workflowEngine', roles: CONSOLE_ALLOWED_ROLES }
+          meta: { titleKey: 'workflowEngine', breadcrumbKey: 'workflowEngine', roles: ADMIN_ALLOWED_ROLES }
         },
         {
           path: '/workflows/editor/:workflowId?',
           name: 'workflow-editor',
           component: WorkflowEditorView,
-          meta: { titleKey: 'workflowEditor', breadcrumbKey: 'workflowEditor', roles: CONSOLE_ALLOWED_ROLES }
+          meta: { titleKey: 'workflowEditor', breadcrumbKey: 'workflowEditor', roles: ADMIN_ALLOWED_ROLES }
         },
         {
           path: '/history-analysis',
@@ -280,36 +330,25 @@ const router = createRouter({
           path: '/users',
           name: 'users',
           component: UsersView,
-          meta: { titleKey: 'users', breadcrumbKey: 'users', roles: CONSOLE_ALLOWED_ROLES }
+          meta: { titleKey: 'users', breadcrumbKey: 'users', roles: ADMIN_ALLOWED_ROLES }
         },
         {
           path: '/tickets',
           name: 'tickets',
           component: TicketsView,
-          meta: { titleKey: 'tickets', breadcrumbKey: 'tickets', roles: CONSOLE_ALLOWED_ROLES }
+          meta: { titleKey: 'tickets', breadcrumbKey: 'tickets', roles: ADMIN_ALLOWED_ROLES }
         },
         {
           path: '/tickets/:id',
           name: 'ticket-detail',
           component: TicketDetailView,
-          meta: { titleKey: 'ticketDetail', breadcrumbKey: 'ticketDetail', roles: CONSOLE_ALLOWED_ROLES }
+          meta: { titleKey: 'ticketDetail', breadcrumbKey: 'ticketDetail', roles: ADMIN_ALLOWED_ROLES }
         },
         {
           path: '/audit-logs',
           name: 'audit-logs',
           component: AuditLogsView,
           meta: { titleKey: 'auditLogs', breadcrumbKey: 'auditLogs', roles: ADMIN_ALLOWED_ROLES }
-        },
-        {
-          path: '/enterprise-management',
-          name: 'enterprise-management',
-          component: EnterpriseManagementView,
-          meta: {
-            title: '企业管理',
-            breadcrumbKey: 'dashboard',
-            roles: ['enterprise'],
-            requiredRoles: ['enterprise']
-          }
         }
       ]
     },
@@ -349,7 +388,7 @@ router.beforeEach(async (to) => {
 
   if ((to.path === '/login/admin' || to.path === '/login/enterprise') && loggedIn) {
     if (hasEnterpriseAccess) {
-      return '/enterprise-management';
+      return '/enterprise/dashboard';
     }
     return hasAdminAccess ? '/dashboard' : '/user/devices';
   }
@@ -397,7 +436,7 @@ router.beforeEach(async (to) => {
     const role = authStore.user?.role;
     if (!role || !requiredRoles.includes(role)) {
       if (to.path === '/dashboard' && role === 'enterprise') {
-        return '/enterprise-management';
+        return '/enterprise/dashboard';
       }
       return '/403';
     }

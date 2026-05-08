@@ -1,23 +1,23 @@
 <template>
   <div class="enterprise-dashboard">
     <el-card class="hero-card">
-      <h2>企业工作台</h2>
-      <p>当前账号角色：{{ roleLabel }}</p>
-      <p v-if="email">登录邮箱：{{ email }}</p>
+      <h2>{{ t('companyworkbench') }}</h2>
+      <p>{{ t('currentaccountrole') }}{{ roleLabel }}</p>
+      <p v-if="email">{{ t('loginemail') }}{{ email }}</p>
     </el-card>
 
     <section class="quick-actions">
       <el-card class="action-card" @click="router.push('/enterprise-management')">
-        <h3>企业管理</h3>
-        <p>查看企业级配置与状态</p>
+        <h3>{{ t('companymanage') }}</h3>
+        <p>{{ t('checkcompanystatus') }}</p>
       </el-card>
       <el-card class="action-card" @click="router.push('/company/product-keys')" v-if="role === 'company_admin'">
-        <h3>企业密钥</h3>
-        <p>管理企业可用密钥与配额</p>
+        <h3>{{ t('companykey') }}</h3>
+        <p>{{ t('companykeymanage') }}</p>
       </el-card>
       <el-card class="action-card" @click="router.push('/tickets')">
-        <h3>工单中心</h3>
-        <p>处理企业运营支持工单</p>
+        <h3>{{ t('ticketcenter') }}</h3>
+        <p>{{ t('ticketprocess') }}</p>
       </el-card>
     </section>
   </div>
@@ -27,9 +27,11 @@
 import { computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
+import { useI18nText } from '../../i18n/useI18n';
 
 const router = useRouter();
 const authStore = useAuthStore();
+const { t } = useI18nText();
 
 const role = computed(() => authStore.user?.role ?? '');
 const email = computed(() => authStore.user?.email ?? '');
