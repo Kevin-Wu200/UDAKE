@@ -36,6 +36,10 @@
           <el-icon><Operation /></el-icon>
           <span>{{ t('workflowEngine') }}</span>
         </el-menu-item>
+        <el-menu-item v-if="authStore.user?.role === 'enterprise'" index="/enterprise-management">
+          <el-icon><UserFilled /></el-icon>
+          <span>企业管理</span>
+        </el-menu-item>
         <el-sub-menu index="/history-analysis">
           <template #title>
             <el-icon><DataAnalysis /></el-icon>
@@ -211,11 +215,12 @@ const onLogout = () => {
 .menu :deep(.el-sub-menu .el-menu-item) {
   font-size: 14px;
   font-weight: 400;
+  color: #333333;
 }
 
 .menu :deep(.el-menu-item:hover) {
-  color: #f8fbff;
-  background: rgba(231, 240, 255, 0.14);
+  color: #1D4ED8;
+  background: #F3F6FA;
   font-weight: 500;
 }
 

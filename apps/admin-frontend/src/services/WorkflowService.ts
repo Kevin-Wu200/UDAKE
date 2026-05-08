@@ -27,6 +27,9 @@ export interface WorkflowExecutePayload {
   async?: boolean;
   debug?: boolean;
   trigger?: string;
+  enterprise_id?: string;
+  owner?: string;
+  assigned_to?: string;
 }
 
 export interface WorkflowTemplateCreatePayload {
@@ -195,6 +198,35 @@ export const workflowService = {
       params: { limit }
     });
     return data;
+  },
+
+  async listWorkflowTasks(workflowId: string, enterpriseId?: string) {
+    const { data } = await http.get<{
+      workflow_id: string;
+      tasks: WorkflowRunItem[];
+      count: number;
+    }>(`/workflow/${workflowId}/tasks`, {
+      params: { enterprise_id: enterpriseId }
+    });
+    return data;
+  },
+
+  async updateTaskAssignment(runId: string, payload: { assigned_to?: string; owner?: string }) {
+    const { data } = await http.patch<{ task: WorkflowRunDetail }>(`/workflow/tasks/${runId}/assignment`, payload);
+    return data.task;
+  },
+
+  async initiateTaskTransfer(runId: string, payload: { from_user_id: string; to_user_id: string }) {
+    const { data } = await http.post<{ task: WorkflowRunDetail }>(`/workflow/tasks/${runId}/transfer`, payload);
+    return data.task;
+  },
+
+  async confirmTaskTransfer(runId: string, payload: { receiver_user_id: string; accept: boolean }) {
+    const { data } = await http.post<{ task: WorkflowRunDetail }>(
+      `/workflow/tasks/${runId}/transfer/confirm`,
+      payload
+    );
+    return data.task;
   },
 
   async getRun(runId: string) {

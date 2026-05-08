@@ -3,6 +3,7 @@ export interface AuthUser {
   email: string;
   role: string;
   permissions: string[];
+  enterpriseId?: number | null;
 }
 
 export interface UserSessionPayload {

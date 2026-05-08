@@ -51,6 +51,7 @@ class AuthUser:
     failed_login_attempts: int = 0
     lock_until: Optional[int] = None
     lock_reason: Optional[str] = None
+    enterprise_id: Optional[int] = None
 
 
 @dataclass
@@ -269,6 +270,7 @@ class AuthService:
             existing.failed_login_attempts = int(user.failed_login_attempts or 0)
             existing.lock_until = user.lock_until
             existing.lock_reason = user.lock_reason
+            existing.enterprise_id = user.enterprise_id
             if old_email != existing.email:
                 self._users_by_email.pop(old_email, None)
             self._users_by_email[existing.email] = existing
@@ -309,6 +311,7 @@ class AuthService:
                 lock_reason=row.lock_reason,
                 last_login_at=self._datetime_to_epoch(row.last_login_at),
                 created_at=self._datetime_to_epoch(row.created_at) or int(time.time()),
+                enterprise_id=int(row.company_id) if row.company_id is not None else None,
             )
             with self._lock:
                 return self._upsert_user_cache_locked(user)
@@ -1013,6 +1016,7 @@ class AuthService:
                 "email": user.email,
                 "role": user.role,
                 "permissions": user.permissions,
+                "enterprise_id": user.enterprise_id,
             },
         }
 

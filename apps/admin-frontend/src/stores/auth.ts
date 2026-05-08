@@ -41,7 +41,8 @@ function normalizeUser(payload: UserSessionPayload): AuthUser {
     userId: payload.user.userId,
     email: payload.user.email,
     role: payload.user.role,
-    permissions: payload.user.permissions
+    permissions: payload.user.permissions,
+    enterpriseId: payload.user.enterpriseId ?? null
   };
 }
 

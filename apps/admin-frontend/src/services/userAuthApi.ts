@@ -17,6 +17,7 @@ interface LoginResponse {
     email: string;
     role: string;
     permissions: string[];
+    enterprise_id?: number | null;
   };
 }
 
@@ -85,7 +86,8 @@ function mapSession(data: LoginResponse): UserSessionPayload {
       userId: data.user_info.user_id,
       email: data.user_info.email,
       role: data.user_info.role,
-      permissions: data.user_info.permissions ?? []
+      permissions: data.user_info.permissions ?? [],
+      enterpriseId: data.user_info.enterprise_id ?? null
     }
   };
 }

@@ -33,6 +33,24 @@ class WorkflowExecuteRequest(BaseModel):
     async_mode: bool = Field(default=False, alias="async")
     debug: bool = Field(default=False)
     trigger: str = Field(default="manual", max_length=80)
+    enterprise_id: Optional[str] = Field(default=None, max_length=120)
+    owner: Optional[str] = Field(default=None, max_length=80)
+    assigned_to: Optional[str] = Field(default=None, max_length=80)
+
+
+class TaskAssignmentUpdateRequest(BaseModel):
+    assigned_to: Optional[str] = Field(default=None, max_length=80)
+    owner: Optional[str] = Field(default=None, max_length=80)
+
+
+class TaskTransferRequest(BaseModel):
+    from_user_id: str = Field(..., min_length=1, max_length=80)
+    to_user_id: str = Field(..., min_length=1, max_length=80)
+
+
+class TaskTransferConfirmRequest(BaseModel):
+    receiver_user_id: str = Field(..., min_length=1, max_length=80)
+    accept: bool = True
 
 
 class WorkflowImportRequest(BaseModel):
@@ -731,8 +749,59 @@ async def execute_workflow(workflow_id: str, payload: WorkflowExecuteRequest) ->
             async_mode=payload.async_mode,
             trigger=payload.trigger,
             debug=payload.debug,
+            enterprise_id=payload.enterprise_id,
+            owner=payload.owner,
+            assigned_to=payload.assigned_to,
         )
         return result
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/tasks")
+async def list_workflow_tasks(
+    workflow_id: str,
+    enterprise_id: Optional[str] = Query(default=None),
+) -> Dict[str, Any]:
+    tasks = smart_workflow_service.list_task_items(workflow_id=workflow_id, enterprise_id=enterprise_id)
+    return {"workflow_id": workflow_id, "tasks": tasks, "count": len(tasks)}
+
+
+@router.patch("/workflow/tasks/{run_id}/assignment")
+async def update_workflow_task_assignment(run_id: str, payload: TaskAssignmentUpdateRequest) -> Dict[str, Any]:
+    try:
+        task = smart_workflow_service.update_task_assignment(
+            run_id=run_id,
+            assigned_to=payload.assigned_to,
+            owner=payload.owner,
+        )
+        return {"task": task}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/tasks/{run_id}/transfer")
+async def initiate_workflow_task_transfer(run_id: str, payload: TaskTransferRequest) -> Dict[str, Any]:
+    try:
+        task = smart_workflow_service.initiate_task_transfer(
+            run_id=run_id,
+            from_user_id=payload.from_user_id,
+            to_user_id=payload.to_user_id,
+        )
+        return {"task": task}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/tasks/{run_id}/transfer/confirm")
+async def confirm_workflow_task_transfer(run_id: str, payload: TaskTransferConfirmRequest) -> Dict[str, Any]:
+    try:
+        task = smart_workflow_service.confirm_task_transfer(
+            run_id=run_id,
+            receiver_user_id=payload.receiver_user_id,
+            accept=payload.accept,
+        )
+        return {"task": task}
     except Exception as exc:  # pylint: disable=broad-except
         _handle_error(exc)
 

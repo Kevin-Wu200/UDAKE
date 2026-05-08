@@ -234,6 +234,7 @@ def get_current_user(request: Request):
                 "username": username,
                 "email": user.email,
                 "role": user.role,
+                "enterprise_id": getattr(user, "enterprise_id", None),
                 "product_key_id": getattr(user, "product_key_id", None),
                 "product_key_info": product_key_info,
             },

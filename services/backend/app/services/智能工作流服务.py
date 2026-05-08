@@ -2114,6 +2114,9 @@ class SmartWorkflowService:
         async_mode: bool = False,
         trigger: str = "manual",
         debug: bool = False,
+        enterprise_id: Optional[str] = None,
+        owner: Optional[str] = None,
+        assigned_to: Optional[str] = None,
     ) -> Dict[str, Any]:
         with self._lock:
             current = self._workflows.get(workflow_id)
@@ -2129,6 +2132,10 @@ class SmartWorkflowService:
                 debug=debug,
             )
             with self._lock:
+                result["enterprise_id"] = enterprise_id
+                result["owner"] = owner
+                result["assigned_to"] = assigned_to
+                result["transfer"] = None
                 self._runs[result["run_id"]] = deepcopy(result)
             self._update_metrics(result)
             return result
@@ -2157,6 +2164,10 @@ class SmartWorkflowService:
                 "failed_nodes": 0,
                 "skipped_nodes": 0,
             },
+            "enterprise_id": enterprise_id,
+            "owner": owner,
+            "assigned_to": assigned_to,
+            "transfer": None,
         }
 
         with self._lock:
@@ -2308,9 +2319,82 @@ class SmartWorkflowService:
                 "ended_at": item.get("ended_at"),
                 "duration_ms": item.get("duration_ms"),
                 "progress": item.get("progress"),
+                "enterprise_id": item.get("enterprise_id"),
+                "owner": item.get("owner"),
+                "assigned_to": item.get("assigned_to"),
+                "transfer": deepcopy(item.get("transfer")),
             }
             for item in trimmed
         ]
+
+    def list_task_items(self, workflow_id: str, enterprise_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        with self._lock:
+            items = [deepcopy(item) for item in self._runs.values() if str(item.get("workflow_id")) == workflow_id]
+        if enterprise_id:
+            target = str(enterprise_id).strip()
+            items = [item for item in items if str(item.get("enterprise_id") or "").strip() == target]
+        items.sort(key=lambda item: str(item.get("started_at") or ""), reverse=True)
+        return items
+
+    def update_task_assignment(
+        self,
+        run_id: str,
+        *,
+        assigned_to: Optional[str] = None,
+        owner: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        with self._lock:
+            run = self._runs.get(run_id)
+            if not run:
+                raise KeyError(f"run '{run_id}' not found")
+            if assigned_to is not None:
+                run["assigned_to"] = str(assigned_to or "").strip() or None
+            if owner is not None:
+                run["owner"] = str(owner or "").strip() or None
+            return deepcopy(run)
+
+    def initiate_task_transfer(self, run_id: str, *, from_user_id: str, to_user_id: str) -> Dict[str, Any]:
+        sender = str(from_user_id or "").strip()
+        receiver = str(to_user_id or "").strip()
+        if not sender or not receiver:
+            raise ValueError("from_user_id 和 to_user_id 不能为空")
+        with self._lock:
+            run = self._runs.get(run_id)
+            if not run:
+                raise KeyError(f"run '{run_id}' not found")
+            run["status"] = "transferring"
+            run["transfer"] = {
+                "status": "pending",
+                "from_user_id": sender,
+                "to_user_id": receiver,
+                "requested_at": datetime.now(timezone.utc).isoformat(),
+                "confirmed_at": None,
+            }
+            return deepcopy(run)
+
+    def confirm_task_transfer(self, run_id: str, *, receiver_user_id: str, accept: bool) -> Dict[str, Any]:
+        receiver = str(receiver_user_id or "").strip()
+        if not receiver:
+            raise ValueError("receiver_user_id 不能为空")
+        with self._lock:
+            run = self._runs.get(run_id)
+            if not run:
+                raise KeyError(f"run '{run_id}' not found")
+            transfer = run.get("transfer") or {}
+            if str(transfer.get("to_user_id") or "") != receiver:
+                raise PermissionError("仅接收人可以确认转移")
+            transfer["status"] = "accepted" if accept else "rejected"
+            transfer["confirmed_at"] = datetime.now(timezone.utc).isoformat()
+            if accept:
+                run["owner"] = receiver
+                run["assigned_to"] = receiver
+                if run.get("status") == "transferring":
+                    run["status"] = "running"
+            else:
+                if run.get("status") == "transferring":
+                    run["status"] = "running"
+            run["transfer"] = transfer
+            return deepcopy(run)
 
     def get_run_logs(self, run_id: str) -> List[Dict[str, Any]]:
         with self._lock:

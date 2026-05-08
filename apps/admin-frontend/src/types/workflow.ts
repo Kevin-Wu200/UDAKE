@@ -110,6 +110,16 @@ export interface WorkflowRunItem {
   ended_at: string | null;
   duration_ms: number | null;
   progress: number;
+  enterprise_id?: string | null;
+  owner?: string | null;
+  assigned_to?: string | null;
+  transfer?: {
+    status: 'pending' | 'accepted' | 'rejected';
+    from_user_id: string;
+    to_user_id: string;
+    requested_at: string;
+    confirmed_at?: string | null;
+  } | null;
 }
 
 export interface WorkflowRunDetail extends WorkflowRunItem {

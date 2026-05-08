@@ -17,6 +17,7 @@ const SMTPSettingsView = () => import('../views/SMTPSettings.vue');
 const EmailLogsView = () => import('../views/EmailLogs.vue');
 const UsersView = () => import('../views/UsersView.vue');
 const AuditLogsView = () => import('../views/AuditLogsView.vue');
+const EnterpriseManagementView = () => import('../views/EnterpriseManagementView.vue');
 const TicketsView = () => import('../views/TicketsView.vue');
 const TicketDetailView = () => import('../views/TicketDetailView.vue');
 const WorkflowListView = () => import('../views/workflow/WorkflowList.vue');
@@ -36,6 +37,7 @@ const DeviceManagementView = () => import('../views/user/DeviceManagementView.vu
 
 const USER_ALLOWED_ROLES = ['user', 'company_admin', 'super_admin', 'admin'];
 const ADMIN_ALLOWED_ROLES = ['company_admin', 'super_admin', 'admin'];
+const CONSOLE_ALLOWED_ROLES = [...ADMIN_ALLOWED_ROLES, 'enterprise'];
 // Remove constant top-level call: const { t } = useI18nText();
 // Instead, use a simple lookup function for static route meta, or handle translation inside components.
 // For routes that require translated titles, we can defer translation or use a central registry.
@@ -53,6 +55,12 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
+      component: LoginView,
+      meta: { requiresAuth: false }
+    },
+    {
+      path: '/enterprise/login',
+      name: 'enterprise-login',
       component: LoginView,
       meta: { requiresAuth: false }
     },
@@ -118,7 +126,7 @@ const router = createRouter({
     {
       path: '/',
       component: AdminLayout,
-      meta: { requiresAuth: true, requiredRoles: ADMIN_ALLOWED_ROLES },
+      meta: { requiresAuth: true, requiredRoles: CONSOLE_ALLOWED_ROLES },
       redirect: '/dashboard',
       children: [
         {
@@ -296,12 +304,22 @@ const router = createRouter({
           name: 'audit-logs',
           component: AuditLogsView,
           meta: { titleKey: 'auditLogs', breadcrumbKey: 'auditLogs' }
+        },
+        {
+          path: '/enterprise-management',
+          name: 'enterprise-management',
+          component: EnterpriseManagementView,
+          meta: {
+            title: '企业管理',
+            breadcrumbKey: 'dashboard',
+            requiredRoles: ['enterprise']
+          }
         }
       ]
     },
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/user/login'
+      redirect: '/enterprise/login'
     }
   ]
 });
@@ -325,8 +343,12 @@ router.beforeEach(async (to) => {
   const requiresUserAuth = Boolean(to.meta.requiresUserAuth);
   const userGuestOnly = Boolean(to.meta.userGuestOnly);
   const hasAdminAccess = authStore.isLegacyAdminSession || isAdminRole(authStore.user?.role);
+  const hasEnterpriseAccess = authStore.user?.role === 'enterprise';
 
-  if (to.path === '/login' && loggedIn) {
+  if ((to.path === '/login' || to.path === '/enterprise/login') && loggedIn) {
+    if (hasEnterpriseAccess) {
+      return '/enterprise-management';
+    }
     return hasAdminAccess ? '/dashboard' : '/user/devices';
   }
 

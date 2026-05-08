@@ -65,6 +65,7 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const { t } = useI18nText();
+const isEnterpriseLogin = computed(() => route.path === '/enterprise/login');
 
 const formRef = ref<FormInstance>();
 const submitting = ref(false);
@@ -110,7 +111,11 @@ const onSubmit = async () => {
     await formRef.value.validate();
     submitting.value = true;
     const session = await loginUser(form.email.trim().toLowerCase(), form.password);
-    if (!isAdminRole(session.user.role)) {
+    if (isEnterpriseLogin.value) {
+      if (session.user.role !== 'enterprise') {
+        throw new Error(t('adminRoleRequired'));
+      }
+    } else if (!isAdminRole(session.user.role)) {
       throw new Error(t('adminRoleRequired'));
     }
     authStore.applyUserSession(session);
@@ -124,7 +129,8 @@ const onSubmit = async () => {
     }
 
     ElMessage.success(t('loginSuccess'));
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/dashboard';
+    const fallbackRedirect = isEnterpriseLogin.value ? '/enterprise-management' : '/dashboard';
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : fallbackRedirect;
     await router.replace(redirect);
   } catch (error) {
     if (error instanceof Error) {
