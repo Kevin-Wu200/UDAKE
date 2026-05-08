@@ -43,6 +43,7 @@ import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import { loginUser } from '../../services/userAuthApi';
 import { decodeRememberPassword, encodeRememberPassword } from '../../utils/auth';
+import { resolveLoginFallbackRedirect } from '../../utils/authRedirect';
 
 interface LoginForm {
   email: string;
@@ -85,7 +86,7 @@ const onSubmit = async () => {
     await formRef.value.validate();
     submitting.value = true;
 
-    const session = await loginUser(form.email, form.password);
+    const session = await loginUser(form.email, form.password, 'user');
     authStore.applyUserSession(session);
 
     if (form.rememberPassword) {
@@ -97,7 +98,9 @@ const onSubmit = async () => {
     }
 
     ElMessage.success('登录成功');
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/user/devices';
+    const redirect = typeof route.query.redirect === 'string'
+      ? route.query.redirect
+      : resolveLoginFallbackRedirect(route.path);
     await router.replace(redirect);
   } catch {
     // 统一错误提示由 HTTP 拦截器处理

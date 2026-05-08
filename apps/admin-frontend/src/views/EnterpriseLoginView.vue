@@ -42,7 +42,7 @@ import type { AppLanguage } from '../stores/app';
 import { reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
-import { isAdminRole, useAuthStore } from '../stores/auth';
+import { useAuthStore } from '../stores/auth';
 import { loginUser } from '../services/userAuthApi';
 import { useI18nText } from '../i18n/useI18n';
 import { decodeRememberPassword, encodeRememberPassword } from '../utils/auth';
@@ -109,8 +109,8 @@ const onSubmit = async () => {
   try {
     await formRef.value.validate();
     submitting.value = true;
-    const session = await loginUser(form.email.trim().toLowerCase(), form.password, 'admin');
-    if (!isAdminRole(session.user.role)) {
+    const session = await loginUser(form.email.trim().toLowerCase(), form.password, 'enterprise');
+    if (session.user.role !== 'enterprise') {
       throw new Error(t('adminRoleRequired'));
     }
     authStore.applyUserSession(session);

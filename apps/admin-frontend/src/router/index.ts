@@ -1,14 +1,9 @@
 import { createRouter, createWebHashHistory } from 'vue-router';
 import { isAdminRole, useAuthStore } from '../stores/auth';
-import type { FormInstance, FormRules } from 'element-plus';
-import type { SMTPConfig } from '../types/admin';
-import { onMounted, reactive, ref } from 'vue';
-import { ElMessage } from 'element-plus';
-import type { AxiosError } from 'axios';
-import { fetchSmtpConfig, saveSmtpConfig, testSmtpConnection } from '../services/smtpApi';
-import { useI18nText } from '../i18n/useI18n';
+import { resolveLoginRouteByContext } from '../utils/authRedirect';
 
-const LoginView = () => import('../views/LoginView.vue');
+const AdminLoginView = () => import('../views/Login/AdminLogin.vue');
+const EnterpriseLoginView = () => import('../views/Login/EnterpriseLogin.vue');
 const DashboardView = () => import('../views/DashboardView.vue');
 const ProductKeysView = () => import('../views/ProductKeysView.vue');
 const CompanyProductKeysView = () => import('../views/CompanyProductKeysView.vue');
@@ -38,11 +33,6 @@ const DeviceManagementView = () => import('../views/user/DeviceManagementView.vu
 const USER_ALLOWED_ROLES = ['user', 'company_admin', 'super_admin', 'admin'];
 const ADMIN_ALLOWED_ROLES = ['company_admin', 'super_admin', 'admin'];
 const CONSOLE_ALLOWED_ROLES = [...ADMIN_ALLOWED_ROLES, 'enterprise'];
-// Remove constant top-level call: const { t } = useI18nText();
-// Instead, use a simple lookup function for static route meta, or handle translation inside components.
-// For routes that require translated titles, we can defer translation or use a central registry.
-// As a temporary fix for the initialization error, we'll use a direct string or a key.
-
 const router = createRouter({
   history: createWebHashHistory(),
   routes: [
@@ -53,15 +43,15 @@ const router = createRouter({
       meta: { requiresAuth: false }
     },
     {
-      path: '/login',
-      name: 'login',
-      component: LoginView,
+      path: '/login/admin',
+      name: 'login-admin',
+      component: AdminLoginView,
       meta: { requiresAuth: false }
     },
     {
-      path: '/enterprise/login',
-      name: 'enterprise-login',
-      component: LoginView,
+      path: '/login/enterprise',
+      name: 'login-enterprise',
+      component: EnterpriseLoginView,
       meta: { requiresAuth: false }
     },
     {
@@ -126,14 +116,14 @@ const router = createRouter({
     {
       path: '/',
       component: AdminLayout,
-      meta: { requiresAuth: true, requiredRoles: CONSOLE_ALLOWED_ROLES },
+      meta: { requiresAuth: true, roles: CONSOLE_ALLOWED_ROLES, requiredRoles: CONSOLE_ALLOWED_ROLES },
       redirect: '/dashboard',
       children: [
         {
           path: '/dashboard',
           name: 'dashboard',
           component: DashboardView,
-          meta: { titleKey: 'dashboard', breadcrumbKey: 'dashboard' }
+          meta: { titleKey: 'dashboard', breadcrumbKey: 'dashboard', roles: CONSOLE_ALLOWED_ROLES }
         },
         {
           path: '/product-keys',
@@ -142,6 +132,7 @@ const router = createRouter({
           meta: {
             titleKey: 'productKeys',
             breadcrumbKey: 'productKeys',
+            roles: ['super_admin', 'admin'],
             requiredRoles: ['super_admin', 'admin']
           }
         },
@@ -164,6 +155,7 @@ const router = createRouter({
           meta: {
             titleKey: 'companyProfile',
             requiresAuth: true,
+            roles: ['company_admin'],
             requiredRoles: ['company_admin']
           }
         },
@@ -173,6 +165,7 @@ const router = createRouter({
           component: SMTPSettingsView,
           meta: {
             titleKey: 'smtpconfig',
+            roles: ['super_admin', 'admin'],
             requiredRoles: ['super_admin', 'admin']
           }
         },
@@ -182,6 +175,7 @@ const router = createRouter({
           component: EmailLogsView,
           meta: {
             titleKey: 'emaillog',
+            roles: ['super_admin', 'admin'],
             requiredRoles: ['super_admin', 'admin']
           }
         },
@@ -189,13 +183,13 @@ const router = createRouter({
           path: '/workflows',
           name: 'workflows',
           component: WorkflowListView,
-          meta: { titleKey: 'workflowEngine', breadcrumbKey: 'workflowEngine' }
+          meta: { titleKey: 'workflowEngine', breadcrumbKey: 'workflowEngine', roles: CONSOLE_ALLOWED_ROLES }
         },
         {
           path: '/workflows/editor/:workflowId?',
           name: 'workflow-editor',
           component: WorkflowEditorView,
-          meta: { titleKey: 'workflowEditor', breadcrumbKey: 'workflowEditor' }
+          meta: { titleKey: 'workflowEditor', breadcrumbKey: 'workflowEditor', roles: CONSOLE_ALLOWED_ROLES }
         },
         {
           path: '/history-analysis',
@@ -204,6 +198,7 @@ const router = createRouter({
           meta: {
             titleKey: 'historyAnalysis',
             breadcrumbKey: 'historyAnalysis',
+            roles: ADMIN_ALLOWED_ROLES,
             requiredRoles: ADMIN_ALLOWED_ROLES
           },
           children: [
@@ -285,25 +280,25 @@ const router = createRouter({
           path: '/users',
           name: 'users',
           component: UsersView,
-          meta: { titleKey: 'users', breadcrumbKey: 'users' }
+          meta: { titleKey: 'users', breadcrumbKey: 'users', roles: CONSOLE_ALLOWED_ROLES }
         },
         {
           path: '/tickets',
           name: 'tickets',
           component: TicketsView,
-          meta: { titleKey: 'tickets', breadcrumbKey: 'tickets' }
+          meta: { titleKey: 'tickets', breadcrumbKey: 'tickets', roles: CONSOLE_ALLOWED_ROLES }
         },
         {
           path: '/tickets/:id',
           name: 'ticket-detail',
           component: TicketDetailView,
-          meta: { titleKey: 'ticketDetail', breadcrumbKey: 'ticketDetail' }
+          meta: { titleKey: 'ticketDetail', breadcrumbKey: 'ticketDetail', roles: CONSOLE_ALLOWED_ROLES }
         },
         {
           path: '/audit-logs',
           name: 'audit-logs',
           component: AuditLogsView,
-          meta: { titleKey: 'auditLogs', breadcrumbKey: 'auditLogs' }
+          meta: { titleKey: 'auditLogs', breadcrumbKey: 'auditLogs', roles: ADMIN_ALLOWED_ROLES }
         },
         {
           path: '/enterprise-management',
@@ -312,6 +307,7 @@ const router = createRouter({
           meta: {
             title: '企业管理',
             breadcrumbKey: 'dashboard',
+            roles: ['enterprise'],
             requiredRoles: ['enterprise']
           }
         }
@@ -319,7 +315,7 @@ const router = createRouter({
     },
     {
       path: '/:pathMatch(.*)*',
-      redirect: '/enterprise/login'
+      redirect: '/login/enterprise'
     }
   ]
 });
@@ -344,8 +340,14 @@ router.beforeEach(async (to) => {
   const userGuestOnly = Boolean(to.meta.userGuestOnly);
   const hasAdminAccess = authStore.isLegacyAdminSession || isAdminRole(authStore.user?.role);
   const hasEnterpriseAccess = authStore.user?.role === 'enterprise';
+  const requiredRoles = Array.isArray(to.meta.roles)
+    ? (to.meta.roles as string[])
+    : Array.isArray(to.meta.requiredRoles)
+      ? (to.meta.requiredRoles as string[])
+    : [];
+  const requiresEnterpriseOnly = requiredRoles.length > 0 && requiredRoles.every((role) => role === 'enterprise');
 
-  if ((to.path === '/login' || to.path === '/enterprise/login') && loggedIn) {
+  if ((to.path === '/login/admin' || to.path === '/login/enterprise') && loggedIn) {
     if (hasEnterpriseAccess) {
       return '/enterprise-management';
     }
@@ -358,7 +360,9 @@ router.beforeEach(async (to) => {
 
   if ((requiresAdminAuth || requiresUserAuth) && !loggedIn) {
     return {
-      path: requiresAdminAuth ? '/login' : '/user/login',
+      path: requiresUserAuth
+        ? resolveLoginRouteByContext('user')
+        : (requiresEnterpriseOnly ? resolveLoginRouteByContext('enterprise') : resolveLoginRouteByContext('admin')),
       query: { redirect: to.fullPath }
     };
   }
@@ -386,16 +390,15 @@ router.beforeEach(async (to) => {
   }
 
   if (requiresAdminAuth && !loggedIn) {
-    return { path: '/login', query: { redirect: to.fullPath } };
+    return { path: '/login/admin', query: { redirect: to.fullPath } };
   }
-
-  const requiredRoles = Array.isArray(to.meta.requiredRoles)
-    ? (to.meta.requiredRoles as string[])
-    : [];
 
   if (requiredRoles.length > 0 && !authStore.isLegacyAdminSession) {
     const role = authStore.user?.role;
     if (!role || !requiredRoles.includes(role)) {
+      if (to.path === '/dashboard' && role === 'enterprise') {
+        return '/enterprise-management';
+      }
       return '/403';
     }
   }

@@ -1,14 +1,17 @@
 <template>
-  <div class="login-page">
+  <div class="login-page enterprise-login-page">
     <div class="login-panel">
-      <div style="display: flex; align-items: center;">
-        <h1 style="width: 80%;">{{ t('appTitle') }}</h1>
+      <div class="header-row">
+        <div>
+          <p class="entry-tag">ENTERPRISE PORTAL</p>
+          <h1>{{ t('appTitle') }}</h1>
+        </div>
         <el-select :model-value="appStore.language" style="width: 120px;" @change="onLanguageChange">
           <el-option label="简体中文" value="zh-CN" />
           <el-option label="English" value="en-US" />
-          <el-option label="日本語" value="ja-JP"/>
-          <el-option label="繁體中文" value="zh-TW"/>
-          <el-option label="한국어" value="ko-KR"/>
+          <el-option label="日本語" value="ja-JP" />
+          <el-option label="繁體中文" value="zh-TW" />
+          <el-option label="한국어" value="ko-KR" />
         </el-select>
       </div>
       <p class="sub-title">{{ t('subTitle') }}</p>
@@ -17,13 +20,7 @@
           <el-input v-model="form.email" :placeholder="t('email')" />
         </el-form-item>
         <el-form-item :label="t('password')" prop="password">
-          <el-input
-            v-model="form.password"
-            type="password"
-            show-password
-            :placeholder="t('password')"
-            @keyup.enter="onSubmit"
-          />
+          <el-input v-model="form.password" type="password" show-password :placeholder="t('password')" @keyup.enter="onSubmit" />
         </el-form-item>
         <div class="row">
           <el-checkbox v-model="form.rememberPassword">{{ t('rememberPassword') }}</el-checkbox>
@@ -38,19 +35,15 @@
 
 <script setup lang="ts">
 import type { FormInstance, FormRules } from 'element-plus';
-import type { AppLanguage } from '../stores/app';
-import { reactive, ref } from 'vue';
+import type { AppLanguage } from '../../stores/app';
+import { computed, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
-import { isAdminRole, useAuthStore } from '../stores/auth';
-import { loginUser } from '../services/userAuthApi';
-import { useI18nText } from '../i18n/useI18n';
-import { decodeRememberPassword, encodeRememberPassword } from '../utils/auth';
-import { useAppStore } from '../stores/app';
-import { computed } from 'vue';
-import { resolveLoginFallbackRedirect } from '../utils/authRedirect';
-
-const appStore = useAppStore();
+import { useAuthStore } from '../../stores/auth';
+import { useI18nText } from '../../i18n/useI18n';
+import { decodeRememberPassword, encodeRememberPassword } from '../../utils/auth';
+import { useAppStore } from '../../stores/app';
+import { resolveLoginFallbackRedirect } from '../../utils/authRedirect';
 
 interface LoginForm {
   email: string;
@@ -59,9 +52,10 @@ interface LoginForm {
 }
 
 const PASSWORD_PATTERN = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
-const REMEMBER_EMAIL_KEY = 'admin_remember_email';
-const REMEMBER_PASSWORD_KEY = 'admin_remember_password';
+const REMEMBER_EMAIL_KEY = 'enterprise_remember_email';
+const REMEMBER_PASSWORD_KEY = 'enterprise_remember_password';
 
+const appStore = useAppStore();
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
@@ -109,11 +103,7 @@ const onSubmit = async () => {
   try {
     await formRef.value.validate();
     submitting.value = true;
-    const session = await loginUser(form.email.trim().toLowerCase(), form.password, 'admin');
-    if (!isAdminRole(session.user.role)) {
-      throw new Error(t('adminRoleRequired'));
-    }
-    authStore.applyUserSession(session);
+    const redirectByRole = await authStore.login(form.email.trim().toLowerCase(), form.password, 'enterprise');
 
     if (form.rememberPassword) {
       localStorage.setItem(REMEMBER_EMAIL_KEY, form.email.trim().toLowerCase());
@@ -125,7 +115,7 @@ const onSubmit = async () => {
 
     ElMessage.success(t('loginSuccess'));
     const fallbackRedirect = resolveLoginFallbackRedirect(route.path);
-    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : fallbackRedirect;
+    const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : (redirectByRole || fallbackRedirect);
     await router.replace(redirect);
   } catch (error) {
     if (error instanceof Error) {
@@ -142,22 +132,40 @@ const onSubmit = async () => {
   min-height: 100vh;
   display: grid;
   place-items: center;
+}
+
+.enterprise-login-page {
   background:
-    radial-gradient(circle at 20% 20%, #e0f5f2 0, transparent 35%),
-    radial-gradient(circle at 80% 0%, #bfe5ff 0, transparent 30%),
-    #f7fbff;
+    radial-gradient(circle at 10% 12%, rgb(16 185 129 / 22%) 0, transparent 32%),
+    radial-gradient(circle at 90% 0%, rgb(20 184 166 / 18%) 0, transparent 36%),
+    linear-gradient(145deg, #f0fdfa 0%, #ecfeff 35%, #f8fafc 100%);
 }
 
 .login-panel {
-  width: min(420px, calc(100vw - 28px));
+  width: min(430px, calc(100vw - 28px));
   padding: 28px;
   border-radius: 16px;
   background: #fff;
-  border: 1px solid #d4e4ee;
+  border: 1px solid #bae6d3;
   box-shadow: 0 16px 42px rgb(15 23 42 / 9%);
 }
 
+.header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.entry-tag {
+  margin: 0;
+  color: #0f766e;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+
 h1 {
+  margin: 4px 0 0;
   font-size: 28px;
   color: #0f172a;
 }

@@ -7,8 +7,8 @@ import router from './router';
 import { useAuthStore } from './stores/auth';
 import './styles/index.css';
 
-if (!window.location.hash && window.location.pathname === '/enterprise/login') {
-  window.location.replace('/#/enterprise/login');
+if (!window.location.hash && window.location.pathname === '/login/enterprise') {
+  window.location.replace('/#/login/enterprise');
 }
 
 const app = createApp(App);

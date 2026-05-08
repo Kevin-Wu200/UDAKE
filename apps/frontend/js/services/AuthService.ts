@@ -30,6 +30,8 @@ interface AuthLoginResult {
     };
 }
 
+export type AuthLoginContext = 'admin' | 'enterprise' | 'user';
+
 interface ApiEnvelope<T> {
     success?: boolean;
     message?: string;
@@ -98,10 +100,11 @@ export class AuthService {
         }
     }
 
-    public async login(username: string, password: string): Promise<AuthLoginResult> {
+    public async login(username: string, password: string, loginContext: AuthLoginContext = 'user'): Promise<AuthLoginResult> {
         const payload = {
             email: username.trim(),
             password,
+            context: loginContext,
             device_info: {
                 platform: navigator.platform || 'unknown',
                 language: navigator.language || 'unknown',

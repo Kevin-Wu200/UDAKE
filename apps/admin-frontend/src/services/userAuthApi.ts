@@ -242,10 +242,13 @@ function mapValidateResult(data: ProductKeyValidateApiResponse): KeyValidationRe
   };
 }
 
-export async function loginUser(email: string, password: string): Promise<UserSessionPayload> {
+export type LoginContext = 'admin' | 'enterprise' | 'user';
+
+export async function loginUser(email: string, password: string, context: LoginContext = 'admin'): Promise<UserSessionPayload> {
   const response = await http.post<BackendResponse<LoginResponse>>('/auth/login', {
     email,
     password,
+    context,
     device_info: buildDeviceInfoPayload()
   });
   return mapSession(unwrap(response.data));

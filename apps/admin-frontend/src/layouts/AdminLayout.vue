@@ -166,7 +166,7 @@ const onLanguageChange = (language: AppLanguage) => {
 const onLogout = () => {
   authStore.logout();
   ElMessage.success(t('logoutsuccess'));
-  router.push('/login');
+  router.push('/login/admin');
 };
 </script>
 

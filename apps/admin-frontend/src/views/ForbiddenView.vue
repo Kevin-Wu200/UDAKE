@@ -3,7 +3,7 @@
     <el-result icon="warning" title="403" sub-title="权限不足，无法访问该页面">
       <template #extra>
         <el-button type="primary" @click="router.push('/user/devices')">返回用户中心</el-button>
-        <el-button @click="router.push('/login')">前往管理后台</el-button>
+        <el-button @click="router.push('/login/admin')">前往管理后台</el-button>
       </template>
     </el-result>
   </div>

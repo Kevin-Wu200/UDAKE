@@ -2,6 +2,7 @@ import axios from 'axios';
 import { defineStore } from 'pinia';
 import type { AuthUser, UserSessionPayload } from '../types/auth';
 import { getTokenExpireAtMs } from '../utils/auth';
+import { loginUser, type LoginContext } from '../services/userAuthApi';
 
 const ACCESS_TOKEN_KEY = 'udake_access_token';
 const REFRESH_TOKEN_KEY = 'udake_refresh_token';
@@ -48,6 +49,16 @@ function normalizeUser(payload: UserSessionPayload): AuthUser {
 
 export function isAdminRole(role: string | null | undefined): boolean {
   return typeof role === 'string' && ADMIN_ALLOWED_ROLES.includes(role as (typeof ADMIN_ALLOWED_ROLES)[number]);
+}
+
+export function resolvePostLoginPathByRole(role: string | null | undefined): string {
+  if (role === 'enterprise') {
+    return '/enterprise-management';
+  }
+  if (isAdminRole(role)) {
+    return '/dashboard';
+  }
+  return '/user/devices';
 }
 
 export const useAuthStore = defineStore('auth', {
@@ -119,10 +130,10 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem(USER_INFO_KEY);
       localStorage.removeItem(LOGIN_USER_KEY);
     },
-    login(username: string, token: string) {
-      this.username = username;
-      localStorage.setItem(LOGIN_USER_KEY, username);
-      this.setToken(token);
+    async login(email: string, password: string, context: LoginContext = 'admin') {
+      const session = await loginUser(email, password, context);
+      this.applyUserSession(session);
+      return resolvePostLoginPathByRole(session.user.role);
     },
     applyUserSession(payload: UserSessionPayload) {
       this.setUser(normalizeUser(payload));

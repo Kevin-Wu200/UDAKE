@@ -16,7 +16,8 @@ from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
-from ..auth import JWTValidationError, ProductKeyRegistry, SensitiveDataCipher, get_auth_service
+from ..auth import ProductKeyRegistry, SensitiveDataCipher, get_auth_service
+from ..auth.dependencies import RoleChecker, ensure_same_company_scope, get_current_user_context
 from ..auth_db.models import AuditLog, Company, ProductKey, User
 from ..auth_db.session import get_auth_db_session
 from ..config import settings
@@ -100,54 +101,28 @@ def _cache_user_role(user_id: int, role: str, company_id: Optional[int]) -> None
         logger.warning("缓存用户角色失败 user_id=%s: %s", user_id, exc)
 
 
-def _verify_access_token(request: Request) -> Dict[str, Any]:
-    token = _extract_bearer_token(request)
-    service = get_auth_service()
-    try:
-        payload = service.jwt.verify_token(token, expected_type="access", check_blacklist=True)
-    except JWTValidationError as exc:
-        raise _fail(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc
-    return payload
-
-
 def _get_authenticated_user(request: Request, db: Session) -> User:
-    payload = _verify_access_token(request)
-    token_role = str(payload.get("role") or "")
-    user_id = payload.get("user_id")
-    if not user_id:
-        raise _fail(status.HTTP_401_UNAUTHORIZED, "Token缺少用户标识")
-
-    try:
-        user_id_int = int(user_id)
-    except (TypeError, ValueError) as exc:
-        raise _fail(status.HTTP_401_UNAUTHORIZED, "Token用户标识无效") from exc
-
-    user = db.query(User).filter(User.id == user_id_int).one_or_none()
+    ctx = get_current_user_context(request, db)
+    user = db.query(User).filter(User.id == ctx.user_id).one_or_none()
     if not user:
         raise _fail(status.HTTP_401_UNAUTHORIZED, "用户不存在或Token无效")
-    if user.status in {"deleted", "disabled", "locked"}:
-        raise _fail(status.HTTP_403_FORBIDDEN, "用户状态不可用")
-
-    if token_role and token_role != user.role:
-        raise _fail(status.HTTP_403_FORBIDDEN, "Token角色与数据库角色不一致")
-
     _cache_user_role(user.id, user.role, user.company_id)
     return user
 
 
 def _require_company_admin_user(request: Request, db: Session) -> User:
-    user = _get_authenticated_user(request, db)
-    if user.role != "company_admin":
-        raise _fail(status.HTTP_403_FORBIDDEN, "权限不足，仅企业管理员可访问")
-    if not user.company_id:
-        raise _fail(status.HTTP_403_FORBIDDEN, "企业管理员必须绑定企业")
+    ctx = RoleChecker(["company_admin"], require_company_scope=True)(request, db)
+    user = db.query(User).filter(User.id == ctx.user_id).one_or_none()
+    if not user:
+        raise _fail(status.HTTP_401_UNAUTHORIZED, "用户不存在或Token无效")
     return user
 
 
 def _require_super_admin_user(request: Request, db: Session) -> User:
-    user = _get_authenticated_user(request, db)
-    if user.role not in {"admin", "super_admin"}:
-        raise _fail(status.HTTP_403_FORBIDDEN, "权限不足，仅超级管理员可访问")
+    ctx = RoleChecker(["admin", "super_admin"])(request, db)
+    user = db.query(User).filter(User.id == ctx.user_id).one_or_none()
+    if not user:
+        raise _fail(status.HTTP_401_UNAUTHORIZED, "用户不存在或Token无效")
     return user
 
 
@@ -501,6 +476,10 @@ def delete_company_user(
     target_user = db.query(User).filter(User.id == user_id).one_or_none()
     if not target_user or target_user.status == "deleted":
         raise _fail(status.HTTP_404_NOT_FOUND, "目标用户不存在")
+    ensure_same_company_scope(
+        get_current_user_context(request, db),
+        target_user.company_id,
+    )
     if target_user.company_id != current_user.company_id:
         raise _fail(status.HTTP_403_FORBIDDEN, "无权限操作其他企业用户")
     if target_user.id == current_user.id:

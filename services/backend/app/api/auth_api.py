@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse
@@ -41,6 +41,8 @@ class RegisterRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: str = Field(..., max_length=320)
     password: str = Field(..., min_length=8, max_length=128)
+    origin: Optional[Literal["admin", "enterprise", "user"]] = Field(default=None)
+    context: Optional[Literal["admin", "enterprise", "user"]] = Field(default=None)
     device_info: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -169,6 +171,7 @@ def register(payload: RegisterRequest, request: Request):
 def login(payload: LoginRequest, request: Request):
     service = get_auth_service()
     try:
+        login_origin = payload.origin or payload.context
         result = service.login(
             email=ensure_safe_text(payload.email, max_len=settings.AUTH_XSS_MAX_INPUT_LEN, reject_sql=True),
             password=payload.password,
@@ -176,6 +179,13 @@ def login(payload: LoginRequest, request: Request):
             ip_address=_extract_client_ip(request),
             user_agent=request.headers.get("user-agent"),
         )
+        role = str(result.get("user_info", {}).get("role") or "").strip().lower()
+        if login_origin == "admin" and role not in {"admin", "super_admin", "company_admin"}:
+            raise PermissionError("当前账号不允许从管理员入口登录")
+        if login_origin == "enterprise" and role != "enterprise":
+            raise PermissionError("当前账号不允许从企业入口登录")
+        if login_origin == "user" and role not in {"user", "admin", "super_admin", "company_admin"}:
+            raise PermissionError("当前账号不允许从用户入口登录")
         return _ok("登录成功", result)
     except ValueError as exc:
         raise _fail(status.HTTP_401_UNAUTHORIZED, str(exc)) from exc

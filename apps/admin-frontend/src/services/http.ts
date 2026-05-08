@@ -2,6 +2,7 @@ import axios from 'axios';
 import type { AxiosError, InternalAxiosRequestConfig } from 'axios';
 import { ElMessage } from 'element-plus';
 import { useAuthStore } from '../stores/auth';
+import { resolveLoginRouteByContext } from '../utils/authRedirect';
 import type {
   AuditEventType,
   AuditLog,
@@ -62,6 +63,16 @@ function unwrapData<T>(payload: BackendResponse<T> | undefined): T {
   return (payload?.data ?? {}) as T;
 }
 
+function resolveUnauthorizedRedirectPath(currentHashPath: string): string {
+  if (currentHashPath.startsWith('/user')) {
+    return resolveLoginRouteByContext('user');
+  }
+  if (currentHashPath.startsWith('/enterprise')) {
+    return resolveLoginRouteByContext('enterprise');
+  }
+  return resolveLoginRouteByContext('admin');
+}
+
 http.interceptors.request.use((config) => {
   const authStore = useAuthStore();
   const token = authStore.getToken();
@@ -92,8 +103,10 @@ http.interceptors.response.use(
       }
 
       authStore.clearToken();
-      if (window.location.hash !== '#/user/login') {
-        window.location.hash = '#/user/login';
+      const currentHashPath = window.location.hash.replace(/^#/, '') || '/';
+      const nextLoginPath = resolveUnauthorizedRedirectPath(currentHashPath);
+      if (window.location.hash !== `#${nextLoginPath}`) {
+        window.location.hash = `#${nextLoginPath}`;
       }
     }
 
