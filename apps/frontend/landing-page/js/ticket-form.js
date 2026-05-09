@@ -168,20 +168,26 @@
             data.phone = iti.getNumber();
         }
         
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+        
         try {
             submitBtn.disabled = true;
             submitBtn.innerText = '提交中...';
             
-            // 模拟 API 调用 (实际应调用 /api/tickets)
-            const response = await fetch('/api/tickets', {
+            // 使用正确的 API 路由 /api/tickets (假设前端代理前缀已处理)
+            const response = await fetch('/tickets', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(data)
+                body: JSON.stringify(data),
+                signal: controller.signal
             });
+            clearTimeout(timeoutId);
             
             if (response.ok) {
                 const result = await response.json();
-                showSuccess(result.ticket_id);
+                // 确保 API 成功后返回真实的数据库 ticket_id
+                showSuccess(result.data.ticket_id);
                 ticketForm.reset();
             } else {
                 const err = await response.json();
@@ -189,11 +195,11 @@
             }
         } catch (error) {
             console.error('Submit error:', error);
-            // 演示用：即便报错也模拟成功（如果后端还没部署）
-            // 在实际生产中应删除此处
-            const mockId = 'TKT-' + Math.random().toString(36).substr(2, 9).toUpperCase();
-            showSuccess(mockId);
-            ticketForm.reset();
+            if (error.name === 'AbortError') {
+                showError(ticketForm, '提交请求超时，请检查网络后重试');
+            } else {
+                showError(ticketForm, '网络连接失败，请稍后重试');
+            }
         } finally {
             submitBtn.disabled = false;
             submitBtn.innerText = originalText;

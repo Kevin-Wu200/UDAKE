@@ -56,6 +56,10 @@
           <el-icon><Document /></el-icon>
           <span>{{ t('auditLogs') }}</span>
         </el-menu-item>
+        <el-menu-item index="/tickets">
+          <el-icon><Tickets /></el-icon>
+          <span>{{ t('tickets') }}</span>
+        </el-menu-item>
       </el-menu>
     </aside>
 
@@ -105,7 +109,7 @@
 import type { AppLanguage } from '../stores/app';
 import { computed, ref, onMounted, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { DataAnalysis, Document, Histogram, Key, Message, Operation, Setting, UserFilled } from '@element-plus/icons-vue';
+import { DataAnalysis, Document, Histogram, Key, Message, Operation, Setting, UserFilled, Tickets } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useAppStore } from '../stores/app';

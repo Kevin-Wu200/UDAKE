@@ -55,7 +55,7 @@ export function isAdminRole(role: string | null | undefined): boolean {
 
 export function resolvePostLoginPathByRole(role: string | null | undefined): string {
   if (role === 'enterprise') {
-    return '/enterprise-management';
+    return '/enterprise/dashboard';
   }
   if (isAdminRole(role)) {
     return '/dashboard';

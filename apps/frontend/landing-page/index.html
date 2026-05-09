@@ -286,8 +286,9 @@
             <strong>github.com/Kevin-Wu200/UDAKE</strong>
           </a>
         </div>
-        <button id="UserLoginBtn" data-i18n="contact.userLogin" class="cta-btn" >用户入口</button>
+        <button id="UserLoginBtn" data-i18n="contact.userLogin" class="cta-btn">用户入口</button>
         <button id="AdminLoginBtn" data-i18n="contact.adminLogin" class="cta-btn">管理员入口</button>
+        <button id="EnterpriseLoginBtn" data-i18n="contact.enterpriseLogin" class="cta-btn">企业入口</button>
         <button id="DeveloperInfoBtn" data-i18n="contact.developerInfo" class="cta-btn">开发者信息</button>
       </section>
 
@@ -452,9 +453,9 @@
   <!-- 密钥申请工单模态框 -->
   <div id="ticketModal" class="ticket-modal" aria-hidden="true">
     <div class="ticket-modal-content">
-      <form id="ticketForm">
+    <button type="button" class="close-modal">&times;</button>
+      <form id="ticketForm" class="ticket-form-grid">
         <div class="ticket-form-group">
-          <button class="close-modal" style="margin-left: 95%;">&times;</button>
           <label for="ticketType" data-i18n="ticket.fields.type">工单类型</label>
           <select id="ticketType" name="ticket_type" required>
             <option value="apply" data-i18n="ticket.options.apply">申请密钥</option>
@@ -515,19 +516,19 @@
           <div class="error-msg" data-i18n="ticket.errors.required">该字段为必填项</div>
         </div>
 
-        <div class="ticket-form-group">
+        <div class="ticket-form-group full-width">
           <label for="purpose" data-i18n="ticket.fields.purpose">用途说明</label>
-          <textarea id="purpose" name="purpose" required placeholder="请简要说明用途"
+          <textarea id="purpose" name="usage_purpose" required placeholder="请简要说明用途"
             data-i18n-placeholder="ticket.placeholders.purpose"></textarea>
           <div class="error-msg" data-i18n="ticket.errors.required">该字段为必填项</div>
         </div>
 
-        <div class="ticket-form-actions">
+        <div class="ticket-form-actions full-width">
           <button type="submit" class="btn btn-primary" data-i18n="ticket.submit">提交申请</button>
           <button type="button" id="cancelTicket" class="btn btn-secondary" data-i18n="ticket.cancel">取消</button>
         </div>
 
-        <div style="margin-top: 1rem; text-align: center;">
+        <div class="full-width" style="margin-top: 1rem; text-align: center;">
           <a href="#" id="openQueryModal" style="font-size: 0.9rem; color: #666;"
             data-i18n="ticket.queryLink">已有工单？点击查询状态</a>
         </div>
@@ -568,7 +569,8 @@
           <input type="email" id="queryEmail" name="email" required placeholder="请输入申请时填写的邮箱"
             data-i18n-placeholder="ticket.query.emailPlaceholder">
         </div>
-        <button type="submit" class="btn btn-primary" style="width: 50%; margin-left: 25%; border-radius: 10px; height: 30px; margin-top: 10px;"
+        <button type="submit" class="btn btn-primary"
+          style="width: 50%; margin-left: 25%; border-radius: 10px; height: 30px; margin-top: 10px;"
           data-i18n="ticket.query.btn">查询</button>
       </form>
       <div id="queryResultArea" class="hidden">

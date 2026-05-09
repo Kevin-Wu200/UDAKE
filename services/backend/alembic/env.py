@@ -39,9 +39,8 @@ def run_migrations_offline() -> None:
 def run_migrations_online() -> None:
     """Run migrations in 'online' mode."""
     db_url = get_auth_database_url()
-    engine_options = build_engine_options()
-    engine_options["poolclass"] = pool.NullPool
-    connectable = create_engine(db_url, **engine_options)
+    # 仅使用 create_engine 支持的基础参数，避免与 pool_size 等参数冲突
+    connectable = create_engine(db_url, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
         context.configure(

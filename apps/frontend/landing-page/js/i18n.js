@@ -211,6 +211,7 @@
         close: "关闭",
         adminLogin: "管理员入口",
         userLogin: "用户登录",
+        enterpriseLogin: "企业登录",
       },
       footer: {
         copy: "© 2026 UDAKE. All rights reserved.",
@@ -533,6 +534,7 @@
         close: "Close",
         adminLogin: "Admin Login",
         userLogin: "User Login",
+        enterpriseLogin: "Enterprise Login",
       },
       footer: {
         copy: "© 2026 UDAKE. All rights reserved.",

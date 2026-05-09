@@ -65,6 +65,7 @@ class TicketCreateRequest(BaseModel):
 
 class TicketResponse(BaseModel):
     id: int
+    ticket_id: str
     ticket_type: str
     status: str
     email: str
@@ -204,7 +205,38 @@ def require_super_admin(handler):
 
         current_user = _get_authenticated_user(request, db)
         if current_user.role not in {"super_admin", "admin"}:
-            raise _fail(status.HTTP_403_FORBIDDEN, "权限不足，仅超级管理员可访问")
+            raise _fail(status.HTTP_403_FORBIDDEN, "权限不足，仅管理员可访问")
+        request.state.current_user = current_user
+        return handler(*args, **kwargs)
+
+    return wrapper
+
+
+def require_company_authorized(handler):
+    """企业管理员权限验证装饰器。
+    支持 super_admin (全量权限) 和 admin (所属企业权限)。
+    """
+
+    @wraps(handler)
+    def wrapper(*args, **kwargs):
+        request = kwargs.get("request")
+        db = kwargs.get("db")
+        if request is None:
+            request = next((arg for arg in args if isinstance(arg, Request)), None)
+        if db is None:
+            db = next((arg for arg in args if isinstance(arg, Session)), None)
+        if request is None or db is None:
+            raise _fail(status.HTTP_500_INTERNAL_SERVER_ERROR, "权限装饰器参数解析失败")
+
+        current_user = _get_authenticated_user(request, db)
+        # 支持超级管理员和企业管理员
+        if current_user.role not in {"super_admin", "admin"}:
+            raise _fail(status.HTTP_403_FORBIDDEN, "权限不足，仅企业管理员或系统管理员可访问")
+
+        # 如果是普通管理员，必须有关联的企业
+        if current_user.role == "admin" and not current_user.company_id:
+            raise _fail(status.HTTP_403_FORBIDDEN, "管理员账号未关联企业，请联系系统管理员")
+
         request.state.current_user = current_user
         return handler(*args, **kwargs)
 
@@ -226,6 +258,7 @@ def _normalize_datetime(value: Any) -> Optional[str]:
 def generate_ticket_response(ticket: Ticket, *, hide_processor: bool = False) -> Dict[str, Any]:
     payload = TicketResponse(
         id=int(ticket.id),
+        ticket_id=ticket.ticket_id,
         ticket_type=ticket.ticket_type,
         status=ticket.status,
         email=ticket.email,
@@ -260,10 +293,13 @@ def validate_usage_purpose(purpose: str) -> bool:
 
 def validate_organization(industry: str, organization: str) -> bool:
     """校验所属单位：结合选择的"所处行业"校验合法性。"""
+    org_lower = organization.lower()
     if industry == "教育":
-        return "学院" in organization or "大学" in organization
+        return any(k in org_lower for k in ["学院", "大学", "university", "college"])
     else:
-        return any(keyword in organization for keyword in ["集团", "公司", "局", "中心", "院", "所"])
+        # 增加对英文单位关键字的支持：'group', 'company', 'institute' 等
+        keywords = ["集团", "公司", "局", "中心", "院", "所", "group", "company", "institute", "corp", "inc"]
+        return any(keyword in org_lower for keyword in keywords)
 
 
 def verify_ticket_access(ticket_id: int, email: str, db: Session) -> Ticket:
@@ -279,8 +315,8 @@ def _resolve_key_sub_type(key_type: str) -> str:
     return "trial" if key_type.endswith("_trial") else "standard"
 
 
-def _resolve_company_for_ticket(db: Session, industry: str) -> Company:
-    company_name = industry.strip()
+def _resolve_company_for_ticket(db: Session, organization: str) -> Company:
+    company_name = organization.strip()
     company = db.query(Company).filter(Company.name == company_name).one_or_none()
     if company:
         return company
@@ -348,11 +384,18 @@ def _rsa_sign_pkcs1_v15_sha256(message: bytes) -> str:
 
 def handle_key_request(ticket: Ticket, db: Session) -> str:
     company = None
-    company_id = None
+    company_id = ticket.company_id
     company_name = None
+    
     if ticket.key_type.startswith("enterprise_"):
-        company = _resolve_company_for_ticket(db, ticket.industry)
-        company_id = company.id
+        if company_id:
+            company = db.query(Company).filter(Company.id == company_id).one_or_none()
+        
+        if not company:
+            company = _resolve_company_for_ticket(db, ticket.organization)
+            company_id = company.id
+            ticket.company_id = company_id
+            
         company_name = company.name
 
     user = _resolve_or_create_ticket_user(db, ticket, company_id)
@@ -494,9 +537,27 @@ def create_ticket(
     if ticket_type == TicketType.KEY_REQUEST.value and existing_key:
         raise _fail(status.HTTP_400_BAD_REQUEST, "key_request 工单不允许提供 existing_key")
 
+    # 自动关联公司 ID
+    company_id = None
+    company = db.query(Company).filter(Company.name == organization).first()
+    if company:
+        company_id = company.id
+    else:
+        # 尝试通过邮箱域名匹配 (可选增强)
+        email_domain = email.split("@")[-1]
+        if email_domain not in {"gmail.com", "outlook.com", "qq.com", "163.com", "sina.com"}:
+             # 简单匹配，实际项目中可能需要更复杂的域名归属表
+             pass
+
     try:
+        # 生成 TKT-XXXXXXXX 格式的 ID
+        import secrets
+        random_suffix = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
+        ticket_id = f"TKT-{random_suffix}"
+        
         ticket = Ticket(
             id=_next_model_id(db, Ticket),
+            ticket_id=ticket_id,
             ticket_type=ticket_type,
             status=TicketStatus.PENDING.value,
             email=email,
@@ -506,6 +567,7 @@ def create_ticket(
             usage_purpose=usage_purpose,
             key_type=key_type,
             existing_key=existing_key,
+            company_id=company_id,
         )
         db.add(ticket)
         db.flush()
@@ -518,40 +580,38 @@ def create_ticket(
             user=None,
             request=request,
             operation_type="create",
-            target_id=str(ticket.id),
+            target_id=ticket.ticket_id,
             success=True,
-            details={"ticket_type": ticket_type, "email": email, "key_type": key_type},
+            details={"ticket_id": ticket.ticket_id, "ticket_type": ticket_type, "email": email, "key_type": key_type},
         )
         db.commit()
         db.refresh(ticket)
-        logger.info("创建工单成功 ticket_id=%s email=%s", ticket.id, email)
+        logger.info("创建工单成功 ticket_id=%s db_id=%s email=%s", ticket.ticket_id, ticket.id, email)
         return success_response(
             "工单创建成功",
             {
-                "ticket_id": ticket.id,
+                "ticket_id": ticket.ticket_id,
                 "ticket": generate_ticket_response(ticket, hide_processor=True),
                 "created_at": _normalize_datetime(ticket.created_at),
             },
         )
-    except HTTPException:
-        raise
-    except (ValueError, SQLAlchemyError) as exc:
+    except Exception as exc:
         db.rollback()
-        logger.exception("创建工单失败: %s", exc)
+        logger.error("创建工单过程中发生异常，详情: %s", str(exc), exc_info=True)
         raise _fail(status.HTTP_500_INTERNAL_SERVER_ERROR, f"数据库错误: {exc}") from exc
 
 
 @router.get(
     "",
     summary="查询工单列表",
-    description="仅超级管理员或管理员可访问，支持按状态和工单类型筛选，并按创建时间倒序分页返回。",
+    description="仅系统管理员或企业管理员可访问，系统管理员可查看全量，企业管理员仅可查看其所属企业工单。",
     responses={
         401: {"description": "未认证"},
         403: {"description": "权限不足"},
         500: {"description": "服务器内部错误"},
     },
 )
-@require_super_admin
+@require_company_authorized
 def list_tickets(
     request: Request,
     status_filter: Optional[str] = Query(default=None, alias="status"),
@@ -563,6 +623,11 @@ def list_tickets(
     current_user = request.state.current_user
     try:
         query = db.query(Ticket)
+
+        # 权限过滤：非超级管理员只能看到自己公司的工单
+        if current_user.role != "super_admin":
+            query = query.filter(Ticket.company_id == current_user.company_id)
+
         if status_filter:
             normalized_status = status_filter.strip()
             if normalized_status not in {item.value for item in TicketStatus}:
@@ -651,7 +716,7 @@ def get_ticket(
 @router.put(
     "/{ticket_id}/approve",
     summary="审批通过工单",
-    description="仅超级管理员或管理员可访问。审批通过后会根据工单类型自动生成新密钥或将现有密钥延期90天。",
+    description="仅系统管理员或企业管理员可访问。审批通过后会根据工单类型自动生成新密钥或将现有密钥延期90天。",
     responses={
         400: {"description": "工单状态错误或审批参数错误"},
         401: {"description": "未认证"},
@@ -660,7 +725,7 @@ def get_ticket(
         500: {"description": "审批处理失败"},
     },
 )
-@require_super_admin
+@require_company_authorized
 def approve_ticket(
     ticket_id: int,
     payload: TicketApprovalRequest,
@@ -669,9 +734,13 @@ def approve_ticket(
 ) -> Dict[str, Any]:
     current_user = request.state.current_user
     try:
-        ticket = db.query(Ticket).filter(Ticket.id == ticket_id).with_for_update().one_or_none()
+        query = db.query(Ticket).filter(Ticket.id == ticket_id)
+        if current_user.role != "super_admin":
+            query = query.filter(Ticket.company_id == current_user.company_id)
+        
+        ticket = query.with_for_update().one_or_none()
         if not ticket:
-            raise _fail(status.HTTP_404_NOT_FOUND, "工单不存在")
+            raise _fail(status.HTTP_404_NOT_FOUND, "工单不存在或无权访问")
         if ticket.status != TicketStatus.PENDING.value:
             raise _fail(status.HTTP_400_BAD_REQUEST, "仅 pending 状态工单允许审批")
 
@@ -725,7 +794,7 @@ def approve_ticket(
 @router.put(
     "/{ticket_id}/reject",
     summary="拒绝工单",
-    description="仅超级管理员或管理员可访问。拒绝时必须提供拒绝原因，系统会记录处理人与处理结果。",
+    description="仅系统管理员或企业管理员可访问。拒绝时必须提供拒绝原因，系统会记录处理人与处理结果。",
     responses={
         400: {"description": "缺少拒绝原因或工单状态错误"},
         401: {"description": "未认证"},
@@ -734,7 +803,7 @@ def approve_ticket(
         500: {"description": "审批处理失败"},
     },
 )
-@require_super_admin
+@require_company_authorized
 def reject_ticket(
     ticket_id: int,
     payload: TicketApprovalRequest,
@@ -746,9 +815,13 @@ def reject_ticket(
     if not reason:
         raise _fail(status.HTTP_400_BAD_REQUEST, "拒绝原因不能为空")
     try:
-        ticket = db.query(Ticket).filter(Ticket.id == ticket_id).with_for_update().one_or_none()
+        query = db.query(Ticket).filter(Ticket.id == ticket_id)
+        if current_user.role != "super_admin":
+            query = query.filter(Ticket.company_id == current_user.company_id)
+
+        ticket = query.with_for_update().one_or_none()
         if not ticket:
-            raise _fail(status.HTTP_404_NOT_FOUND, "工单不存在")
+            raise _fail(status.HTTP_404_NOT_FOUND, "工单不存在或无权访问")
         if ticket.status != TicketStatus.PENDING.value:
             raise _fail(status.HTTP_400_BAD_REQUEST, "仅 pending 状态工单允许拒绝")
 

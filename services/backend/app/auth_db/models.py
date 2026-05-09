@@ -243,6 +243,7 @@ class Ticket(Base):
     }
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ticket_id: Mapped[str] = mapped_column(String(32), nullable=False, unique=True)
     ticket_type: Mapped[str] = mapped_column(String(50), nullable=False)
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'pending'"))
     email: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -252,6 +253,9 @@ class Ticket(Base):
     usage_purpose: Mapped[str] = mapped_column(Text, nullable=False)
     key_type: Mapped[str] = mapped_column(String(50), nullable=False)
     existing_key: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    company_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("companies.id", ondelete="SET NULL"), nullable=True
+    )
     processed_by: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
@@ -267,6 +271,7 @@ class Ticket(Base):
     processor = relationship("User", back_populates="processed_tickets", foreign_keys=[processed_by])
 
     __table_args__ = (
+        Index("ix_tickets_ticket_id", "ticket_id"),
         CheckConstraint(
             "ticket_type IN ('key_request', 'key_extension')",
             name="ck_tickets_ticket_type_enum",
@@ -304,6 +309,7 @@ class Ticket(Base):
         Index("ix_tickets_created_at", "created_at"),
         Index("ix_tickets_ticket_type", "ticket_type"),
         Index("ix_tickets_processed_by", "processed_by"),
+        Index("ix_tickets_company_id", "company_id"),
     )
 
     @validates("email")

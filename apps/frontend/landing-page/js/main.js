@@ -332,7 +332,7 @@
   }
 
   const adminLoginUrl = {
-    ADMIN_LOGIN_URL: "http://127.0.0.1:5175/#/login",
+    ADMIN_LOGIN_URL: "http://127.0.0.1:5175/#/login/admin",
   };
   const adminLoginBtn = document.getElementById("AdminLoginBtn");
   if (adminLoginBtn) {
@@ -342,12 +342,22 @@
   }
 
   const userLoginUrl = {
-    USER_LOGIN_URL: "http://127.0.0.1:5175/#/users/login",
+    USER_LOGIN_URL: "http://127.0.0.1:5175/#/user/login",
   };
   const userLoginBtn = document.getElementById("UserLoginBtn");
   if (userLoginBtn) {
     userLoginBtn.addEventListener("click", function () {
       window.location.href = userLoginUrl.USER_LOGIN_URL;
+    });
+  }
+
+  const enterpriseLoginUrl = {
+    ENTERPRISE_LOGIN_URL: "http://127.0.0.1:5175/#/login/enterprise",
+  };
+  const enterpriseLoginBtn = document.getElementById("EnterpriseLoginBtn");
+  if (enterpriseLoginBtn) {
+    enterpriseLoginBtn.addEventListener("click", function () {
+      window.location.href = enterpriseLoginUrl.ENTERPRISE_LOGIN_URL;
     });
   }
 })();
