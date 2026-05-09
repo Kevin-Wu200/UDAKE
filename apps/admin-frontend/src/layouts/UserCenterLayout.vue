@@ -15,12 +15,16 @@
           <div class="title">账户安全中心</div>
           <div class="desc">{{ authStore.user?.email || authStore.username }}</div>
         </div>
+        <div class="header-text">
+          <div class="greeting">{{ greeting }}</div>
+          <div class="sub">{{ t('welcome') }}{{ authStore.user_Name }}</div>
+        </div>
         <div class="actions">
           <el-button plain @click="router.push('/dashboard')">管理员后台</el-button>
+          
           <el-button type="danger" @click="onLogout">退出登录</el-button>
-        </div>
+        </div>        
       </header>
-
       <main>
         <router-view />
       </main>
@@ -32,19 +36,65 @@
 import { ElMessage } from 'element-plus';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import {ref, onMounted, watch} from 'vue';
+import { useAppStore } from '../stores/app';
+import { useI18nText } from '../i18n/useI18n';
 
+const { t } = useI18nText();
+const appStore = useAppStore();
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
+const greeting = ref('');
 
 const onLogout = async () => {
   await authStore.logoutWithApi();
   ElMessage.success('已退出登录');
   router.replace('/user/login');
 };
+
+function updateGreeting() {
+  const hour = new Date().getHours();
+  if (hour > 5 && hour < 12) {
+    greeting.value = t('goodMorning');
+  } else if (hour < 18) {
+    greeting.value = t('goodAfternoon');
+  } else if (hour < 22) {
+    greeting.value = t('goodEvening');
+  } else {
+    greeting.value = t('goodNight');
+  }
+}
+
+onMounted(() => {
+  updateGreeting();
+});
+
+watch(() => appStore.language, () => {
+  updateGreeting();
+});
 </script>
 
 <style scoped>
+.greeting {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1d1d1f;
+  letter-spacing: -0.02em;
+  margin-bottom: 0;
+  animation: fadeUp 0.5s ease;
+}
+
+.sub{
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #86868b;
+  letter-spacing: -0.01em;
+  animation: fadeUp 0.7s ease;
+}
+
 .user-layout {
   min-height: 100vh;
   display: grid;
@@ -129,6 +179,24 @@ main {
     padding: 12px;
     gap: 10px;
     flex-wrap: wrap;
+  }
+}
+
+.header-text{
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 </style>

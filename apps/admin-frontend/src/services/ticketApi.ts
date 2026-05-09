@@ -13,7 +13,7 @@ interface TicketListData {
 }
 
 export async function getTickets(params: TicketListParams): Promise<{ total: number; items: Ticket[] }> {
-  const response = await http.get<BackendResponse<TicketListData>>('/api/tickets', { params });
+  const response = await http.get<BackendResponse<TicketListData>>('/tickets', { params });
   const data = response.data.data;
   return {
     total: data.total,
@@ -22,14 +22,14 @@ export async function getTickets(params: TicketListParams): Promise<{ total: num
 }
 
 export async function getTicket(ticketId: number): Promise<Ticket> {
-  const response = await http.get<BackendResponse<Ticket>>(`/api/tickets/${ticketId}`);
+  const response = await http.get<BackendResponse<Ticket>>(`/tickets/${ticketId}`);
   return response.data.data;
 }
 
 export async function approveTicket(ticketId: number, notes: string): Promise<void> {
-  await http.put(`/api/tickets/${ticketId}/approve`, { notes });
+  await http.put(`/tickets/${ticketId}/approve`, { notes });
 }
 
 export async function rejectTicket(ticketId: number, reason: string): Promise<void> {
-  await http.put(`/api/tickets/${ticketId}/reject`, { reason });
+  await http.put(`/tickets/${ticketId}/reject`, { reason });
 }

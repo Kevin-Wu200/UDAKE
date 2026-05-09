@@ -73,8 +73,11 @@
             </el-breadcrumb-item>
           </el-breadcrumb>
         </div>
-        <div class="actions">
-          
+        <div class="header-text">
+            <div class="greeting">{{ greeting }}</div>
+            <div class="sub">{{ t('welcome') }}{{ authStore.user_Name }}</div>
+          </div>
+        <div class="actions">  
           <el-select :model-value="appStore.language" style="width: 120px" @change="onLanguageChange">
             <el-option label="简体中文" value="zh-CN" />
             <el-option label="English" value="en-US" />
@@ -82,7 +85,7 @@
             <el-option label="繁體中文" value="zh-TW"/>
             <el-option label="한국어" value="ko-KR"/>
           </el-select>
-          <span class="user">{{ authStore.username }}</span>
+          
           <el-button plain @click="router.push('/user')">{{ t('userCenter') }}</el-button>
           <el-button type="danger" plain @click="onLogout">{{ t('logout') }}</el-button>
         </div>
@@ -100,7 +103,7 @@
 
 <script setup lang="ts">
 import type { AppLanguage } from '../stores/app';
-import { computed } from 'vue';
+import { computed, ref, onMounted, watch } from 'vue';
 import { ElMessage } from 'element-plus';
 import { DataAnalysis, Document, Histogram, Key, Message, Operation, Setting, UserFilled } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -108,6 +111,7 @@ import { useAuthStore } from '../stores/auth';
 import { useAppStore } from '../stores/app';
 import { useI18nText } from '../i18n/useI18n';
 
+const greeting = ref('');
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
@@ -164,9 +168,49 @@ const onLogout = () => {
   ElMessage.success(t('logoutsuccess'));
   router.push('/login/admin');
 };
+
+function updateGreeting() {
+  const hour = new Date().getHours();
+  if (hour > 5 && hour < 12) {
+    greeting.value = t('goodMorning');
+  } else if (hour < 18) {
+    greeting.value = t('goodAfternoon');
+  } else if (hour < 22) {
+    greeting.value = t('goodEvening');
+  } else {
+    greeting.value = t('goodNight');
+  }
+}
+
+onMounted(() => {
+  updateGreeting();
+});
+
+watch(() => appStore.language, () => {
+  updateGreeting();
+});
 </script>
 
 <style scoped>
+.greeting {
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #1d1d1f;
+  letter-spacing: -0.02em;
+  margin-bottom: 0;
+  animation: fadeUp 0.5s ease;
+}
+
+.sub{
+  font-size: 15px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: #86868b;
+  letter-spacing: -0.01em;
+  animation: fadeUp 0.7s ease;
+}
+
 .admin-layout {
   display: grid;
   grid-template-columns: 220px 1fr;
@@ -260,11 +304,6 @@ const onLogout = () => {
   gap: 12px;
 }
 
-.user {
-  color: #334155;
-  font-weight: 500;
-}
-
 .content {
   flex: 1;
   padding: 20px;
@@ -288,6 +327,24 @@ const onLogout = () => {
 
   .menu :deep(.el-menu-item) {
     margin-bottom: 0;
+  }
+}
+
+.header-text{
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 24px 0;
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 </style>

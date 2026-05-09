@@ -52,7 +52,7 @@
             <el-option label="繁體中文" value="zh-TW"/>
             <el-option label="한국어" value="ko-KR"/>
           </el-select>
-          <span class="user">{{ authStore.username }}</span>
+          <span class="user">{{ authStore.user_Name }}</span>
           <el-button type="danger" plain @click="onLogout">{{ t('logout') }}</el-button>
         </div>
       </header>

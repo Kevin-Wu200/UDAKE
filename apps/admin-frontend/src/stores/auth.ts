@@ -8,6 +8,7 @@ const ACCESS_TOKEN_KEY = 'udake_access_token';
 const REFRESH_TOKEN_KEY = 'udake_refresh_token';
 const USER_INFO_KEY = 'udake_user_info';
 const LOGIN_USER_KEY = 'admin_login_user';
+const REAL_USERNAME_KEY = 'udake_real_username';
 const LEGACY_ADMIN_ACCESS_TOKEN_KEY = 'admin_access_token';
 const VALIDATE_CACHE_MS = 60_000;
 const ADMIN_ALLOWED_ROLES = ['company_admin', 'super_admin', 'admin'] as const;
@@ -39,6 +40,7 @@ function getInitialAccessToken() {
 
 function normalizeUser(payload: UserSessionPayload): AuthUser {
   return {
+    username: payload.user.username,
     userId: payload.user.userId,
     email: payload.user.email,
     role: payload.user.role,
@@ -67,6 +69,7 @@ export const useAuthStore = defineStore('auth', {
     refreshToken: localStorage.getItem(REFRESH_TOKEN_KEY) ?? '',
     user: parseJson<AuthUser>(localStorage.getItem(USER_INFO_KEY)),
     username: localStorage.getItem(LOGIN_USER_KEY) ?? '',
+    user_Name: localStorage.getItem(REAL_USERNAME_KEY) ?? '',
     refreshTimer: null as number | null,
     bootstrapped: false,
     refreshPromise: null as Promise<string | null> | null,
@@ -78,6 +81,7 @@ export const useAuthStore = defineStore('auth', {
     hasAdminAccess: (state) => Boolean(state.accessToken && (state.user ? isAdminRole(state.user.role) : true)),
     isSuperAdmin: (state) => Boolean(state.accessToken && (state.user ? state.user.role === 'super_admin' : true)),
     isCompanyAdmin: (state) => Boolean(state.user?.role === 'company_admin'),
+    displayName: (state) => state.user_Name || state.username || state.user?.email || 'User',
     currentCompany: (state) => {
       const userId = state.user?.userId ?? 1;
       const prefix = state.user?.email?.split('@')[0] || '默认';
@@ -92,8 +96,10 @@ export const useAuthStore = defineStore('auth', {
       this.user = user;
       if (user) {
         localStorage.setItem(USER_INFO_KEY, JSON.stringify(user));
-        this.username = user.email;
-        localStorage.setItem(LOGIN_USER_KEY, user.email);
+        this.username = user.username;
+        localStorage.setItem(LOGIN_USER_KEY, user.username);
+        this.user_Name = user.username;
+        localStorage.setItem(REAL_USERNAME_KEY, user.username);
       } else {
         localStorage.removeItem(USER_INFO_KEY);
       }
@@ -123,12 +129,14 @@ export const useAuthStore = defineStore('auth', {
       this.refreshToken = '';
       this.user = null;
       this.username = '';
+      this.user_Name = '';
       this.lastValidatedAt = 0;
       localStorage.removeItem(ACCESS_TOKEN_KEY);
       localStorage.removeItem(LEGACY_ADMIN_ACCESS_TOKEN_KEY);
       localStorage.removeItem(REFRESH_TOKEN_KEY);
       localStorage.removeItem(USER_INFO_KEY);
       localStorage.removeItem(LOGIN_USER_KEY);
+      localStorage.removeItem(REAL_USERNAME_KEY);
     },
     async login(email: string, password: string, context: LoginContext = 'admin') {
       const session = await loginUser(email, password, context);

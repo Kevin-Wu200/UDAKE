@@ -41,7 +41,8 @@ DEVICE_INACTIVE_AFTER_SECONDS = 30 * 24 * 60 * 60
 class AuthUser:
     id: int
     email: str
-    password_hash: str
+    username: str = ""
+    password_hash: str = ""
     role: str = "user"
     permissions: List[str] = field(default_factory=list)
     status: str = "active"
@@ -261,6 +262,7 @@ class AuthService:
         if existing:
             old_email = existing.email
             existing.email = user.email
+            existing.username = user.username
             existing.password_hash = user.password_hash
             existing.role = user.role
             existing.permissions = list(user.permissions)
@@ -301,6 +303,7 @@ class AuthService:
             user = AuthUser(
                 id=int(row.id),
                 email=str(row.email).strip().lower(),
+                username=str(row.username or ""),
                 password_hash=str(row.password_hash or ""),
                 role=role,
                 permissions=self._build_permissions_for_role(role),
@@ -791,38 +794,86 @@ class AuthService:
             )
             raise
 
-        with self._lock:
-            if normalized_email in self._users_by_email:
+        try:
+            from app.auth_db.models import User
+            from app.auth_db.session import get_auth_session_factory
+        except ImportError:
+            logger.error("Failed to import DB models in register")
+            raise RuntimeError("Database access failed")
+
+        session_factory = get_auth_session_factory()
+        db_session = session_factory()
+        
+        try:
+            # 检查邮箱是否已在数据库中注册
+            existing_db_user = db_session.query(User).filter(func.lower(User.email) == normalized_email).one_or_none()
+            if existing_db_user:
                 raise ValueError("邮箱已注册")
 
-            user_id = self._next_user_id
-            self._next_user_id += 1
-            role = "admin" if use_bootstrap_admin_role else "user"
-            permissions = ["read", "write", "admin"] if use_bootstrap_admin_role else ["read"]
-            user = AuthUser(
-                id=user_id,
-                email=normalized_email,
-                password_hash=hash_password(password),
-                role=role,
-                permissions=permissions,
-                status="active",
-            )
-            self._apply_super_admin_role_if_needed(user)
-            self._activate_product_key_in_db(validate_product_key, user_id)
-            record.status = "active"
-            record.user_id = user_id
-            if int(record.total_quota or 0) > 0:
-                record.used_count = min(int(record.total_quota), int(record.used_count or 0) + 1)
-            self.product_keys.register_key(record)
-            self._users_by_email[normalized_email] = user
-            self._users_by_id[user_id] = user
-            self._record_password_history(user_id, user.password_hash)
+            with self._lock:
+                if normalized_email in self._users_by_email:
+                    raise ValueError("邮箱已注册")
+
+                # 生成唯一用户名
+                base_name = normalized_email.split("@", 1)[0][:32] or "user"
+                username = base_name
+                suffix = 1
+                while db_session.query(User).filter(User.username == username).one_or_none():
+                    suffix += 1
+                    username = f"{base_name[:28]}_{suffix}"
+
+                role = "admin" if use_bootstrap_admin_role else "user"
+                pwd_hash = hash_password(password)
+                
+                # 持久化用户到数据库 (pending 状态)
+                new_user_row = User(
+                    email=normalized_email,
+                    username=username,
+                    password_hash=pwd_hash,
+                    role=role,
+                    status="pending",
+                    is_email_verified=False,
+                    created_at=datetime.now(timezone.utc)
+                )
+                db_session.add(new_user_row)
+                db_session.commit()
+                db_session.refresh(new_user_row)
+                
+                user_id = new_user_row.id
+                permissions = self._build_permissions_for_role(role)
+                
+                user = AuthUser(
+                    id=user_id,
+                    email=normalized_email,
+                    username=username,
+                    password_hash=pwd_hash,
+                    role=role,
+                    permissions=permissions,
+                    status="pending",
+                )
+                self._apply_super_admin_role_if_needed(user)
+                self._activate_product_key_in_db(validate_product_key, user_id)
+                record.status = "active"
+                record.user_id = user_id
+                if int(record.total_quota or 0) > 0:
+                    record.used_count = min(int(record.total_quota), int(record.used_count or 0) + 1)
+                self.product_keys.register_key(record)
+                self._users_by_email[normalized_email] = user
+                self._users_by_id[user_id] = user
+                self._next_user_id = max(self._next_user_id, user_id + 1)
+                self._record_password_history(user_id, pwd_hash)
+        except Exception as exc:
+            db_session.rollback()
+            logger.error(f"Register persistence failed: {exc}")
+            raise
+        finally:
+            db_session.close()
 
         code = self.verifier.issue_code(normalized_email, namespace="verify_code")
         self._send_template_email(
             template_key="register_code",
             to_email=normalized_email,
-            variables={"username": self._user_name_from_email(normalized_email), "code": code, "valid_time": "10分钟"},
+            variables={"username": username, "code": code, "valid_time": "10分钟"},
         )
         self._audit(
             operation="register",
@@ -1014,6 +1065,7 @@ class AuthService:
             "user_info": {
                 "user_id": user.id,
                 "email": user.email,
+                "username": user.username,
                 "role": user.role,
                 "permissions": user.permissions,
                 "enterprise_id": user.enterprise_id,
@@ -1178,13 +1230,39 @@ class AuthService:
         normalized_email = self._normalize_email(email)
         self._ensure_rate_limit(identity=normalized_email, action="verify_code")
         self.verifier.verify_code(normalized_email, code, namespace="verify_code")
-        with self._lock:
-            user = self._users_by_email.get(normalized_email)
-            if user:
-                user.is_email_verified = True
+
+        try:
+            from app.auth_db.models import User
+            from app.auth_db.session import get_auth_session_factory
+        except ImportError:
+            pass
+
+        session_factory = get_auth_session_factory()
+        db_session = session_factory()
+        
+        try:
+            # 更新数据库中的用户状态
+            row = db_session.query(User).filter(func.lower(User.email) == normalized_email).one_or_none()
+            if row:
+                row.is_email_verified = True
+                row.status = "active"
+                db_session.commit()
+
+            with self._lock:
+                user = self._users_by_email.get(normalized_email)
+                if user:
+                    user.is_email_verified = True
+                    user.status = "active"
+        except Exception as exc:
+            db_session.rollback()
+            logger.error(f"Verify email persistence failed: {exc}")
+            # 继续执行，因为验证码已经校验过了
+        finally:
+            db_session.close()
+
         self._audit(
             operation="verify_email",
-            user_id=user.id if user else None,
+            user_id=user.id if 'user' in locals() and user else None,
             details={"action": "verify_email", "result": "success", "email": normalized_email},
         )
 

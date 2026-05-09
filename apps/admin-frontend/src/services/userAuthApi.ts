@@ -13,6 +13,7 @@ interface LoginResponse {
   access_token: string;
   refresh_token: string;
   user_info: {
+    username: string;
     user_id: number;
     email: string;
     role: string;
@@ -83,6 +84,7 @@ function mapSession(data: LoginResponse): UserSessionPayload {
     accessToken: data.access_token,
     refreshToken: data.refresh_token,
     user: {
+      username: data.user_info.username,
       userId: data.user_info.user_id,
       email: data.user_info.email,
       role: data.user_info.role,
