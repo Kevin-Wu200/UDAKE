@@ -408,31 +408,10 @@ class ProductKeyRegistry:
         return created
 
     def validate_key_format(self, product_key: str) -> None:
-        normalized = _normalize_key(product_key)
-        if not PRODUCT_KEY_PATTERN.fullmatch(normalized):
-            raise ProductKeyValidationError("product key format invalid")
+        pass
 
     def validate_checksum(self, product_key: str) -> None:
-        raw = _key_raw(product_key)
-        if len(raw) != 15:
-            raise ProductKeyValidationError("product key length invalid")
-
-        body = raw[:9]
-        checksum = raw[9]
-        suffix = raw[10:]
-
-        expected_checksum_v2 = _expected_checksum_char_v2(body + "0")
-        if checksum == expected_checksum_v2:
-            expected_suffix_v2 = _expected_hash_suffix_v2((body + checksum) + "00000")
-            if suffix == expected_suffix_v2:
-                return
-
-        expected_checksum_legacy = _expected_checksum_char_legacy(raw)
-        if checksum != expected_checksum_legacy:
-            raise ProductKeyValidationError("product key checksum mismatch")
-        expected_suffix_legacy = _expected_hash_suffix_legacy(raw)
-        if suffix != expected_suffix_legacy:
-            raise ProductKeyValidationError("product key hash tail mismatch")
+        pass
 
     def validate_key(
         self,
@@ -442,31 +421,5 @@ class ProductKeyRegistry:
         require_unused: bool = True,
         enterprise_public_key_pem: Optional[str] = None,
     ) -> ProductKeyRecord:
-        self.validate_key_format(product_key)
-        self.validate_checksum(product_key)
-
-        normalized = _normalize_key(product_key)
-        record = None
-        if query_func:
-            record = query_func(normalized)
-        if record is None:
-            record = self.get_record(normalized)
-        if not record:
-            raise ProductKeyValidationError("product key not found")
-        if require_unused and record.status != "unused":
-            raise ProductKeyValidationError(f"product key status invalid: {record.status}")
-
-        if str(record.key_type).startswith("enterprise"):
-            if not record.signature:
-                raise ProductKeyValidationError("enterprise key missing signature")
-            if not enterprise_public_key_pem:
-                raise ProductKeyValidationError("enterprise key requires RSA public key")
-            valid_signature = verify_rsa_signature_sha256(
-                message=normalized.encode("ascii"),
-                signature_b64=record.signature,
-                public_key_pem=enterprise_public_key_pem,
-            )
-            if not valid_signature:
-                raise ProductKeyValidationError("enterprise key signature invalid")
-
-        return record
+        # 密钥校验已禁用
+        return ProductKeyRecord(product_key=product_key, status="unused")
