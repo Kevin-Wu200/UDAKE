@@ -2,15 +2,20 @@
  * GeoScene Maps SDK for JavaScript 配置文件
  *
  * 重要说明：
- * 1. 当前支持从后端动态获取API Key
- * 2. 若API Key为空，自动启用Mock模式
- * 3. 禁止在其他文件中硬编码GeoScene配置
+ * 1. 支持两种认证模式：apikey (API Key) 和 enterprise (企业账号)
+ * 2. Enterprise 模式使用 GeoScene 企业服务器进行身份认证
+ * 3. 若认证信息无效，自动启用Mock模式
+ * 4. 禁止在其他文件中硬编码GeoScene配置
  */
 
 // 默认配置（当无法从后端获取时使用）
 const DEFAULT_CONFIG = {
-    API_KEY: "YOUR_GEOSCENE_API_KEY_HERE",
+    API_KEY: "",
+    AUTH_MODE: "apikey",  // "apikey" | "enterprise"
+    USERNAME: "",
+    PASSWORD: "",
     PORTAL_URL: "https://www.geoscene.cn",
+    TOKEN_URL: "",
     ENV: "development",
     GEOSCENE_LIGHT_BASEMAP: "arcgis-topographic",
     GEOSCENE_DARK_BASEMAP: "arcgis-dark-gray",
@@ -33,9 +38,28 @@ export const GeoSceneConfig = {
         return currentConfig.API_KEY;
     },
 
+    // 认证模式
+    get AUTH_MODE() {
+        return currentConfig.AUTH_MODE;
+    },
+
+    // Enterprise 认证
+    get USERNAME() {
+        return currentConfig.USERNAME;
+    },
+
+    get PASSWORD() {
+        return currentConfig.PASSWORD;
+    },
+
     // Portal配置
     get PORTAL_URL() {
         return currentConfig.PORTAL_URL;
+    },
+
+    // Token服务URL
+    get TOKEN_URL() {
+        return currentConfig.TOKEN_URL;
     },
 
     // 环境配置
@@ -74,7 +98,11 @@ export const GeoSceneConfig = {
         if (config && config.geoscene) {
             currentConfig = {
                 API_KEY: config.geoscene.apiKey || DEFAULT_CONFIG.API_KEY,
+                AUTH_MODE: config.geoscene.authMode || DEFAULT_CONFIG.AUTH_MODE,
+                USERNAME: config.geoscene.username || DEFAULT_CONFIG.USERNAME,
+                PASSWORD: config.geoscene.password || DEFAULT_CONFIG.PASSWORD,
                 PORTAL_URL: config.geoscene.portalUrl || DEFAULT_CONFIG.PORTAL_URL,
+                TOKEN_URL: config.geoscene.tokenUrl || DEFAULT_CONFIG.TOKEN_URL,
                 ENV: config.geoscene.env || DEFAULT_CONFIG.ENV,
                 GEOSCENE_LIGHT_BASEMAP: config.geoscene.defaultBasemap || DEFAULT_CONFIG.GEOSCENE_LIGHT_BASEMAP,
                 GEOSCENE_DARK_BASEMAP: "arcgis-dark-gray",
@@ -88,7 +116,15 @@ export const GeoSceneConfig = {
 
     // Mock模式检测
     isMockMode() {
-        return !this.API_KEY || this.API_KEY === "YOUR_GEOSCENE_API_KEY_HERE";
+        if (this.AUTH_MODE === 'enterprise') {
+            // Enterprise 模式下检查用户名密码是否有效
+            return !this.USERNAME || !this.PASSWORD;
+        }
+        // API Key 模式
+        if (!this.API_KEY || this.API_KEY === "YOUR_GEOSCENE_API_KEY_HERE") {
+            return true;
+        }
+        return false;
     },
 
     // 获取配置信息
@@ -98,7 +134,11 @@ export const GeoSceneConfig = {
         }
         return {
             apiKey: this.API_KEY,
+            authMode: this.AUTH_MODE,
+            username: this.USERNAME,
+            password: this.PASSWORD,
             portalUrl: this.PORTAL_URL,
+            tokenUrl: this.TOKEN_URL,
             env: this.ENV,
             isMock: this.isMockMode()
         };

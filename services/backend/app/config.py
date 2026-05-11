@@ -103,12 +103,16 @@ class Settings(BaseSettings):
     GRID_RESOLUTION: int = 100
 
     # GeoScene配置
-    GEOSCENE_API_KEY: str = "YOUR_GEOSCENE_API_KEY_HERE"
+    GEOSCENE_AUTH_MODE: Literal["apikey", "enterprise"] = "apikey"
+    GEOSCENE_API_KEY: str = ""
+    GEOSCENE_USERNAME: str = ""
+    GEOSCENE_PASSWORD: str = ""
     GEOSCENE_PORTAL_URL: str = "https://www.geoscene.cn"
     GEOSCENE_ENV: str = "development"
     GEOSCENE_DEFAULT_BASEMAP: str = "streets-vector"
     GEOSCENE_DEFAULT_CENTER: Union[str, List[float]] = "[139.767125,35.681236]"
     GEOSCENE_DEFAULT_ZOOM: int = 10
+    GEOSCENE_TOKEN_URL: str = ""
 
     # 高德地图配置（从环境变量读取）
     AMAP_API_KEY: str = Field(default="", description="高德地图API密钥")
@@ -392,6 +396,11 @@ class Settings(BaseSettings):
 
     @property
     def geoscene_is_mock(self) -> bool:
+        """判断是否为Mock模式：无有效API Key且非Enterprise认证模式"""
+        if self.GEOSCENE_AUTH_MODE == "enterprise":
+            # Enterprise 模式下，检查账号密码是否已配置
+            return not (self.GEOSCENE_USERNAME.strip() and self.GEOSCENE_PASSWORD.strip())
+        # API Key 模式
         key = (self.GEOSCENE_API_KEY or "").strip()
         if not key:
             return True
@@ -402,6 +411,14 @@ class Settings(BaseSettings):
             "DEV_MOCK_KEY_REPLACE_FOR_PROD",
         }
         return normalized in mock_tokens
+
+    @property
+    def geoscene_token_url(self) -> str:
+        """获取GeoScene Enterprise Token服务URL"""
+        if self.GEOSCENE_TOKEN_URL and self.GEOSCENE_TOKEN_URL.strip():
+            return self.GEOSCENE_TOKEN_URL.strip()
+        portal = self.GEOSCENE_PORTAL_URL.rstrip("/")
+        return f"{portal}/portal/sharing/rest/generateToken"
 
     @property
     def is_development(self) -> bool:

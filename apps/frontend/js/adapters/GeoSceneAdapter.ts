@@ -92,15 +92,27 @@ export class GeoSceneAdapter extends MapAdapter {
 
             return this.view;
         } else {
-            // 使用 ArcGIS 引擎
+            // 使用 GeoScene 引擎
             console.log('🗺️ 使用 GeoScene 地图引擎');
 
             // 设置 GeoScene 配置
             try {
-                // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
+                // @ts-ignore - GeoScene 模块通过 global.d.ts 声明
                 const esriConfig: any = await import('@geoscene/core/config');
-                (esriConfig.default as any).apiKey = config.apiKey;
                 (esriConfig.default as any).portalUrl = config.portalUrl;
+
+                // 根据认证模式配置
+                if (config.authMode === 'enterprise') {
+                    // Enterprise 模式：使用 IdentityManager 进行企业认证
+                    console.log('🔐 使用 GeoScene Enterprise 认证模式');
+                    await this._setupEnterpriseAuth(esriConfig.default, config);
+                } else {
+                    // API Key 模式
+                    if (config.apiKey) {
+                        (esriConfig.default as any).apiKey = config.apiKey;
+                        console.log('🔑 使用 GeoScene API Key 认证');
+                    }
+                }
             } catch (error) {
                 console.warn('GeoScene 配置设置失败，使用默认配置', error);
             }
@@ -126,6 +138,58 @@ export class GeoSceneAdapter extends MapAdapter {
             console.log('✅ GeoScene 地图初始化完成');
 
             return this.view;
+        }
+    }
+
+    /**
+     * 设置 GeoScene Enterprise 认证
+     * 使用 IdentityManager + ServerInfo 进行企业门户 Token 认证
+     */
+    private async _setupEnterpriseAuth(esriConfig: any, config: any): Promise<void> {
+        try {
+            // @ts-ignore - GeoScene 模块通过 global.d.ts 声明
+            const IdentityManager: any = await import('@geoscene/core/identity/IdentityManager');
+            // @ts-ignore - GeoScene 模块通过 global.d.ts 声明
+            const ServerInfo: any = await import('@geoscene/core/identity/ServerInfo');
+            // @ts-ignore - GeoScene 模块通过 global.d.ts 声明
+            const OAuthInfo: any = await import('@geoscene/core/identity/OAuthInfo');
+
+            const portalUrl = config.portalUrl || 'https://www.geoscene.cn';
+
+            // 配置 OAuthInfo
+            const oauthInfo = new OAuthInfo.default({
+                appId: 'udake-geoscene-app',
+                portalUrl: portalUrl,
+                popup: false  // 使用服务器端认证而非弹出窗口
+            });
+
+            IdentityManager.default.registerOAuthInfos([oauthInfo]);
+
+            // 使用用户名密码生成 Token
+            const serverInfo = new ServerInfo.default({
+                server: portalUrl,
+                tokenServiceUrl: config.tokenUrl || `${portalUrl}/portal/sharing/rest/generateToken`
+            });
+
+            const tokenResponse = await IdentityManager.default.generateToken(serverInfo, {
+                username: config.username,
+                password: config.password
+            });
+
+            if (tokenResponse && tokenResponse.token) {
+                IdentityManager.default.registerToken({
+                    server: portalUrl,
+                    token: tokenResponse.token,
+                    expires: tokenResponse.expires,
+                    ssl: tokenResponse.ssl
+                });
+                console.log('✅ GeoScene Enterprise Token 获取成功');
+            } else {
+                console.warn('⚠️ GeoScene Enterprise Token 获取失败，回退为访客模式');
+            }
+        } catch (error) {
+            console.warn('⚠️ GeoScene Enterprise 认证失败，回退为访客模式:', error);
+            // 即使企业认证失败，也允许地图以访客模式加载
         }
     }
 

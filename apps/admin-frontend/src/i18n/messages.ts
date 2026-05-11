@@ -565,6 +565,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     superadmin: '超级管理员',
     companyadmin: '企业管理员',
     user: '普通用户',
+    extenddays: '延长天数',
   },
   'en-US': {
     appTitle: 'Admin Console',
@@ -1678,6 +1679,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     superadmin: 'スーパー管理者',
     companyadmin: '企業管理者',
     user: '一般ユーザー',
+    extenddays: '延長日数',
   },
   'ko-KR': {
     appTitle: '관리자 콘솔',
@@ -2238,6 +2240,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     superadmin: '슈퍼 관리자',
     companyadmin: '기업 관리자',
     user: '일반 사용자',
+    extenddays: '연장 일수',
   },
   'zh-TW': {
     appTitle: '管理員後台',
@@ -2798,6 +2801,7 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     superadmin: '超級管理員',
     companyadmin: '企業管理員',
     user: '普通用戶',
+    extenddays: '延長天數',
   },
 };
 

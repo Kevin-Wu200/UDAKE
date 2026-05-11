@@ -44,7 +44,11 @@ async def get_map_config():
     config = {
         "geoscene": {
             "apiKey": settings.GEOSCENE_API_KEY,
+            "authMode": settings.GEOSCENE_AUTH_MODE,
+            "username": settings.GEOSCENE_USERNAME,
+            "password": settings.GEOSCENE_PASSWORD,
             "portalUrl": settings.GEOSCENE_PORTAL_URL,
+            "tokenUrl": settings.geoscene_token_url,
             "env": settings.GEOSCENE_ENV,
             "defaultBasemap": settings.GEOSCENE_DEFAULT_BASEMAP,
             "defaultCenter": settings.geoscene_center_list,
@@ -121,7 +125,11 @@ async def get_all_config():
         "map": {
             "geoscene": {
                 "apiKey": settings.GEOSCENE_API_KEY,
+                "authMode": settings.GEOSCENE_AUTH_MODE,
+                "username": settings.GEOSCENE_USERNAME,
+                "password": settings.GEOSCENE_PASSWORD,
                 "portalUrl": settings.GEOSCENE_PORTAL_URL,
+                "tokenUrl": settings.geoscene_token_url,
                 "env": settings.GEOSCENE_ENV,
                 "defaultBasemap": settings.GEOSCENE_DEFAULT_BASEMAP,
                 "defaultCenter": settings.geoscene_center_list,

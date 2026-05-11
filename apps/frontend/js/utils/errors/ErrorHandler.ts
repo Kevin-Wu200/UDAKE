@@ -133,6 +133,8 @@ export class ErrorHandler {
     }
 
     window.addEventListener('unhandledrejection', (event) => {
+      // 防止浏览器默认的错误日志
+      event.preventDefault();
       this.handle(
         new ApplicationError(
           ErrorType.UNKNOWN,

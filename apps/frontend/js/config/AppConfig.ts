@@ -82,13 +82,17 @@ export const AppConfig: RuntimeAppConfig = {
 
 export const DEFAULT_MAP_CONFIG = {
     geoscene: {
-        apiKey: 'YOUR_GEOSCENE_API_KEY_HERE',
+        apiKey: '',
+        authMode: 'enterprise',
+        username: '',
+        password: '',
         portalUrl: 'https://www.geoscene.cn',
+        tokenUrl: '',
         env: 'development',
         defaultBasemap: 'arcgis-topographic',
         defaultCenter: [139.767125, 35.681236] as [number, number],
         defaultZoom: 10,
-        isMock: true
+        isMock: false
     },
     amap: {
         apiKey: 'YOUR_AMAP_API_KEY_HERE',

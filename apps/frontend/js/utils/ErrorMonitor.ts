@@ -184,6 +184,7 @@ export class ErrorMonitor {
         });
 
         window.addEventListener('unhandledrejection', (event) => {
+            event.preventDefault();
             ErrorMonitor._addFallbackLog(event.reason, {
                 component: 'promise',
                 action: 'unhandledRejection'

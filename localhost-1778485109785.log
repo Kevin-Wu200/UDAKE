@@ -1,0 +1,187 @@
+ [PerformanceMonitor] Initialized successfully
+ [2026-05-11T07:37:48.857Z] [RuntimeLifecycle] 全局资源追踪已启用
+ [2026-05-11T07:37:48.857Z] [主程序] 主程序已执行
+ [2026-05-11T07:37:48.858Z] [PerformanceMonitor] Initialized successfully
+ [2026-05-11T07:37:48.859Z] [StateBridge] 状态桥接已启动
+ [2026-05-11T07:37:48.860Z] [StartupManager] 启动流程开始
+ [2026-05-11T07:37:48.860Z] [ResourceOptimizationManager] 初始化资源优化
+ [2026-05-11T07:37:48.861Z] [ResourceOptimizationManager] 性能监控已启动
+:5173/favicon.ico:1  Failed to load resource: the server responded with a status of 404 (Not Found)
+ [2026-05-11T07:37:48.900Z] [ResourceOptimizationManager] Service Worker 注册成功: Object
+ [2026-05-11T07:37:48.933Z] 初始化准备完成
+ [2026-05-11T07:37:48.933Z] API URL: http://172.20.10.2:8000/api
+ [2026-05-11T07:37:48.933Z] API 初始化完成
+ [2026-05-11T07:37:48.933Z] 准备初始化地图
+ [2026-05-11T07:37:48.971Z] [MapEngineRegistry] 引擎 tilted25d 尚未提供适配器工厂，跳过注册
+ [2026-05-11T07:37:48.971Z] [地图初始化] 使用地图引擎：geoscene
+ [2026-05-11T07:37:48.972Z] ⚠️ GeoScene API Key 未配置，当前为 Mock 模式
+ [2026-05-11T07:37:48.972Z] 🗺️ 地图模式: Mock 模式
+ [2026-05-11T07:37:48.972Z] ⚠️ GeoScene API Key 未配置，当前为 Mock 模式
+ [2026-05-11T07:37:48.972Z] 🗺️ 使用 Mock 地图引擎
+ [2026-05-11T07:37:48.972Z] ✅ Mock 地图引擎初始化完成
+ [2026-05-11T07:37:48.972Z] ✅ Mock 地图初始化完成
+ [2026-05-11T07:37:48.972Z] Mock 模式：点击处理器已设置（无实际功能）
+ [2026-05-11T07:37:48.972Z] 地图初始化完成
+ [2026-05-11T07:37:48.972Z] 准备初始化组件
+ [2026-05-11T07:37:48.972Z] [ComponentInitializer] 开始初始化组件...
+ [2026-05-11T07:37:48.972Z] [ComponentInitializer] 初始化基础UI组件...
+ [2026-05-11T07:37:48.974Z] 正在加载行业配置（尝试 1/8）... URL: http://172.20.10.2:8000/api/industries
+ [2026-05-11T07:37:48.974Z] [ComponentInitializer] 基础UI组件初始化完成
+ [2026-05-11T07:37:48.975Z] [ComponentInitializer] 初始化地图交互组件...
+ [2026-05-11T07:37:48.975Z] 🗺️ 创建地图引擎切换按钮...
+ [2026-05-11T07:37:48.975Z] ✅ 地图引擎切换按钮已添加到容器
+ [2026-05-11T07:37:48.991Z] [ComponentInitializer] 地图交互组件初始化完成
+ [2026-05-11T07:37:48.991Z] [ComponentInitializer] 初始化参数组件...
+ [2026-05-11T07:37:49.000Z] [ComponentInitializer] 参数组件初始化完成
+ [2026-05-11T07:37:49.000Z] [ComponentInitializer] 初始化高级功能组件...
+ [2026-05-11T07:37:49.001Z] [ComponentInitializer] 高级功能组件初始化完成
+ [2026-05-11T07:37:49.001Z] [ComponentInitializer] 组件初始化完成
+ [2026-05-11T07:37:49.001Z] 组件初始化完成
+ [2026-05-11T07:37:49.001Z] 准备绑定事件
+Logger.ts:162 [2026-05-11T07:37:49.007Z] bindEvents 执行
+Logger.ts:162 [2026-05-11T07:37:49.007Z] [EventBinder] 元素 #preferences-btn 尚未就绪，剩余重试次数: 3
+Logger.ts:162 [2026-05-11T07:37:49.007Z] [EventBinder] 元素 #feedback-btn 尚未就绪，剩余重试次数: 3
+Logger.ts:162 [2026-05-11T07:37:49.007Z] [EventBinder] 元素 #theme-toggle-btn 尚未就绪，剩余重试次数: 3
+Logger.ts:162 [2026-05-11T07:37:49.007Z] [EventBinder] 元素 #export-csv 尚未就绪，剩余重试次数: 3
+Logger.ts:162 [2026-05-11T07:37:49.007Z] [EventBinder] 元素 #export-report 尚未就绪，剩余重试次数: 3
+Logger.ts:162 [2026-05-11T07:37:49.007Z] [Sidebar] 移动端主侧边栏元素不完整，已跳过绑定
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:49.007Z] [Sidebar] 状态同步完成: isSidebarOpen=true, aria-expanded=true
+Logger.ts:162 [2026-05-11T07:37:49.007Z] [Sidebar] 右侧侧边栏切换事件绑定成功
+Logger.ts:162 [2026-05-11T07:37:49.007Z] [Sidebar] 移动端视口/键盘状态监听已绑定
+Logger.ts:162 [2026-05-11T07:37:49.008Z] bindEvents 调用完成
+Logger.ts:162 [2026-05-11T07:37:49.009Z] 准备检测定位权限
+Logger.ts:162 [2026-05-11T07:37:49.009Z] 准备就绪
+Logger.ts:162 [2026-05-11T07:37:49.009Z] [LaunchProgress] 所有加载阶段完成，总耗时: 148ms
+Logger.ts:162 [2026-05-11T07:37:49.009Z] [LaunchProgress] 初始化应用: 1ms
+Logger.ts:162 [2026-05-11T07:37:49.009Z] [LaunchProgress] 连接后端: 0ms
+Logger.ts:162 [2026-05-11T07:37:49.009Z] [LaunchProgress] 初始化 API: 0ms
+Logger.ts:162 [2026-05-11T07:37:49.009Z] [LaunchProgress] 加载地图: 39ms
+Logger.ts:162 [2026-05-11T07:37:49.009Z] [LaunchProgress] 初始化组件: 29ms
+Logger.ts:162 [2026-05-11T07:37:49.009Z] [LaunchProgress] 绑定事件: 7ms
+Logger.ts:162 [2026-05-11T07:37:49.009Z] [LaunchProgress] 检查权限: 1ms
+Logger.ts:162 [2026-05-11T07:37:49.009Z] [LaunchProgress] 准备就绪: 0ms
+Logger.ts:162 [2026-05-11T07:37:49.017Z] 定位权限状态: granted
+Logger.ts:162 [2026-05-11T07:37:49.017Z] [Performance] CLS 超过阈值: 0.3118022328548644 > 0.1
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:49.017Z] ✓ 成功加载 9 个行业配置
+Logger.ts:162 [2026-05-11T07:37:49.508Z] [EventBinder] 元素 #preferences-btn 尚未就绪，剩余重试次数: 2
+Logger.ts:162 [2026-05-11T07:37:49.508Z] [EventBinder] 元素 #feedback-btn 尚未就绪，剩余重试次数: 2
+Logger.ts:162 [2026-05-11T07:37:49.508Z] [EventBinder] 元素 #theme-toggle-btn 尚未就绪，剩余重试次数: 2
+Logger.ts:162 [2026-05-11T07:37:49.509Z] [EventBinder] 元素 #export-csv 尚未就绪，剩余重试次数: 2
+Logger.ts:162 [2026-05-11T07:37:49.509Z] [EventBinder] 元素 #export-report 尚未就绪，剩余重试次数: 2
+Logger.ts:162 [2026-05-11T07:37:50.009Z] [EventBinder] 元素 #preferences-btn 尚未就绪，剩余重试次数: 1
+Logger.ts:162 [2026-05-11T07:37:50.009Z] [EventBinder] 元素 #feedback-btn 尚未就绪，剩余重试次数: 1
+Logger.ts:162 [2026-05-11T07:37:50.009Z] [EventBinder] 元素 #theme-toggle-btn 尚未就绪，剩余重试次数: 1
+Logger.ts:162 [2026-05-11T07:37:50.009Z] [EventBinder] 元素 #export-csv 尚未就绪，剩余重试次数: 1
+Logger.ts:162 [2026-05-11T07:37:50.009Z] [EventBinder] 元素 #export-report 尚未就绪，剩余重试次数: 1
+Logger.ts:162 [2026-05-11T07:37:50.510Z] [EventBinder] 达到最大重试次数，未找到元素: #preferences-btn。尝试使用 MutationObserver 监听...
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:50.511Z] [EventBinder] 达到最大重试次数，未找到元素: #feedback-btn。尝试使用 MutationObserver 监听...
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:50.511Z] [EventBinder] 达到最大重试次数，未找到元素: #theme-toggle-btn。尝试使用 MutationObserver 监听...
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:50.511Z] [EventBinder] 达到最大重试次数，未找到元素: #export-csv。尝试使用 MutationObserver 监听...
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:50.511Z] [EventBinder] 达到最大重试次数，未找到元素: #export-report。尝试使用 MutationObserver 监听...
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:51.630Z] [StartupManager] 启动流程完成，总耗时: 2770ms
+Logger.ts:162 [2026-05-11T07:37:51.630Z] [StartupManager] 性能数据:
+Logger.ts:162 [2026-05-11T07:37:51.631Z]   startup-start: +0ms
+Logger.ts:162 [2026-05-11T07:37:51.631Z]   startup-complete: +2770ms
+Logger.ts:162 [2026-05-11T07:37:51.633Z] 开始初始化非关键组件...
+Logger.ts:162 [2026-05-11T07:37:51.643Z] [离线管理器] 初始化完成
+Logger.ts:162 [2026-05-11T07:37:51.716Z] 3D克里金面板初始化成功
+Logger.ts:162 [2026-05-11T07:37:51.797Z] 深度学习面板初始化成功
+Access to fetch at 'http://172.20.10.2:8000/api/dl/spatiotemporal/explain/monitor' from origin 'http://localhost:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Access to fetch at 'http://172.20.10.2:8000/api/dl/health' from origin 'http://localhost:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Logger.ts:162 [2026-05-11T07:37:51.835Z] 前端功能集成补齐面板初始化成功
+Logger.ts:162 [2026-05-11T07:37:51.835Z] 开始初始化位置服务...
+172.20.10.2:8000/api/dl/spatiotemporal/explain/monitor:1  Failed to load resource: the server responded with a status of 503 ()
+172.20.10.2:8000/api/dl/health:1  Failed to load resource: the server responded with a status of 503 ()
+Logger.ts:162 [2026-05-11T07:37:51.836Z] [APIService] 请求失败 [503]，1000ms 后重试 (1/3)
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:51.836Z] [APIService] 请求失败 [503]，1000ms 后重试 (1/3)
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:51.886Z] 正在初始化位置服务...
+Logger.ts:162 [2026-05-11T07:37:51.892Z] 传感器管理器初始化完成
+Logger.ts:162 [2026-05-11T07:37:51.892Z] 请求位置权限失败: Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:51.893Z] 位置权限被拒绝，部分功能将不可用
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:51.893Z] 可视化组件创建完成
+Logger.ts:162 [2026-05-11T07:37:51.893Z] 找到 0 个轨迹
+Logger.ts:162 [2026-05-11T07:37:51.893Z] 找到 0 个地理围栏
+Logger.ts:162 [2026-05-11T07:37:51.893Z] 位置服务初始化完成
+Logger.ts:162 [2026-05-11T07:37:51.893Z] 位置服务初始化成功
+Logger.ts:162 [2026-05-11T07:37:51.898Z] 非关键组件初始化完成
+Access to fetch at 'http://172.20.10.2:8000/api/dl/spatiotemporal/explain/monitor' from origin 'http://localhost:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+172.20.10.2:8000/api/dl/spatiotemporal/explain/monitor:1  Failed to load resource: the server responded with a status of 503 ()
+Access to fetch at 'http://172.20.10.2:8000/api/dl/health' from origin 'http://localhost:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Logger.ts:162 [2026-05-11T07:37:52.844Z] [APIService] 请求失败 [503]，1000ms 后重试 (2/3)
+(anonymous) @ Logger.ts:162
+172.20.10.2:8000/api/dl/health:1  Failed to load resource: the server responded with a status of 503 ()
+Logger.ts:162 [2026-05-11T07:37:52.844Z] [APIService] 请求失败 [503]，1000ms 后重试 (2/3)
+(anonymous) @ Logger.ts:162
+Access to fetch at 'http://172.20.10.2:8000/api/dl/spatiotemporal/explain/monitor' from origin 'http://localhost:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Access to fetch at 'http://172.20.10.2:8000/api/dl/health' from origin 'http://localhost:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+172.20.10.2:8000/api/dl/spatiotemporal/explain/monitor:1  Failed to load resource: the server responded with a status of 503 ()
+Logger.ts:162 [2026-05-11T07:37:54.861Z] [APIService] 请求失败 [503]，1000ms 后重试 (3/3)
+(anonymous) @ Logger.ts:162
+172.20.10.2:8000/api/dl/health:1  Failed to load resource: the server responded with a status of 503 ()
+Logger.ts:162 [2026-05-11T07:37:54.861Z] [APIService] 请求失败 [503]，1000ms 后重试 (3/3)
+(anonymous) @ Logger.ts:162
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+The resource <URL> was preloaded using link preload but not used within a few seconds from the window's load event. Please make sure it has an appropriate `as` value and it is preloaded intentionally.
+Access to fetch at 'http://172.20.10.2:8000/api/dl/spatiotemporal/explain/monitor' from origin 'http://localhost:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+Access to fetch at 'http://172.20.10.2:8000/api/dl/health' from origin 'http://localhost:5173' has been blocked by CORS policy: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+172.20.10.2:8000/api/dl/spatiotemporal/explain/monitor:1  Failed to load resource: the server responded with a status of 503 ()
+Logger.ts:162 [2026-05-11T07:37:57.869Z] [APIService] API请求失败 [503] Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:57.870Z] [FATAL] [SERVER_ERROR] 服务暂时不可用，请稍后重试 Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:57.870Z] [ErrorHandler] 捕获到高优先级错误 Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:59.385Z] [ErrorHandler] 处理服务器错误 Object
+Logger.ts:162 [2026-05-11T07:37:59.386Z] [FATAL] [SERVER_ERROR] 服务暂时不可用，请稍后重试 Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:37:59.386Z] [ErrorHandler] 捕获到高优先级错误 Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:38:00.218Z] [ErrorHandler] 处理服务器错误 Object
+172.20.10.2:8000/api/dl/health:1  Failed to load resource: the server responded with a status of 503 ()
+Logger.ts:162 [2026-05-11T07:38:00.223Z] [SEVERE] [E-SYS-UNHANDLED-REJECTION] 应用出现未处理的异步错误，请稍后重试 Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:38:00.223Z] [ErrorHandler] 捕获到高优先级错误 Object
+(anonymous) @ Logger.ts:162
+(index):1 Uncaught (in promise) ServerError: 服务暂时不可用，请稍后重试
+    at APIService._buildHttpAppError (APIService.ts:224:20)
+    at APIService.ts:431:47
+Logger.ts:162 [2026-05-11T07:38:01.009Z] [APIService] API请求失败 [503] Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:38:01.010Z] [FATAL] [SERVER_ERROR] 服务暂时不可用，请稍后重试 Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:38:01.010Z] [ErrorHandler] 捕获到高优先级错误 Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:38:03.085Z] [ErrorHandler] 处理服务器错误 Object
+Logger.ts:162 [2026-05-11T07:38:03.085Z] [FATAL] [SERVER_ERROR] 服务暂时不可用，请稍后重试 Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:38:03.085Z] [ErrorHandler] 捕获到高优先级错误 Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:38:05.784Z] [ErrorHandler] 处理服务器错误 Object
+Logger.ts:162 [2026-05-11T07:38:05.786Z] [SEVERE] [E-SYS-UNHANDLED-REJECTION] 应用出现未处理的异步错误，请稍后重试 Object
+(anonymous) @ Logger.ts:162
+Logger.ts:162 [2026-05-11T07:38:05.787Z] [ErrorHandler] 捕获到高优先级错误 Object
+(anonymous) @ Logger.ts:162
+(index):1 Uncaught (in promise) ServerError: 服务暂时不可用，请稍后重试
+    at APIService._buildHttpAppError (APIService.ts:224:20)
+    at APIService.ts:431:47

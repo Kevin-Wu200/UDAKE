@@ -11,7 +11,11 @@ import { DEFAULT_AI_CONFIG, DEFAULT_APP_LIMITS, DEFAULT_MAP_CONFIG } from '../co
 export interface MapConfig {
     geoscene: {
         apiKey: string;
+        authMode: string;
+        username: string;
+        password: string;
         portalUrl: string;
+        tokenUrl: string;
         env: string;
         defaultBasemap: string;
         defaultCenter: [number, number];

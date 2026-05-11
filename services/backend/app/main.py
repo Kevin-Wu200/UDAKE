@@ -20,6 +20,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.openapi.utils import get_openapi
+from starlette.middleware.base import BaseHTTPMiddleware
 from .config import settings
 from .security_middleware import security_guard_middleware
 from .startup_manager import StartupManager
@@ -123,11 +124,23 @@ def custom_openapi():
 
 app.openapi = custom_openapi
 
-# CORS中间件 —— 开发环境放行所有来源，避免 Capacitor/局域网调试时 origin 不匹配
+# CORS中间件 —— 开发环境放行常见来源，避免 Capacitor/局域网调试时 origin 不匹配
 if settings.is_development:
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["http://localhost:5173", "http://127.0.0.1:5173", "*"],
+        allow_origins=[
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5174",
+            "http://127.0.0.1:5174",
+            "http://172.20.10.2:5173",
+            "http://172.20.10.2:5174",
+            "http://localhost:3000",
+            "https://localhost",
+            "http://localhost",
+            "capacitor://localhost",
+            "ionic://localhost",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -139,6 +152,31 @@ else:
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
+    )
+
+# 全局异常处理：确保所有错误响应都包含 CORS 头
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """全局异常处理，为错误响应添加 CORS 头"""
+    from fastapi.responses import JSONResponse as JsonResp
+    origin = request.headers.get("origin", "")
+    allowed_origins = settings.cors_origins_list
+
+    headers = {}
+    if origin in allowed_origins:
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    elif settings.is_development:
+        # 开发环境允许所有来源
+        headers["Access-Control-Allow-Origin"] = origin or "*"
+        headers["Access-Control-Allow-Credentials"] = "true"
+        headers["Access-Control-Allow-Methods"] = "*"
+        headers["Access-Control-Allow-Headers"] = "*"
+
+    return JsonResp(
+        status_code=503,
+        content={"detail": "服务暂时不可用，请稍后重试", "error_type": type(exc).__name__},
+        headers=headers
     )
 
 # 挂载静态文件

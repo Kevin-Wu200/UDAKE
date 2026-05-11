@@ -67,7 +67,7 @@ export class EventBinder {
         if (element) {
             this.bind(element, type, handler, options);
         } else if (retryCount > 0) {
-            console.log(`[EventBinder] 元素 ${selector} 尚未就绪，剩余重试次数: ${retryCount}`);
+            console.debug(`[EventBinder] 元素 ${selector} 尚未就绪，剩余重试次数: ${retryCount}`);
             setTimeout(() => {
                 this.bindBySelector(selector, type, handler, options, retryCount - 1);
             }, 500);
