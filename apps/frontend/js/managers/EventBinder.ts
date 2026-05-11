@@ -60,14 +60,55 @@ export class EventBinder {
         selector: string,
         type: string,
         handler: EventListenerOrEventListenerObject,
-        options?: AddEventListenerOptions | boolean
+        options?: AddEventListenerOptions | boolean,
+        retryCount: number = 3
     ): void {
         const element = document.querySelector(selector);
         if (element) {
             this.bind(element, type, handler, options);
+        } else if (retryCount > 0) {
+            console.log(`[EventBinder] 元素 ${selector} 尚未就绪，剩余重试次数: ${retryCount}`);
+            setTimeout(() => {
+                this.bindBySelector(selector, type, handler, options, retryCount - 1);
+            }, 500);
         } else {
-            console.warn(`[EventBinder] 未找到元素: ${selector}`);
+            console.warn(`[EventBinder] 达到最大重试次数，未找到元素: ${selector}。尝试使用 MutationObserver 监听...`);
+            this.observeAndBind(selector, type, handler, options);
         }
+    }
+
+    /**
+     * 使用 MutationObserver 监听 DOM 并在元素出现时绑定
+     */
+    private observeAndBind(
+        selector: string,
+        type: string,
+        handler: EventListenerOrEventListenerObject,
+        options?: AddEventListenerOptions | boolean
+    ): void {
+        // 先检查一次，防止在创建观察者期间元素已经出现
+        const element = document.querySelector(selector);
+        if (element) {
+            this.bind(element, type, handler, options);
+            return;
+        }
+
+        const observer = new MutationObserver((mutations, obs) => {
+            const el = document.querySelector(selector);
+            if (el) {
+                this.bind(el, type, handler, options);
+                obs.disconnect();
+                console.log(`[EventBinder] 通过 MutationObserver 成功绑定元素: ${selector}`);
+            }
+        });
+
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true
+        });
+
+        // 15秒后停止监听，避免无限监听占用资源
+        setTimeout(() => observer.disconnect(), 15000);
     }
 
     /**

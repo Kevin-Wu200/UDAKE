@@ -80,6 +80,7 @@ class StartupManager:
     TASK_ORDER: List[str] = [
         "loadConfig",
         "connectBackend",
+        "initDLService",
         "loadUserData",
         "initPushService",
     ]
@@ -113,6 +114,14 @@ class StartupManager:
                 timeout_seconds=self.CRITICAL_TIMEOUT_SECONDS,
                 status_text="正在连接服务器...",
                 handler=self._task_connect_backend,
+            ),
+            "initDLService": StartupTask(
+                task_id="initDLService",
+                label="检查深度学习服务",
+                priority=StartupPriority.P1,
+                timeout_seconds=self.NON_CRITICAL_TIMEOUT_SECONDS,
+                status_text="正在加载深度学习模型...",
+                handler=self._task_init_dl_service,
             ),
             "loadUserData": StartupTask(
                 task_id="loadUserData",
@@ -167,7 +176,13 @@ class StartupManager:
                 {"event": "startup_end", "duration_ms": total_duration_ms},
             )
 
-        self._ready = self._fatal_error is None
+        # 优化 ready 逻辑：P0 和 P1 任务必须全部成功才视为 ready
+        p0_p1_success = all(
+            report.success 
+            for report in self._task_reports 
+            if report.priority in [StartupPriority.P0, StartupPriority.P1]
+        )
+        self._ready = self._fatal_error is None and p0_p1_success
         return self.get_health_snapshot()
 
     async def _run_ordered_tasks(self) -> None:
@@ -280,6 +295,20 @@ class StartupManager:
             "data_dir_exists": data_exists,
             "results_dir_writable": results_writable,
         }
+
+    async def _task_init_dl_service(self) -> Dict[str, Any]:
+        """初始化深度学习服务并检查健康状态。"""
+        try:
+            # 动态导入避免循环依赖
+            from .dl_services.service import DeepLearningService
+            dl_service = DeepLearningService()
+            health_info = dl_service.health()
+            if health_info.get("status") != "healthy":
+                raise ValueError(f"深度学习服务不健康: {health_info}")
+            return health_info
+        except Exception as e:
+            logger.error("深度学习服务初始化检查失败: %s", e)
+            raise
 
     async def _task_load_user_data(self) -> Dict[str, Any]:
         await asyncio.sleep(0)

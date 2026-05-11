@@ -448,7 +448,12 @@ class App {
             // 阶段6：绑定事件
             await this.launchProgressManager.executeStage('events-bind', async (updateProgress) => {
                 console.log('准备绑定事件');
+                updateProgress(30);
+                
+                // 确保 DOM 已经完全挂载并渲染
+                await new Promise(resolve => requestAnimationFrame(resolve));
                 updateProgress(50);
+                
                 this.initializeLanguageSwitcher();
                 this.bindEvents();
                 this.bindMobileEvents();

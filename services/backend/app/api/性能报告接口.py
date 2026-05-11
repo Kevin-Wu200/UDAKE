@@ -4,12 +4,26 @@
 from fastapi import APIRouter, HTTPException
 from ..schemas.性能报告模型 import (
     PerformanceReportRequest, PerformanceReportResponse,
-    PerformanceTrendAnalysis, HistoricalPerformanceStats
+    PerformanceTrendAnalysis, HistoricalPerformanceStats,
+    PerformanceMetricsBatch
 )
 from ..services.性能报告服务 import performance_report_service
-from typing import Optional
+from typing import Optional, List
 
 router = APIRouter()
+
+@router.post("/performance/metrics")
+async def receive_performance_metrics(batch: PerformanceMetricsBatch):
+    """
+    接收前端上报的实时监控指标
+    """
+    try:
+        # 记录或处理指标数据
+        # 实际生产中这里可能会异步存入数据库或时序数据库
+        # 目前简单返回成功
+        return {"status": "ok", "count": len(batch.metrics)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/performance/report", response_model=PerformanceReportResponse)
 async def generate_performance_report(request: PerformanceReportRequest):

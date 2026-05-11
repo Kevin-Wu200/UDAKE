@@ -124,3 +124,17 @@ class PerformanceTrendAnalysis(BaseModel):
     trend: str
     improvement_rate: Optional[float] = None
     degradation_rate: Optional[float] = None
+
+class PerformanceMetric(BaseModel):
+    """单条性能指标"""
+    name: str = Field(..., description="指标名称")
+    value: float = Field(..., description="指标值")
+    ts: int = Field(..., description="时间戳")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="元数据")
+
+class PerformanceMetricsBatch(BaseModel):
+    """性能指标批量上报"""
+    app: str = Field(..., description="应用名称")
+    page: str = Field(..., description="页面路径")
+    userAgent: str = Field(..., description="用户代理")
+    metrics: List[PerformanceMetric] = Field(..., description="指标列表")

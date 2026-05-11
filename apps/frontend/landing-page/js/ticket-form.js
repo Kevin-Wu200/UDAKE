@@ -176,7 +176,7 @@
             submitBtn.innerText = '提交中...';
             
             // 使用正确的 API 路由 /api/tickets (假设前端代理前缀已处理)
-            const response = await fetch('/tickets', {
+            const response = await fetch('/api/tickets', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(data),

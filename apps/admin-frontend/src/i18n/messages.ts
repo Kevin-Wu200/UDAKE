@@ -561,6 +561,10 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     goodEvening: '辛苦了，别忘了放松一下 ',
     goodNight: '夜深了，也要记得照顾自己 ',
     welcome: '欢迎回来，',
+    enterprise: '企业',
+    superadmin: '超级管理员',
+    companyadmin: '企业管理员',
+    user: '普通用户',
   },
   'en-US': {
     appTitle: 'Admin Console',
@@ -1110,6 +1114,10 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     goodEvening: 'You’ve done enough for today ',
     goodNight: 'Don’t forget to take care of yourself ',
     welcome: 'Welcome back, ',
+    enterprise: 'Enterprise',
+    superadmin: 'Super Administrator',
+    companyadmin: 'Company Administrator',
+    user: 'Regular User',
   },
   'ja-JP': {
     appTitle: '管理者コンソール',
@@ -1666,6 +1674,10 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     goodEvening: '今日もお疲れさまでした ',
     goodNight: '遅い時間だからこそ、ゆっくり休んでください ',
     welcome: 'ようこそ、',
+    enterprise: '企業',
+    superadmin: 'スーパー管理者',
+    companyadmin: '企業管理者',
+    user: '一般ユーザー',
   },
   'ko-KR': {
     appTitle: '관리자 콘솔',
@@ -2222,6 +2234,10 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     goodEvening: '오늘도 정말 수고하셨습니다 ',
     goodNight: '늦은 시간인 만큼, 충분히 쉬어주세요 ',
     welcome: '환영합니다, ',
+    enterprise: '기업',
+    superadmin: '슈퍼 관리자',
+    companyadmin: '기업 관리자',
+    user: '일반 사용자',
   },
   'zh-TW': {
     appTitle: '管理員後台',
@@ -2778,6 +2794,10 @@ const messages: Record<AppLanguage, Record<string, string>> = {
     goodEvening: '辛苦了，別忘了放鬆一下 ',
     goodNight: '夜深了，也要記得照顧自己 ',
     welcome: '歡迎，',
+    enterprise: '企業',
+    superadmin: '超級管理員',
+    companyadmin: '企業管理員',
+    user: '普通用戶',
   },
 };
 

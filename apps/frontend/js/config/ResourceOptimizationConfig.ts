@@ -574,9 +574,9 @@ export class ResourceOptimizationManager {
              const body = JSON.stringify(payload);
              if ('sendBeacon' in navigator) {
                  const blob = new Blob([body], { type: 'application/json' });
-                 navigator.sendBeacon('/api/performance/report', blob);
+                 navigator.sendBeacon('/api/performance/metrics', blob);
              } else {
-                 void fetch('/api/performance/report', {
+                 void fetch('/api/performance/metrics', {
                      method: 'POST',
                      headers: {
                          'Content-Type': 'application/json'

@@ -4,7 +4,10 @@
       <el-select v-model="filters.role" clearable :placeholder="t('role')" style="width: 140px">
         <el-option :label="t('admin')" value="admin" />
         <el-option :label="t('auditor')" value="auditor" />
-        <el-option :label="t('viewer')" value="viewer" />
+        <el-option :label="t('user')" value="viewer" />
+        <el-option :label="t('superadmin')" value="super_admin" />
+        <el-option :label="t('companyadmin')" value="company_admin" />
+        <el-option :label="t('enterprise')" value="enterprise" />
       </el-select>
       <el-select v-model="filters.status" clearable :placeholder="t('status')" style="width: 140px">
         <el-option :label="t('enable')" value="enabled" />
@@ -124,9 +127,10 @@ const roleText = (role: UserRole | string) => {
     admin: t('admin'),
     auditor: t('auditor'),
     viewer: t('viewer'),
-    super_admin: t('admin'),
-    company_admin: t('admin'),
-    user: t('viewer')
+    super_admin: t('superadmin'),
+    company_admin: t('companyadmin'),
+    user: t('user'),
+    enterprise: t('enterprise')
   };
   return map[role] || role || '-';
 };
