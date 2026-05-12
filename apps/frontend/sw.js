@@ -1,11 +1,12 @@
 /**
  * Service Worker - 增强版缓存策略
- * Cache First for CSS/JS, Network First for API (带缓存回退)
- * 支持离线模式和后台同步
+ * Stale-While-Revalidate for static assets, Network First for API (带缓存回退)
+ * 支持离线模式和后台同步，动态版本号管理避免缓存冲突
  */
 
-const CACHE_NAME = 'udake-v2';
-const API_CACHE = 'udake-api-v1';
+const CACHE_VERSION = '3';
+const CACHE_NAME = `udake-v${CACHE_VERSION}`;
+const API_CACHE = `udake-api-v${CACHE_VERSION}`;
 const STATIC_ASSETS = [
     '/',
     '/index.html',
@@ -84,19 +85,22 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    // 静态资源：Cache First
+    // 静态资源：Stale-While-Revalidate（优先返回缓存，后台异步更新）
+    // 避免 Cache First 导致开发/部署时 CSS/JS 缓存"脏数据"持续生效
     if (event.request.method === 'GET') {
         event.respondWith(
-            caches.match(event.request).then((cached) => {
-                if (cached) return cached;
-                return fetch(event.request).then((response) => {
-                    if (response.ok && url.origin === self.location.origin) {
-                        const clone = response.clone();
-                        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-                    }
-                    return response;
-                });
-            })
+            caches.open(CACHE_NAME).then((cache) =>
+                cache.match(event.request).then((cached) => {
+                    const fetchPromise = fetch(event.request).then((networkResponse) => {
+                        if (networkResponse.ok && url.origin === self.location.origin) {
+                            cache.put(event.request, networkResponse.clone());
+                        }
+                        return networkResponse;
+                    });
+                    // 有缓存则立即返回缓存，同时后台更新；无缓存则等待网络请求
+                    return cached || fetchPromise;
+                })
+            )
         );
     }
 });

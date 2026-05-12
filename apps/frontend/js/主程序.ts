@@ -2755,7 +2755,30 @@ window.addEventListener('load', () => {
         return;
     }
 
-    navigator.serviceWorker.register('/sw.js').catch((error) => {
+    // 开发环境：强制清理所有已注册的 Service Worker，避免缓存"脏数据"
+    if (isLocalhost) {
+        navigator.serviceWorker.getRegistrations().then((registrations) => {
+            for (const reg of registrations) {
+                reg.unregister();
+            }
+            console.log('[Dev] 已清理所有 Service Worker 注册，避免缓存冲突');
+        });
+    }
+
+    navigator.serviceWorker.register('/sw.js').then((registration) => {
+        // 监听 Service Worker 更新，新版本激活后自动刷新页面
+        registration.addEventListener('updatefound', () => {
+            const newWorker = registration.installing;
+            if (newWorker) {
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'activated' && navigator.serviceWorker.controller) {
+                        console.log('[SW] 新版本已激活，即将刷新页面...');
+                        window.location.reload();
+                    }
+                });
+            }
+        });
+    }).catch((error) => {
         try {
             localStorage.setItem('udake-offline-fallback-enabled', 'true');
             localStorage.setItem('udake-offline-fallback-reason', t('error.SW.regist.failed'));
