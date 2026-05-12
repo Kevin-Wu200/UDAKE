@@ -98,7 +98,7 @@
         if (ticketTypeSelect) {
             ticketTypeSelect.addEventListener('change', (e) => {
                 const type = e.target.value;
-                if (type === 'apply') {
+                if (type === 'key_request') {
                     keyTypeGroup.classList.remove('hidden');
                     existingKeyGroup.classList.add('hidden');
                     document.getElementById('existingKey').required = false;
@@ -234,7 +234,7 @@
                 ticket_id: queryId,
                 status: 'pending',
                 created_at: new Date().toLocaleString(),
-                ticket_type: 'apply'
+                ticket_type: 'key_request'
             });
         }
     }
