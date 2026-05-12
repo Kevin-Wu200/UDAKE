@@ -780,7 +780,7 @@ export class SpatiotemporalExplainPanel {
             return true;
         }
         try {
-            return window.confirm('切换模型后将保留当前输入与任务列表，但会切换解释页面上下文，确认继续？');
+            return window.confirm(I18n.t('spatiotemporal.switchModelConfirmation'));
         } catch {
             return true;
         }
@@ -806,7 +806,7 @@ export class SpatiotemporalExplainPanel {
             return;
         }
         if (!this.currentTaskId) {
-            crumb.textContent = '任务提交';
+            crumb.textContent = I18n.t('spatiotemporal.taskSubmit');
             return;
         }
         const section = this.activeTab === 'lime'
@@ -825,10 +825,10 @@ export class SpatiotemporalExplainPanel {
             return;
         }
         if (!this.navHistory.length) {
-            historyEl.textContent = '访问历史：暂无';
+            historyEl.textContent = I18n.t('spatiotemporal.noVisitHistory');
             return;
         }
-        historyEl.textContent = `访问历史：${this.navHistory.slice(-4).join(' -> ')}`;
+        historyEl.textContent = I18n.t('spatiotemporal.visitHistory', { history: this.navHistory.slice(-4).join(' -> ') });
     }
 
     private navigateToSection(target: string): void {
@@ -859,12 +859,12 @@ export class SpatiotemporalExplainPanel {
         } else if (target === 'task') {
             const crumb = this.container.querySelector('#dl-explain-crumb-current') as HTMLElement | null;
             if (crumb) {
-                crumb.textContent = '任务状态';
+                crumb.textContent = I18n.t('spatiotemporal.taskStatus');
             }
         } else {
             const crumb = this.container.querySelector('#dl-explain-crumb-current') as HTMLElement | null;
             if (crumb) {
-                crumb.textContent = '任务提交';
+                crumb.textContent = I18n.t('spatiotemporal.taskSubmit');
             }
         }
     }
@@ -924,7 +924,7 @@ export class SpatiotemporalExplainPanel {
 
         if (historyEl) {
             if (!this.modelSelectionHistory.length) {
-                historyEl.innerHTML = '<span class="muted">最近模型：暂无历史</span>';
+                historyEl.innerHTML = '<span class="muted">' + I18n.t('spatiotemporal.noRecentModelHistory') + '</span>';
             } else {
                 historyEl.innerHTML = `
                     <span class="muted">最近模型：</span>
@@ -3163,7 +3163,7 @@ export class SpatiotemporalExplainPanel {
         if (toggle) {
             const isDark = mode === 'dark';
             toggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
-            toggle.textContent = isDark ? '浅色模式' : '暗黑模式';
+            toggle.textContent = isDark ? I18n.t('spatiotemporal.lightMode') : I18n.t('spatiotemporal.darkMode');
         }
         try {
             window.localStorage.setItem('dl-explain-theme', mode);

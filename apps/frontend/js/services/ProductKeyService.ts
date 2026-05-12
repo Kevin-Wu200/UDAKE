@@ -50,7 +50,15 @@ export class ProductKeyService {
             }),
         });
 
+        // 持久化 ProductKeyInfo
         this.authService.persistProductKeyInfo(data);
+        // 同步更新 AuthUserInfo 中的密钥字段
+        const storedUser = this.authService.getStoredUserInfo();
+        if (storedUser) {
+            storedUser.product_key = data.product_key || productKey.trim().toUpperCase();
+            storedUser.key_status = data.status || 'active';
+            localStorage.setItem('user_info', JSON.stringify(storedUser));
+        }
         this.setActivationAttempts(0);
         this.setLockedUntil(null);
         return data;

@@ -76,6 +76,8 @@ class User(Base):
     company_admin_key_id: Mapped[Optional[int]] = mapped_column(
         BigInteger, ForeignKey("product_keys.id", ondelete="SET NULL"), nullable=True
     )
+    product_key: Mapped[Optional[str]] = mapped_column(String(128), nullable=True)
+    key_status: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'unused'"))
     total_keys_created: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
     last_login_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[Any] = mapped_column(
@@ -120,9 +122,15 @@ class User(Base):
             "company_admin_type IS NULL OR company_admin_type IN ('trial', 'standard')",
             name="ck_users_company_admin_type_enum",
         ),
+        CheckConstraint(
+            "key_status IN ('unused', 'active', 'disabled', 'expired')",
+            name="ck_users_key_status_enum",
+        ),
         Index("ix_users_username", "username"),
         Index("ix_users_email", "email"),
         Index("ix_users_status", "status"),
+        Index("ix_users_key_status", "key_status"),
+        Index("ix_users_product_key", "product_key"),
         Index("ix_users_company_id", "company_id"),
         Index("ix_users_company_admin_type", "company_admin_type"),
     )

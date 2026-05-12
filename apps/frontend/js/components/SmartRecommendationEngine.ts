@@ -1,3 +1,5 @@
+import { I18n } from '../utils/I18n';
+
 interface Recommendation {
     actionId: string;
     score: number;
@@ -208,15 +210,15 @@ export class SmartRecommendationEngine {
         }
 
         if (this.isBeginner()) {
-            this.hintEl.textContent = '检测为新手模式：建议先完成“导入向导”与“插值向导”。';
+            this.hintEl.textContent = I18n.t('smartrecommendation.detectBeginnerMode');
         } else if (context.includes('can-export')) {
-            this.hintEl.textContent = '当前结果可导出，推荐优先执行结果导出。';
+            this.hintEl.textContent = I18n.t('smartrecommendation.recommendExport');
         } else {
-            this.hintEl.textContent = '根据最近操作习惯和当前上下文生成推荐。';
+            this.hintEl.textContent = I18n.t('smartrecommendation.generateRecommendation');
         }
 
         if (recommendations.length === 0) {
-            this.listEl.innerHTML = '<p class="smart-recommendation-empty">暂无推荐，请先进行几次操作。</p>';
+            this.listEl.innerHTML = '<p class="smart-recommendation-empty">' + I18n.t('smartrecommendation.noRecommendations') + '</p>';
             return;
         }
 

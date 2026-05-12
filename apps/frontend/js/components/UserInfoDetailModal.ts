@@ -56,9 +56,9 @@ export class UserInfoDetailModal {
             <div class="user-info-row"><span>用户名</span><strong>${user?.username || '-'}</strong></div>
             <div class="user-info-row"><span>邮箱</span><strong>${user?.email || '-'}</strong></div>
             <div class="user-info-row"><span>角色</span><strong>${user?.role || '-'}</strong></div>
-            <div class="user-info-row"><span>密钥</span><strong>${key?.product_key || '-'}</strong></div>
+            <div class="user-info-row"><span>密钥</span><strong>${user?.product_key || key?.product_key || '-'}</strong></div>
             <div class="user-info-row"><span>类型</span><strong>${key?.key_type || '-'}</strong></div>
-            <div class="user-info-row"><span>状态</span><strong>${key?.status || '-'}</strong></div>
+            <div class="user-info-row"><span>状态</span><strong>${user?.key_status || key?.status || '-'}</strong></div>
             <div class="user-info-row"><span>配额</span><strong>${key ? `${key.used_count} / ${key.total_quota}` : '-'}</strong></div>
             <div class="user-info-row"><span>到期时间</span><strong>${key?.expires_at || '-'}</strong></div>
         `;

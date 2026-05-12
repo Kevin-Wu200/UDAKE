@@ -3,6 +3,7 @@
  * IndexedDB 数据存储 + 离线模式检测 + 数据同步 + 冲突解决
  */
 
+import { I18n } from './I18n';
 import { databaseService, type DatabaseGPSSample } from '../services/DatabaseService.js';
 
 // ========== 类型定义 ==========
@@ -879,9 +880,9 @@ export class OfflineManager {
 
             header.style.padding = '20px 24px 16px';
             header.style.borderBottom = '1px solid #e5e7eb';
-            title.textContent = '检测到离线冲突';
+            title.textContent = I18n.t('offline.conflictDetected');
             title.style.margin = '0 0 6px';
-            subtitle.textContent = `操作类型：${context.action.type}，请逐字段确认保留哪一侧数据。`;
+            subtitle.textContent = I18n.t('offline.conflictActionType', { actionType: context.action.type });
             subtitle.style.margin = '0';
             subtitle.style.fontSize = '13px';
             subtitle.style.color = '#4b5563';
@@ -936,10 +937,10 @@ export class OfflineManager {
 
                 const clientOption = document.createElement('option');
                 clientOption.value = 'client';
-                clientOption.textContent = '客户端';
+                clientOption.textContent = I18n.t('offline.clientSide');
                 const serverOption = document.createElement('option');
                 serverOption.value = 'server';
-                serverOption.textContent = '服务端';
+                serverOption.textContent = I18n.t('offline.serverSide');
                 select.appendChild(clientOption);
                 select.appendChild(serverOption);
                 select.value = defaultChoice;
@@ -958,7 +959,7 @@ export class OfflineManager {
             tableWrap.appendChild(table);
 
             previewWrap.style.padding = '0 24px 20px';
-            previewTitle.textContent = '合并预览';
+            previewTitle.textContent = I18n.t('offline.mergePreview');
             previewTitle.style.fontSize = '13px';
             previewTitle.style.fontWeight = '600';
             previewTitle.style.marginBottom = '8px';
@@ -980,21 +981,21 @@ export class OfflineManager {
             actionWrap.style.gap = '10px';
             actionWrap.style.justifyContent = 'flex-end';
 
-            btnUseSuggestion.textContent = '应用智能建议';
+            btnUseSuggestion.textContent = I18n.t('offline.applySmartSuggestion');
             btnUseSuggestion.style.padding = '8px 14px';
             btnUseSuggestion.style.border = '1px solid #d1d5db';
             btnUseSuggestion.style.background = '#f9fafb';
             btnUseSuggestion.style.borderRadius = '8px';
             btnUseSuggestion.style.cursor = 'pointer';
 
-            btnServer.textContent = '保留服务端';
+            btnServer.textContent = I18n.t('offline.keepServerSide');
             btnServer.style.padding = '8px 14px';
             btnServer.style.border = '1px solid #d1d5db';
             btnServer.style.background = '#ffffff';
             btnServer.style.borderRadius = '8px';
             btnServer.style.cursor = 'pointer';
 
-            btnConfirm.textContent = '确认合并';
+            btnConfirm.textContent = I18n.t('offline.confirmMerge');
             btnConfirm.style.padding = '8px 14px';
             btnConfirm.style.border = 'none';
             btnConfirm.style.background = '#2563eb';

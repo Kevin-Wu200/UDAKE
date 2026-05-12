@@ -1,3 +1,4 @@
+import { I18n } from '../utils/I18n';
 import type { IAPIService } from '../../types/api';
 
 /**
@@ -307,7 +308,7 @@ export class SamplingRLPanel {
         const distribution = fromSourceContribution.length ? fromSourceContribution : fromRecommendations;
 
         if (!distribution.length) {
-            container.innerHTML = '<div class="status-message">暂无策略分布数据</div>';
+            container.innerHTML = '<div class="status-message">' + I18n.t('samplingrl.noPolicyDistribution') + '</div>';
             return;
         }
         const totalByCount = distribution.reduce((acc, item) => acc + item.count, 0);
@@ -367,7 +368,7 @@ export class SamplingRLPanel {
         const heatmap = this.normalizeHeatmap(rawHeatmap);
 
         if (!heatmap.length) {
-            container.innerHTML = '<div class="status-message">暂无动作价值热图数据</div>';
+            container.innerHTML = '<div class="status-message">' + I18n.t('samplingrl.noActionValueHeatmap') + '</div>';
             return;
         }
         const flat = heatmap.flat();
@@ -448,7 +449,7 @@ export class SamplingRLPanel {
 
         const hasData = rows.some((row) => Number.isFinite(row.value) && Math.abs(row.value) > 1e-8);
         if (!hasData) {
-            container.innerHTML = '<div class="status-message">暂无奖励分解数据</div>';
+            container.innerHTML = '<div class="status-message">' + I18n.t('samplingrl.noRewardDecomposition') + '</div>';
             return;
         }
         const maxAbs = Math.max(...rows.map((row) => Math.abs(Number(row.value) || 0)), 1e-6);
@@ -494,7 +495,7 @@ export class SamplingRLPanel {
             .sort((a, b) => a.rank - b.rank);
 
         if (!points.length) {
-            container.innerHTML = '<div class="status-message">暂无状态-动作轨迹数据</div>';
+            container.innerHTML = '<div class="status-message">' + I18n.t('samplingrl.noStateActionTrajectory') + '</div>';
             return;
         }
         const maxRow = Math.max(...points.map((point) => point.row), 1);
@@ -631,7 +632,7 @@ export class SamplingRLPanel {
             Number(trainingSummary.final_reward)
         ].filter((item) => Number.isFinite(item));
         if (points.length === 0) {
-            container.innerHTML = '<div class="status-message">暂无策略趋势数据</div>';
+            container.innerHTML = '<div class="status-message">' + I18n.t('samplingrl.noPolicyTrend') + '</div>';
             return;
         }
         const width = 300;
@@ -665,7 +666,7 @@ export class SamplingRLPanel {
             : actionValue.value_heatmap;
         const map = this.normalizeHeatmap(Array.isArray(contourSource) ? contourSource : []);
         if (!map.length) {
-            container.innerHTML = '<div class="status-message">暂无价值函数等高线数据</div>';
+            container.innerHTML = '<div class="status-message">' + I18n.t('samplingrl.noValueFunctionContour') + '</div>';
             return;
         }
         const width = 320;
@@ -726,7 +727,7 @@ export class SamplingRLPanel {
             .sort((a, b) => a.rank - b.rank);
 
         if (!points.length) {
-            container.innerHTML = '<div class="status-message">暂无探索轨迹数据</div>';
+            container.innerHTML = '<div class="status-message">' + I18n.t('samplingrl.noExplorationTrajectory') + '</div>';
             return;
         }
         const width = 320;

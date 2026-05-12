@@ -1,3 +1,4 @@
+import { I18n } from '../utils/I18n';
 import { APIService } from '../services/API封装.js';
 import { DataQualityPanel } from './integration/DataQualityPanel.js';
 import { HistorySnapshotPanel } from './integration/HistorySnapshotPanel.js';
@@ -123,12 +124,12 @@ export class FrontendIntegrationHub {
         }
 
         title.style.cursor = 'pointer';
-        title.textContent = '前端功能集成补齐 ▸';
+        title.textContent = I18n.t('frontendintegration.titleExpanded');
 
         title.addEventListener('click', () => {
             const isHidden = container.style.display === 'none';
             container.style.display = isHidden ? 'block' : 'none';
-            title.textContent = isHidden ? '前端功能集成补齐 ▾' : '前端功能集成补齐 ▸';
+            title.textContent = isHidden ? I18n.t('frontendintegration.titleCollapsed') : I18n.t('frontendintegration.titleExpanded');
         });
 
         title.setAttribute('data-toggle-bound', 'true');

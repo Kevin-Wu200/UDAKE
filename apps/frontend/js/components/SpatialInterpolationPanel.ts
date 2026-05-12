@@ -1,3 +1,4 @@
+import { I18n } from '../utils/I18n';
 import type { IAPIService } from '../../types/api';
 
 type SpatialSample = [number, number, number];
@@ -688,20 +689,20 @@ export class SpatialInterpolationPanel {
 
         const data = this.visualizationData;
         if (!data || data.rows.length === 0) {
-            errorSummary.textContent = '暂无数据';
-            errorChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
-            weightSummary.textContent = '暂无数据';
-            weightChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
-            neighborhoodSummary.textContent = '暂无数据';
-            neighborhoodChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
-            compareSummary.textContent = '暂无数据';
-            compareChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
-            heatmapSummary.textContent = '暂无数据';
-            heatmapChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
-            networkSummary.textContent = '暂无数据';
-            networkChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
-            mapSummary.textContent = '暂无数据';
-            mapChart.innerHTML = '<div class="dl-spatial-empty">请先执行预测</div>';
+            errorSummary.textContent = I18n.t('interpolation.noData');
+            errorChart.innerHTML = '<div class="dl-spatial-empty">' + I18n.t('interpolation.runPredictionFirst') + '</div>';
+            weightSummary.textContent = I18n.t('interpolation.noData');
+            weightChart.innerHTML = '<div class="dl-spatial-empty">' + I18n.t('interpolation.runPredictionFirst') + '</div>';
+            neighborhoodSummary.textContent = I18n.t('interpolation.noData');
+            neighborhoodChart.innerHTML = '<div class="dl-spatial-empty">' + I18n.t('interpolation.runPredictionFirst') + '</div>';
+            compareSummary.textContent = I18n.t('interpolation.noData');
+            compareChart.innerHTML = '<div class="dl-spatial-empty">' + I18n.t('interpolation.runPredictionFirst') + '</div>';
+            heatmapSummary.textContent = I18n.t('interpolation.noData');
+            heatmapChart.innerHTML = '<div class="dl-spatial-empty">' + I18n.t('interpolation.runPredictionFirst') + '</div>';
+            networkSummary.textContent = I18n.t('interpolation.noData');
+            networkChart.innerHTML = '<div class="dl-spatial-empty">' + I18n.t('interpolation.runPredictionFirst') + '</div>';
+            mapSummary.textContent = I18n.t('interpolation.noData');
+            mapChart.innerHTML = '<div class="dl-spatial-empty">' + I18n.t('interpolation.runPredictionFirst') + '</div>';
             this.updateQuerySelector();
             return;
         }
@@ -710,13 +711,13 @@ export class SpatialInterpolationPanel {
         const selected = data.rows[Math.max(0, Math.min(data.selectedQueryIndex, data.rows.length - 1))];
         const errors = data.rows.map(row => row.absConsistencyError);
 
-        errorSummary.textContent = `MAE=${data.global.mae.toFixed(4)} | RMSE=${data.global.rmse.toFixed(4)} | MaxAbs=${data.global.maxAbsError.toFixed(4)}`;
+        errorSummary.textContent = I18n.t('interpolation.errorSummary', { mae: data.global.mae.toFixed(4), rmse: data.global.rmse.toFixed(4), maxAbs: data.global.maxAbsError.toFixed(4) });
         errorChart.innerHTML = this.renderBarSeries(errors, 120, 'error');
 
-        weightSummary.textContent = `主导邻居平均权重=${data.global.meanDominantWeight.toFixed(4)} | 权重样本数=${data.weightHistogram.counts.reduce((sum, c) => sum + c, 0)}`;
+        weightSummary.textContent = I18n.t('interpolation.dominantNeighborWeight', { weight: data.global.meanDominantWeight.toFixed(4), count: data.weightHistogram.counts.reduce((sum, c) => sum + c, 0) });
         weightChart.innerHTML = this.renderHistogram(data.weightHistogram);
 
-        neighborhoodSummary.textContent = `Q${selected.queryIndex} 坐标(${selected.queryCoord[0].toFixed(3)}, ${selected.queryCoord[1].toFixed(3)}) | 主导邻居权重=${selected.dominantNeighbor.weight.toFixed(4)}`;
+        neighborhoodSummary.textContent = I18n.t('interpolation.pointDetail', { index: selected.queryIndex, x: selected.queryCoord[0].toFixed(3), y: selected.queryCoord[1].toFixed(3), weight: selected.dominantNeighbor.weight.toFixed(4) });
         neighborhoodChart.innerHTML = `
             <div class="dl-spatial-neighbor-list">
                 ${selected.neighbors.map((neighbor, idx) => `
@@ -737,20 +738,20 @@ export class SpatialInterpolationPanel {
         `;
 
         const delta = selected.predicted - selected.weightedMean;
-        compareSummary.textContent = `Q${selected.queryIndex} 预测=${selected.predicted.toFixed(4)} | 邻域均值=${selected.weightedMean.toFixed(4)} | 最近邻=${selected.nearestValue.toFixed(4)} | 偏差=${delta.toFixed(4)}`;
+        compareSummary.textContent = I18n.t('interpolation.pointPrediction', { index: selected.queryIndex, predicted: selected.predicted.toFixed(4), mean: selected.weightedMean.toFixed(4), nearest: selected.nearestValue.toFixed(4) });
         compareChart.innerHTML = this.buildCompareSvg(data.rows);
 
         const globalMaxWeight = data.rows.reduce((max, row) => Math.max(max, ...row.allNeighbors.map(item => item.weight)), 0);
-        heatmapSummary.textContent = `查询点=${data.rows.length} | 样本点=${data.samplePoints.length} | 最大权重=${globalMaxWeight.toFixed(4)}`;
+        heatmapSummary.textContent = I18n.t('interpolation.querySampleStats', { queryCount: data.rows.length, sampleCount: data.samplePoints.length, maxWeight: globalMaxWeight.toFixed(4) });
         heatmapChart.innerHTML = this.renderWeightHeatmap(data);
 
         const avgDistance = selected.neighbors.length > 0
             ? selected.neighbors.reduce((sum, item) => sum + item.distance, 0) / selected.neighbors.length
             : 0;
-        networkSummary.textContent = `Q${selected.queryIndex} 邻居数=${selected.neighbors.length} | 平均距离=${avgDistance.toFixed(4)} | 主导权重=${selected.dominantNeighbor.weight.toFixed(4)}`;
+        networkSummary.textContent = I18n.t('interpolation.queryPointNeighborDetail', { index: selected.queryIndex, count: selected.neighbors.length, distance: avgDistance.toFixed(4), weight: selected.dominantNeighbor.weight.toFixed(4) });
         networkChart.innerHTML = this.buildNeighborhoodRelationSvg(selected);
 
-        mapSummary.textContent = `样本=${data.samplePoints.length} | 查询=${data.queryPoints.length} | 值域=[${data.valueRange.min.toFixed(4)}, ${data.valueRange.max.toFixed(4)}]`;
+        mapSummary.textContent = I18n.t('interpolation.spatialStats', { sampleCount: data.samplePoints.length, queryCount: data.queryPoints.length, min: data.valueRange.min.toFixed(4), max: data.valueRange.max.toFixed(4) });
         mapChart.innerHTML = this.buildInterpolationMapSvg(data, selected);
     }
 

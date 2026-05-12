@@ -7,6 +7,8 @@ import { APIService } from '../../services/API封装.js';
 import { ConfirmDialog } from '../ConfirmDialog.js';
 import notificationManager from '../NotificationManager.js';
 import { SkeletonLoader } from '../../utils/SkeletonLoader.js';
+import { I18n } from '../../utils/I18n';
+import { I18n } from '../../utils/I18n';
 
 interface SnapshotLocalState {
     labelOverrides: Record<string, string>;
@@ -726,7 +728,7 @@ export class HistorySnapshotPanel {
         }
 
         const currentLabel = this.getDisplayLabel(snapshot);
-        const nextLabel = window.prompt(`编辑版本 v${version} 标签`, currentLabel);
+        const nextLabel = window.prompt(I18n.t('historysnapshot.editVersionLabel', { version }), currentLabel);
         if (nextLabel === null) {
             return;
         }
@@ -924,12 +926,12 @@ export class HistorySnapshotPanel {
         }
 
         if (!this.currentDatasetId) {
-            this.listHost.innerHTML = '<div class="history-empty">请输入并加载数据集后查看快照列表。</div>';
+            this.listHost.innerHTML = '<div class="history-empty">' + I18n.t('historysnapshot.loadDatasetFirst') + '</div>';
             return;
         }
 
         if (this.filteredSnapshots.length === 0) {
-            this.listHost.innerHTML = '<div class="history-empty">当前筛选条件下没有快照。</div>';
+            this.listHost.innerHTML = '<div class="history-empty">' + I18n.t('historysnapshot.noSnapshotsUnderFilter') + '</div>';
             return;
         }
 
@@ -1002,7 +1004,7 @@ export class HistorySnapshotPanel {
         }
 
         if (!this.currentDatasetId || this.snapshots.length === 0) {
-            this.detailHost.innerHTML = '<div class="history-empty">暂无快照详情。</div>';
+            this.detailHost.innerHTML = '<div class="history-empty">' + I18n.t('historysnapshot.noSnapshotDetails') + '</div>';
             return;
         }
 
@@ -1275,7 +1277,7 @@ export class HistorySnapshotPanel {
         this.stopAutoRefresh();
         if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
             if (this.refreshProgressElement) {
-                this.refreshProgressElement.textContent = '自动刷新已关闭。';
+                this.refreshProgressElement.textContent = I18n.t('historysnapshot.autoRefreshOff');
             }
             return;
         }
@@ -1312,7 +1314,7 @@ export class HistorySnapshotPanel {
         this.refreshCountdownTimer = window.setInterval(() => {
             this.refreshRemainSec = Math.max(0, this.refreshRemainSec - 1);
             if (this.refreshProgressElement) {
-                this.refreshProgressElement.textContent = `自动刷新中，${this.refreshRemainSec} 秒后刷新。`;
+                this.refreshProgressElement.textContent = I18n.t('historysnapshot.autoRefreshCountdown', { seconds: this.refreshRemainSec });
             }
             if (this.refreshRemainSec <= 0) {
                 this.refreshRemainSec = Math.floor(intervalSec);

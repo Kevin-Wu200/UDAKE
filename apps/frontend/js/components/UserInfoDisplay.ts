@@ -58,12 +58,14 @@ export class UserInfoDisplay {
             return '<div class="user-info-empty">未登录</div>';
         }
 
-        const keyStatus = key?.status || 'inactive';
+        // 优先从 AuthUserInfo 读取密钥状态，回退到 ProductKeyInfo
+        const keyStatus = user.key_status || key?.status || 'unused';
+        const keyType = key?.key_type || '未激活';
         const quotaText = key ? `${key.used_count} / ${key.total_quota}` : '- / -';
         const expires = key?.expires_at || '未设置';
         return `
             <div class="user-info-row"><span>用户</span><strong>${user.username || user.email}</strong></div>
-            <div class="user-info-row"><span>密钥类型</span><strong>${key?.key_type || '未激活'}</strong></div>
+            <div class="user-info-row"><span>密钥类型</span><strong>${keyType}</strong></div>
             <div class="user-info-row"><span>密钥状态</span><strong class="key-status ${keyStatus === 'active' ? 'active' : 'expired'}">${keyStatus}</strong></div>
             <div class="user-info-row"><span>配额</span><strong>${quotaText}</strong></div>
             <div class="user-info-row"><span>到期时间</span><strong>${expires}</strong></div>

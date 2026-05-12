@@ -322,6 +322,21 @@ def _friendly_validate_error_message(exc: ProductKeyValidationError) -> str:
 
 
 def _get_active_key_for_user(service: Any, user_id: int) -> Optional[Any]:
+    # 优先从 users 表的内存对象读取 product_key 和 key_status
+    user = service._users_by_id.get(user_id)  # noqa: SLF001
+    if user is not None and user.product_key and user.key_status == "active":
+        # 构造一个兼容 ProductKeyRecord 接口的对象
+        class _UserKeyInfo:
+            def __init__(self):
+                self.product_key = user.product_key
+                self.key_type = getattr(user, "role", "personal_standard")
+                self.status = user.key_status
+                self.total_quota = 0
+                self.used_count = 0
+                self.expires_at = None
+        return _UserKeyInfo()
+
+    # 回退：从 ProductKey 注册表中查找（向后兼容旧数据）
     registry = getattr(service, "product_keys", None)
     records = getattr(registry, "_keys", {}) if registry else {}
     for record in records.values():
@@ -683,6 +698,14 @@ def activate_product_key(payload: ActivateRequest, request: Request):
         checked = registry.validate_key(normalized_key, require_unused=True)
         checked.status = "active"
         checked.user_id = token_user_id
+
+        # 同步更新内存中 users 表对应的 AuthUser 对象
+        with service._lock:  # noqa: SLF001
+            user = service._users_by_id.get(token_user_id)  # noqa: SLF001
+            if user is not None:
+                user.product_key = normalized_key
+                user.key_status = "active"
+
         _clear_failed_attempts(service, token_user_id)
         return _ok("密钥激活成功", _serialize_key(checked))
     except ProductKeyValidationError as exc:

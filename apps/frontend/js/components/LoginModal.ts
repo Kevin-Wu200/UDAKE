@@ -1,4 +1,5 @@
 import { AuthService } from '../services/AuthService.js';
+import { I18n } from '../utils/I18n';
 import { ExitHandler } from '../utils/ExitHandler.js';
 
 interface LoginModalOptions {
@@ -100,7 +101,7 @@ export class LoginModal {
 
     private setLoading(loading: boolean): void {
         this.submitBtn.disabled = loading;
-        this.submitBtn.textContent = loading ? '登录中...' : '登录';
+        this.submitBtn.textContent = loading ? I18n.t('login.loggingIn') : I18n.t('common.login');
         this.overlay.classList.toggle('is-loading', loading);
     }
 

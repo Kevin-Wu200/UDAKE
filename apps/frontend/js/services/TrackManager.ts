@@ -3,6 +3,7 @@
  * 负责轨迹的记录、存储、导出和可视化
  */
 
+import { I18n } from '../utils/I18n';
 import type { Track, TrackPoint, LocationData, AccelerometerData, OrientationData } from '../types/sensor';
 import { locationService } from './LocationService';
 import { sensorManager } from './SensorManager';
@@ -507,7 +508,7 @@ ${track.points
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(data, 'text/xml');
 
-    const trackName = xmlDoc.querySelector('trk > name')?.textContent || '导入的轨迹';
+    const trackName = xmlDoc.querySelector('trk > name')?.textContent || I18n.t('track.importedTrack');
     const trackDesc = xmlDoc.querySelector('trk > desc')?.textContent || undefined;
     const trackPoints = xmlDoc.querySelectorAll('trkpt');
 

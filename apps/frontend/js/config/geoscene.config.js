@@ -8,15 +8,27 @@
  * 4. 禁止在其他文件中硬编码GeoScene配置
  */
 
-// 默认配置（当无法从后端获取时使用）
+/**
+ * 从 import.meta.env 读取 VITE_* 环境变量
+ */
+function _readEnv(key, fallback = "") {
+    try {
+        const env = import.meta.env || {};
+        return env[key] || fallback;
+    } catch {
+        return fallback;
+    }
+}
+
+// 默认配置（优先从环境变量读取，无法获取时使用硬编码默认值）
 const DEFAULT_CONFIG = {
-    API_KEY: "",
-    AUTH_MODE: "apikey",  // "apikey" | "enterprise"
-    USERNAME: "",
-    PASSWORD: "",
-    PORTAL_URL: "https://www.geoscene.cn",
-    TOKEN_URL: "",
-    ENV: "development",
+    API_KEY: _readEnv("VITE_GEOSCENE_API_KEY", ""),
+    AUTH_MODE: _readEnv("VITE_GEOSCENE_AUTH_MODE", "apikey"),  // "apikey" | "enterprise"
+    USERNAME: _readEnv("VITE_GEOSCENE_USERNAME", ""),
+    PASSWORD: _readEnv("VITE_GEOSCENE_PASSWORD", ""),
+    PORTAL_URL: _readEnv("VITE_GEOSCENE_PORTAL_URL", "https://www.geoscene.cn"),
+    TOKEN_URL: _readEnv("VITE_GEOSCENE_TOKEN_URL", ""),
+    ENV: _readEnv("VITE_GEOSCENE_ENV", "development"),
     GEOSCENE_LIGHT_BASEMAP: "arcgis-topographic",
     GEOSCENE_DARK_BASEMAP: "arcgis-dark-gray",
     GEOSCENE_DEFAULT_CENTER: [139.767125, 35.681236], // 东京

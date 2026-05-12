@@ -53,6 +53,8 @@ class AuthUser:
     lock_until: Optional[int] = None
     lock_reason: Optional[str] = None
     enterprise_id: Optional[int] = None
+    product_key: Optional[str] = None
+    key_status: str = "unused"
 
 
 @dataclass
@@ -192,7 +194,7 @@ class AuthService:
     def _activate_product_key_in_db(self, product_key: str, user_id: int) -> bool:
         normalized = product_key.strip().upper()
         try:
-            from app.auth_db.models import ProductKey
+            from app.auth_db.models import ProductKey, User
             from app.auth_db.session import get_auth_session_factory
         except Exception:  # pragma: no cover - auth db unavailable fallback
             return False
@@ -219,6 +221,16 @@ class AuthService:
             now = datetime.now(timezone.utc)
             row.activated_at = row.activated_at or now
             row.last_used_at = now
+
+            # 同步更新 users 表的 product_key 和 key_status
+            try:
+                user_row = db.query(User).filter(User.id == user_id).one_or_none()
+                if user_row is not None:
+                    user_row.product_key = normalized
+                    user_row.key_status = "active"
+            except Exception as exc:
+                logger.warning("update user product_key/key_status in db skipped: %s", exc)
+
             try:
                 db.commit()
             except Exception as exc:  # pragma: no cover - commit failure fallback to memory mode
@@ -315,6 +327,8 @@ class AuthService:
                 last_login_at=self._datetime_to_epoch(row.last_login_at),
                 created_at=self._datetime_to_epoch(row.created_at) or int(time.time()),
                 enterprise_id=int(row.company_id) if row.company_id is not None else None,
+                product_key=getattr(row, "product_key", None) or None,
+                key_status=str(getattr(row, "key_status", None) or "unused"),
             )
             with self._lock:
                 return self._upsert_user_cache_locked(user)
@@ -833,6 +847,8 @@ class AuthService:
                     role=role,
                     status="pending",
                     is_email_verified=False,
+                    product_key=validate_product_key,
+                    key_status="active",
                     created_at=datetime.now(timezone.utc)
                 )
                 db_session.add(new_user_row)
@@ -850,6 +866,8 @@ class AuthService:
                     role=role,
                     permissions=permissions,
                     status="pending",
+                    product_key=validate_product_key,
+                    key_status="active",
                 )
                 self._apply_super_admin_role_if_needed(user)
                 self._activate_product_key_in_db(validate_product_key, user_id)
@@ -1069,6 +1087,8 @@ class AuthService:
                 "role": user.role,
                 "permissions": user.permissions,
                 "enterprise_id": user.enterprise_id,
+                "product_key": user.product_key,
+                "key_status": user.key_status,
             },
         }
 

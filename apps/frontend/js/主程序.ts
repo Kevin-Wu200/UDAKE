@@ -1089,7 +1089,9 @@ class App {
         // 地图引擎切换
         this.eventBinder.bind(document, 'map-engine-switch', (e: Event) => {
             const customEvent = e as CustomEvent;
-            this.handleMapEngineSwitch(customEvent.detail);
+            this.handleMapEngineSwitch(customEvent.detail).catch((err) => {
+                Logger.error(t('common.main'), t('error.mapSwitch.unhandled'), err);
+            });
         });
 
         // 回到中心
@@ -2175,12 +2177,17 @@ class App {
                 })
             ]);
             ensureSwitchAlive();
-            this.view = mapAdapter.getView();
-            this.layerManager = new LayerManager(mapAdapter);
-            this.componentInitializer.updateMapContext({
-                layerManager: this.layerManager,
-                view: this.view ?? undefined
-            });
+            try {
+                this.view = mapAdapter.getView();
+                this.layerManager = new LayerManager(mapAdapter);
+                this.componentInitializer.updateMapContext({
+                    layerManager: this.layerManager,
+                    view: this.view ?? undefined
+                });
+            } catch (stateError) {
+                Logger.error(t('common.main'), t('error.mapSwitch.stateInitFailed'), stateError);
+                throw stateError;
+            }
 
             if (currentCenter && currentZoom) {
                 const center: [number, number] = Array.isArray(currentCenter)
@@ -2191,8 +2198,20 @@ class App {
             }
 
             const pointsToRestore = projectPoints.length > 0 ? projectPoints : samplingPoints;
-            for (const point of pointsToRestore) {
-                await this.layerManager.addSamplingPoint(point);
+            if (pointsToRestore.length > 0) {
+                Logger.info(t('common.main'), t('dialog.mapSwitch.restoringPoints', {
+                    count: pointsToRestore.length
+                }));
+                for (const point of pointsToRestore) {
+                    try {
+                        await this.layerManager.addSamplingPoint(point);
+                    } catch (pointError) {
+                        Logger.error(t('common.main'), t('error.mapSwitch.restorePointFailed', {
+                            x: point.x,
+                            y: point.y
+                        }), pointError);
+                    }
+                }
             }
 
             if (this.samplingComponent) {
@@ -2240,15 +2259,31 @@ class App {
                 }
 
                 const pointsToRestore = projectPoints.length > 0 ? projectPoints : samplingPoints;
-                for (const point of pointsToRestore) {
-                    await this.layerManager.addSamplingPoint(point);
+                if (pointsToRestore.length > 0) {
+                    Logger.info(t('common.main'), t('dialog.mapSwitch.restoringPoints', {
+                        count: pointsToRestore.length
+                    }));
+                    for (const point of pointsToRestore) {
+                        try {
+                            await this.layerManager.addSamplingPoint(point);
+                        } catch (pointError) {
+                            Logger.error(t('common.main'), t('error.mapSwitch.restorePointFailed', {
+                                x: point.x,
+                                y: point.y
+                            }), pointError);
+                        }
+                    }
                 }
             } catch (rollbackError) {
                 Logger.error(t('common.main'), t('error.mapSwitch.rollBack.failed'), rollbackError);
             }
             const errorMessage = error instanceof Error ? error.message : t('error.common.unkown');
             this.showStatus(t('error.mapSwitch.failed', {errorMessage: errorMessage}), 'error');
-            throw error;
+            // 错误已在上面完整处理（回滚+通知用户），不再向上抛出以避免未处理的异步拒绝
+            Logger.error(t('common.main'), t('error.mapSwitch.detail', {
+                errorMessage: errorMessage,
+                stack: error instanceof Error ? error.stack || '' : ''
+            }));
         } finally {
             // 重置切换状态标志
             this.isSwitchingMap = false;

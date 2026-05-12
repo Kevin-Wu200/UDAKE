@@ -1,3 +1,5 @@
+import { I18n } from '../utils/I18n';
+
 interface MobileInteractionEnhancerOptions {
     container: HTMLElement;
     onRefresh?: () => Promise<void> | void;
@@ -85,7 +87,7 @@ class MobileInteractionEnhancer {
     private createPullIndicator(): void {
         const indicator = document.createElement('div');
         indicator.className = 'pull-refresh-indicator';
-        indicator.textContent = '下拉刷新';
+        indicator.textContent = I18n.t('mobile.pullToRefresh');
         this.container.insertBefore(indicator, this.container.firstChild);
         this.pullIndicator = indicator;
     }
@@ -97,7 +99,7 @@ class MobileInteractionEnhancer {
 
         const indicator = document.createElement('div');
         indicator.className = 'infinite-loading-indicator';
-        indicator.textContent = '上拉加载更多';
+        indicator.textContent = I18n.t('mobile.pullUpToLoadMore');
         this.container.appendChild(indicator);
         this.loadMoreIndicator = indicator;
     }
@@ -150,7 +152,7 @@ class MobileInteractionEnhancer {
         if (this.pullIndicator) {
             this.pullIndicator.classList.add('active');
             this.pullIndicator.style.transform = `translateY(${this.pullDistance - 56}px)`;
-            this.pullIndicator.textContent = this.pullDistance >= this.refreshThreshold ? '松开立即刷新' : '下拉刷新';
+            this.pullIndicator.textContent = this.pullDistance >= this.refreshThreshold ? I18n.t('mobile.releaseToRefresh') : I18n.t('mobile.pullToRefresh');
         }
     };
 
@@ -199,18 +201,18 @@ class MobileInteractionEnhancer {
 
         if (this.pullIndicator) {
             this.pullIndicator.classList.add('active');
-            this.pullIndicator.textContent = '正在刷新...';
+            this.pullIndicator.textContent = I18n.t('mobile.refreshing');
             this.pullIndicator.style.transform = 'translateY(0)';
         }
 
         try {
             await this.onRefresh();
             if (this.pullIndicator) {
-                this.pullIndicator.textContent = '刷新完成';
+                this.pullIndicator.textContent = I18n.t('mobile.refreshComplete');
             }
         } catch {
             if (this.pullIndicator) {
-                this.pullIndicator.textContent = '刷新失败';
+                this.pullIndicator.textContent = I18n.t('mobile.refreshFailed');
             }
         } finally {
             window.setTimeout(() => {
@@ -218,7 +220,7 @@ class MobileInteractionEnhancer {
                     return;
                 }
                 this.pullIndicator.classList.remove('active');
-                this.pullIndicator.textContent = '下拉刷新';
+                this.pullIndicator.textContent = I18n.t('mobile.pullToRefresh');
                 this.pullIndicator.style.transform = 'translateY(-56px)';
             }, 520);
             this.isRefreshing = false;
@@ -233,23 +235,23 @@ class MobileInteractionEnhancer {
         this.isLoadingMore = true;
         if (this.loadMoreIndicator) {
             this.loadMoreIndicator.classList.add('active');
-            this.loadMoreIndicator.textContent = '正在加载更多...';
+            this.loadMoreIndicator.textContent = I18n.t('mobile.loadingMore');
         }
 
         try {
             await this.onLoadMore();
             if (this.loadMoreIndicator) {
-                this.loadMoreIndicator.textContent = '继续上拉加载';
+                this.loadMoreIndicator.textContent = I18n.t('mobile.continuePullToLoad');
             }
         } catch {
             if (this.loadMoreIndicator) {
-                this.loadMoreIndicator.textContent = '加载失败，请重试';
+                this.loadMoreIndicator.textContent = I18n.t('mobile.loadFailedRetry');
             }
         } finally {
             window.setTimeout(() => {
                 if (this.loadMoreIndicator) {
                     this.loadMoreIndicator.classList.remove('active');
-                    this.loadMoreIndicator.textContent = '上拉加载更多';
+                    this.loadMoreIndicator.textContent = I18n.t('mobile.pullUpToLoadMore');
                 }
             }, 380);
             this.isLoadingMore = false;

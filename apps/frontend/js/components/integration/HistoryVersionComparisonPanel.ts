@@ -4,6 +4,8 @@ import { DataComparison } from '../../utils/DataComparison.js';
 import { LayerComparisonPanel, LayerType } from '../LayerComparisonPanel.js';
 import notificationManager from '../NotificationManager.js';
 import { SkeletonLoader } from '../../utils/SkeletonLoader.js';
+import { I18n } from '../../utils/I18n';
+import { I18n } from '../../utils/I18n';
 
 interface ComparisonDiffItem {
     key: string;
@@ -565,8 +567,8 @@ export class HistoryVersionComparisonPanel {
         }
 
         if (this.snapshots.length === 0) {
-            this.fromVersionSelect.innerHTML = '<option value="">暂无版本</option>';
-            this.toVersionSelect.innerHTML = '<option value="">暂无版本</option>';
+            this.fromVersionSelect.innerHTML = '<option value="">' + I18n.t('historyversion.noVersions') + '</option>';
+            this.toVersionSelect.innerHTML = '<option value="">' + I18n.t('historyversion.noVersions') + '</option>';
             return;
         }
 
@@ -595,7 +597,7 @@ export class HistoryVersionComparisonPanel {
         }
 
         if (this.snapshots.length === 0) {
-            this.versionInfoHost.innerHTML = '<div class="history-empty">请先加载版本列表。</div>';
+            this.versionInfoHost.innerHTML = '<div class="history-empty">' + I18n.t('historyversion.loadVersionListFirst') + '</div>';
             return;
         }
 
@@ -696,7 +698,7 @@ export class HistoryVersionComparisonPanel {
         }
 
         if (!this.comparison) {
-            this.summaryHost.innerHTML = '<div class="history-empty">执行版本对比后展示摘要。</div>';
+            this.summaryHost.innerHTML = '<div class="history-empty">' + I18n.t('historyversion.runComparisonForSummary') + '</div>';
             return;
         }
 
@@ -760,7 +762,7 @@ export class HistoryVersionComparisonPanel {
         }
 
         if (!this.comparison) {
-            this.distributionHost.innerHTML = '<div class="history-empty">执行版本对比后展示差值分布。</div>';
+            this.distributionHost.innerHTML = '<div class="history-empty">' + I18n.t('historyversion.runComparisonForDiffDistribution') + '</div>';
             return;
         }
 
@@ -809,12 +811,12 @@ export class HistoryVersionComparisonPanel {
         }
 
         if (!this.comparison) {
-            this.tableHost.innerHTML = '<div class="history-empty">执行版本对比后展示差值表格。</div>';
+            this.tableHost.innerHTML = '<div class="history-empty">' + I18n.t('historyversion.runComparisonForDiffTable') + '</div>';
             return;
         }
 
         if (this.filteredDiffs.length === 0) {
-            this.tableHost.innerHTML = '<div class="history-empty">当前筛选条件下没有数据。</div>';
+            this.tableHost.innerHTML = '<div class="history-empty">' + I18n.t('historyversion.noDataUnderFilter') + '</div>';
             return;
         }
 
@@ -865,7 +867,7 @@ export class HistoryVersionComparisonPanel {
         }
 
         if (!this.comparison) {
-            this.detailHost.innerHTML = '<div class="history-empty">执行版本对比后查看详情。</div>';
+            this.detailHost.innerHTML = '<div class="history-empty">' + I18n.t('historyversion.runComparisonForDetails') + '</div>';
             return;
         }
 
@@ -875,7 +877,7 @@ export class HistoryVersionComparisonPanel {
         }
 
         if (!target) {
-            this.detailHost.innerHTML = '<div class="history-empty">暂无可展示的变化详情。</div>';
+            this.detailHost.innerHTML = '<div class="history-empty">' + I18n.t('historyversion.noVersions') + '</div>';
             return;
         }
 
@@ -899,7 +901,7 @@ export class HistoryVersionComparisonPanel {
                 const heatLayer = this.heatmapHost.querySelector('[data-layer-id="diff-heatmap"]');
                 const highlightLayer = this.heatmapHost.querySelector('[data-layer-id="highlight-overlay"]');
                 if (heatLayer) {
-                    heatLayer.innerHTML = '<div class="history-empty">执行版本对比后显示热力图。</div>';
+                    heatLayer.innerHTML = '<div class="history-empty">' + I18n.t('historyversion.runComparisonForHeatmap') + '</div>';
                 }
                 if (highlightLayer) {
                     highlightLayer.innerHTML = '';
@@ -1261,7 +1263,7 @@ export class HistoryVersionComparisonPanel {
         this.stopAutoRefresh();
         if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
             if (this.refreshProgressElement) {
-                this.refreshProgressElement.textContent = '自动刷新已关闭。';
+                this.refreshProgressElement.textContent = I18n.t('historyversion.autoRefreshOff');
             }
             return;
         }
@@ -1298,7 +1300,7 @@ export class HistoryVersionComparisonPanel {
         this.refreshCountdownTimer = window.setInterval(() => {
             this.refreshRemainSec = Math.max(0, this.refreshRemainSec - 1);
             if (this.refreshProgressElement) {
-                this.refreshProgressElement.textContent = `自动刷新中，${this.refreshRemainSec} 秒后刷新。`;
+                this.refreshProgressElement.textContent = I18n.t('historyversion.autoRefreshCountdown', { seconds: this.refreshRemainSec });
             }
             if (this.refreshRemainSec <= 0) {
                 this.refreshRemainSec = Math.floor(intervalSec);

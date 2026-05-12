@@ -10,6 +10,7 @@ import { gpsSamplingService } from '../services/GPSSamplingService';
 import { gpsSyncService, type GPSSyncStatus } from '../services/GPSSyncService';
 import type { LocationData, Track } from '../types/sensor';
 import { I18nDialog } from './I18nDialog.js';
+import { I18n } from '../utils/I18n';
 
 /**
  * 位置服务面板类
@@ -464,7 +465,7 @@ export class LocationServicePanel {
     const geofences = geofenceManager.getAllGeofences();
 
     if (geofences.length === 0) {
-      geofenceList.innerHTML = '<div class="empty-message">暂无地理围栏</div>';
+      geofenceList.innerHTML = '<div class="empty-message">' + I18n.t('locationservice.noGeofences') + '</div>';
       return;
     }
 
@@ -591,7 +592,7 @@ export class LocationServicePanel {
 
     const samples = await gpsSamplingService.getSamples(this.currentProjectId, 20);
     if (!samples.length) {
-      listEl.innerHTML = '<div class="empty-message">暂无采样点</div>';
+      listEl.innerHTML = '<div class="empty-message">' + I18n.t('locationservice.noSamplePoints') + '</div>';
       return;
     }
 

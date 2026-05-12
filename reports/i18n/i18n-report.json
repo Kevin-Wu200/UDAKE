@@ -1,11 +1,11 @@
 {
-  "generatedAt": "2026-04-27T02:07:26.143Z",
+  "generatedAt": "2026-05-12T02:59:39.714Z",
   "summary": {
-    "baseKeyCount": 755,
-    "usedKeyCount": 680,
-    "unusedKeyCount": 349,
-    "baselineUnusedKeyCount": 131,
-    "hardcodedCount": 1998,
+    "baseKeyCount": 970,
+    "usedKeyCount": 809,
+    "unusedKeyCount": 437,
+    "baselineUnusedKeyCount": 130,
+    "hardcodedCount": 1852,
     "baselineHardcodedCount": 72
   },
   "coverage": [
@@ -106,7 +106,22 @@
     "accessibility.voice-control.stop.title",
     "accessibility.voice-control.template",
     "accessibility.welcome",
+    "advanced.filter.add",
+    "advanced.filter.apply",
+    "advanced.filter.clear",
+    "advanced.filter.contain",
+    "advanced.filter.saved",
+    "advanced.filter.search.label",
+    "advanced.filter.search.placeholder",
+    "advanced.filter.title",
+    "advanced.filter.value",
     "app.subtitle",
+    "batchoperations.file.format.invalid",
+    "batchoperations.operate.confirm.confirmButton",
+    "batchoperations.operate.confirm.message.point",
+    "batchoperations.operate.confirm.message.title",
+    "batchoperations.operate.confirm.message.warning",
+    "batchoperations.operate.confirm.title",
     "common.collapse",
     "common.delete",
     "common.estimatedTime",
@@ -125,6 +140,30 @@
     "common.valid",
     "common.view",
     "common.warning",
+    "coordinate.error.invalidFormat",
+    "coordinate.error.invalidRange.latitude",
+    "coordinate.error.invalidRange.longitude",
+    "coordinate.error.sampling.mustNum",
+    "coordinate.error.sampling.valueEmpty",
+    "coordinate.error.sampling.valueRequired",
+    "coordinate.error.valueRequired",
+    "coordinate.transform.error",
+    "datacomparison.panel.datasetA",
+    "datacomparison.panel.datasetB",
+    "datacomparison.panel.description",
+    "datacomparison.panel.selectDataset",
+    "datacomparison.panel.startBtn",
+    "datacomparison.panel.title",
+    "datacomparison.report.diff",
+    "datacomparison.report.error",
+    "datacomparison.report.matchedPoints",
+    "datacomparison.report.matchedPoints.detail",
+    "datacomparison.report.max",
+    "datacomparison.report.mean",
+    "datacomparison.report.min",
+    "datacomparison.report.points",
+    "datacomparison.report.std",
+    "datacomparison.report.target",
     "dataimport.label.wkt",
     "dataimport.status.noWktInfo",
     "description.accountInfo",
@@ -167,6 +206,7 @@
     "dialog.mapSwitch.loading",
     "dialog.mapSwitch.noNeed",
     "dialog.mapSwitch.quietLoading",
+    "dialog.mapSwitch.restoringPoints",
     "dialog.mapSwitch.success",
     "dialog.mapSwitch.timeout",
     "dialog.mapSwitch.title",
@@ -235,34 +275,70 @@
     "error.common.icon.success",
     "error.common.icon.warning",
     "error.common.refreshButton",
-    "error.deepLearning.Panel.load.failed",
+    "error.coordinate_format.solution1",
+    "error.coordinate_format.solution2",
+    "error.deeplearning.Panel.load.failed",
+    "error.exit.failed",
     "error.export.task.noReport",
     "error.export_failed.noResult",
+    "error.export_failed.solution1",
+    "error.export_failed.solution2",
     "error.file_format",
+    "error.file_too_large.solution1",
+    "error.file_too_large.solution2",
     "error.file_unexist",
+    "error.geojson_format.solution1",
+    "error.geojson_format.solution2",
+    "error.geojson_format.suggestion1",
+    "error.geolocation_failed.solution1",
+    "error.geolocation_failed.solution2",
     "error.import.data.fewPoints",
     "error.import.data.unexist",
     "error.import.failed",
     "error.import.gridResolution.illegal",
+    "error.insufficient_points.solution",
     "error.integrationHub.Panel.load.failed",
+    "error.interpolation_failed.solution1",
+    "error.interpolation_failed.solution2",
+    "error.invalid_polygon.solution",
     "error.kriging3D.Panel.load.failed",
     "error.map.init.timeout",
     "error.map.unsigned",
+    "error.mapSwitch.detail",
     "error.mapSwitch.failed",
+    "error.mapSwitch.restorePointFailed",
     "error.mapSwitch.rollBack",
     "error.mapSwitch.rollBack.failed",
     "error.mapSwitch.rollBack.timeout",
+    "error.mapSwitch.stateInitFailed",
+    "error.mapSwitch.unhandled",
+    "error.monitor.sentry.loadFailed",
+    "error.network_error.solution1",
+    "error.network_error.solution2",
+    "error.network_error.solution3",
     "error.offlineMessage.Kriging.Parameter",
     "error.offlineMessage.uploadPayload.file",
     "error.parameter.verify.failed",
+    "error.permission_denied.solution1",
+    "error.permission_denied.solution2",
+    "error.point_out_of_bounds.solution1",
+    "error.point_out_of_bounds.solution2",
     "error.preprocess.failed",
     "error.preprocess.fewpoint",
     "error.project.parameter.invalid",
     "error.project.sampling.overRegion",
     "error.project.unexist",
+    "error.server_error.solution1",
+    "error.server_error.solution2",
+    "error.server_error.solution3",
     "error.startFailed",
     "error.stepFailed",
     "error.timeout_error.StartupStep",
+    "error.timeout_error.solution1",
+    "error.timeout_error.solution2",
+    "error.unsupported_format.solution",
+    "error.validation_error.solution1",
+    "error.validation_error.solution2",
     "explain.action.refresh",
     "explain.action.submit",
     "explain.action.verify",
@@ -299,12 +375,24 @@
     "explain.task.progress",
     "explain.task.retry",
     "explain.task.title",
+    "export.report.crossValidation",
+    "export.report.crossValidation.target",
+    "export.report.crossValidation.value",
+    "export.report.interpolation",
+    "export.report.interpolation.detail",
+    "export.report.parameter.config",
+    "export.report.parameter.config.gridResolution",
+    "export.report.parameter.config.kriging",
+    "export.report.parameter.config.parameter",
+    "export.report.parameter.config.samplingPoints",
+    "export.report.parameter.config.value",
+    "export.report.stats",
+    "formvalidator.error.format",
     "interpolation.failed",
     "interpolation.finished",
     "interpolation.loadingResult",
     "interpolation.progress",
     "interpolation.success",
-    "kriging.help.parameter-relations.suggestion",
     "kriging.help.quick-start.suggestion",
     "kriging.range-spatial.recommend-range",
     "kriging.relationship.grid-performance",
@@ -356,15 +444,14 @@
     "status.loading",
     "status.unrecognized",
     "status.unrecognizedCoordinateSystem",
-    "tempalte.config.large-dataset.description",
-    "tempalte.operate.warning",
     "template.analysis.description",
     "template.analysis.name",
     "template.config.balanced.description",
     "template.config.balanced.name",
     "template.config.customize",
+    "template.config.high-precision.description",
     "template.config.high-precision.name",
-    "template.config.high-precosion.description",
+    "template.config.large-dataset.description",
     "template.config.large-dataset.name",
     "template.config.quick-estimate.description",
     "template.config.quick-estimate.name",
@@ -385,6 +472,7 @@
     "template.monitor.error.failed",
     "template.monitor.error.unexist",
     "template.operate.success",
+    "template.operate.warning",
     "template.sampling.description",
     "template.sampling.name",
     "template.save.success",
@@ -396,12 +484,12 @@
     "html": [
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 63,
+        "line": 62,
         "text": "新建项目"
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 231,
+        "line": 230,
         "text": "，且"
       },
       {
@@ -9581,7 +9669,7 @@
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/index.html",
-        "line": 297,
+        "line": 298,
         "text": "开发者信息"
       },
       {
@@ -9642,748 +9730,18 @@
     ],
     "js": [
       {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/AnomalyDetectionPanel.ts",
-        "line": 403,
-        "text": "'>暂无可用于时间序列可视化的数据</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/AnomalyDetectionPanel.ts",
-        "line": 405,
-        "text": "'请先执行检测，或检查输入 values 是否为有效数值数组。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/AnomalyDetectionPanel.ts",
-        "line": 1076,
-        "text": "'请至少选择两个模型后再运行对比。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/AnomalyDetectionPanel.ts",
-        "line": 1094,
-        "text": "'正在运行模型对比，请稍候...'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/AnomalyDetectionPanel.ts",
-        "line": 1149,
-        "text": "'模型对比失败，请检查输入参数或后端服务状态。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/DeepLearningPanel.ts",
-        "line": 113,
-        "text": "'深度学习 ▾'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/DeepLearningPanel.ts",
-        "line": 123,
-        "text": "'深度学习服务状态：检测中...'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/DeepLearningPanel.ts",
-        "line": 132,
-        "text": "'深度学习服务状态：${health.status}（device: ${health.device}）'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/DeepLearningPanel.ts",
-        "line": 138,
-        "text": "'模型注册数：${health.registered_models?.length ?? 0}，异常模型：${health.trained_anomaly_models?.length ?? 0}，RL模型：${health.trained_sampling_rl_models?.length ?? 0}'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/DeepLearningPanel.ts",
-        "line": 142,
-        "text": "'深度学习服务状态：不可用 (${error instanceof Error ? error.message : String(error)})'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/DeepLearningPanel.ts",
-        "line": 148,
-        "text": "'请确认后端已启动且 /api/dl 路由可访问。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/FrontendIntegrationHub.ts",
-        "line": 126,
-        "text": "'前端功能集成补齐 ▸'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/FrontendIntegrationHub.ts",
-        "line": 131,
-        "text": "'前端功能集成补齐 ▾'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/KeyActivationModal.ts",
-        "line": 146,
-        "text": "'已锁定，请在 ${mm}:${ss} 后重试'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/KeyActivationModal.ts",
-        "line": 168,
-        "text": "'剩余 ${Math.max(0, remaining)} 次尝试'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/KeyActivationModal.ts",
-        "line": 173,
-        "text": "'激活中...'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/LocationServicePanel.ts",
-        "line": 467,
-        "text": "'>暂无地理围栏</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/LocationServicePanel.ts",
-        "line": 594,
-        "text": "'>暂无采样点</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/LoginModal.ts",
-        "line": 103,
-        "text": "'登录中...'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Map25DHeatmapController.ts",
-        "line": 256,
-        "text": "'切换 2.5D'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Map25DHeatmapController.ts",
-        "line": 294,
-        "text": "'暂停时间轴'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Map25DHeatmapController.ts",
-        "line": 690,
-        "text": "'值: ${(nearest.point.value * 100).toFixed(1)}%<br/>点位: ${nearest.point.sourceId}'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Map25DHeatmapController.ts",
-        "line": 713,
-        "text": "'选中 ${nearest.point.sourceId} 值 ${(nearest.point.value * 100).toFixed(1)}%'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileInteractionEnhancer.ts",
-        "line": 88,
-        "text": "'下拉刷新'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileInteractionEnhancer.ts",
-        "line": 100,
-        "text": "'上拉加载更多'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileInteractionEnhancer.ts",
-        "line": 153,
-        "text": "'松开立即刷新'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileInteractionEnhancer.ts",
-        "line": 202,
-        "text": "'正在刷新...'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileInteractionEnhancer.ts",
-        "line": 209,
-        "text": "'刷新完成'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileInteractionEnhancer.ts",
-        "line": 213,
-        "text": "'刷新失败'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileInteractionEnhancer.ts",
-        "line": 221,
-        "text": "'下拉刷新'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileInteractionEnhancer.ts",
-        "line": 236,
-        "text": "'正在加载更多...'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileInteractionEnhancer.ts",
-        "line": 242,
-        "text": "'继续上拉加载'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileInteractionEnhancer.ts",
-        "line": 246,
-        "text": "'加载失败，请重试'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileInteractionEnhancer.ts",
-        "line": 252,
-        "text": "'上拉加载更多'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileNavigation.ts",
-        "line": 105,
-        "text": "'打开菜单'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/MobileParameterDrawer.ts",
-        "line": 168,
-        "text": "'参数设置'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/ParameterImpactPreview.ts",
-        "line": 53,
-        "text": "'参数影响预览'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/ParameterImpactPreview.ts",
-        "line": 58,
-        "text": "'导出预览图'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/ParameterImpactPreview.ts",
-        "line": 220,
-        "text": "'>点击“生成预览”查看参数影响对比</span>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRLPanel.ts",
-        "line": 310,
-        "text": "'>暂无策略分布数据</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRLPanel.ts",
-        "line": 370,
-        "text": "'>暂无动作价值热图数据</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRLPanel.ts",
-        "line": 451,
-        "text": "'>暂无奖励分解数据</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRLPanel.ts",
-        "line": 497,
-        "text": "'>暂无状态-动作轨迹数据</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRLPanel.ts",
-        "line": 634,
-        "text": "'>暂无策略趋势数据</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRLPanel.ts",
-        "line": 668,
-        "text": "'>暂无价值函数等高线数据</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRLPanel.ts",
-        "line": 729,
-        "text": "'>暂无探索轨迹数据</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SmartRecommendationEngine.ts",
-        "line": 211,
-        "text": "'检测为新手模式：建议先完成“导入向导”与“插值向导”。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SmartRecommendationEngine.ts",
-        "line": 213,
-        "text": "'当前结果可导出，推荐优先执行结果导出。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SmartRecommendationEngine.ts",
-        "line": 215,
-        "text": "'根据最近操作习惯和当前上下文生成推荐。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SmartRecommendationEngine.ts",
-        "line": 219,
-        "text": "'>暂无推荐，请先进行几次操作。</p>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 691,
-        "text": "'暂无数据'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 692,
-        "text": "'>请先执行预测</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 693,
-        "text": "'暂无数据'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 694,
-        "text": "'>请先执行预测</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 695,
-        "text": "'暂无数据'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 696,
-        "text": "'>请先执行预测</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 697,
-        "text": "'暂无数据'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 698,
-        "text": "'>请先执行预测</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 699,
-        "text": "'暂无数据'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 700,
-        "text": "'>请先执行预测</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 701,
-        "text": "'暂无数据'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 702,
-        "text": "'>请先执行预测</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 703,
-        "text": "'暂无数据'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 704,
-        "text": "'>请先执行预测</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 716,
-        "text": "'主导邻居平均权重=${data.global.meanDominantWeight.toFixed(4)} | 权重样本数=${data.weightHistogram.counts.reduce((sum, c) => sum + c, 0)}'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 719,
-        "text": "'Q${selected.queryIndex} 坐标(${selected.queryCoord[0].toFixed(3)}, ${selected.queryCoord[1].toFixed(3)}) | 主导邻居权重=${selected.dominantNeighbor.weight.toFixed(4)}'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 740,
-        "text": "'Q${selected.queryIndex} 预测=${selected.predicted.toFixed(4)} | 邻域均值=${selected.weightedMean.toFixed(4)} | 最近邻=${selected.nearestValue.toFixed(4)} | 偏差=${delta.toFixed(4)}'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 744,
-        "text": "'查询点=${data.rows.length} | 样本点=${data.samplePoints.length} | 最大权重=${globalMaxWeight.toFixed(4)}'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 750,
-        "text": "'Q${selected.queryIndex} 邻居数=${selected.neighbors.length} | 平均距离=${avgDistance.toFixed(4)} | 主导权重=${selected.dominantNeighbor.weight.toFixed(4)}'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatialInterpolationPanel.ts",
-        "line": 753,
-        "text": "'样本=${data.samplePoints.length} | 查询=${data.queryPoints.length} | 值域=[${data.valueRange.min.toFixed(4)}, ${data.valueRange.max.toFixed(4)}]'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatiotemporalExplainPanel.ts",
-        "line": 783,
-        "text": "'切换模型后将保留当前输入与任务列表，但会切换解释页面上下文，确认继续？'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatiotemporalExplainPanel.ts",
-        "line": 809,
-        "text": "'任务提交'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatiotemporalExplainPanel.ts",
-        "line": 828,
-        "text": "'访问历史：暂无'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatiotemporalExplainPanel.ts",
-        "line": 831,
-        "text": "'访问历史：${this.navHistory.slice(-4).join('"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatiotemporalExplainPanel.ts",
-        "line": 862,
-        "text": "'任务状态'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatiotemporalExplainPanel.ts",
-        "line": 867,
-        "text": "'任务提交'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatiotemporalExplainPanel.ts",
-        "line": 927,
-        "text": "'>最近模型：暂无历史</span>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SpatiotemporalExplainPanel.ts",
-        "line": 3166,
-        "text": "'浅色模式'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/TimeSlider.ts",
-        "line": 109,
-        "text": "'暂停'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/VariogramChart.ts",
-        "line": 720,
-        "text": "'<span>拟合质量：暂无可用模型</span>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistorySnapshotPanel.ts",
-        "line": 729,
-        "text": "'编辑版本 v${version} 标签'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistorySnapshotPanel.ts",
-        "line": 927,
-        "text": "'>请输入并加载数据集后查看快照列表。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistorySnapshotPanel.ts",
-        "line": 932,
-        "text": "'>当前筛选条件下没有快照。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistorySnapshotPanel.ts",
-        "line": 1005,
-        "text": "'>暂无快照详情。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistorySnapshotPanel.ts",
-        "line": 1278,
-        "text": "'自动刷新已关闭。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistorySnapshotPanel.ts",
-        "line": 1315,
-        "text": "'自动刷新中，${this.refreshRemainSec} 秒后刷新。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 859,
-        "text": "'>最新版本</option>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 1089,
-        "text": "'>未检测到异常点。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 1095,
-        "text": "'>当前筛选条件下暂无异常点。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 1149,
-        "text": "'>暂无可聚合的坐标异常点。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 1157,
-        "text": "'>当前无密集区域聚合。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 1327,
-        "text": "'>暂无预警历史记录。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 1344,
-        "text": "'>未检测到异常点，暂无原因分析。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 1448,
-        "text": "'>未检测到显著周期分量。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 1878,
-        "text": "'>执行趋势分析后展示模型切换。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 1879,
-        "text": "'>执行趋势分析后展示模型性能对比。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2383,
-        "text": "'>未加载 ECharts，无法展示交互式预览图表。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2635,
-        "text": "'>暂无报告生成历史。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2674,
-        "text": "'>暂无下载历史。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2686,
-        "text": "'>暂无报告生成历史。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2691,
-        "text": "'<h5>最近报告</h5><ul>${rows}</ul>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2696,
-        "text": "'>暂无下载历史。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2701,
-        "text": "'<h5>最近下载</h5><ul>${rows}</ul>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2932,
-        "text": "'>执行趋势分析后展示统计指标。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2936,
-        "text": "'>执行趋势分析后展示 Mann-Kendall 检验结果。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2940,
-        "text": "'>执行趋势分析后展示周期识别结果。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2944,
-        "text": "'>执行趋势分析后展示异常点列表。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2948,
-        "text": "'>暂无聚合标注。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2952,
-        "text": "'>执行趋势分析后展示预警统计。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2956,
-        "text": "'>暂无预警历史记录。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2960,
-        "text": "'>执行趋势分析后展示异常原因。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2964,
-        "text": "'>执行趋势分析后展示模型切换。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2968,
-        "text": "'>执行趋势分析后展示模型性能对比。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2972,
-        "text": "'>暂无报告生成历史。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2976,
-        "text": "'>暂无下载历史。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 2996,
-        "text": "'>当前环境未加载 ECharts，无法渲染图表。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 3198,
-        "text": "'自动刷新已关闭。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 3235,
-        "text": "'自动刷新中，${this.refreshRemainSec} 秒后刷新。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryTrendAnalysisPanel.ts",
-        "line": 3310,
-        "text": "'${message}；可点击“重试”。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 568,
-        "text": "'>暂无版本</option>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 569,
-        "text": "'>暂无版本</option>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 598,
-        "text": "'>请先加载版本列表。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 699,
-        "text": "'>执行版本对比后展示摘要。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 763,
-        "text": "'>执行版本对比后展示差值分布。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 812,
-        "text": "'>执行版本对比后展示差值表格。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 817,
-        "text": "'>当前筛选条件下没有数据。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 868,
-        "text": "'>执行版本对比后查看详情。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 878,
-        "text": "'>暂无可展示的变化详情。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 902,
-        "text": "'>执行版本对比后显示热力图。</div>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 1264,
-        "text": "'自动刷新已关闭。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/HistoryVersionComparisonPanel.ts",
-        "line": 1301,
-        "text": "'自动刷新中，${this.refreshRemainSec} 秒后刷新。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/ModelFusionPanel.ts",
-        "line": 75,
-        "text": "'可执行融合任务后自动生成高级可视化（饼图/性能对比/趋势/决策树）。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/ModelFusionPanel.ts",
-        "line": 79,
-        "text": "'等待操作...'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/ModelFusionPanel.ts",
-        "line": 804,
-        "text": "'>未检测到权重字段。</p>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/ModelFusionPanel.ts",
-        "line": 849,
-        "text": "'>暂无可用于对比的子模型性能数据。</p>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/integration/ModelFusionPanel.ts",
-        "line": 887,
-        "text": "'>暂无可绘制趋势的数据序列。</p>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/services/TrackManager.ts",
-        "line": 510,
-        "text": "'导入的轨迹'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/utils/ExitHandler.ts",
-        "line": 16,
-        "text": "'当前环境不允许脚本直接关闭页面，请手动关闭此标签页。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/utils/OfflineManager.ts",
-        "line": 882,
-        "text": "'检测到离线冲突'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/utils/OfflineManager.ts",
-        "line": 884,
-        "text": "'操作类型：${context.action.type}，请逐字段确认保留哪一侧数据。'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/utils/OfflineManager.ts",
-        "line": 939,
-        "text": "'客户端'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/utils/OfflineManager.ts",
-        "line": 942,
-        "text": "'服务端'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/utils/OfflineManager.ts",
-        "line": 961,
-        "text": "'合并预览'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/utils/OfflineManager.ts",
-        "line": 983,
-        "text": "'应用智能建议'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/utils/OfflineManager.ts",
-        "line": 990,
-        "text": "'保留服务端'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/utils/OfflineManager.ts",
-        "line": 997,
-        "text": "'确认合并'"
-      },
-      {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/js/i18n.js",
-        "line": 690,
+        "line": 692,
         "text": "'中文'"
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/js/ticket-form.js",
-        "line": 212,
+        "line": 218,
         "text": "'<p>查询中...</p>'"
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/js/ticket-form.js",
-        "line": 222,
+        "line": 228,
         "text": "'>未找到相关工单或信息不匹配</p>'"
       }
     ]

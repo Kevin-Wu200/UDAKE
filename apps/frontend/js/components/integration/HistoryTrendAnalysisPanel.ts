@@ -3,6 +3,7 @@ import { APIService } from '../../services/API封装.js';
 import notificationManager from '../NotificationManager.js';
 import { ConfirmDialog } from '../ConfirmDialog.js';
 import { SkeletonLoader } from '../../utils/SkeletonLoader.js';
+import { I18n } from '../../utils/I18n';
 
 interface TrendPoint {
     timestamp: string;
@@ -856,7 +857,7 @@ export class HistoryTrendAnalysisPanel {
         }
 
         if (this.snapshots.length === 0) {
-            this.versionSelect.innerHTML = '<option value="">最新版本</option>';
+            this.versionSelect.innerHTML = '<option value="">' + I18n.t('historytrend.latestVersion') + '</option>';
             return;
         }
 
@@ -1086,13 +1087,13 @@ export class HistoryTrendAnalysisPanel {
             return;
         }
         if (this.anomalyViewItems.length === 0) {
-            this.anomalyListHost.innerHTML = '<div class="history-empty">未检测到异常点。</div>';
+            this.anomalyListHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noAnomaliesDetected') + '</div>';
             return;
         }
 
         const filtered = this.getFilteredAnomalies();
         if (filtered.length === 0) {
-            this.anomalyListHost.innerHTML = '<div class="history-empty">当前筛选条件下暂无异常点。</div>';
+            this.anomalyListHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noAnomaliesUnderFilter') + '</div>';
             return;
         }
 
@@ -1146,7 +1147,7 @@ export class HistoryTrendAnalysisPanel {
                 { notMerge: true }
             );
             if (this.anomalyMapClusterHost) {
-                this.anomalyMapClusterHost.innerHTML = '<div class="history-empty">暂无可聚合的坐标异常点。</div>';
+                this.anomalyMapClusterHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noClusterableAnomalies') + '</div>';
             }
             return;
         }
@@ -1154,7 +1155,7 @@ export class HistoryTrendAnalysisPanel {
         const clusters = this.buildAnomalyClusters(points);
         if (this.anomalyMapClusterHost) {
             if (clusters.length === 0) {
-                this.anomalyMapClusterHost.innerHTML = '<div class="history-empty">当前无密集区域聚合。</div>';
+                this.anomalyMapClusterHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noDenseRegionClusters') + '</div>';
             } else {
                 const clusterRows = clusters
                     .map(cluster => `<li>聚合 ${cluster.id}: ${cluster.count} 个点，最高分 ${cluster.maxScore.toFixed(2)}</li>`)
@@ -1324,7 +1325,7 @@ export class HistoryTrendAnalysisPanel {
             return;
         }
         if (this.warningHistory.length === 0) {
-            this.warningHistoryHost.innerHTML = '<div class="history-empty">暂无预警历史记录。</div>';
+            this.warningHistoryHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noAlertHistory') + '</div>';
             return;
         }
 
@@ -1341,7 +1342,7 @@ export class HistoryTrendAnalysisPanel {
         }
 
         if (this.anomalyViewItems.length === 0) {
-            this.reasonHost.innerHTML = '<div class="history-empty">未检测到异常点，暂无原因分析。</div>';
+            this.reasonHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noAnomalyCauses') + '</div>';
             return;
         }
 
@@ -1445,7 +1446,7 @@ export class HistoryTrendAnalysisPanel {
 
         const components = result.periodic_components;
         if (components.length === 0) {
-            this.fftTableHost.innerHTML = '<div class="history-empty">未检测到显著周期分量。</div>';
+            this.fftTableHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noSignificantPeriodicity') + '</div>';
         } else {
             const rows = components
                 .map((item, idx) => {
@@ -1875,8 +1876,8 @@ export class HistoryTrendAnalysisPanel {
             return;
         }
         if (this.modelResults.length === 0) {
-            this.modelVisibilityHost.innerHTML = '<div class="history-empty">执行趋势分析后展示模型切换。</div>';
-            this.modelCompareHost.innerHTML = '<div class="history-empty">执行趋势分析后展示模型性能对比。</div>';
+            this.modelVisibilityHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.runAnalysisForModelSwitch') + '</div>';
+            this.modelCompareHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.runAnalysisForPerformanceComparison') + '</div>';
             return;
         }
         const best = this.modelResults
@@ -2380,7 +2381,7 @@ export class HistoryTrendAnalysisPanel {
             return;
         }
         if (!echarts) {
-            host.innerHTML = '<div class="history-empty">未加载 ECharts，无法展示交互式预览图表。</div>';
+            host.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.echartsNotLoaded') + '</div>';
             return;
         }
         if (!this.reportPreviewChart) {
@@ -2632,7 +2633,7 @@ export class HistoryTrendAnalysisPanel {
             return;
         }
         if (this.reportHistory.length === 0) {
-            host.innerHTML = '<div class="history-empty">暂无报告生成历史。</div>';
+            host.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noReportHistory') + '</div>';
             return;
         }
         const rows = this.reportHistory.slice(0, 12).map(item => `
@@ -2671,7 +2672,7 @@ export class HistoryTrendAnalysisPanel {
             return;
         }
         if (this.reportDownloadHistory.length === 0) {
-            host.innerHTML = '<div class="history-empty">暂无下载历史。</div>';
+            host.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noDownloadHistory') + '</div>';
             return;
         }
         const list = this.reportDownloadHistory.slice(0, 16).map(item => (
@@ -2683,22 +2684,22 @@ export class HistoryTrendAnalysisPanel {
     private renderReportSummaries(): void {
         if (this.reportHistorySummaryHost) {
             if (this.reportHistory.length === 0) {
-                this.reportHistorySummaryHost.innerHTML = '<div class="history-empty">暂无报告生成历史。</div>';
+                this.reportHistorySummaryHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noReportHistory') + '</div>';
             } else {
                 const rows = this.reportHistory.slice(0, 5).map(item => (
                     `<li>${this.escapeHtml(item.title)} | ${this.formatDateTimeLabel(item.generatedAt)} | <button type="button" class="history-link-btn" data-action="report-history-regenerate" data-report-id="${item.id}">重生成</button> <button type="button" class="history-link-btn" data-action="report-history-delete" data-report-id="${item.id}">删除</button></li>`
                 )).join('');
-                this.reportHistorySummaryHost.innerHTML = `<h5>最近报告</h5><ul>${rows}</ul>`;
+                this.reportHistorySummaryHost.innerHTML = '<h5>' + I18n.t('historytrend.recentReports') + '</h5><ul>${rows}</ul>';
             }
         }
         if (this.reportDownloadSummaryHost) {
             if (this.reportDownloadHistory.length === 0) {
-                this.reportDownloadSummaryHost.innerHTML = '<div class="history-empty">暂无下载历史。</div>';
+                this.reportDownloadSummaryHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noDownloadHistory') + '</div>';
             } else {
                 const rows = this.reportDownloadHistory.slice(0, 5).map(item => (
                     `<li>${this.formatDateTimeLabel(item.createdAt)} | ${item.format.toUpperCase()} | ${this.escapeHtml(item.fileName)}</li>`
                 )).join('');
-                this.reportDownloadSummaryHost.innerHTML = `<h5>最近下载</h5><ul>${rows}</ul>`;
+                this.reportDownloadSummaryHost.innerHTML = '<h5>' + I18n.t('historytrend.recentDownloads') + '</h5><ul>${rows}</ul>';
             }
         }
     }
@@ -2929,51 +2930,51 @@ export class HistoryTrendAnalysisPanel {
 
     private renderEmptyState(): void {
         if (this.metricsHost) {
-            this.metricsHost.innerHTML = '<div class="history-empty">执行趋势分析后展示统计指标。</div>';
+            this.metricsHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.runAnalysisForStatistics') + '</div>';
         }
 
         if (this.mannHost) {
-            this.mannHost.innerHTML = '<div class="history-empty">执行趋势分析后展示 Mann-Kendall 检验结果。</div>';
+            this.mannHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.runAnalysisForMKTest') + '</div>';
         }
 
         if (this.fftTableHost) {
-            this.fftTableHost.innerHTML = '<div class="history-empty">执行趋势分析后展示周期识别结果。</div>';
+            this.fftTableHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.runAnalysisForPeriodicity') + '</div>';
         }
 
         if (this.anomalyListHost) {
-            this.anomalyListHost.innerHTML = '<div class="history-empty">执行趋势分析后展示异常点列表。</div>';
+            this.anomalyListHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.runAnalysisForAnomalyList') + '</div>';
         }
 
         if (this.anomalyMapClusterHost) {
-            this.anomalyMapClusterHost.innerHTML = '<div class="history-empty">暂无聚合标注。</div>';
+            this.anomalyMapClusterHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noClusterAnnotations') + '</div>';
         }
 
         if (this.warningStatsHost) {
-            this.warningStatsHost.innerHTML = '<div class="history-empty">执行趋势分析后展示预警统计。</div>';
+            this.warningStatsHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.runAnalysisForAlertStats') + '</div>';
         }
 
         if (this.warningHistoryHost) {
-            this.warningHistoryHost.innerHTML = '<div class="history-empty">暂无预警历史记录。</div>';
+            this.warningHistoryHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noAlertHistory') + '</div>';
         }
 
         if (this.reasonHost) {
-            this.reasonHost.innerHTML = '<div class="history-empty">执行趋势分析后展示异常原因。</div>';
+            this.reasonHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.runAnalysisForAnomalyCauses') + '</div>';
         }
 
         if (this.modelVisibilityHost) {
-            this.modelVisibilityHost.innerHTML = '<div class="history-empty">执行趋势分析后展示模型切换。</div>';
+            this.modelVisibilityHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.runAnalysisForModelSwitch') + '</div>';
         }
 
         if (this.modelCompareHost) {
-            this.modelCompareHost.innerHTML = '<div class="history-empty">执行趋势分析后展示模型性能对比。</div>';
+            this.modelCompareHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.runAnalysisForPerformanceComparison') + '</div>';
         }
 
         if (this.reportHistorySummaryHost) {
-            this.reportHistorySummaryHost.innerHTML = '<div class="history-empty">暂无报告生成历史。</div>';
+            this.reportHistorySummaryHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noReportHistory') + '</div>';
         }
 
         if (this.reportDownloadSummaryHost) {
-            this.reportDownloadSummaryHost.innerHTML = '<div class="history-empty">暂无下载历史。</div>';
+            this.reportDownloadSummaryHost.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.noDownloadHistory') + '</div>';
         }
     }
 
@@ -2993,7 +2994,7 @@ export class HistoryTrendAnalysisPanel {
                                     ? this.anomalySeriesHost
                                     : this.anomalyTrendHost;
             if (host) {
-                host.innerHTML = '<div class="history-empty">当前环境未加载 ECharts，无法渲染图表。</div>';
+                host.innerHTML = '<div class="history-empty">' + I18n.t('historytrend.echartsNotAvailable') + '</div>';
             }
             return null;
         }
@@ -3195,7 +3196,7 @@ export class HistoryTrendAnalysisPanel {
         this.stopAutoRefresh();
         if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
             if (this.refreshProgressElement) {
-                this.refreshProgressElement.textContent = '自动刷新已关闭。';
+                this.refreshProgressElement.textContent = I18n.t('historytrend.autoRefreshOff');
             }
             return;
         }
@@ -3232,7 +3233,7 @@ export class HistoryTrendAnalysisPanel {
         this.refreshCountdownTimer = window.setInterval(() => {
             this.refreshRemainSec = Math.max(0, this.refreshRemainSec - 1);
             if (this.refreshProgressElement) {
-                this.refreshProgressElement.textContent = `自动刷新中，${this.refreshRemainSec} 秒后刷新。`;
+                this.refreshProgressElement.textContent = I18n.t('historytrend.autoRefreshCountdown', { seconds: this.refreshRemainSec });
             }
             if (this.refreshRemainSec <= 0) {
                 this.refreshRemainSec = Math.floor(intervalSec);
@@ -3307,7 +3308,7 @@ export class HistoryTrendAnalysisPanel {
             this.statusElement.classList.add('is-error');
         }
         if (type === 'error' && this.lastRetryAction) {
-            this.statusElement.textContent = `${message}；可点击“重试”。`;
+            this.statusElement.textContent = I18n.t('historytrend.errorWithRetry', { message });
         }
     }
 

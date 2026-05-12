@@ -5,6 +5,7 @@
 
 import { ChartService, type VariogramModel } from '../services/ChartService';
 import { I18nDialog } from './I18nDialog.js';
+import { I18n } from '../utils/I18n';
 
 export interface VariogramChartConfig {
   container: HTMLElement;
@@ -717,7 +718,7 @@ export class VariogramChart {
 
     const selected = this.selectedModel ? this.data.models.get(this.selectedModel) : null;
     if (!selected) {
-      this.qualityPanel.innerHTML = '<span>拟合质量：暂无可用模型</span>';
+      this.qualityPanel.innerHTML = '<span>' + I18n.t('variogram.fitQualityNoModel') + '</span>';
       return;
     }
 

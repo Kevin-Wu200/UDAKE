@@ -86,7 +86,7 @@ describe('ParameterImpactPreview', () => {
 
         preview.clear();
         expect(preview.getLatest()).toBeNull();
-        expect(container.textContent).toContain('点击“生成预览”查看参数影响对比');
+        expect(container.textContent).toContain('点击"生成预览"查看参数影响对比');
 
         canvasMock.restore();
     });

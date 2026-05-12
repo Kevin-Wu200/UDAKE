@@ -3,6 +3,8 @@
  * 用于快速对比参数配置对精度、耗时和内存的影响
  */
 
+import { I18n } from '../utils/I18n';
+
 export interface KrigingPreviewConfig {
     'grid-resolution': number;
     nlags: number;
@@ -50,12 +52,12 @@ export class ParameterImpactPreview {
 
         const title = document.createElement('span');
         title.className = 'parameter-impact-title';
-        title.textContent = '参数影响预览';
+        title.textContent = I18n.t('parameterimpact.title');
 
         const exportBtn = document.createElement('button');
         exportBtn.type = 'button';
         exportBtn.className = 'btn btn-secondary parameter-impact-export';
-        exportBtn.textContent = '导出预览图';
+        exportBtn.textContent = I18n.t('parameterimpact.exportPreview');
         exportBtn.addEventListener('click', () => this.exportLatestPreviewImage());
 
         toolbar.appendChild(title);
@@ -217,7 +219,7 @@ export class ParameterImpactPreview {
 
         const latest = this.getLatest();
         if (!latest) {
-            this.summaryContainer.innerHTML = '<span class="parameter-impact-empty">点击“生成预览”查看参数影响对比</span>';
+            this.summaryContainer.innerHTML = '<span class="parameter-impact-empty">' + I18n.t('parameterimpact.clickToGenerate') + '</span>';
             return;
         }
 

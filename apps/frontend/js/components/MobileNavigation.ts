@@ -4,6 +4,7 @@
  */
 
 import './config/主题变量';
+import { I18n } from '../utils/I18n';
 import VirtualList, { type VirtualListOptions } from './VirtualList';
 import { RuntimeLifecycle, type LifecycleScope } from '../utils/RuntimeLifecycle';
 import { Logger } from '../utils/Logger';
@@ -102,7 +103,7 @@ class MobileNavigation {
             <span class="hamburger-line"></span>
             <span class="hamburger-line"></span>
         `;
-        hamburger.setAttribute('aria-label', '打开菜单');
+        hamburger.setAttribute('aria-label', I18n.t('mobilenavigation.openMenu'));
         hamburger.setAttribute('aria-expanded', 'false');
 
         headerLeft.appendChild(hamburger);

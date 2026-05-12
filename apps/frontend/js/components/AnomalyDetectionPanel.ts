@@ -1,3 +1,4 @@
+import { I18n } from '../utils/I18n';
 import type { IAPIService } from '../../types/api';
 
 type SeverityLevel = 'high' | 'medium' | 'low';
@@ -400,9 +401,9 @@ export class AnomalyDetectionPanel {
         const series = this.extractSeriesData(dataSource);
         this.seriesCache = series;
         if (series.length < 2) {
-            host.innerHTML = '<div class="status-message">暂无可用于时间序列可视化的数据</div>';
+            host.innerHTML = '<div class="status-message">' + I18n.t('anomaly.noTimeSeriesData') + '</div>';
             legend.innerHTML = '';
-            summary.textContent = '请先执行检测，或检查输入 values 是否为有效数值数组。';
+            summary.textContent = I18n.t('anomaly.runDetectionFirst');
             windowHost.innerHTML = '';
             return;
         }
@@ -1073,7 +1074,7 @@ export class AnomalyDetectionPanel {
         try {
             const selectedModels = this.getSelectedCompareModels();
             if (selectedModels.length < 2) {
-                summary.textContent = '请至少选择两个模型后再运行对比。';
+                summary.textContent = I18n.t('anomaly.selectTwoModels');
                 metricsHost.innerHTML = '';
                 consistencyHost.innerHTML = '';
                 tableHost.innerHTML = '';
@@ -1091,7 +1092,7 @@ export class AnomalyDetectionPanel {
                 'vae') as CompareModelName;
 
             this.setStatus(`正在对比 ${selectedModels.length} 个异常检测模型...`, 'loading');
-            summary.textContent = '正在运行模型对比，请稍候...';
+            summary.textContent = I18n.t('anomaly.modelComparisonRunning');
 
             const requests = selectedModels.map(async (model) => {
                 const response = await this.apiService.predictAnomaly({
@@ -1146,7 +1147,7 @@ export class AnomalyDetectionPanel {
             )}%。`;
             this.setStatus('异常检测结果对比完成', 'success');
         } catch (error) {
-            summary.textContent = '模型对比失败，请检查输入参数或后端服务状态。';
+            summary.textContent = I18n.t('anomaly.modelComparisonFailed');
             this.setStatus(`对比失败：${error instanceof Error ? error.message : String(error)}`, 'error');
         }
     }

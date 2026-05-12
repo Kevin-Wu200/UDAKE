@@ -1,3 +1,5 @@
+import { I18n } from '../utils/I18n';
+
 export interface TimeSliderEvents {
     onTimeChange?: (timestamp: string, index: number) => void;
     onPlayStateChange?: (playing: boolean) => void;
@@ -106,7 +108,7 @@ export class TimeSlider {
         this.playing = !this.playing;
         const playBtn = this.container.querySelector('#st-time-play') as HTMLButtonElement | null;
         if (playBtn) {
-            playBtn.textContent = this.playing ? '暂停' : '▶';
+            playBtn.textContent = this.playing ? I18n.t('timeslider.pause') : '▶';
         }
 
         if (this.playing) {

@@ -8,6 +8,8 @@ export interface AuthUserInfo {
     role: string;
     permissions?: string[];
     product_key_id?: number | null;
+    product_key?: string | null;
+    key_status?: string;
 }
 
 export interface ProductKeyInfo {
@@ -27,6 +29,8 @@ interface AuthLoginResult {
         email: string;
         role: string;
         permissions?: string[];
+        product_key?: string | null;
+        key_status?: string;
     };
 }
 
@@ -126,6 +130,8 @@ export class AuthService {
             role: data.user_info.role,
             permissions: data.user_info.permissions || [],
             product_key_id: null,
+            product_key: data.user_info.product_key || null,
+            key_status: data.user_info.key_status || 'unused',
         };
         this.persistAuthSession(data.access_token, data.refresh_token, userInfo, this.getStoredProductKeyInfo());
         return data;
@@ -176,6 +182,8 @@ export class AuthService {
             email: string;
             role: string;
             product_key_id: number | null;
+            product_key?: string | null;
+            key_status?: string;
             product_key_info?: ProductKeyInfo | null;
         }>('/auth/me', {
             method: 'GET',
@@ -191,6 +199,8 @@ export class AuthService {
             email: data.email,
             role: data.role,
             product_key_id: data.product_key_id,
+            product_key: data.product_key || null,
+            key_status: data.key_status || 'unused',
         };
         const productKeyInfo = data.product_key_info || null;
         this.persistAuthSession(accessToken, this.getRefreshToken(), user, productKeyInfo);

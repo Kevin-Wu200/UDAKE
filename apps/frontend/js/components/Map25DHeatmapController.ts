@@ -1,3 +1,4 @@
+import { I18n } from '../utils/I18n';
 import type { SamplingPoint } from '../../types/core';
 
 type MapMode = '2d' | '2.5d';
@@ -253,7 +254,7 @@ export class Map25DHeatmapController {
         const modeBtn = this.panel.querySelector('#mve-mode-btn') as HTMLButtonElement | null;
         modeBtn?.addEventListener('click', () => {
             this.mode = this.mode === '2d' ? '2.5d' : '2d';
-            modeBtn.textContent = this.mode === '2d' ? '切换 2.5D' : '切换 2D';
+            modeBtn.textContent = this.mode === '2d' ? I18n.t('heatmap.toggle3D') : I18n.t('heatmap.toggle2D');
         });
 
         const heatmapSwitch = this.panel.querySelector('#mve-heatmap-enabled') as HTMLInputElement | null;
@@ -291,7 +292,7 @@ export class Map25DHeatmapController {
         const playBtn = this.panel.querySelector('#mve-play-time') as HTMLButtonElement | null;
         playBtn?.addEventListener('click', () => {
             this.heatmap.autoPlay = !this.heatmap.autoPlay;
-            playBtn.textContent = this.heatmap.autoPlay ? '暂停时间轴' : '播放时间轴';
+            playBtn.textContent = this.heatmap.autoPlay ? I18n.t('heatmap.pauseTimeline') : I18n.t('heatmap.playTimeline');
         });
 
         const minFilterInput = this.panel.querySelector('#mve-filter-min') as HTMLInputElement | null;
@@ -687,7 +688,7 @@ export class Map25DHeatmapController {
         this.tooltip.style.display = 'block';
         this.tooltip.style.left = `${nearest.x + 10}px`;
         this.tooltip.style.top = `${nearest.y + 10}px`;
-        this.tooltip.innerHTML = `值: ${(nearest.point.value * 100).toFixed(1)}%<br/>点位: ${nearest.point.sourceId}`;
+        this.tooltip.innerHTML = I18n.t('heatmap.tooltipValuePoint', { value: (nearest.point.value * 100).toFixed(1), sourceId: nearest.point.sourceId });
     }
 
     private onMouseLeave(): void {
@@ -710,7 +711,7 @@ export class Map25DHeatmapController {
 
         const selected = this.panel.querySelector('#mve-selected');
         if (selected) {
-            selected.textContent = `选中 ${nearest.point.sourceId} 值 ${(nearest.point.value * 100).toFixed(1)}%`;
+            selected.textContent = I18n.t('heatmap.selectedPoint', { sourceId: nearest.point.sourceId, value: (nearest.point.value * 100).toFixed(1) });
         }
     }
 

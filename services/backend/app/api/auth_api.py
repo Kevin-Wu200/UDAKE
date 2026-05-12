@@ -87,6 +87,19 @@ class ChangeEmailVerifyRequest(BaseModel):
 
 
 def _find_user_product_key(service: Any, user_id: int) -> Optional[Dict[str, Any]]:
+    # 优先从 users 表的内存对象读取 product_key 和 key_status
+    user = service._users_by_id.get(user_id)  # noqa: SLF001
+    if user is not None and user.product_key and user.key_status == "active":
+        return {
+            "product_key": user.product_key,
+            "key_type": getattr(user, "role", "personal_standard"),
+            "status": user.key_status,
+            "total_quota": 0,
+            "used_count": 0,
+            "expires_at": None,
+        }
+
+    # 回退：从 ProductKey 注册表中查找（向后兼容旧数据）
     registry = getattr(service, "product_keys", None)
     records = getattr(registry, "_keys", {}) if registry else {}
     for record in records.values():
@@ -246,6 +259,8 @@ def get_current_user(request: Request):
                 "role": user.role,
                 "enterprise_id": getattr(user, "enterprise_id", None),
                 "product_key_id": getattr(user, "product_key_id", None),
+                "product_key": getattr(user, "product_key", None) or None,
+                "key_status": getattr(user, "key_status", None) or "unused",
                 "product_key_info": product_key_info,
             },
         )

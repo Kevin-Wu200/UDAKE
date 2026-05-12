@@ -5,6 +5,8 @@
 
 import './config/主题变量';
 
+import { I18n } from '../utils/I18n';
+
 interface Parameter {
     id: string;
     label: string;
@@ -165,7 +167,7 @@ class MobileParameterDrawer {
         // 创建标题
         const title = document.createElement('div');
         title.className = 'drawer-title';
-        title.textContent = '参数设置';
+        title.textContent = I18n.t('mobileparameterdrawer.title');
         title.style.cssText = `
             font-size: 18px;
             font-weight: 600;

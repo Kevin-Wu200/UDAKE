@@ -1,3 +1,4 @@
+import { I18n } from '../utils/I18n';
 import { ProductKeyService } from '../services/ProductKeyService.js';
 import { ExitHandler } from '../utils/ExitHandler.js';
 
@@ -143,7 +144,7 @@ export class KeyActivationModal {
             this.activateBtn.disabled = true;
             const mm = String(Math.floor(remain / 60)).padStart(2, '0');
             const ss = String(remain % 60).padStart(2, '0');
-            this.attemptsText.textContent = `已锁定，请在 ${mm}:${ss} 后重试`;
+            this.attemptsText.textContent = I18n.t('keyactivation.lockedRetryAfter', { minutes: mm, seconds: ss });
             this.attemptsText.classList.add('is-locked');
         };
         render();
@@ -165,12 +166,12 @@ export class KeyActivationModal {
 
     private renderAttempts(remaining: number): void {
         this.attemptsText.classList.remove('is-locked');
-        this.attemptsText.textContent = `剩余 ${Math.max(0, remaining)} 次尝试`;
+        this.attemptsText.textContent = I18n.t('keyactivation.remainingAttempts', { count: Math.max(0, remaining) });
     }
 
     private setLoading(loading: boolean): void {
         this.activateBtn.disabled = loading;
-        this.activateBtn.textContent = loading ? '激活中...' : '激活';
+        this.activateBtn.textContent = loading ? I18n.t('keyactivation.activating') : I18n.t('keyactivation.activate');
         this.overlay.classList.toggle('is-loading', loading);
     }
 

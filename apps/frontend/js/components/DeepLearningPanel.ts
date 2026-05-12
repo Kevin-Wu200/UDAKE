@@ -1,3 +1,4 @@
+import { I18n } from '../utils/I18n';
 import type { IAPIService } from '../../types/api';
 import { SpatialInterpolationPanel } from './SpatialInterpolationPanel.js';
 import { AnomalyDetectionPanel } from './AnomalyDetectionPanel.js';
@@ -110,7 +111,7 @@ export class DeepLearningPanel {
 
         const title = this.section.querySelector('.panel-title') as HTMLElement | null;
         if (title) {
-            title.textContent = this.isExpanded ? '深度学习 ▾' : '深度学习 ▸';
+            title.textContent = this.isExpanded ? I18n.t('deeplearning.titleCollapsed') : I18n.t('deeplearning.titleExpanded');
         }
     }
 
@@ -120,7 +121,7 @@ export class DeepLearningPanel {
         const detailEl = this.container.querySelector('#dl-health-detail') as HTMLElement | null;
 
         if (statusEl) {
-            statusEl.textContent = '深度学习服务状态：检测中...';
+            statusEl.textContent = I18n.t('deeplearning.statusChecking');
         }
         if (dotEl) {
             dotEl.className = 'dl-status-dot pending';
@@ -129,23 +130,23 @@ export class DeepLearningPanel {
         try {
             const health = await this.apiService.health();
             if (statusEl) {
-                statusEl.textContent = `深度学习服务状态：${health.status}（device: ${health.device}）`;
+                statusEl.textContent = I18n.t('deeplearning.statusHealthy', { status: health.status, device: health.device });
             }
             if (dotEl) {
                 dotEl.className = 'dl-status-dot online';
             }
             if (detailEl) {
-                detailEl.textContent = `模型注册数：${health.registered_models?.length ?? 0}，异常模型：${health.trained_anomaly_models?.length ?? 0}，RL模型：${health.trained_sampling_rl_models?.length ?? 0}`;
+                detailEl.textContent = I18n.t('deeplearning.modelStats', { registered: health.registered_models?.length ?? 0, anomaly: health.trained_anomaly_models?.length ?? 0, rl: health.trained_sampling_rl_models?.length ?? 0 });
             }
         } catch (error) {
             if (statusEl) {
-                statusEl.textContent = `深度学习服务状态：不可用 (${error instanceof Error ? error.message : String(error)})`;
+                statusEl.textContent = I18n.t('deeplearning.statusUnavailable', { reason: error instanceof Error ? error.message : String(error) });
             }
             if (dotEl) {
                 dotEl.className = 'dl-status-dot offline';
             }
             if (detailEl) {
-                detailEl.textContent = '请确认后端已启动且 /api/dl 路由可访问。';
+                detailEl.textContent = I18n.t('deeplearning.checkBackend');
             }
         }
     }

@@ -1,4 +1,6 @@
 import { APIService } from '../../services/API封装.js';
+import { I18n } from '../../utils/I18n';
+import { I18n } from '../../utils/I18n';
 import type { PanelConfig, PanelField, PanelOperation } from './ConfigurableApiPanel.js';
 import { panelConfigs } from './panelConfigs.js';
 
@@ -72,11 +74,11 @@ export class ModelFusionPanel {
 
         this.mfStatusElement = document.createElement('div');
         this.mfStatusElement.className = 'status-message';
-        this.mfStatusElement.textContent = '可执行融合任务后自动生成高级可视化（饼图/性能对比/趋势/决策树）。';
+        this.mfStatusElement.textContent = I18n.t('modelfusion.fusionTaskDescription');
 
         this.mfResultElement = document.createElement('pre');
         this.mfResultElement.className = 'integration-result';
-        this.mfResultElement.textContent = '等待操作...';
+        this.mfResultElement.textContent = I18n.t('modelfusion.waitingForOperation');
 
         const visualGrid = document.createElement('div');
         visualGrid.className = 'fusion-visual-grid';
@@ -801,7 +803,7 @@ export class ModelFusionPanel {
 
         const rows = Object.entries(weights).sort((a, b) => b[1] - a[1]);
         if (rows.length === 0) {
-            body.innerHTML = '<p class="fusion-viz-empty">未检测到权重字段。</p>';
+            body.innerHTML = '<p class="fusion-viz-empty">' + I18n.t('modelfusion.noWeightFields') + '</p>';
             return;
         }
 
@@ -846,7 +848,7 @@ export class ModelFusionPanel {
         }
 
         if (performanceRows.length === 0) {
-            body.innerHTML = '<p class="fusion-viz-empty">暂无可用于对比的子模型性能数据。</p>';
+            body.innerHTML = '<p class="fusion-viz-empty">' + I18n.t('modelfusion.noSubModelPerformanceData') + '</p>';
             return;
         }
 
@@ -884,7 +886,7 @@ export class ModelFusionPanel {
         }
 
         if (trendSeries.length < 2) {
-            body.innerHTML = '<p class="fusion-viz-empty">暂无可绘制趋势的数据序列。</p>';
+            body.innerHTML = '<p class="fusion-viz-empty">' + I18n.t('modelfusion.noTrendDataSeries') + '</p>';
             return;
         }
 
