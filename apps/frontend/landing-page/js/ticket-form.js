@@ -389,12 +389,20 @@
 
     function validateOrganization(industry, organization) {
         // 校验所属单位：结合选择的"所处行业"校验合法性
+        if (!organization || !organization.toString().trim()) return false;
+        const org = organization.toString().trim();
+
         if (industry === '教育') {
-            return organization.includes('学院') || organization.includes('大学') || 
-                   organization.toLowerCase().includes('university') || organization.toLowerCase().includes('college');
+            // 教育行业常见单位名包含：学院、大学、所、研究所、系；同时支持常见英文形式
+            const zhKeywords = ['学院', '大学', '所', '研究所', '系'];
+            const enKeywords = ['university', 'college', 'institute', 'school', 'research'];
+            const lower = org.toLowerCase();
+            return zhKeywords.some(k => org.includes(k)) || enKeywords.some(k => lower.includes(k));
         } else {
+            // 其他行业接受常见公司/机构类型中英文关键词
             const keywords = ['集团', '公司', '局', '中心', '院', '所', 'group', 'company', 'corp', 'inc', 'center', 'institute', 'department'];
-            return keywords.some(k => organization.toLowerCase().includes(k));
+            const lower = org.toLowerCase();
+            return keywords.some(k => lower.includes(k));
         }
     }
     
