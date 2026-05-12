@@ -921,7 +921,6 @@ const ZH_CN: LocaleMessages = {
     'interpolation.querySampleStats': '查询点={queryCount} | 样本点={sampleCount} | 最大权重={maxWeight}',
     'interpolation.runPredictionFirst': '请先执行预测',
     'interpolation.errorSummary': 'MAE={mae} | RMSE={rmse} | MaxAbs={maxAbs}',
-    'interpolation.errorSummary': 'MAE={mae} | RMSE={rmse} | MaxAbs={maxAbs}',
     'interpolation.spatialStats': '样本={sampleCount} | 查询={queryCount} | 值域=[{min}, {max}]',
     'keyactivation.activating': '激活中...',
     'keyactivation.activate': '激活',

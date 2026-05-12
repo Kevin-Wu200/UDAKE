@@ -8,7 +8,6 @@ import { ConfirmDialog } from '../ConfirmDialog.js';
 import notificationManager from '../NotificationManager.js';
 import { SkeletonLoader } from '../../utils/SkeletonLoader.js';
 import { I18n } from '../../utils/I18n';
-import { I18n } from '../../utils/I18n';
 
 interface SnapshotLocalState {
     labelOverrides: Record<string, string>;

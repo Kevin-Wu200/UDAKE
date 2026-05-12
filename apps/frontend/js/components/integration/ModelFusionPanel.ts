@@ -1,6 +1,5 @@
 import { APIService } from '../../services/API封装.js';
 import { I18n } from '../../utils/I18n';
-import { I18n } from '../../utils/I18n';
 import type { PanelConfig, PanelField, PanelOperation } from './ConfigurableApiPanel.js';
 import { panelConfigs } from './panelConfigs.js';
 
