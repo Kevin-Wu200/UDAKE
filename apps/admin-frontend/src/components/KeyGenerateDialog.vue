@@ -35,8 +35,8 @@
     </el-form>
 
     <template #footer>
-      <el-button @click="handleClose">{{ tc('cancel') }}</el-button>
-      <el-button type="primary" :loading="loading" :disabled="createDisabledByQuota" @click="handleConfirm">{{ tc('confirm') }}</el-button>
+      <el-button @click="handleClose">{{ tc('dialogCancel') }}</el-button>
+      <el-button type="primary" :loading="loading" :disabled="createDisabledByQuota" @click="handleConfirm">{{ tc('dialogConfirm') }}</el-button>
     </template>
   </el-dialog>
 </template>

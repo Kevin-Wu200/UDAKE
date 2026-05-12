@@ -3,19 +3,32 @@
     <el-card>
       <template #header>
         <div class="header">
-          <span>工单详情 #{{ ticketStore.currentTicket.id }}</span>
-          <el-button @click="$router.back()">返回</el-button>
+          <span>{{ tc('ticketDetail', {ticketId: ticketStore.currentTicket.ticket_id}) }}</span>
+          <el-button @click="$router.back()" style="margin-left: 25px;">{{ tc('back') }}</el-button>
         </div>
       </template>
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="状态"><StatusTag :status="ticketStore.currentTicket.status" /></el-descriptions-item>
-        <el-descriptions-item label="类型">{{ ticketStore.currentTicket.type === 'key_request' ? '申请' : '延期' }}</el-descriptions-item>
-        <el-descriptions-item label="申请人">{{ ticketStore.currentTicket.applicant_email }}</el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ ticketStore.currentTicket.created_at }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('ticketId')">{{ ticketStore.currentTicket.ticket_id }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('status')"><StatusTag :status="ticketStore.currentTicket.status" /></el-descriptions-item>
+        <el-descriptions-item :label="tc('type')">{{ ticketStore.currentTicket.ticket_type === 'key_request' ? tc('keyRequest') : tc('keyExtension') }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('email')">{{ ticketStore.currentTicket.email }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('phone')">{{ ticketStore.currentTicket.phone }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('industry')">{{ ticketStore.currentTicket.industry }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('organization')">{{ ticketStore.currentTicket.organization }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('usagePurpose')" :span="2">{{ ticketStore.currentTicket.usage_purpose }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('keyType')">{{ ticketStore.currentTicket.key_type }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('existingKey')">{{ ticketStore.currentTicket.existing_key || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('assignedKey')">{{ ticketStore.currentTicket.assigned_key || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('responseMessage')" :span="2">{{ ticketStore.currentTicket.response_message || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('approvalNotes')" :span="2">{{ ticketStore.currentTicket.approval_notes || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('processedBy')">{{ ticketStore.currentTicket.processed_by ?? tc('notProcessed') }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('processedAt')">{{ ticketStore.currentTicket.processed_at || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('createAt')">{{ ticketStore.currentTicket.created_at }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('updatedAt')">{{ ticketStore.currentTicket.updated_at }}</el-descriptions-item>
       </el-descriptions>
       <div v-if="ticketStore.currentTicket.status === 'pending'" class="actions">
-        <el-button type="primary" @click="openApprove">批准</el-button>
-        <el-button type="danger" @click="openReject">拒绝</el-button>
+        <el-button type="primary" @click="openApprove">{{ tc('approveTicket') }}</el-button>
+        <el-button type="danger" @click="openReject">{{ tc('rejectTicket') }}</el-button>
       </div>
     </el-card>
     <ApprovalDialog ref="approveDialog" type="approve" @confirm="onApprove" />
@@ -30,9 +43,11 @@ import { useTicketStore } from '../stores/ticket';
 import StatusTag from '../components/StatusTag.vue';
 import ApprovalDialog from '../components/ApprovalDialog.vue';
 import { ElMessage } from 'element-plus';
+import { useI18nText } from '../i18n/useI18n';
 
 const route = useRoute();
 const ticketStore = useTicketStore();
+const { tc } = useI18nText();
 const approveDialog = ref();
 const rejectDialog = ref();
 
@@ -43,14 +58,14 @@ const openReject = () => rejectDialog.value.open();
 
 const onApprove = async (notes: string) => {
   await ticketStore.approve(ticketStore.currentTicket!.id, notes);
-  ElMessage.success('批准成功');
+  ElMessage.success(tc('approveSuccess'));
   approveDialog.value.close();
   load();
 };
 
 const onReject = async (reason: string) => {
   await ticketStore.reject(ticketStore.currentTicket!.id, reason);
-  ElMessage.success('拒绝成功');
+  ElMessage.success(tc('rejectSuccess'));
   rejectDialog.value.close();
   load();
 };

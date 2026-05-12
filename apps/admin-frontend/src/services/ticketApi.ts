@@ -22,8 +22,8 @@ export async function getTickets(params: TicketListParams): Promise<{ total: num
 }
 
 export async function getTicket(ticketId: number): Promise<Ticket> {
-  const response = await http.get<BackendResponse<Ticket>>(`/tickets/${ticketId}`);
-  return response.data.data;
+  const response = await http.get<BackendResponse<{ ticket: Ticket }>>(`/tickets/${ticketId}`);
+  return response.data.data.ticket;
 }
 
 export async function approveTicket(ticketId: number, notes: string): Promise<void> {

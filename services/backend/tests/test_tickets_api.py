@@ -14,7 +14,7 @@ from sqlalchemy.pool import StaticPool
 
 from app.api.tickets_api import router as tickets_router
 from app.auth import get_auth_service, reset_auth_service
-from app.auth_db.models import AuditLog, Base, ProductKey, Ticket, User
+from app.auth_db.models import AuditLog, Base, Company, ProductKey, Ticket, User
 from app.auth_db.session import get_auth_db_session
 
 
@@ -33,6 +33,11 @@ def tickets_client(monkeypatch: pytest.MonkeyPatch):
     Base.metadata.create_all(engine)
 
     with SessionLocal() as db:
+        company = Company(
+            id=1,
+            name="某某测绘集团有限公司",
+            status="active",
+        )
         super_admin = User(
             id=1,
             username="root",
@@ -48,6 +53,7 @@ def tickets_client(monkeypatch: pytest.MonkeyPatch):
             password_hash="hash",
             role="admin",
             status="active",
+            company_id=1,
         )
         user = User(
             id=3,
@@ -70,6 +76,7 @@ def tickets_client(monkeypatch: pytest.MonkeyPatch):
         )
         pending_ticket = Ticket(
             id=200,
+            ticket_id="TKT-TEST0001",
             ticket_type="key_request",
             status="pending",
             email="owner@example.com",
@@ -78,8 +85,9 @@ def tickets_client(monkeypatch: pytest.MonkeyPatch):
             organization="某某测绘集团有限公司",
             usage_purpose="这是一个用于空间插值与不确定性分析平台测试的用途说明，确保超过十五个汉字。",
             key_type="personal_trial",
+            company_id=1,
         )
-        db.add_all([super_admin, admin, user, existing_key, pending_ticket])
+        db.add_all([company, super_admin, admin, user, existing_key, pending_ticket])
         db.commit()
 
     app = FastAPI()
@@ -136,14 +144,14 @@ def test_create_and_public_get_ticket(tickets_client):
     detail_resp = client.get(f"/api/tickets/{ticket_id}?email=applicant@example.com")
     assert detail_resp.status_code == 200, detail_resp.text
     ticket = detail_resp.json()["data"]["ticket"]
-    assert ticket["id"] == ticket_id
+    assert ticket["ticket_id"] == ticket_id
     assert "processed_by" not in ticket
 
     with session_factory() as db:
-        stored = db.query(Ticket).filter(Ticket.id == ticket_id).one()
+        stored = db.query(Ticket).filter(Ticket.ticket_id == ticket_id).one()
         assert stored.email == "applicant@example.com"
         assert stored.status == "pending"
-        assert db.query(AuditLog).filter(AuditLog.target_id == str(ticket_id)).count() >= 2
+        assert db.query(AuditLog).filter(AuditLog.target_id == str(stored.id)).count() >= 2
 
 
 def test_create_ticket_validates_existing_key_requirement(tickets_client):
@@ -211,6 +219,7 @@ def test_approve_key_extension_extends_expiry(tickets_client):
     with session_factory() as db:
         ticket = Ticket(
             id=201,
+            ticket_id="TKT-TEST0002",
             ticket_type="key_extension",
             status="pending",
             email="member@example.com",
@@ -245,6 +254,7 @@ def test_reject_ticket_requires_reason_and_updates_status(tickets_client):
     with session_factory() as db:
         ticket = Ticket(
             id=202,
+            ticket_id="TKT-TEST0003",
             ticket_type="key_request",
             status="pending",
             email="reject@example.com",

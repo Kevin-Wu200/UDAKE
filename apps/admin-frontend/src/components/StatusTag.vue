@@ -5,8 +5,10 @@
 <script setup lang="ts">
 import type { TagProps } from 'element-plus';
 import { computed } from 'vue';
+import { useI18nText } from '../i18n/useI18n';
 
 const props = defineProps<{ status: 'pending' | 'approved' | 'rejected' | 'completed' }>();
+const { tc } = useI18nText();
 
 const tagType = computed<TagProps['type']>(() => {
   switch (props.status) {
@@ -20,10 +22,10 @@ const tagType = computed<TagProps['type']>(() => {
 
 const statusLabel = computed(() => {
   switch (props.status) {
-    case 'pending': return '待处理';
-    case 'approved': return '已批准';
-    case 'rejected': return '已拒绝';
-    case 'completed': return '已完成';
+    case 'pending': return tc('pending');
+    case 'approved': return tc('approved');
+    case 'rejected': return tc('rejected');
+    case 'completed': return tc('completed');
     default: return props.status;
   }
 });

@@ -302,10 +302,29 @@ def validate_organization(industry: str, organization: str) -> bool:
         return any(keyword in org_lower for keyword in keywords)
 
 
-def verify_ticket_access(ticket_id: int, email: str, db: Session) -> Ticket:
-    ticket = db.query(Ticket).filter(Ticket.id == ticket_id).one_or_none()
+def _resolve_ticket(ticket_id_str: str, db: Session) -> Ticket:
+    """根据传入的工单标识符查询工单。
+    
+    支持两种格式：
+    - 以 TKT- 开头：按 ticket_id 字段查询（面向公众查询）
+    - 纯数字：按 id 主键查询（面向管理后台）
+    """
+    if ticket_id_str.upper().startswith("TKT-"):
+        ticket = db.query(Ticket).filter(Ticket.ticket_id == ticket_id_str).one_or_none()
+    else:
+        try:
+            numeric_id = int(ticket_id_str)
+        except ValueError:
+            raise _fail(status.HTTP_404_NOT_FOUND, "工单不存在（无效的工单ID格式）")
+        ticket = db.query(Ticket).filter(Ticket.id == numeric_id).one_or_none()
     if not ticket:
         raise _fail(status.HTTP_404_NOT_FOUND, "工单不存在")
+    return ticket
+
+
+def verify_ticket_access(ticket_id_str: str, email: str, db: Session) -> Ticket:
+    """公开查询：通过 ticket_id（TKT-XXXXXXXX 格式）和邮箱验证访问权限。"""
+    ticket = _resolve_ticket(ticket_id_str, db)
     if ticket.email.lower() != validate_email(email):
         raise _fail(status.HTTP_403_FORBIDDEN, "邮箱验证失败，无权访问该工单")
     return ticket
@@ -580,7 +599,7 @@ def create_ticket(
             user=None,
             request=request,
             operation_type="create",
-            target_id=ticket.ticket_id,
+            target_id=str(ticket.id),
             success=True,
             details={"ticket_id": ticket.ticket_id, "ticket_type": ticket_type, "email": email, "key_type": key_type},
         )
@@ -677,33 +696,70 @@ def list_tickets(
 @router.get(
     "/{ticket_id}",
     summary="查询单个工单",
-    description="公开查询接口，需使用创建工单时填写的邮箱作为身份校验条件。",
+    description="支持两种认证方式：1) 管理员 Bearer Token 认证（无需邮箱）；2) 邮箱公开查询。",
     responses={
-        403: {"description": "邮箱校验失败"},
+        400: {"description": "缺少邮箱参数且未提供管理员Token"},
+        401: {"description": "Token无效"},
+        403: {"description": "邮箱校验失败或无权限"},
         404: {"description": "工单不存在"},
         500: {"description": "服务器内部错误"},
     },
 )
 def get_ticket(
-    ticket_id: int,
+    ticket_id: str,
     request: Request,
-    email: str = Query(..., description="邮箱，用于身份验证"),
+    email: Optional[str] = Query(default=None, description="邮箱，用于公开查询的身份验证，管理员Token认证时可不填"),
     db: Session = Depends(get_auth_db_session),
 ) -> Dict[str, Any]:
     try:
-        ticket = verify_ticket_access(ticket_id, email, db)
-        _record_audit_log(
-            db,
-            user=None,
-            request=request,
-            operation_type="read",
-            target_id=str(ticket.id),
-            success=True,
-            details={"scope": "detail", "email": validate_email(email)},
-        )
-        db.commit()
-        logger.info("查询工单详情成功 ticket_id=%s", ticket.id)
-        return success_response("工单详情查询成功", {"ticket": generate_ticket_response(ticket, hide_processor=True)})
+        # 尝试通过 Bearer Token 认证（管理员可直接查看工单）
+        current_user = None
+        auth_header = request.headers.get("authorization", "")
+        if auth_header.startswith("Bearer "):
+            try:
+                current_user = _get_authenticated_user(request, db)
+                if current_user.role not in {"super_admin", "admin"}:
+                    # 非管理员角色，降级为邮箱校验
+                    current_user = None
+            except HTTPException:
+                # Token 无效，降级为邮箱校验
+                current_user = None
+
+        if current_user is not None:
+            # 管理员 Token 认证：直接查询工单（支持 TKT-XXXXXXXX 格式或数字ID）
+            ticket = _resolve_ticket(ticket_id, db)
+            # 非超级管理员只能查看自己公司的工单
+            if current_user.role != "super_admin" and ticket.company_id != current_user.company_id:
+                raise _fail(status.HTTP_403_FORBIDDEN, "无权访问该工单")
+            _record_audit_log(
+                db,
+                user=current_user,
+                request=request,
+                operation_type="read",
+                target_id=str(ticket.id),
+                success=True,
+                details={"scope": "detail", "auth": "token", "user_id": current_user.id},
+            )
+            db.commit()
+            logger.info("管理员查询工单详情 user_id=%s ticket_id=%s", current_user.id, ticket.id)
+            return success_response("工单详情查询成功", {"ticket": generate_ticket_response(ticket, hide_processor=False)})
+        else:
+            # 邮箱公开查询
+            if not email:
+                raise _fail(status.HTTP_400_BAD_REQUEST, "请提供邮箱参数，或使用管理员Token认证")
+            ticket = verify_ticket_access(ticket_id, email, db)
+            _record_audit_log(
+                db,
+                user=None,
+                request=request,
+                operation_type="read",
+                target_id=str(ticket.id),
+                success=True,
+                details={"scope": "detail", "email": validate_email(email)},
+            )
+            db.commit()
+            logger.info("公开查询工单详情成功 ticket_id=%s", ticket.id)
+            return success_response("工单详情查询成功", {"ticket": generate_ticket_response(ticket, hide_processor=True)})
     except HTTPException:
         db.rollback()
         raise

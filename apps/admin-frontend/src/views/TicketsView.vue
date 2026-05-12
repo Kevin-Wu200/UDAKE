@@ -17,10 +17,10 @@
 
     <el-table v-loading="ticketStore.loading" :data="ticketStore.tickets" border style="width: 100%">
       <el-table-column prop="id" label="ID" width="80" />
-      <el-table-column prop="type" :label="tc('type')">
-        <template #default="{ row }">{{ row.type === 'key_request' ? tc('keyRequest') : tc('keyExtension') }}</template>
+      <el-table-column prop="ticket_type" :label="tc('type')">
+        <template #default="{ row }">{{ row.ticket_type === 'key_request' ? tc('keyRequest') : tc('keyExtension') }}</template>
       </el-table-column>
-      <el-table-column prop="applicant_email" :label="tc('applicant')" />
+      <el-table-column prop="email" :label="tc('applicant')" />
       <el-table-column prop="status" :label="tc('status')">
         <template #default="{ row }"><StatusTag :status="row.status" /></template>
       </el-table-column>
@@ -49,7 +49,7 @@
 
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRouter, useRoute } from 'vue-router';
 import { useTicketStore } from '../stores/ticket';
 import StatusTag from '../components/StatusTag.vue';
 import ApprovalDialog from '../components/ApprovalDialog.vue';
@@ -59,6 +59,7 @@ import { useI18nText } from '../i18n/useI18n';
 
 const { tc } = useI18nText();
 const router = useRouter();
+const route = useRoute();
 const ticketStore = useTicketStore();
 const filters = reactive<{
   status?: TicketListParams['status'];
@@ -74,7 +75,13 @@ const loadData = () => {
   ticketStore.fetchTickets({ ...pagination, ...filters });
 };
 
-const viewDetail = (id: number) => router.push(`/admin/tickets/${id}`);
+const viewDetail = (id: number) => {
+  if (route.name === 'enterprise-tickets') {
+    router.push({ name: 'enterprise-ticket-detail', params: { id } });
+  } else {
+    router.push({ name: 'ticket-detail', params: { id } });
+  }
+};
 
 const openApprove = (row: Ticket) => {
   currentActionTicket.value = row;

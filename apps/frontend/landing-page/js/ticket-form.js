@@ -222,7 +222,9 @@
             const response = await fetch(`/api/tickets/${queryId}?email=${encodeURIComponent(queryEmail)}`);
             
             if (response.ok) {
-                const data = await response.json();
+                const result = await response.json();
+                // 后端返回格式: { success: true, data: { ticket: {...} } }
+                const data = result.data?.ticket || result;
                 displayQueryResult(data);
             } else {
                 resultArea.innerHTML = '<p class="error-msg" style="display:block">未找到相关工单或信息不匹配</p>';
@@ -273,8 +275,8 @@
                 <p><strong>工单 ID:</strong> ${data.ticket_id}</p>
                 <p><strong>状态:</strong> <span class="status-badge ${status.class}">${status.text}</span></p>
                 <p><strong>创建时间:</strong> ${data.created_at}</p>
-                ${data.api_key ? `<p><strong>密钥:</strong> <code>${data.api_key}</code></p>` : ''}
-                ${data.reject_reason ? `<p><strong>拒绝原因:</strong> ${data.reject_reason}</p>` : ''}
+                ${data.assigned_key ? `<p><strong>密钥:</strong> <code>${data.assigned_key}</code></p>` : ''}
+                ${data.response_message ? `<p><strong>拒绝原因/备注:</strong> ${data.response_message}</p>` : ''}
             </div>
         `;
         resultArea.classList.remove('hidden');
