@@ -215,7 +215,7 @@
         const resultArea = document.getElementById('queryResultArea');
         
         try {
-            resultArea.innerHTML = '<p>查询中...</p>';
+            resultArea.innerHTML = `<p>${t('ticket.queryResult.searching')}</p>`;
             resultArea.classList.remove('hidden');
             
             // 模拟 API 调用
@@ -227,17 +227,11 @@
                 const data = result.data?.ticket || result;
                 displayQueryResult(data);
             } else {
-                resultArea.innerHTML = '<p class="error-msg" style="display:block">未找到相关工单或信息不匹配</p>';
+                resultArea.innerHTML = `<p class="error-msg" style="display:block">${t('ticket.queryResult.notFound')}</p>`;
             }
         } catch (e) {
             console.error('Query error:', e);
-            // 模拟数据
-            displayQueryResult({
-                ticket_id: queryId,
-                status: 'pending',
-                created_at: new Date().toLocaleString(),
-                ticket_type: 'key_request'
-            });
+            resultArea.innerHTML = `<p class="error-msg" style="display:block">${t('ticket.queryResult.notFound')}</p>`;
         }
     }
 
@@ -259,24 +253,55 @@
         setTimeout(() => errorDiv.remove(), 5000);
     }
     
+    // 获取 i18n 翻译
+    function t(key) {
+        if (window.UDAKEI18N) {
+            const lang = window.UDAKEI18N.getCurrentLanguage();
+            // 从 translations 字典获取
+            const dict = (window.UDAKEI18N._translations || {})[lang] || {};
+            return key.split('.').reduce((obj, k) => (obj && obj[k] !== undefined ? obj[k] : null), dict) || key;
+        }
+        return key;
+    }
+
     // 显示查询结果
     function displayQueryResult(data) {
         const resultArea = document.getElementById('queryResultArea');
-        const statusMap = {
-            'pending': { text: '待处理', class: 'status-pending' },
-            'completed': { text: '已完成', class: 'status-completed' },
-            'rejected': { text: '已拒绝', class: 'status-rejected' }
+        
+        // 状态样式映射
+        const statusClassMap = {
+            'pending': 'status-pending',
+            'approved': 'status-approved',
+            'completed': 'status-completed',
+            'rejected': 'status-rejected'
         };
+        const statusClass = statusClassMap[data.status] || '';
+        const statusText = t('ticket.queryResult.statusMap.' + data.status) || data.status;
         
-        const status = statusMap[data.status] || { text: data.status, class: '' };
+        // 密钥类型本地化
+        const keyTypeText = t('ticket.queryResult.keyTypeMap.' + data.key_type) || data.key_type || '';
         
+        // 根据状态决定备注标签：拒绝显示"拒绝原因"，其他显示"备注/处理结果"
+        let remarkLabel = '';
+        let remarkContent = '';
+        if (data.response_message) {
+            if (data.status === 'rejected') {
+                remarkLabel = t('ticket.queryResult.rejectionReason');
+                remarkContent = data.response_message;
+            } else {
+                remarkLabel = t('ticket.queryResult.remark');
+                remarkContent = data.response_message;
+            }
+        }
+
         resultArea.innerHTML = `
             <div class="query-result">
-                <p><strong>工单 ID:</strong> ${data.ticket_id}</p>
-                <p><strong>状态:</strong> <span class="status-badge ${status.class}">${status.text}</span></p>
-                <p><strong>创建时间:</strong> ${data.created_at}</p>
-                ${data.assigned_key ? `<p><strong>密钥:</strong> <code>${data.assigned_key}</code></p>` : ''}
-                ${data.response_message ? `<p><strong>拒绝原因/备注:</strong> ${data.response_message}</p>` : ''}
+                <p><strong>${t('ticket.queryResult.ticketId')}:</strong> ${data.ticket_id}</p>
+                <p><strong>${t('ticket.queryResult.status')}:</strong> <span class="status-badge ${statusClass}">${statusText}</span></p>
+                <p><strong>${t('ticket.queryResult.created')}:</strong> ${data.created_at}</p>
+                ${keyTypeText ? `<p><strong>${t('ticket.queryResult.keyType')}:</strong> ${keyTypeText}</p>` : ''}
+                ${data.assigned_key ? `<p><strong>${t('ticket.queryResult.key')}:</strong> <code>${data.assigned_key}</code></p>` : ''}
+                ${remarkContent ? `<p><strong>${remarkLabel}:</strong> ${remarkContent}</p>` : ''}
             </div>
         `;
         resultArea.classList.remove('hidden');

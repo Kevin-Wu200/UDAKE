@@ -1136,6 +1136,22 @@ class SmartWorkflowService:
             pool_size=current.pool_size,
         )
         self._email_service.update_smtp_settings(next_settings)
+
+        # 同步更新工单邮件服务，确保审批通知邮件能使用已配置的SMTP发送
+        try:
+            from ..utils.email_service import ticket_email_service
+            ticket_email_service.update_settings(
+                host=next_settings.host,
+                port=next_settings.port,
+                username=next_settings.user,
+                password=next_settings.password,
+                use_tls=next_settings.use_tls,
+                use_ssl=next_settings.use_ssl,
+                email_from=next_settings.user,
+            )
+        except Exception:
+            logger.exception("同步工单邮件服务SMTP配置失败")
+
         return self._email_service.get_smtp_config(masked=True)
 
     def validate_smtp_configuration(

@@ -281,6 +281,29 @@
           idPlaceholder: "请输入工单 ID",
           emailPlaceholder: "请输入申请时填写的邮箱",
           btn: "查询"
+        },
+        queryResult: {
+          ticketId: "工单 ID",
+          status: "状态",
+          created: "创建时间",
+          key: "分配的密钥",
+          keyType: "密钥类型",
+          rejectionReason: "拒绝原因",
+          remark: "备注 / 处理结果",
+          notFound: "未找到相关工单或信息不匹配",
+          searching: "查询中...",
+          statusMap: {
+            pending: "待处理",
+            approved: "已批准",
+            rejected: "已拒绝",
+            completed: "已完成"
+          },
+          keyTypeMap: {
+            personal_trial: "个人试用版",
+            personal_standard: "个人标准版",
+            enterprise_trial: "企业试用版",
+            enterprise_standard: "企业标准版"
+          }
         }
       },
     },
@@ -604,6 +627,29 @@
           idPlaceholder: "Enter your Ticket ID",
           emailPlaceholder: "Enter the email used for application",
           btn: "Query"
+        },
+        queryResult: {
+          ticketId: "Ticket ID",
+          status: "Status",
+          created: "Created",
+          key: "Assigned Key",
+          keyType: "Key Type",
+          rejectionReason: "Rejection Reason",
+          remark: "Remarks / Result",
+          notFound: "Ticket not found or information does not match",
+          searching: "Searching...",
+          statusMap: {
+            pending: "Pending",
+            approved: "Approved",
+            rejected: "Rejected",
+            completed: "Completed"
+          },
+          keyTypeMap: {
+            personal_trial: "Personal Trial",
+            personal_standard: "Personal Standard",
+            enterprise_trial: "Enterprise Trial",
+            enterprise_standard: "Enterprise Standard"
+          }
         }
       },
     },
@@ -721,5 +767,6 @@
     toggleLanguage: toggleLanguage,
     getCurrentLanguage: getCurrentLanguage,
     init: init,
+    _translations: translations,
   };
 })();

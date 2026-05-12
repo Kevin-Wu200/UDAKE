@@ -33,6 +33,14 @@ PRODUCT_KEY_TYPES = {
     "enterprise_trial",
     "enterprise_standard",
 }
+
+# 密钥类型的中文显示名称映射
+KEY_TYPE_DISPLAY_NAMES = {
+    "personal_trial": "个人试用版",
+    "personal_standard": "个人标准版",
+    "enterprise_trial": "企业试用版",
+    "enterprise_standard": "企业标准版",
+}
 _DIGEST_INFO_SHA256_PREFIX = bytes.fromhex("3031300d060960864801650304020105000420")
 _ADMIN_RSA_N = int(
     "108644163298684185968680396944903067290814949464415306645182857358122199241528367130765515403781105"
@@ -46,9 +54,7 @@ _ADMIN_RSA_D = int(
     "444536529318902547281630975310580646401209487762487120996819065058041336924603321362037892551086296"
     "64759349273"
 )
-from ..utils.email_service import EmailService
-
-email_service = EmailService()
+from ..utils.email_service import ticket_email_service as email_service
 _key_registry = ProductKeyRegistry()
 
 
@@ -448,7 +454,8 @@ def handle_key_request(ticket: Ticket, db: Session) -> str:
     db.add(product_key)
     db.flush()
     ticket.assigned_key = normalized_key
-    ticket.response_message = f"工单已审批通过，已为您分配新的{ticket.key_type}密钥。"
+    key_display = KEY_TYPE_DISPLAY_NAMES.get(ticket.key_type, ticket.key_type)
+    ticket.response_message = f"工单已审批通过，已为您分配新的{key_display}密钥。"
     logger.info("工单审批生成新密钥 ticket_id=%s product_key_id=%s", ticket.id, product_key.id)
     return normalized_key
 
