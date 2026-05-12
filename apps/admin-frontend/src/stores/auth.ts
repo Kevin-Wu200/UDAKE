@@ -39,13 +39,15 @@ function getInitialAccessToken() {
 }
 
 function normalizeUser(payload: UserSessionPayload): AuthUser {
+  const enterpriseId = payload.user.enterpriseId ?? null;
   return {
     username: payload.user.username,
     userId: payload.user.userId,
     email: payload.user.email,
     role: payload.user.role,
     permissions: payload.user.permissions,
-    enterpriseId: payload.user.enterpriseId ?? null
+    enterpriseId,
+    companyId: enterpriseId
   };
 }
 
@@ -83,10 +85,10 @@ export const useAuthStore = defineStore('auth', {
     isCompanyAdmin: (state) => Boolean(state.user?.role === 'company_admin'),
     displayName: (state) => state.user_Name || state.username || state.user?.email || 'User',
     currentCompany: (state) => {
-      const userId = state.user?.userId ?? 1;
+      const companyId = state.user?.enterpriseId ?? state.user?.companyId ?? state.user?.userId ?? 1;
       const prefix = state.user?.email?.split('@')[0] || '默认';
       return {
-        id: userId,
+        id: companyId,
         name: `${prefix}企业`
       };
     }

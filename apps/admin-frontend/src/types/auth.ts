@@ -4,6 +4,7 @@ export interface AuthUser {
   role: string;
   permissions: string[];
   enterpriseId?: number | null;
+  companyId?: number | null;
   username: string;
 }
 

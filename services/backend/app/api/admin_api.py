@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import String, cast, func, or_
+from sqlalchemy import String, and_, cast, func, or_
 from sqlalchemy.orm import Session
 
 from ..auth import JWTValidationError, ProductKeyRegistry, SensitiveDataCipher, get_auth_service, hash_password
@@ -365,6 +365,36 @@ def _serialize_user(item: User, company_name: Optional[str] = None) -> Dict[str,
     }
 
 
+def _map_to_frontend_event_type(item: AuditLog) -> str:
+    """将后端 operation_type + target_table + details 映射为前端期望的 eventType。"""
+    op = item.operation_type
+    target = item.target_table or ""
+    details = item.details or {}
+    action = details.get("action", "") if isinstance(details, dict) else ""
+
+    if op == "create" and target == "product_keys" and action == "batch_import_product_keys":
+        return "import_key"
+    if op == "create" and target == "product_keys":
+        return "create_key"
+    if op == "delete" and target == "product_keys":
+        return "delete_key"
+    if op == "update" and target == "users":
+        return "update_user"
+    if op == "password_change" and target == "users":
+        return "reset_password"
+    if op == "login":
+        return "login"
+    # 其它类型保持原值作为回退
+    return op
+
+
+def _build_target_string(item: AuditLog) -> str:
+    """构建前端期望的 target 字段: 'table:id' 或 'table'。"""
+    if item.target_id:
+        return f"{item.target_table}:{item.target_id}"
+    return item.target_table or ""
+
+
 def _serialize_audit_log(item: AuditLog) -> Dict[str, Any]:
     return {
         "id": item.id,
@@ -381,6 +411,12 @@ def _serialize_audit_log(item: AuditLog) -> Dict[str, Any]:
         "failure_reason": item.failure_reason,
         "details": item.details or {},
         "operated_at": _to_iso(item.operated_at),
+        # 前端兼容字段（与 AuditLogView.vue 和 http.ts 的 AuditLog 接口对齐）
+        "operator": item.actor_username or "",
+        "eventType": _map_to_frontend_event_type(item),
+        "target": _build_target_string(item),
+        "time": _to_iso(item.operated_at),
+        "ip": item.ip_address or "",
     }
 
 
@@ -1246,6 +1282,37 @@ def admin_reset_user_password(
     return _ok("密码重置成功，已通知用户")
 
 
+def _apply_event_type_filter(query, event_type: str):
+    """将前端 eventType 值翻译为数据库 operation_type + target_table 组合过滤条件。
+
+    前端 AuditEventType: create_key | import_key | update_user | reset_password | login | delete_key
+    数据库 operation_type: create | update | delete | login | password_change | read | ...
+
+    注意: details 列在数据库中是 JSON 类型（非 JSONB），不能使用 @> 操作符。
+    因此对 action 字段的过滤使用 LIKE + cast to String 方式。
+    """
+    translation = {
+        "create_key": ("create", "product_keys", "create_product_keys"),
+        "import_key": ("create", "product_keys", "batch_import_product_keys"),
+        "delete_key": ("delete", "product_keys", None),
+        "update_user": ("update", "users", None),
+        "reset_password": ("password_change", "users", None),
+        "login": ("login", None, None),
+    }
+
+    if event_type in translation:
+        op_type, target_table, action = translation[event_type]
+        filters = [AuditLog.operation_type == op_type]
+        if target_table:
+            filters.append(AuditLog.target_table == target_table)
+        if action:
+            filters.append(cast(AuditLog.details, String).contains(action))
+        return query.filter(and_(*filters))
+    else:
+        # 未识别的事件类型，按原始值过滤 operation_type
+        return query.filter(AuditLog.operation_type == event_type)
+
+
 def _build_audit_logs_query(
     db: Session,
     *,
@@ -1261,7 +1328,7 @@ def _build_audit_logs_query(
     if end_time:
         query = query.filter(AuditLog.operated_at <= end_time)
     if event_type:
-        query = query.filter(AuditLog.operation_type == event_type)
+        query = _apply_event_type_filter(query, event_type)
     if user_id is not None:
         query = query.filter(AuditLog.user_id == user_id)
     if search:
@@ -1482,24 +1549,22 @@ def _build_stats_payload(db: Session) -> Dict[str, Any]:
 
     return {
         "generated_at": now.isoformat(),
-        "user_growth_trend": user_growth_trend,
-        "key_usage": {
+        "userGrowth": user_growth_trend,
+        "keyUsage": {
             "total": total_keys,
             "used": used_keys,
             "unused": unused_keys,
             "usage_rate": round((used_keys / total_keys) * 100, 2) if total_keys else 0,
         },
-        "active_users_7d": active_users_7d,
-        "company_stats": {
-            "total": total_companies,
-            "active": active_companies,
-        },
-        "device_stats": {
+        "activeUsers7d": active_users_7d,
+        "enterpriseTotal": total_companies,
+        "enterpriseActive": active_companies,
+        "deviceStats": {
             "total": total_devices,
             "online": online_devices,
         },
-        "today_registrations": today_registrations,
-        "today_logins": today_logins,
+        "todayRegistrations": today_registrations,
+        "todayLogins": today_logins,
     }
 
 

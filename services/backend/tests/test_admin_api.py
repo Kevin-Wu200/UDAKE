@@ -475,7 +475,7 @@ def test_admin_audit_export_and_stats(admin_client):
     stats_1 = client.get("/api/admin/stats", headers=_auth_header(tokens["super_admin"]))
     assert stats_1.status_code == 200, stats_1.text
     assert stats_1.json()["data"]["cached"] is False
-    assert "user_growth_trend" in stats_1.json()["data"]
+    assert "userGrowth" in stats_1.json()["data"]
 
     stats_2 = client.get("/api/admin/stats", headers=_auth_header(tokens["super_admin"]))
     assert stats_2.status_code == 200, stats_2.text
