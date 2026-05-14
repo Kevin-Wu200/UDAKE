@@ -1,70 +1,70 @@
 <template>
   <div class="register-page">
     <div class="panel">
-      <h1>用户注册</h1>
-      <p class="subtitle">请输入邮箱、密码和产品密钥，完成验证码验证后即可开通账号。</p>
+      <h1>{{ t('userRegister') }}</h1>
+      <p class="subtitle">{{ t('registerDescription') }}</p>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="form.email" placeholder="请输入邮箱" />
+        <el-form-item :label="t('email')" prop="email">
+          <el-input v-model="form.email" :placeholder="t('enterEmail')" />
         </el-form-item>
 
-        <el-form-item label="密码" prop="password">
-          <el-input v-model="form.password" type="password" show-password placeholder="请输入密码" />
+        <el-form-item :label="t('password')" prop="password">
+          <el-input v-model="form.password" type="password" show-password :placeholder="t('enterPassword')" />
         </el-form-item>
 
         <div class="strength-box">
           <div class="strength-title">
-            密码强度：
+            {{ t('passwordStrength') }}：
             <span :style="{ color: passwordStrength.color }">{{ passwordStrength.label }}</span>
           </div>
           <el-progress :percentage="passwordStrength.score" :stroke-width="8" :color="passwordStrength.color" />
-          <div class="strength-requirements">要求：至少8位，包含大小写字母和数字</div>
+          <div class="strength-requirements">{{ t('passwordRequirements') }}</div>
         </div>
 
-        <el-form-item label="确认密码" prop="confirmPassword">
+        <el-form-item :label="t('confirmPassword')" prop="confirmPassword">
           <el-input
             v-model="form.confirmPassword"
             type="password"
             show-password
-            placeholder="请再次输入密码"
+            :placeholder="t('enterConfirmPassword')"
           />
         </el-form-item>
 
-        <el-form-item label="产品密钥" prop="productKey">
+        <el-form-item :label="t('productKey')" prop="productKey">
           <el-input
             v-model="form.productKey"
-            placeholder="例如：ABC-1234-5678-9XYZ"
+            :placeholder="t('productKeyExample')"
             @input="onProductKeyInput"
             @blur="() => onValidateProductKey(true)"
           />
         </el-form-item>
 
         <div class="key-status" :class="{ valid: keyValidation.valid, invalid: keyValidation.valid === false }">
-          <span v-if="validating">密钥状态：校验中...</span>
+          <span v-if="validating">{{ t('keyStatus') }}{{ t('keyValidating') }}</span>
           <span v-else-if="keyValidation.valid === true">
-            密钥状态：有效（{{ keyValidation.typeLabel || keyValidation.type || '已校验' }}）
+            {{ t('keyStatus') }}{{ t('keyValid') }}（{{ keyValidation.typeLabel || keyValidation.type || t('keyValid') }}）
           </span>
-          <span v-else-if="keyValidation.valid === false">密钥状态：{{ keyValidation.message || '密钥无效' }}</span>
-          <span v-else>密钥状态：待校验</span>
+          <span v-else-if="keyValidation.valid === false">{{ t('keyStatus') }}{{ keyValidation.message || t('keyInvalid') }}</span>
+          <span v-else>{{ t('keyStatus') }}{{ t('keyPendingValidation') }}</span>
         </div>
 
-        <el-form-item label="邮箱验证码" prop="code">
+        <el-form-item :label="t('emailCode')" prop="code">
           <div class="code-row">
-            <el-input v-model="form.code" placeholder="请输入6位验证码" maxlength="6" />
+            <el-input v-model="form.code" :placeholder="t('enterCode')" maxlength="6" />
             <el-button :disabled="countdown > 0 || codeSending" @click="onSendCode">
-              {{ countdown > 0 ? `${countdown}s 后重发` : '发送验证码' }}
+              {{ countdown > 0 ? `${countdown}s` : t('sendCode') }}
             </el-button>
           </div>
         </el-form-item>
 
         <el-button type="primary" class="submit" :loading="submitting" @click="onSubmit">
-          完成注册
+          {{ t('completeRegistration') }}
         </el-button>
 
         <div class="footer-line">
-          已有账号？
-          <el-link type="primary" @click="router.push('/user/login')">去登录</el-link>
+          {{ t('hasAccountHint') }}
+          <el-link type="primary" @click="router.push('/user/login')">{{ t('goToLogin') }}</el-link>
         </div>
       </el-form>
     </div>
@@ -79,6 +79,9 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import { loginUser, registerUser, validateProductKey, verifyRegisterCode } from '../../services/userAuthApi';
 import { evaluatePasswordStrength } from '../../utils/auth';
+import { useI18nText } from '../../i18n/useI18n';
+
+const { t } = useI18nText();
 
 interface RegisterForm {
   email: string;
@@ -127,11 +130,11 @@ const passwordStrength = computed(() => evaluatePasswordStrength(form.password))
 
 const validateConfirmPassword = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
   if (!value) {
-    callback(new Error('请确认密码'));
+    callback(new Error(t('confirmPassword')));
     return;
   }
   if (value !== form.password) {
-    callback(new Error('两次密码输入不一致'));
+    callback(new Error(t('passwordsDoNotMatch')));
     return;
   }
   callback();
@@ -140,7 +143,7 @@ const validateConfirmPassword = (_rule: unknown, value: string, callback: (error
 const validatePasswordStrength = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
   const strength = evaluatePasswordStrength(value);
   if (strength.level === 'weak') {
-    callback(new Error('密码强度不足，请至少8位并包含大小写字母和数字'));
+    callback(new Error(t('passwordStrengthRequirement')));
     return;
   }
   callback();
@@ -148,28 +151,28 @@ const validatePasswordStrength = (_rule: unknown, value: string, callback: (erro
 
 const rules: FormRules<RegisterForm> = {
   email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '邮箱格式不正确', trigger: ['blur', 'change'] }
+    { required: true, message: t('enterEmail'), trigger: 'blur' },
+    { type: 'email', message: t('invalidEmail'), trigger: ['blur', 'change'] }
   ],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
+    { required: true, message: t('enterPassword'), trigger: 'blur' },
     { validator: validatePasswordStrength, trigger: 'blur' }
   ],
   confirmPassword: [{ validator: validateConfirmPassword, trigger: 'blur' }],
-  productKey: [{ required: true, message: '请输入产品密钥', trigger: 'blur' }],
-  code: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
+  productKey: [{ required: true, message: t('enterProductKey'), trigger: 'blur' }],
+  code: [{ required: true, message: t('enterCode'), trigger: 'blur' }]
 };
 
 function keyTypeLabel(keyType: string): string {
   switch (keyType) {
     case 'personal_standard':
-      return '个人标准版';
+      return t('personalStandard');
     case 'enterprise_standard':
-      return '企业标准版';
+      return t('enterpriseStandard');
     case 'personal_trial':
-      return '个人试用版';
+      return t('personalTrial');
     case 'enterprise_trial':
-      return '企业试用版';
+      return t('enterpriseTrial');
     default:
       return '';
   }
@@ -209,7 +212,7 @@ const runValidateProductKey = async () => {
     keyValidation.valid = false;
     keyValidation.type = '';
     keyValidation.typeLabel = '';
-    keyValidation.message = error instanceof Error ? error.message : '密钥验证失败，请稍后重试';
+    keyValidation.message = error instanceof Error ? error.message : t('keyValidationFailed');
   } finally {
     if (seq === validateSeq) {
       validating.value = false;
@@ -264,7 +267,7 @@ const onSendCode = async () => {
     await registerUser(form.email, form.password, form.productKey);
     codeRequested.value = true;
     startCountdown(60);
-    ElMessage.success('验证码已发送，请查收邮箱');
+    ElMessage.success(t('codeSent'));
   } catch {
     // 由拦截器展示错误
   } finally {
@@ -280,7 +283,7 @@ const onSubmit = async () => {
   try {
     await formRef.value.validate();
     if (!codeRequested.value) {
-      ElMessage.warning('请先发送验证码');
+      ElMessage.warning(t('pleaseSendCodeFirst'));
       return;
     }
 
@@ -289,7 +292,7 @@ const onSubmit = async () => {
 
     const session = await loginUser(form.email, form.password);
     authStore.applyUserSession(session);
-    ElMessage.success('注册成功，已自动登录');
+    ElMessage.success(t('registerSuccess'));
     await router.replace('/user/devices');
   } catch {
     // 由拦截器展示错误

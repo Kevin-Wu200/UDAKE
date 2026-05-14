@@ -341,6 +341,16 @@
     });
   }
 
+  const onlineAccessUrl = {
+    ONLINE_ACCESS_URL: "http://127.0.0.1:5173/",
+  };
+  const onlineAccessBtn = document.getElementById("onlineAccessBtn");
+  if (onlineAccessBtn) {
+    onlineAccessBtn.addEventListener("click", function () {
+      window.location.href = onlineAccessUrl.ONLINE_ACCESS_URL;
+    });
+  }
+
   const userLoginUrl = {
     USER_LOGIN_URL: "http://127.0.0.1:5175/#/user/login",
   };

@@ -6,7 +6,7 @@
       <span class="node-type">{{ data.nodeType }}</span>
     </header>
     <div class="node-title">{{ data.label }}</div>
-    <div class="node-desc">{{ data.description || '无描述' }}</div>
+    <div class="node-desc">{{ data.description || t('noDescription') }}</div>
     <Handle id="out" type="source" :position="Position.Right" class="handle" />
   </div>
 </template>

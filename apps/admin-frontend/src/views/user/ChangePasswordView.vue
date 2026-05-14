@@ -1,32 +1,32 @@
 <template>
   <div class="page-card page-wrap">
-    <h2>修改密码</h2>
-    <p class="desc">新密码不能与最近5次密码重复。修改后将自动退出，需要重新登录。</p>
+    <h2>{{ t('changepassword') }}</h2>
+    <p class="desc">{{ t('passwordDescription') }}</p>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
-      <el-form-item label="旧密码" prop="oldPassword">
-        <el-input v-model="form.oldPassword" type="password" show-password placeholder="请输入旧密码" />
+      <el-form-item :label="t('oldPassword')" prop="oldPassword">
+        <el-input v-model="form.oldPassword" type="password" show-password :placeholder="t('enterOldPassword')" />
       </el-form-item>
 
-      <el-form-item label="新密码" prop="newPassword">
-        <el-input v-model="form.newPassword" type="password" show-password placeholder="请输入新密码" />
+      <el-form-item :label="t('newPassword')" prop="newPassword">
+        <el-input v-model="form.newPassword" type="password" show-password :placeholder="t('enterNewPassword')" />
       </el-form-item>
 
       <div class="strength-box">
         <div>
-          密码强度：
+          {{ t('passwordStrength') }}：
           <span :style="{ color: passwordStrength.color }">{{ passwordStrength.label }}</span>
         </div>
         <el-progress :percentage="passwordStrength.score" :stroke-width="8" :color="passwordStrength.color" />
-        <small>强度要求：至少8位，包含大小写字母和数字</small>
+        <small>{{ t('passwordRequirements') }}</small>
       </div>
 
-      <el-form-item label="确认新密码" prop="confirmPassword">
-        <el-input v-model="form.confirmPassword" type="password" show-password placeholder="请再次输入新密码" />
+      <el-form-item :label="t('confirmNewPassword')" prop="confirmPassword">
+        <el-input v-model="form.confirmPassword" type="password" show-password :placeholder="t('enterConfirmPassword')" />
       </el-form-item>
 
       <div class="actions">
-        <el-button type="primary" :loading="submitting" @click="onSubmit">确认修改</el-button>
+        <el-button type="primary" :loading="submitting" @click="onSubmit">{{ t('confirmModify') }}</el-button>
       </div>
     </el-form>
   </div>
@@ -40,6 +40,9 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import { changePassword } from '../../services/userAuthApi';
 import { evaluatePasswordStrength } from '../../utils/auth';
+import { useI18nText } from '../../i18n/useI18n';
+
+const { t } = useI18nText();
 
 interface PasswordForm {
   oldPassword: string;
@@ -63,7 +66,7 @@ const passwordStrength = computed(() => evaluatePasswordStrength(form.newPasswor
 const validatePasswordStrength = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
   const strength = evaluatePasswordStrength(value);
   if (strength.level === 'weak') {
-    callback(new Error('密码强度不足'));
+    callback(new Error(t('passwordStrengthWeak')));
     return;
   }
   callback();
@@ -71,20 +74,20 @@ const validatePasswordStrength = (_rule: unknown, value: string, callback: (erro
 
 const validateConfirmPassword = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
   if (!value) {
-    callback(new Error('请再次输入新密码'));
+    callback(new Error(t('enterConfirmPassword')));
     return;
   }
   if (value !== form.newPassword) {
-    callback(new Error('两次密码输入不一致'));
+    callback(new Error(t('passwordsDoNotMatch')));
     return;
   }
   callback();
 };
 
 const rules: FormRules<PasswordForm> = {
-  oldPassword: [{ required: true, message: '请输入旧密码', trigger: 'blur' }],
+  oldPassword: [{ required: true, message: t('enterOldPassword'), trigger: 'blur' }],
   newPassword: [
-    { required: true, message: '请输入新密码', trigger: 'blur' },
+    { required: true, message: t('enterNewPassword'), trigger: 'blur' },
     { validator: validatePasswordStrength, trigger: 'blur' }
   ],
   confirmPassword: [{ validator: validateConfirmPassword, trigger: 'blur' }]
@@ -100,7 +103,7 @@ const onSubmit = async () => {
     submitting.value = true;
     await changePassword(form.oldPassword, form.newPassword, form.confirmPassword);
 
-    ElMessage.success('密码修改成功，请重新登录');
+    ElMessage.success(t('passwordChangeSuccess'));
     await authStore.logoutWithApi();
     await router.replace('/user/login');
   } catch {

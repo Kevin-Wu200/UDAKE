@@ -20,7 +20,7 @@ export const useTicketStore = defineStore('ticket', {
         this.loading = false;
       }
     },
-    async fetchTicketDetail(ticketId: number) {
+    async fetchTicketDetail(ticketId: string) {
       this.loading = true;
       try {
         this.currentTicket = await getTicket(ticketId);
@@ -28,10 +28,10 @@ export const useTicketStore = defineStore('ticket', {
         this.loading = false;
       }
     },
-    async approve(ticketId: number, notes: string) {
+    async approve(ticketId: string, notes: string) {
       await approveTicket(ticketId, notes);
     },
-    async reject(ticketId: number, reason: string) {
+    async reject(ticketId: string, reason: string) {
       await rejectTicket(ticketId, reason);
     }
   }

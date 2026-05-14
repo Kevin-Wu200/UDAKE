@@ -13,7 +13,7 @@ export interface Ticket {
   assigned_key?: string | null;
   approval_notes?: string | null;
   response_message?: string | null;
-  processed_by?: number | null;
+  processed_by?: string | null;
   processed_at?: string | null;
   created_at: string;
   updated_at: string;

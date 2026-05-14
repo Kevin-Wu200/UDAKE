@@ -155,3 +155,30 @@ export function formatUnixTime(timestamp: number): string {
   const ss = `${date.getSeconds()}`.padStart(2, '0');
   return `${y}-${m}-${d} ${hh}:${mm}:${ss}`;
 }
+
+/**
+ * 将 ISO 时间字符串格式化为中文可读格式:
+ * "(Asia/Shanghai) 2026 年 05 月 13 日 09 时 49 分 02 秒"
+ * 如果传入空值则返回 "-"
+ */
+export function formatTicketTime(isoString: string | null | undefined): string {
+  if (!isoString) {
+    return '-';
+  }
+  try {
+    const date = new Date(isoString);
+    if (isNaN(date.getTime())) {
+      return isoString;
+    }
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+    const y = date.getFullYear();
+    const m = `${date.getMonth() + 1}`.padStart(2, '0');
+    const d = `${date.getDate()}`.padStart(2, '0');
+    const hh = `${date.getHours()}`.padStart(2, '0');
+    const mm = `${date.getMinutes()}`.padStart(2, '0');
+    const ss = `${date.getSeconds()}`.padStart(2, '0');
+    return `(${timezone}) ${y} 年 ${m} 月 ${d} 日 ${hh} 时 ${mm} 分 ${ss} 秒`;
+  } catch {
+    return isoString;
+  }
+}

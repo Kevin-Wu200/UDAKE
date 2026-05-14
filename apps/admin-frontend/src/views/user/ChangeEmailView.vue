@@ -1,33 +1,33 @@
 <template>
   <div class="page-card page-wrap">
-    <h2>修改邮箱</h2>
-    <p class="desc">请输入新邮箱并完成验证码验证，系统会向旧邮箱发送变更通知。</p>
+    <h2>{{ t('changeemail') }}</h2>
+    <p class="desc">{{ t('emailDescription') }}</p>
 
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
-      <el-form-item label="新邮箱" prop="newEmail">
-        <el-input v-model="form.newEmail" placeholder="请输入新邮箱" />
+      <el-form-item :label="t('newEmail')" prop="newEmail">
+        <el-input v-model="form.newEmail" :placeholder="t('enterNewEmail')" />
       </el-form-item>
 
-      <el-form-item label="当前密码" prop="currentPassword">
+      <el-form-item :label="t('currentPassword')" prop="currentPassword">
         <el-input
           v-model="form.currentPassword"
           type="password"
           show-password
-          placeholder="请输入当前密码"
+          :placeholder="t('enterCurrentPassword')"
         />
       </el-form-item>
 
-      <el-form-item label="验证码" prop="code">
+      <el-form-item :label="t('verificationCode')" prop="code">
         <div class="code-row">
-          <el-input v-model="form.code" placeholder="请输入验证码" maxlength="6" />
+          <el-input v-model="form.code" :placeholder="t('enterCode')" maxlength="6" />
           <el-button :disabled="countdown > 0 || sendingCode" @click="onSendCode">
-            {{ countdown > 0 ? `${countdown}s` : '发送验证码' }}
+            {{ countdown > 0 ? `${countdown}s` : t('sendCode') }}
           </el-button>
         </div>
       </el-form-item>
 
       <div class="actions">
-        <el-button type="primary" :loading="submitting" @click="onSubmit">确认修改</el-button>
+        <el-button type="primary" :loading="submitting" @click="onSubmit">{{ t('confirmModify') }}</el-button>
       </div>
     </el-form>
   </div>
@@ -39,6 +39,9 @@ import { onBeforeUnmount, reactive, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useAuthStore } from '../../stores/auth';
 import { sendChangeEmailCode, verifyChangeEmailCode } from '../../services/userAuthApi';
+import { useI18nText } from '../../i18n/useI18n';
+
+const { t } = useI18nText();
 
 interface EmailForm {
   newEmail: string;
@@ -61,11 +64,11 @@ const form = reactive<EmailForm>({
 
 const rules: FormRules<EmailForm> = {
   newEmail: [
-    { required: true, message: '请输入新邮箱', trigger: 'blur' },
-    { type: 'email', message: '邮箱格式不正确', trigger: ['blur', 'change'] }
+    { required: true, message: t('enterNewEmail'), trigger: 'blur' },
+    { type: 'email', message: t('invalidEmail'), trigger: ['blur', 'change'] }
   ],
-  currentPassword: [{ required: true, message: '请输入当前密码', trigger: 'blur' }],
-  code: [{ required: true, message: '请输入验证码', trigger: 'blur' }]
+  currentPassword: [{ required: true, message: t('enterCurrentPassword'), trigger: 'blur' }],
+  code: [{ required: true, message: t('enterCode'), trigger: 'blur' }]
 };
 
 const startCountdown = (seconds: number) => {
@@ -93,7 +96,7 @@ const onSendCode = async () => {
     sendingCode.value = true;
     await sendChangeEmailCode(form.newEmail, form.currentPassword);
     startCountdown(600);
-    ElMessage.success('验证码已发送，请查收新邮箱');
+    ElMessage.success(t('codeSentCheckNewEmail'));
   } catch {
     // 错误由拦截器提示
   } finally {
@@ -119,7 +122,7 @@ const onSubmit = async () => {
       });
     }
 
-    ElMessage.success('邮箱修改成功，旧邮箱已收到通知');
+    ElMessage.success(t('emailChangeSuccess'));
     form.currentPassword = '';
     form.code = '';
     countdown.value = 0;

@@ -84,6 +84,7 @@ class TicketResponse(BaseModel):
     assigned_key: Optional[str] = None
     approval_notes: Optional[str] = None
     response_message: Optional[str] = None
+    processed_by: Optional[str] = None
     processed_at: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
@@ -282,7 +283,9 @@ def generate_ticket_response(ticket: Ticket, *, hide_processor: bool = False) ->
         updated_at=_normalize_datetime(ticket.updated_at),
     ).model_dump()
     if not hide_processor:
-        payload["processed_by"] = ticket.processed_by
+        payload["processed_by"] = ticket.processor.username if ticket.processor else None
+    else:
+        payload.pop("processed_by", None)
     return payload
 
 
@@ -790,20 +793,18 @@ def get_ticket(
 )
 @require_company_authorized
 def approve_ticket(
-    ticket_id: int,
+    ticket_id: str,
     payload: TicketApprovalRequest,
     request: Request,
     db: Session = Depends(get_auth_db_session),
 ) -> Dict[str, Any]:
     current_user = request.state.current_user
     try:
-        query = db.query(Ticket).filter(Ticket.id == ticket_id)
-        if current_user.role != "super_admin":
-            query = query.filter(Ticket.company_id == current_user.company_id)
-        
-        ticket = query.with_for_update().one_or_none()
-        if not ticket:
-            raise _fail(status.HTTP_404_NOT_FOUND, "工单不存在或无权访问")
+        ticket = _resolve_ticket(ticket_id, db)
+        if current_user.role != "super_admin" and ticket.company_id != current_user.company_id:
+            raise _fail(status.HTTP_403_FORBIDDEN, "无权访问该工单")
+        # 重新查询以获取行锁，防止并发审批
+        ticket = db.query(Ticket).filter(Ticket.id == ticket.id).with_for_update().one()
         if ticket.status != TicketStatus.PENDING.value:
             raise _fail(status.HTTP_400_BAD_REQUEST, "仅 pending 状态工单允许审批")
 
@@ -836,7 +837,13 @@ def approve_ticket(
             email_service.send_ticket_notification(
                 ticket, 
                 "approved", 
-                {"assigned_key": assigned_key, "approval_notes": notes}
+                {
+                    "assigned_key": assigned_key,
+                    "approval_notes": notes,
+                    "processed_by_name": current_user.username,
+                    "processed_at": ticket.processed_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S") + " UTC",
+                    "key_type": KEY_TYPE_DISPLAY_NAMES.get(ticket.key_type, ticket.key_type),
+                }
             )
         except Exception as e:
             logger.error("发送审批通过通知邮件失败: %s", e)
@@ -868,7 +875,7 @@ def approve_ticket(
 )
 @require_company_authorized
 def reject_ticket(
-    ticket_id: int,
+    ticket_id: str,
     payload: TicketApprovalRequest,
     request: Request,
     db: Session = Depends(get_auth_db_session),
@@ -878,13 +885,11 @@ def reject_ticket(
     if not reason:
         raise _fail(status.HTTP_400_BAD_REQUEST, "拒绝原因不能为空")
     try:
-        query = db.query(Ticket).filter(Ticket.id == ticket_id)
-        if current_user.role != "super_admin":
-            query = query.filter(Ticket.company_id == current_user.company_id)
-
-        ticket = query.with_for_update().one_or_none()
-        if not ticket:
-            raise _fail(status.HTTP_404_NOT_FOUND, "工单不存在或无权访问")
+        ticket = _resolve_ticket(ticket_id, db)
+        if current_user.role != "super_admin" and ticket.company_id != current_user.company_id:
+            raise _fail(status.HTTP_403_FORBIDDEN, "无权访问该工单")
+        # 重新查询以获取行锁，防止并发审批
+        ticket = db.query(Ticket).filter(Ticket.id == ticket.id).with_for_update().one()
         if ticket.status != TicketStatus.PENDING.value:
             raise _fail(status.HTTP_400_BAD_REQUEST, "仅 pending 状态工单允许拒绝")
 
@@ -909,7 +914,13 @@ def reject_ticket(
             email_service.send_ticket_notification(
                 ticket, 
                 "rejected", 
-                {"rejection_reason": reason}
+                {
+                    "assigned_key": ticket.assigned_key or "无",
+                    "approval_notes": reason,
+                    "processed_by_name": current_user.username,
+                    "processed_at": ticket.processed_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M:%S") + " UTC",
+                    "key_type": KEY_TYPE_DISPLAY_NAMES.get(ticket.key_type, ticket.key_type),
+                }
             )
         except Exception as e:
             logger.error("发送审批拒绝通知邮件失败: %s", e)

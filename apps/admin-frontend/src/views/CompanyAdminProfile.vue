@@ -3,24 +3,24 @@
     <el-card v-loading="loading" class="profile-card">
       <template #header>
         <div class="card-header">
-          <h2>企业管理员信息</h2>
+          <h2>{{ t('companyProfile') }}</h2>
           <el-tag :type="profile?.company_admin_type === 'trial' ? 'warning' : 'success'">
             {{ profileTypeLabel }}
           </el-tag>
         </div>
       </template>
 
-      <el-empty v-if="!profile && !loading" description="暂无企业管理员信息" />
+      <el-empty v-if="!profile && !loading" description="No profile data" />
 
       <template v-else-if="profile">
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="企业名称">{{ profile.company_name }}</el-descriptions-item>
-          <el-descriptions-item label="企业ID">{{ profile.company_id }}</el-descriptions-item>
-          <el-descriptions-item label="管理员类型">{{ profileTypeLabel }}</el-descriptions-item>
-          <el-descriptions-item label="已创建密钥数量">{{ profile.total_keys_created }}</el-descriptions-item>
-          <el-descriptions-item label="最大可创建数量">{{ profile.max_keys_allowed }}</el-descriptions-item>
-          <el-descriptions-item label="剩余可创建数量">{{ profile.remaining_keys_quota }}</el-descriptions-item>
-          <el-descriptions-item label="允许创建的密钥类型" :span="2">
+          <el-descriptions-item :label="t('companyName')">{{ profile.company_name }}</el-descriptions-item>
+          <el-descriptions-item :label="t('companyid')">{{ profile.company_id }}</el-descriptions-item>
+          <el-descriptions-item :label="t('role')">{{ profileTypeLabel }}</el-descriptions-item>
+          <el-descriptions-item label="Keys Created">{{ profile.total_keys_created }}</el-descriptions-item>
+          <el-descriptions-item label="Max Allowed">{{ profile.max_keys_allowed }}</el-descriptions-item>
+          <el-descriptions-item label="Remaining Quota">{{ profile.remaining_keys_quota }}</el-descriptions-item>
+          <el-descriptions-item label="Allowed Key Types" :span="2">
             <el-tag
               v-for="item in profile.allowed_key_types"
               :key="item"
@@ -33,7 +33,7 @@
         </el-descriptions>
 
         <div class="quota-block">
-          <div class="quota-title">角色配额使用进度</div>
+          <div class="quota-title">Quota Usage Progress</div>
           <el-progress
             :percentage="usagePercent"
             :status="usagePercent >= 100 ? 'exception' : usagePercent >= 80 ? 'warning' : 'success'"
@@ -52,12 +52,15 @@ import { computed, onMounted, ref } from 'vue';
 import { ElMessage } from 'element-plus';
 import { useAuthStore } from '../stores/auth';
 import { fetchCompanyAdminProfile } from '../services/http';
+import { useI18nText } from '../i18n/useI18n';
+
+const { t, tc } = useI18nText();
 
 const authStore = useAuthStore();
 const loading = ref(false);
 const profile = ref<CompanyAdmin | null>(null);
 
-const profileTypeLabel = computed(() => (profile.value?.company_admin_type === 'trial' ? '试用企业管理员' : '标准企业管理员'));
+const profileTypeLabel = computed(() => (profile.value?.company_admin_type === 'trial' ? t('companyAdminTrial') : t('companyAdminStandard')));
 const usagePercent = computed(() => {
   if (!profile.value || profile.value.max_keys_allowed <= 0) {
     return 0;
@@ -66,14 +69,14 @@ const usagePercent = computed(() => {
 });
 
 const keyTypeLabel = (value: CompanyAdmin['allowed_key_types'][number]) =>
-  value === 'enterprise_trial' ? '企业试用' : '企业标准';
+  value === 'enterprise_trial' ? tc('companyTrail') : tc('companyStandard');
 
 const loadProfile = async () => {
   loading.value = true;
   try {
     profile.value = await fetchCompanyAdminProfile(authStore.currentCompany.id);
   } catch {
-    ElMessage.error('加载企业管理员信息失败');
+    ElMessage.error(tc('companydataloadfailed'));
   } finally {
     loading.value = false;
   }

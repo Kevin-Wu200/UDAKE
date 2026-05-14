@@ -1,6 +1,7 @@
 import logging
 import os
 import smtplib
+from datetime import timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from typing import Optional
@@ -10,21 +11,35 @@ from jinja2 import Environment, FileSystemLoader
 logger = logging.getLogger(__name__)
 
 
+def _get_settings_smtp_value(key: str, default: str = "") -> str:
+    """优先从 Pydantic Settings 对象读取配置，因为 Pydantic Settings 加载 .env 文件后
+    不会将值写入 os.environ，导致 os.getenv() 无法获取 .env 中的配置值。"""
+    try:
+        from ..config import settings
+        value = getattr(settings, key, None)
+        if value is not None and value != "":
+            return str(value)
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+
 class EmailService:
     def __init__(self):
-        self._load_from_env()
+        self._load_from_settings()
         template_dir = os.path.join(os.path.dirname(__file__), "..", "templates", "email")
         self.template_env = Environment(loader=FileSystemLoader(template_dir))
 
-    def _load_from_env(self):
-        self.smtp_host = os.getenv("SMTP_HOST", "smtp.example.com")
-        self.smtp_port = int(os.getenv("SMTP_PORT", 587))
-        self.smtp_user = os.getenv("SMTP_USER", "noreply@example.com")
-        self.smtp_password = os.getenv("SMTP_PASSWORD", "")
-        self.use_tls = os.getenv("SMTP_USE_TLS", "true").lower() == "true"
-        self.email_from = os.getenv("EMAIL_FROM", self.smtp_user)
-        self.email_from_name = os.getenv("EMAIL_FROM_NAME", "UDAKE Team")
-        self.use_ssl = os.getenv("SMTP_USE_SSL", "false").lower() == "true"
+    def _load_from_settings(self):
+        """从 Pydantic Settings 加载 SMTP 配置（优先），回退到 os.getenv()。"""
+        self.smtp_host = _get_settings_smtp_value("SMTP_HOST", "smtp.example.com")
+        self.smtp_port = int(_get_settings_smtp_value("SMTP_PORT", "587"))
+        self.smtp_user = _get_settings_smtp_value("SMTP_USER", "noreply@example.com")
+        self.smtp_password = _get_settings_smtp_value("SMTP_PASSWORD", "")
+        self.use_tls = _get_settings_smtp_value("SMTP_USE_TLS", "true").lower() == "true"
+        self.email_from = _get_settings_smtp_value("EMAIL_FROM", self.smtp_user)
+        self.email_from_name = _get_settings_smtp_value("EMAIL_FROM_NAME", "UDAKE Team")
+        self.use_ssl = _get_settings_smtp_value("SMTP_USE_SSL", "false").lower() == "true"
         self._enabled = bool(self.smtp_host.strip() and self.smtp_user.strip() and self.smtp_password.strip())
 
     def update_settings(
@@ -96,7 +111,7 @@ class EmailService:
 
     def send_ticket_notification(self, ticket: any, notification_type: str, extra_data: dict = None):
         if not self._enabled:
-            logger.info("SMTP未配置，跳过工单通知邮件: ticket_id=%s type=%s", ticket.id, notification_type)
+            logger.info("SMTP未配置，跳过工单通知邮件: ticket_id=%s type=%s", ticket.ticket_id, notification_type)
             return
 
         template_map = {
@@ -111,10 +126,15 @@ class EmailService:
             return
             
         template = self.template_env.get_template(template_name)
+        # 将 created_at 转换为 UTC 时间字符串显示
+        created_at_str = ""
+        if ticket.created_at:
+            created_at_utc = ticket.created_at.astimezone(timezone.utc) if hasattr(ticket.created_at, 'astimezone') else ticket.created_at
+            created_at_str = created_at_utc.strftime("%Y-%m-%d %H:%M:%S") + " UTC"
         data = {
-            "ticket_id": ticket.id,
+            "ticket_id": ticket.ticket_id,
             "ticket_type": ticket.ticket_type,
-            "created_at": ticket.created_at,
+            "created_at": created_at_str,
             **(extra_data or {})
         }
         html_body = template.render(**data)

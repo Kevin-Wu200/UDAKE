@@ -21,6 +21,19 @@ logger = logging.getLogger(__name__)
 EMAIL_PATTERN = re.compile(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$")
 
 
+def _get_settings_value(key: str, default: str = "") -> str:
+    """优先从 Pydantic Settings 对象读取配置（因为 Pydantic Settings 不会将 .env 值写入 os.environ），
+    回退到 os.getenv()。"""
+    try:
+        from ..config import settings
+        value = getattr(settings, key, None)
+        if value is not None and value != "":
+            return str(value)
+    except Exception:
+        pass
+    return os.getenv(key, default)
+
+
 class InvalidEmailAddressError(ValueError):
     """Raised when recipient email is malformed."""
 
@@ -63,7 +76,7 @@ class SMTPEmailService:
     @classmethod
     def from_env(cls) -> "SMTPEmailService":
         accounts: List[SMTPAccount] = []
-        accounts_json = os.getenv("SMTP_ACCOUNTS")
+        accounts_json = _get_settings_value("SMTP_ACCOUNTS") or os.getenv("SMTP_ACCOUNTS")
         if accounts_json:
             try:
                 parsed = json.loads(accounts_json)
@@ -85,10 +98,10 @@ class SMTPEmailService:
                 logger.warning("SMTP_ACCOUNTS JSON 解析失败，将使用默认环境变量")
 
         if not accounts:
-            host = os.getenv("SMTP_HOST", "smtp.qq.com").strip()
-            user = os.getenv("SMTP_USER", "").strip()
-            password = os.getenv("SMTP_PASSWORD", "").strip()
-            port = int(os.getenv("SMTP_PORT", "587"))
+            host = _get_settings_value("SMTP_HOST", "smtp.qq.com").strip()
+            user = _get_settings_value("SMTP_USER", "").strip()
+            password = _get_settings_value("SMTP_PASSWORD", "").strip()
+            port = int(_get_settings_value("SMTP_PORT", "587"))
             if user and password:
                 accounts.append(
                     SMTPAccount(
@@ -101,10 +114,10 @@ class SMTPEmailService:
                     )
                 )
 
-            backup_host = os.getenv("SMTP_BACKUP_HOST", "smtp.gmail.com").strip()
-            backup_user = os.getenv("SMTP_BACKUP_USER", "").strip()
-            backup_password = os.getenv("SMTP_BACKUP_PASSWORD", "").strip()
-            backup_port = int(os.getenv("SMTP_BACKUP_PORT", "587"))
+            backup_host = _get_settings_value("SMTP_BACKUP_HOST", "smtp.gmail.com").strip()
+            backup_user = _get_settings_value("SMTP_BACKUP_USER", "").strip()
+            backup_password = _get_settings_value("SMTP_BACKUP_PASSWORD", "").strip()
+            backup_port = int(_get_settings_value("SMTP_BACKUP_PORT", "587"))
             if backup_user and backup_password:
                 accounts.append(
                     SMTPAccount(
@@ -119,10 +132,10 @@ class SMTPEmailService:
 
         return cls(
             accounts=accounts,
-            retry_attempts=int(os.getenv("SMTP_RETRY_ATTEMPTS", "3")),
-            retry_interval_seconds=int(os.getenv("SMTP_RETRY_INTERVAL", "10")),
-            timeout_seconds=int(os.getenv("SMTP_TIMEOUT_SECONDS", "20")),
-            max_workers=int(os.getenv("SMTP_ASYNC_WORKERS", "4")),
+            retry_attempts=int(_get_settings_value("SMTP_RETRY_ATTEMPTS", "3")),
+            retry_interval_seconds=int(_get_settings_value("SMTP_RETRY_INTERVAL", "10")),
+            timeout_seconds=int(_get_settings_value("SMTP_TIMEOUT_SECONDS", "20")),
+            max_workers=int(_get_settings_value("SMTP_ASYNC_WORKERS", "4")),
         )
 
     @property

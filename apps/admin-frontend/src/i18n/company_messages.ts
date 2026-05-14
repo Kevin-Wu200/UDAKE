@@ -84,6 +84,10 @@ const messages: Record<AppLanguage, Record<string, string>> = {
         rejectTicket: '拒绝工单',
         notProcessed: '未处理',
         ticketDetail: '工单号：{ticketId} 详情页',
+        personalTrial: '个人试用版',
+        personalStandard: '个人标准版',
+        enterpriseTrial: '企业试用版',
+        enterpriseStandard: '企业标准版',
     },
     "en-US": {
         companymenbernum: 'Number of Enterprise Members',
@@ -166,6 +170,10 @@ const messages: Record<AppLanguage, Record<string, string>> = {
         rejectTicket: 'Reject Ticket',
         notProcessed: 'Not Processed',
         ticketDetail: 'Ticket No. {ticketId} Details Page',
+        personalTrial: 'Personal Trial',
+        personalStandard: 'Personal Standard',
+        enterpriseTrial: 'Enterprise Trial',
+        enterpriseStandard: 'Enterprise Standard',
     },
     "ko-KR": {
         companymenbernum: '기업 구성원 수',
@@ -248,6 +256,10 @@ const messages: Record<AppLanguage, Record<string, string>> = {
         rejectTicket: '티켓 거부',
         notProcessed: '처리되지 않음',
         ticketDetail: '티켓 번호: {ticketId} 상세 페이지',
+        personalTrial: '개인 체험판',
+        personalStandard: '개인 표준',
+        enterpriseTrial: '기업 체험판',
+        enterpriseStandard: '기업 표준',
     },
     "ja-JP": {
         companymenbernum: '企業メンバー数',
@@ -330,6 +342,10 @@ const messages: Record<AppLanguage, Record<string, string>> = {
         rejectTicket: 'チケット却下',
         notProcessed: '未処理',
         ticketDetail: 'チケット番号：{ticketId} の詳細ページ',
+        personalTrial: 'パーソナルトライアル',
+        personalStandard: 'パーソナル標準',
+        enterpriseTrial: 'エンタープライズトライアル',
+        enterpriseStandard: 'エンタープライズ標準',
     },
     "zh-TW": {
         companymenbernum: '企業成員數',
@@ -412,6 +428,10 @@ const messages: Record<AppLanguage, Record<string, string>> = {
         rejectTicket: '拒絕工單',
         notProcessed: '未處理',
         ticketDetail: '工單號：{ticketId} 詳情頁',
+        personalTrial: '個人試用版',
+        personalStandard: '個人標準版',
+        enterpriseTrial: '企業試用版',
+        enterpriseStandard: '企業標準版',
     },
 };
 

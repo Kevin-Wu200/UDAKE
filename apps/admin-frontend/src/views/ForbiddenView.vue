@@ -1,9 +1,9 @@
 <template>
   <div class="forbidden-page">
-    <el-result icon="warning" title="403" sub-title="权限不足，无法访问该页面">
+    <el-result icon="warning" title="403" :sub-title="t('forbiddenTitle')">
       <template #extra>
-        <el-button type="primary" @click="router.push('/user/devices')">返回用户中心</el-button>
-        <el-button @click="router.push('/login/admin')">前往管理后台</el-button>
+        <el-button type="primary" @click="router.push('/user/devices')">{{ t('backToUserCenter') }}</el-button>
+        <el-button @click="router.push('/login/admin')">{{ t('goToAdminConsole') }}</el-button>
       </template>
     </el-result>
   </div>
@@ -11,7 +11,9 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
+import { useI18nText } from '../i18n/useI18n';
 
+const { t } = useI18nText();
 const router = useRouter();
 </script>
 

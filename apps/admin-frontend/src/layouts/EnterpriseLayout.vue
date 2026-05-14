@@ -1,7 +1,7 @@
 <template>
   <div class="enterprise-layout">
     <aside class="sidebar">
-      <div class="brand">{{ t('appTitle_enterprise') || '企业门户' }}</div>
+      <div class="brand">{{ t('appTitle_enterprise') }}</div>
       <el-menu
         :default-active="activePath"
         class="menu"

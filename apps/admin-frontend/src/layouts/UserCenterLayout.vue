@@ -1,18 +1,18 @@
 <template>
   <div class="user-layout">
     <aside class="menu-panel">
-      <h2>用户中心</h2>
+      <h2>{{ t('userCenterTitle') }}</h2>
       <el-menu :default-active="route.path" router>
-        <el-menu-item index="/user/devices">设备管理</el-menu-item>
-        <el-menu-item index="/user/change-password">修改密码</el-menu-item>
-        <el-menu-item index="/user/change-email">修改邮箱</el-menu-item>
+        <el-menu-item index="/user/devices">{{ t('deviceManagement') }}</el-menu-item>
+        <el-menu-item index="/user/change-password">{{ t('changepassword') }}</el-menu-item>
+        <el-menu-item index="/user/change-email">{{ t('changeemail') }}</el-menu-item>
       </el-menu>
     </aside>
 
     <section class="main-panel">
       <header class="topbar">
         <div>
-          <div class="title">账户安全中心</div>
+          <div class="title">{{ t('accountSecurityCenter') }}</div>
           <div class="desc">{{ authStore.user?.email || authStore.username }}</div>
         </div>
         <div class="header-text">
@@ -20,9 +20,9 @@
           <div class="sub">{{ t('welcome') }}{{ authStore.user_Name }}</div>
         </div>
         <div class="actions">
-          <el-button plain @click="router.push('/dashboard')">管理员后台</el-button>
+          <el-button plain @click="router.push('/dashboard')">{{ t('adminConsole') }}</el-button>
           
-          <el-button type="danger" @click="onLogout">退出登录</el-button>
+          <el-button type="danger" @click="onLogout">{{ t('logout') }}</el-button>
         </div>        
       </header>
       <main>
@@ -49,7 +49,7 @@ const greeting = ref('');
 
 const onLogout = async () => {
   await authStore.logoutWithApi();
-  ElMessage.success('已退出登录');
+  ElMessage.success(t('logoutsuccess'));
   router.replace('/user/login');
 };
 

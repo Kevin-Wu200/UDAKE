@@ -113,9 +113,9 @@ const handleTest = async () => {
     await formRef.value.validate();
     testing.value = true;
     const result = await testSmtpConnection(form);
-    ElMessage.success(`连接测试成功，耗时 ${result.latencyMs}ms`);
+    ElMessage.success(t('connectSuccessMsg', { latencyMs: String(result.latencyMs) }));
   } catch (error) {
-    ElMessage.error(resolveErrorMessage(error, '连接测试失败'));
+    ElMessage.error(resolveErrorMessage(error, t('connectFailedMsg')));
   } finally {
     testing.value = false;
   }
@@ -130,9 +130,9 @@ const handleSave = async () => {
     saving.value = true;
     const res = await saveSmtpConfig(form);
     Object.assign(form, res);
-    ElMessage.success('SMTP配置已保存（密码已脱敏存储）');
+    ElMessage.success(t('smtpSaveSuccessMsg'));
   } catch (error) {
-    ElMessage.error(resolveErrorMessage(error, '保存失败，请检查配置后重试'));
+    ElMessage.error(resolveErrorMessage(error, t('smtpSaveFailedMsg')));
   } finally {
     saving.value = false;
   }

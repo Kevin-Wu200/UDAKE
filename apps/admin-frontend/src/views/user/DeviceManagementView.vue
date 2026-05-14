@@ -2,38 +2,38 @@
   <div class="page-card">
     <div class="toolbar">
       <div class="title-block">
-        <h2>设备管理</h2>
-        <p>可查看登录设备并踢出异常会话。</p>
+        <h2>{{ t('deviceManagement') }}</h2>
+        <p>{{ t('deviceManagementDescription') }}</p>
       </div>
-      <el-button :loading="loading" @click="loadDevices">刷新设备</el-button>
+      <el-button :loading="loading" @click="loadDevices">{{ t('refreshDevices') }}</el-button>
     </div>
 
     <el-table :data="devices" v-loading="loading" border>
-      <el-table-column label="设备名称" min-width="200">
+      <el-table-column :label="t('deviceName')" min-width="200">
         <template #default="scope">
           <div class="device-name">
             {{ scope.row.deviceName }}
-            <el-tag v-if="scope.row.isCurrent" size="small" type="success">当前设备</el-tag>
+            <el-tag v-if="scope.row.isCurrent" size="small" type="success">{{ t('currentDevice') }}</el-tag>
           </div>
         </template>
       </el-table-column>
-      <el-table-column prop="deviceType" label="设备类型" width="100" />
-      <el-table-column prop="os" label="操作系统" width="110" />
-      <el-table-column prop="browser" label="浏览器" width="120" />
-      <el-table-column prop="ip" label="IP地址" width="130" />
-      <el-table-column label="最后登录时间" width="180">
+      <el-table-column prop="deviceType" :label="t('deviceType')" width="100" />
+      <el-table-column prop="os" :label="t('osLabel')" width="110" />
+      <el-table-column prop="browser" :label="t('browser')" width="120" />
+      <el-table-column prop="ip" :label="t('ipAddress')" width="130" />
+      <el-table-column :label="t('lastLoginTime')" width="180">
         <template #default="scope">{{ formatUnixTime(scope.row.lastLoginAt) }}</template>
       </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column :label="t('actions')" width="220" fixed="right">
         <template #default="scope">
-          <el-button size="small" @click="openDetail(scope.row)">详情</el-button>
+          <el-button size="small" @click="openDetail(scope.row)">{{ t('details') }}</el-button>
           <el-button
             size="small"
             type="danger"
             :disabled="scope.row.isCurrent"
             @click="onKickDevice(scope.row.deviceId)"
           >
-            踢出设备
+            {{ t('kickDevice') }}
           </el-button>
         </template>
       </el-table-column>
@@ -50,26 +50,26 @@
       />
     </div>
 
-    <el-drawer v-model="detailVisible" title="设备详情" size="460px">
+    <el-drawer v-model="detailVisible" :title="t('deviceDetail')" size="460px">
       <template v-if="selectedDevice">
         <el-descriptions :column="1" border>
-          <el-descriptions-item label="设备ID">{{ selectedDevice.deviceId }}</el-descriptions-item>
-          <el-descriptions-item label="设备名称">{{ selectedDevice.deviceName }}</el-descriptions-item>
-          <el-descriptions-item label="设备类型">{{ selectedDevice.deviceType }}</el-descriptions-item>
-          <el-descriptions-item label="操作系统">{{ selectedDevice.os }}</el-descriptions-item>
-          <el-descriptions-item label="浏览器">{{ selectedDevice.browser }}</el-descriptions-item>
-          <el-descriptions-item label="IP地址">{{ selectedDevice.ip }}</el-descriptions-item>
-          <el-descriptions-item label="地理位置">{{ selectedDevice.location }}</el-descriptions-item>
-          <el-descriptions-item label="最后登录时间">
+          <el-descriptions-item :label="t('deviceId')">{{ selectedDevice.deviceId }}</el-descriptions-item>
+          <el-descriptions-item :label="t('deviceName')">{{ selectedDevice.deviceName }}</el-descriptions-item>
+          <el-descriptions-item :label="t('deviceType')">{{ selectedDevice.deviceType }}</el-descriptions-item>
+          <el-descriptions-item :label="t('osLabel')">{{ selectedDevice.os }}</el-descriptions-item>
+          <el-descriptions-item :label="t('browser')">{{ selectedDevice.browser }}</el-descriptions-item>
+          <el-descriptions-item :label="t('ipAddress')">{{ selectedDevice.ip }}</el-descriptions-item>
+          <el-descriptions-item :label="t('location')">{{ selectedDevice.location }}</el-descriptions-item>
+          <el-descriptions-item :label="t('lastLoginTime')">
             {{ formatUnixTime(selectedDevice.lastLoginAt) }}
           </el-descriptions-item>
         </el-descriptions>
 
-        <h4 class="history-title">登录历史</h4>
+        <h4 class="history-title">{{ t('loginHistory') }}</h4>
         <el-table :data="loginHistory" size="small" border>
-          <el-table-column prop="time" label="登录时间" width="170" />
+          <el-table-column prop="time" :label="t('time')" width="170" />
           <el-table-column prop="ip" label="IP" width="130" />
-          <el-table-column prop="result" label="结果" width="90" />
+          <el-table-column prop="result" :label="t('result')" width="90" />
         </el-table>
       </template>
     </el-drawer>
@@ -82,6 +82,9 @@ import { ElMessage, ElMessageBox } from 'element-plus';
 import { fetchUserDevices, kickUserDevice } from '../../services/userAuthApi';
 import type { DeviceItem } from '../../types/auth';
 import { formatUnixTime } from '../../utils/auth';
+import { useI18nText } from '../../i18n/useI18n';
+
+const { t } = useI18nText();
 
 const loading = ref(false);
 const devices = ref<DeviceItem[]>([]);
@@ -102,7 +105,7 @@ const loginHistory = computed(() => {
     {
       time: formatUnixTime(selectedDevice.value.lastLoginAt),
       ip: selectedDevice.value.ip,
-      result: selectedDevice.value.status === 'active' ? '成功' : '已失效'
+      result: selectedDevice.value.status === 'active' ? t('success') : t('expired')
     }
   ];
 });
@@ -132,22 +135,22 @@ const openDetail = (device: DeviceItem) => {
 
 const onKickDevice = async (deviceId: string) => {
   try {
-    await ElMessageBox.confirm('确定要踢出该设备吗？该设备的Token将立即失效。', '确认踢出', {
+    await ElMessageBox.confirm(t('kickDeviceConfirm'), t('kickDeviceConfirmTitle'), {
       type: 'warning',
-      confirmButtonText: '确认',
-      cancelButtonText: '取消',
+      confirmButtonText: t('confirm'),
+      cancelButtonText: t('cancel'),
       modalClass: 'admin-confirm-dialog-overlay',
       closeOnClickModal: false,
       closeOnPressEscape: false
     });
 
     await kickUserDevice(deviceId);
-    ElMessage.success('设备已踢出');
+    ElMessage.success(t('deviceKicked'));
     await loadDevices();
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
-      console.error('踢出设备失败:', error);
-      ElMessage.error('操作失败，请重试');
+      console.error(t('kickDeviceFailed'), error);
+      ElMessage.error(t('actionfailed'));
     }
   }
 };

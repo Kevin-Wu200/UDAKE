@@ -201,7 +201,7 @@ def test_approve_key_request_generates_product_key_and_completes_ticket(tickets_
     assert resp.status_code == 200, resp.text
     data = resp.json()["data"]
     assert data["ticket"]["status"] == "completed"
-    assert data["ticket"]["processed_by"] == 2
+    assert data["ticket"]["processed_by"] == "admin"
     assert data["assigned_key"]
 
     with session_factory() as db:

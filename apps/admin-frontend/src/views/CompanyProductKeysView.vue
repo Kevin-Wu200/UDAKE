@@ -1,95 +1,95 @@
 <template>
   <div class="company-product-keys-view">
     <div class="page-header">
-      <h1>企业密钥管理</h1>
+      <h1>{{ t('companyProductKeys') }}</h1>
       <div class="company-info">
         <el-tag type="success">{{ currentCompany.name }}</el-tag>
-        <el-tag type="warning">管理员类型：{{ adminTypeLabel }}</el-tag>
-        <el-tag type="info">已创建 {{ companyStats.totalKeys }} / {{ createLimit }}</el-tag>
+        <el-tag type="warning">{{ tc('manager') }}{{ adminTypeLabel }}</el-tag>
+        <el-tag type="info">{{ t('companykey') }}{{ companyStats.totalKeys }} / {{ createLimit }}</el-tag>
       </div>
     </div>
 
     <div class="stats-cards">
       <el-card class="stat-card">
         <div class="stat-value">{{ companyStats.totalKeys }}</div>
-        <div class="stat-label">总密钥数</div>
+        <div class="stat-label">{{ t('totalkeys') }}</div>
       </el-card>
       <el-card class="stat-card">
         <div class="stat-value">{{ companyStats.activeKeys }}</div>
-        <div class="stat-label">活跃密钥</div>
+        <div class="stat-label">{{ t('activeKeys') }}</div>
       </el-card>
       <el-card class="stat-card">
         <div class="stat-value">{{ companyStats.assignedKeys }}</div>
-        <div class="stat-label">已分配</div>
+        <div class="stat-label">{{ tc('assignedKey') }}</div>
       </el-card>
       <el-card class="stat-card">
         <div class="stat-value">{{ companyStats.availableKeys }}</div>
-        <div class="stat-label">可用密钥</div>
+        <div class="stat-label">{{ t('unusedKeys') }}</div>
       </el-card>
       <el-card class="stat-card">
         <div class="stat-value">{{ companyStats.expiredKeys }}</div>
-        <div class="stat-label">已过期</div>
+        <div class="stat-label">{{ t('expired') }}</div>
       </el-card>
     </div>
 
     <div class="action-bar">
-      <el-button type="primary" @click="handleBatchGenerate">批量生成密钥</el-button>
-      <el-button @click="handleAssignKey">分配密钥</el-button>
-      <el-button @click="handleViewUsers">管理用户</el-button>
+      <el-button type="primary" @click="handleBatchGenerate">{{ tc('batchGenerateCompanyKeys') }}</el-button>
+      <el-button @click="handleAssignKey">{{ tc('assignedKey') }}</el-button>
+      <el-button @click="handleViewUsers">{{ tc('menbermanage') }}</el-button>
     </div>
 
     <el-card class="filter-card">
       <el-form :inline="true" :model="filterForm">
-        <el-form-item label="密钥类型">
-          <el-select v-model="filterForm.type" placeholder="选择类型" clearable style="width: 180px">
-            <el-option label="企业试用" value="enterprise_trial" />
-            <el-option label="企业标准" value="enterprise_standard" />
+        <el-form-item :label="t('keytype')">
+          <el-select v-model="filterForm.type" :placeholder="t('selectType')" clearable style="width: 180px">
+            <el-option :label="tc('companyTrail')" value="enterprise_trial" />
+            <el-option :label="tc('companyStandard')" value="enterprise_standard" />
           </el-select>
         </el-form-item>
-        <el-form-item label="分配状态">
-          <el-select v-model="filterForm.assigned" placeholder="选择状态" clearable style="width: 160px">
-            <el-option label="已分配" :value="true" />
-            <el-option label="未分配" :value="false" />
+        <el-form-item :label="t('assignedat')">
+          <el-select v-model="filterForm.assigned" :placeholder="t('selectStatus')" clearable style="width: 160px">
+            <el-option :label="tc('assignedKey')" :value="true" />
+            <el-option :label="t('unused')" :value="false" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
+          <el-button type="primary" @click="handleSearch">{{ t('search') }}</el-button>
+          <el-button @click="handleReset">{{ t('reset') }}</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
     <el-table :data="keys" border v-loading="loading">
-      <el-table-column prop="product_key" label="密钥" min-width="220" />
-      <el-table-column prop="key_type" label="类型" width="120">
+      <el-table-column prop="product_key" :label="t('key')" min-width="220" />
+      <el-table-column prop="key_type" :label="t('type')" width="120">
         <template #default="{ row }">{{ getKeyTypeLabel(row.key_type) }}</template>
       </el-table-column>
-      <el-table-column prop="status" label="状态" width="110">
+      <el-table-column prop="status" :label="t('status')" width="110">
         <template #default="{ row }">
           <el-tag :type="getStatusType(row.status)">{{ getStatusLabel(row.status) }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="total_quota" label="总配额" width="100" />
-      <el-table-column prop="used_count" label="已使用" width="100" />
-      <el-table-column label="分配用户" width="180">
+      <el-table-column prop="total_quota" :label="t('totalquota')" width="100" />
+      <el-table-column prop="used_count" :label="t('used')" width="100" />
+      <el-table-column :label="tc('assignedKey')" width="180">
         <template #default="{ row }">{{ row.metadata?.assigned_user_name || '-' }}</template>
       </el-table-column>
-      <el-table-column prop="assigned_at" label="分配时间" width="170" />
-      <el-table-column prop="expires_at" label="过期时间" width="180">
+      <el-table-column prop="assigned_at" :label="t('assignedat')" width="170" />
+      <el-table-column prop="expires_at" :label="t('expiresat')" width="180">
         <template #default="{ row }">
           <span :class="{ 'is-expired-time': row.status === 'expired' }">{{ row.expires_at || '-' }}</span>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="220" fixed="right">
+      <el-table-column :label="t('actions')" width="220" fixed="right">
         <template #default="{ row }">
-          <el-button link type="primary" @click="handleView(row)">查看</el-button>
+          <el-button link type="primary" @click="handleView(row)">{{ t('check') }}</el-button>
           <el-button
             link
             type="primary"
             @click="handleAssign(row)"
             :disabled="Boolean(row.metadata?.assigned_user_name)"
           >
-            分配
+            {{ tc('assignedKey') }}
           </el-button>
           <el-button
             link
@@ -97,7 +97,7 @@
             @click="handleRevoke(row)"
             :disabled="!row.metadata?.assigned_user_name"
           >
-            撤销
+            {{ t('cancel') }}
           </el-button>
         </template>
       </el-table-column>
@@ -123,33 +123,33 @@
       @success="handleGenerateSuccess"
     />
 
-    <el-dialog v-model="assignDialogVisible" title="分配企业密钥" width="460px">
+    <el-dialog v-model="assignDialogVisible" :title="tc('assignedKey')" width="460px">
       <el-form ref="assignFormRef" :model="assignForm" :rules="assignRules" label-width="100px">
-        <el-form-item label="目标用户" prop="user_id">
-          <el-select v-model="assignForm.user_id" placeholder="请选择用户" filterable style="width: 100%">
+        <el-form-item :label="t('userid')" prop="user_id">
+          <el-select v-model="assignForm.user_id" :placeholder="t('selectUser')" filterable style="width: 100%">
             <el-option v-for="user in companyUsers" :key="user.id" :label="user.name" :value="user.id" />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="assignDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmAssign">确认分配</el-button>
+        <el-button @click="assignDialogVisible = false">{{ tc('cancel') }}</el-button>
+        <el-button type="primary" @click="confirmAssign">{{ tc('confirm') }}</el-button>
       </template>
     </el-dialog>
 
-    <el-dialog v-model="detailDialogVisible" title="密钥详情" width="640px">
+    <el-dialog v-model="detailDialogVisible" :title="t('keydetail')" width="640px">
       <el-descriptions :column="2" border v-if="selectedKey">
-        <el-descriptions-item label="密钥">{{ selectedKey.product_key }}</el-descriptions-item>
-        <el-descriptions-item label="类型">{{ getKeyTypeLabel(selectedKey.key_type) }}</el-descriptions-item>
-        <el-descriptions-item label="状态">{{ getStatusLabel(selectedKey.status) }}</el-descriptions-item>
-        <el-descriptions-item label="总配额">{{ selectedKey.total_quota }}</el-descriptions-item>
-        <el-descriptions-item label="已使用">{{ selectedKey.used_count }}</el-descriptions-item>
-        <el-descriptions-item label="分配用户">
+        <el-descriptions-item :label="t('key')">{{ selectedKey.product_key }}</el-descriptions-item>
+        <el-descriptions-item :label="t('type')">{{ getKeyTypeLabel(selectedKey.key_type) }}</el-descriptions-item>
+        <el-descriptions-item :label="t('status')">{{ getStatusLabel(selectedKey.status) }}</el-descriptions-item>
+        <el-descriptions-item :label="t('totalquota')">{{ selectedKey.total_quota }}</el-descriptions-item>
+        <el-descriptions-item :label="t('used')">{{ selectedKey.used_count }}</el-descriptions-item>
+        <el-descriptions-item :label="tc('assignedKey')">
           {{ selectedKey.metadata?.assigned_user_name || '-' }}
         </el-descriptions-item>
-        <el-descriptions-item label="过期时间">{{ selectedKey.expires_at || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="分配时间">{{ selectedKey.assigned_at || '-' }}</el-descriptions-item>
-        <el-descriptions-item label="备注">{{ selectedKey.metadata?.notes || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="t('expiresat')">{{ selectedKey.expires_at || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="t('assignedat')">{{ selectedKey.assigned_at || '-' }}</el-descriptions-item>
+        <el-descriptions-item :label="t('notes')">{{ selectedKey.metadata?.notes || '-' }}</el-descriptions-item>
       </el-descriptions>
     </el-dialog>
   </div>
@@ -171,6 +171,9 @@ import {
   fetchCompanyUsers,
   revokeCompanyKey
 } from '../services/http';
+import { useI18nText } from '../i18n/useI18n';
+
+const { t, tc } = useI18nText();
 
 const router = useRouter();
 const authStore = useAuthStore();
@@ -203,7 +206,7 @@ const companyStats = reactive({
 
 const companyAdminProfile = ref<CompanyAdmin | null>(null);
 const adminTypeLabel = computed(() =>
-  companyAdminProfile.value?.company_admin_type === 'trial' ? '试用企业管理员' : '标准企业管理员'
+  companyAdminProfile.value?.company_admin_type === 'trial' ? t('companyAdminTrial') : t('companyAdminStandard')
 );
 const createLimit = computed(() => companyAdminProfile.value?.max_keys_allowed ?? 1000);
 
@@ -218,18 +221,18 @@ const assignForm = reactive({
 });
 
 const assignRules: FormRules<typeof assignForm> = {
-  user_id: [{ required: true, message: '请选择用户', trigger: 'change' }]
+  user_id: [{ required: true, message: t('selectUser'), trigger: 'change' }]
 };
 
 const getKeyTypeLabel = (type: ProductKey['key_type']) =>
-  type === 'enterprise_trial' ? '企业试用' : '企业标准';
+  type === 'enterprise_trial' ? tc('companyTrail') : tc('companyStandard');
 
 const getStatusLabel = (status: KeyStatus) => {
   const map: Record<KeyStatus, string> = {
-    unused: '未使用',
-    active: '活跃',
-    disabled: '已禁用',
-    expired: '已过期'
+    unused: t('unused'),
+    active: t('active'),
+    disabled: t('disabled'),
+    expired: t('expired')
   };
   return map[status];
 };
@@ -281,7 +284,7 @@ const loadList = async () => {
     keys.value = res.items;
     pagination.total = res.total;
   } catch {
-    ElMessage.error('加载企业密钥列表失败');
+    ElMessage.error(t('loadKeyListFailed'));
   } finally {
     loading.value = false;
   }
@@ -294,7 +297,7 @@ const handleBatchGenerate = () => {
 const handleAssignKey = () => {
   const target = keys.value.find((item) => !item.metadata?.assigned_user_name);
   if (!target) {
-    ElMessage.warning('没有可分配的密钥');
+    ElMessage.warning(t('noKeyToAssign'));
     return;
   }
   handleAssign(target);
@@ -345,7 +348,7 @@ const confirmAssign = async () => {
     await assignFormRef.value.validate();
     const user = companyUsers.value.find((item) => item.id === assignForm.user_id);
     if (!user) {
-      ElMessage.error('目标用户不存在');
+      ElMessage.error(t('targetUserNotFound'));
       return;
     }
     await assignCompanyKey(assignKeyId.value, {
@@ -354,20 +357,20 @@ const confirmAssign = async () => {
       operator: authStore.username || 'company_admin'
     });
     assignDialogVisible.value = false;
-    ElMessage.success('分配成功');
+    ElMessage.success(t('assignSuccess'));
     await Promise.all([loadList(), loadCompanyStats(), loadCompanyProfile()]);
   } catch {
-    ElMessage.error('分配失败');
+    ElMessage.error(t('assignFailed'));
   }
 };
 
 const handleRevoke = async (row: ProductKey) => {
   try {
     await revokeCompanyKey(row.id, authStore.username || 'company_admin');
-    ElMessage.success('已撤销分配');
+    ElMessage.success(t('revokeSuccess'));
     await Promise.all([loadList(), loadCompanyStats(), loadCompanyProfile()]);
   } catch {
-    ElMessage.error('撤销失败');
+    ElMessage.error(t('revokeFailed'));
   }
 };
 

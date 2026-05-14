@@ -15,6 +15,9 @@ import { computed, ref } from 'vue';
 import { useAuthStore } from '../stores/auth';
 import AdminDashboard from './Dashboard/AdminDashboard.vue';
 import EnterpriseDashboard from './Dashboard/EnterpriseDashboard.vue';
+import { useI18nText } from '../i18n/useI18n';
+
+const { t } = useI18nText();
 
 const authStore = useAuthStore();
 const role = computed(() => authStore.user?.role ?? '');
@@ -22,8 +25,8 @@ const isCompanyAdmin = computed(() => role.value === 'company_admin');
 
 const activeView = ref<'admin' | 'enterprise'>('admin');
 const viewOptions = [
-  { label: '管理视角', value: 'admin' },
-  { label: '企业视角', value: 'enterprise' }
+  { label: t('dashboardAdminView'), value: 'admin' },
+  { label: t('dashboardEnterpriseView'), value: 'enterprise' }
 ];
 
 const currentView = computed(() => {

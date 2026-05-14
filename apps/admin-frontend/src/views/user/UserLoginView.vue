@@ -1,34 +1,34 @@
 <template>
   <div class="user-login-page">
     <div class="panel">
-      <h1>用户登录</h1>
-      <p class="subtitle">支持自动登录、记住密码与Token自动刷新</p>
+      <h1>{{ t('userLogin') }}</h1>
+      <p class="subtitle">{{ t('autoLoginSupport') }}</p>
 
       <el-form ref="formRef" :model="form" :rules="rules" label-position="top" @submit.prevent>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="form.email" placeholder="请输入邮箱" />
+        <el-form-item :label="t('email')" prop="email">
+          <el-input v-model="form.email" :placeholder="t('enterEmail')" />
         </el-form-item>
 
-        <el-form-item label="密码" prop="password">
+        <el-form-item :label="t('password')" prop="password">
           <el-input
             v-model="form.password"
             type="password"
             show-password
-            placeholder="请输入密码"
+            :placeholder="t('enterPassword')"
             @keyup.enter="onSubmit"
           />
         </el-form-item>
 
         <div class="row">
-          <el-checkbox v-model="form.rememberPassword">记住密码</el-checkbox>
-          <el-link type="primary" @click="router.push('/user/forgot-password')">找回密码</el-link>
+          <el-checkbox v-model="form.rememberPassword">{{ t('rememberPassword') }}</el-checkbox>
+          <el-link type="primary" @click="router.push('/user/forgot-password')">{{ t('forgotPassword') }}</el-link>
         </div>
 
-        <el-button type="primary" class="submit" :loading="submitting" @click="onSubmit">登录</el-button>
+        <el-button type="primary" class="submit" :loading="submitting" @click="onSubmit">{{ t('login') }}</el-button>
 
         <div class="footer-line">
-          还没有账号？
-          <el-link type="primary" @click="router.push('/user/register')">立即注册</el-link>
+          {{ t('noAccountHint') }}
+          <el-link type="primary" @click="router.push('/user/register')">{{ t('goToRegister') }}</el-link>
         </div>
       </el-form>
     </div>
@@ -44,6 +44,9 @@ import { useAuthStore } from '../../stores/auth';
 import { loginUser } from '../../services/userAuthApi';
 import { decodeRememberPassword, encodeRememberPassword } from '../../utils/auth';
 import { resolveLoginFallbackRedirect } from '../../utils/authRedirect';
+import { useI18nText } from '../../i18n/useI18n';
+
+const { t } = useI18nText();
 
 interface LoginForm {
   email: string;
@@ -71,10 +74,10 @@ const form = reactive<LoginForm>({
 
 const rules: FormRules<LoginForm> = {
   email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '邮箱格式不正确', trigger: ['blur', 'change'] }
+    { required: true, message: t('enterEmail'), trigger: 'blur' },
+    { type: 'email', message: t('invalidEmail'), trigger: ['blur', 'change'] }
   ],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }]
+  password: [{ required: true, message: t('enterPassword'), trigger: 'blur' }]
 };
 
 const onSubmit = async () => {
@@ -97,7 +100,7 @@ const onSubmit = async () => {
       localStorage.removeItem(REMEMBER_PASSWORD_KEY);
     }
 
-    ElMessage.success('登录成功');
+    ElMessage.success(t('loginSuccess'));
     const redirect = typeof route.query.redirect === 'string'
       ? route.query.redirect
       : resolveLoginFallbackRedirect(route.path);

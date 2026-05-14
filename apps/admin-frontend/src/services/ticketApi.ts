@@ -21,15 +21,15 @@ export async function getTickets(params: TicketListParams): Promise<{ total: num
   };
 }
 
-export async function getTicket(ticketId: number): Promise<Ticket> {
+export async function getTicket(ticketId: string): Promise<Ticket> {
   const response = await http.get<BackendResponse<{ ticket: Ticket }>>(`/tickets/${ticketId}`);
   return response.data.data.ticket;
 }
 
-export async function approveTicket(ticketId: number, notes: string): Promise<void> {
+export async function approveTicket(ticketId: string, notes: string): Promise<void> {
   await http.put(`/tickets/${ticketId}/approve`, { notes });
 }
 
-export async function rejectTicket(ticketId: number, reason: string): Promise<void> {
+export async function rejectTicket(ticketId: string, reason: string): Promise<void> {
   await http.put(`/tickets/${ticketId}/reject`, { reason });
 }

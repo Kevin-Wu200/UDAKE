@@ -18,6 +18,7 @@
         title: "智能空间决策，驱动未来",
         subtitle: "空间插值与不确定性分析平台",
         cta: "立即体验",
+        onlineAccess: "在线试用",
       },
       features: {
         title: "核心功能模块",
@@ -322,6 +323,7 @@
         subtitle:
           "Platform for spatial interpolation and uncertainty analysis",
         cta: "Get Started",
+        onlineAccess: "Online Trail",
       },
       features: {
         title: "Core Modules",

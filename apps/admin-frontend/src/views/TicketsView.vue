@@ -16,7 +16,7 @@
     </div>
 
     <el-table v-loading="ticketStore.loading" :data="ticketStore.tickets" border style="width: 100%">
-      <el-table-column prop="id" label="ID" width="80" />
+      <el-table-column prop="ticket_id" label="ID" width="140" />
       <el-table-column prop="ticket_type" :label="tc('type')">
         <template #default="{ row }">{{ row.ticket_type === 'key_request' ? tc('keyRequest') : tc('keyExtension') }}</template>
       </el-table-column>
@@ -24,10 +24,12 @@
       <el-table-column prop="status" :label="tc('status')">
         <template #default="{ row }"><StatusTag :status="row.status" /></template>
       </el-table-column>
-      <el-table-column prop="created_at" :label="tc('createAt')" />
+      <el-table-column :label="tc('createAt')">
+        <template #default="{ row }">{{ formatTicketTime(row.created_at) }}</template>
+      </el-table-column>
       <el-table-column :label="tc('action')" width="200">
         <template #default="{ row }">
-          <el-button link @click="viewDetail(row.id)">{{ tc('check') }}</el-button>
+          <el-button link @click="viewDetail(row.ticket_id)">{{ tc('check') }}</el-button>
           <el-button v-if="row.status === 'pending'" link type="primary" @click="openApprove(row)">{{tc('approve')}}</el-button>
           <el-button v-if="row.status === 'pending'" link type="danger" @click="openReject(row)">{{tc('reject')}}</el-button>
         </template>
@@ -56,6 +58,7 @@ import ApprovalDialog from '../components/ApprovalDialog.vue';
 import { ElMessage } from 'element-plus';
 import type { Ticket, TicketListParams } from '../types/ticket';
 import { useI18nText } from '../i18n/useI18n';
+import { formatTicketTime } from '../utils/auth';
 
 const { tc } = useI18nText();
 const router = useRouter();
@@ -75,7 +78,7 @@ const loadData = () => {
   ticketStore.fetchTickets({ ...pagination, ...filters });
 };
 
-const viewDetail = (id: number) => {
+const viewDetail = (id: string) => {
   if (route.name === 'enterprise-tickets') {
     router.push({ name: 'enterprise-ticket-detail', params: { id } });
   } else {
@@ -97,7 +100,7 @@ const onApprove = async (notes: string) => {
   if (!currentActionTicket.value) {
     return;
   }
-  await ticketStore.approve(currentActionTicket.value.id, notes);
+  await ticketStore.approve(currentActionTicket.value.ticket_id, notes);
   ElMessage.success(tc('approveSuccess'));
   approveDialog.value.close();
   loadData();
@@ -107,7 +110,7 @@ const onReject = async (reason: string) => {
   if (!currentActionTicket.value) {
     return;
   }
-  await ticketStore.reject(currentActionTicket.value.id, reason);
+  await ticketStore.reject(currentActionTicket.value.ticket_id, reason);
   ElMessage.success(tc('rejectSuccess'));
   rejectDialog.value.close();
   loadData();
