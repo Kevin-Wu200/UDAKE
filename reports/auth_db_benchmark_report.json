@@ -1,6 +1,6 @@
 {
   "generated_at": 1775003164,
-  "database_url": "sqlite+pysqlite:////tmp/auth_db_benchmark.sqlite",
+  "database_url": "postgresql://wuchenkai:qwer236236H@localhost:5432/udake_auth",
   "results": [
     {
       "users": 100,

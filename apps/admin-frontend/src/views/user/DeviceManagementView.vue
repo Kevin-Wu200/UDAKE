@@ -68,7 +68,7 @@
         <h4 class="history-title">{{ t('loginHistory') }}</h4>
         <el-table :data="loginHistory" size="small" border>
           <el-table-column prop="time" :label="t('time')" width="170" />
-          <el-table-column prop="ip" label="IP" width="130" />
+          <el-table-column prop="ip" :label="t('ipAddress')" width="130" />
           <el-table-column prop="result" :label="t('result')" width="90" />
         </el-table>
       </template>

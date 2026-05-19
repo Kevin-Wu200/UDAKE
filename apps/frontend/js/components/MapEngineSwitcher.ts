@@ -56,7 +56,8 @@ export class MapEngineSwitcher {
         if (deduplicated.size === 0) {
             return [
                 { provider: 'geoscene', displayName: 'GeoScene' },
-                { provider: 'amap', displayName: t('map.name.amap') }
+                { provider: 'amap', displayName: t('map.name.amap') },
+                { provider: 'canvas', displayName: '空白画布 (Canvas)' }
             ];
         }
 

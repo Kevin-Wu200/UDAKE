@@ -87,7 +87,7 @@ const router = createRouter({
           name: 'user-devices',
           component: DeviceManagementView,
           meta: {
-            title: '设备管理',
+            titleKey: 'deviceManagement',
             requiresUserAuth: true,
             requiredRoles: USER_ALLOWED_ROLES
           }
@@ -97,7 +97,7 @@ const router = createRouter({
           name: 'user-change-password',
           component: ChangePasswordView,
           meta: {
-            title: '修改密码',
+            titleKey: 'changepassword',
             requiresUserAuth: true,
             requiredRoles: USER_ALLOWED_ROLES
           }
@@ -107,7 +107,7 @@ const router = createRouter({
           name: 'user-change-email',
           component: ChangeEmailView,
           meta: {
-            title: '修改邮箱',
+            titleKey: 'changeemail',
             requiresUserAuth: true,
             requiredRoles: USER_ALLOWED_ROLES
           }

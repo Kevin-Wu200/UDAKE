@@ -32,6 +32,10 @@ const builtinFactories: Record<string, AdapterFactory> = {
     amap: async () => {
         const mod = await import('../adapters/AMapAdapter.js');
         return new mod.AMapAdapter();
+    },
+    canvas: async () => {
+        const mod = await import('./canvas/CanvasMapAdapter.js');
+        return new mod.CanvasMapAdapter();
     }
 };
 
@@ -63,6 +67,13 @@ function registerBuiltinEngines(): void {
         displayName: '高德',
         source: 'builtin',
         createAdapter: builtinFactories.amap
+    });
+
+    registerMapEngine({
+        provider: 'canvas',
+        displayName: '空白画布 (Canvas)',
+        source: 'builtin',
+        createAdapter: builtinFactories.canvas
     });
 }
 

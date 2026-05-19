@@ -118,6 +118,65 @@ export interface ArcGISExtent {
     spatialReference: any;
 }
 
+// ========== Canvas 引擎特定类型 ==========
+
+/** 高斯-克吕格投影带类型 */
+export type GKBandType = '3-degree' | '6-degree';
+
+/** GK 投影配置 */
+export interface GKProjectionConfig {
+    /** 中央经线（度），不指定则根据中心点自动计算 */
+    centralMeridian?: number;
+    /** 带类型，默认 3 度带 */
+    bandType?: GKBandType;
+    /** 椭球参数：长半轴（米），默认 WGS84 */
+    semiMajorAxis?: number;
+    /** 椭球参数：扁率倒数，默认 WGS84 */
+    inverseFlattening?: number;
+    /** 东偏移（米），默认 500000 */
+    falseEasting?: number;
+    /** 北偏移（米），默认 0 */
+    falseNorthing?: number;
+}
+
+/** 画布引擎配置 */
+export interface CanvasEngineConfig {
+    /** GK 投影配置 */
+    projection?: GKProjectionConfig;
+    /** 初始中心点 [lng, lat] */
+    center?: [number, number];
+    /** 初始缩放级别 */
+    zoom?: number;
+    /** 最小缩放 */
+    minZoom?: number;
+    /** 最大缩放 */
+    maxZoom?: number;
+    /** 栅格图层 API 基础 URL（ArcGIS ImageryLayer Export Image） */
+    imageryBaseUrl?: string;
+    /** 是否启用深色模式 */
+    darkMode?: boolean;
+}
+
+/** GK 平面坐标（米） */
+export interface GKCoordinate {
+    /** 东向坐标 (Easting) */
+    x: number;
+    /** 北向坐标 (Northing) */
+    y: number;
+}
+
+/** 画布视口边界（GK 坐标） */
+export interface CanvasViewportBounds {
+    /** 最小东向坐标 */
+    minX: number;
+    /** 最小北向坐标 */
+    minY: number;
+    /** 最大东向坐标 */
+    maxX: number;
+    /** 最大北向坐标 */
+    maxY: number;
+}
+
 /** ArcGIS 地图引擎 */
 export class GeoSceneEngine extends BaseMapEngine {
     /** ArcGIS MapView 实例 */

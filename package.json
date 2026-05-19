@@ -90,6 +90,7 @@
     "@capacitor/local-notifications": "^8.0.2",
     "@geoscene/core": "^4.33.19",
     "echarts": "^6.0.0",
+    "proj4": "^2.20.8",
     "socket.io-client": "^4.8.3"
   },
   "build": {
