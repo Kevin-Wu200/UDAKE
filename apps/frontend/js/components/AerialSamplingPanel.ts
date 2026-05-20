@@ -237,15 +237,22 @@ export class AerialSamplingPanel {
 
         // 开始处理
         startBtn?.addEventListener('click', () => this.startFullPipeline());
+    }
 
-        this.handleFileSelect = (file: File) => {
-            this.selectedFile = file;
-            if (fileName) fileName.textContent = `📎 ${file.name} (${this.formatFileSize(file.size)})`;
-            if (startBtn) {
-                startBtn.disabled = false;
-                startBtn.style.opacity = '1';
-            }
-        };
+    /** 处理文件选择 */
+    private handleFileSelect(file: File): void {
+        this.selectedFile = file;
+
+        const fileName = this.container.querySelector('#aerial-file-name') as HTMLElement | null;
+        const startBtn = this.container.querySelector('#aerial-start-btn') as HTMLButtonElement | null;
+
+        if (fileName) {
+            fileName.textContent = `📎 ${file.name} (${this.formatFileSize(file.size)})`;
+        }
+        if (startBtn) {
+            startBtn.disabled = false;
+            startBtn.style.opacity = '1';
+        }
     }
 
     /** 进度步骤 */
