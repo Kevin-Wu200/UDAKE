@@ -107,7 +107,7 @@ class Settings(BaseSettings):
     GEOSCENE_API_KEY: str = ""
     GEOSCENE_USERNAME: str = ""
     GEOSCENE_PASSWORD: str = ""
-    GEOSCENE_PORTAL_URL: str = "https://www.geoscene.cn"
+    GEOSCENE_PORTAL_URL: str = "https://gis:7443/geoscene/"
     GEOSCENE_ENV: str = "development"
     GEOSCENE_DEFAULT_BASEMAP: str = "streets-vector"
     GEOSCENE_DEFAULT_CENTER: Union[str, List[float]] = "[139.767125,35.681236]"
@@ -414,11 +414,13 @@ class Settings(BaseSettings):
 
     @property
     def geoscene_token_url(self) -> str:
-        """获取GeoScene Enterprise Token服务URL"""
+        """获取GeoScene Enterprise Token服务URL
+        GeoScene Enterprise Token端点: {portalUrl}/sharing/rest/generateToken
+        """
         if self.GEOSCENE_TOKEN_URL and self.GEOSCENE_TOKEN_URL.strip():
             return self.GEOSCENE_TOKEN_URL.strip()
         portal = self.GEOSCENE_PORTAL_URL.rstrip("/")
-        return f"{portal}/portal/sharing/rest/generateToken"
+        return f"{portal}/sharing/rest/generateToken"
 
     @property
     def is_development(self) -> bool:

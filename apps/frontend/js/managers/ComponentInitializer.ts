@@ -9,6 +9,7 @@ import { SinglePointSampling } from '../单点采样输入.js';
 import { SamplingRecommendationPanel } from '../components/SamplingRecommendationPanel.js';
 import { EnhancedSamplingRecommendationPanel } from '../components/EnhancedSamplingRecommendationPanel.js';
 import { InteractiveSamplingMarkers } from '../components/InteractiveSamplingMarkers.js';
+import { PointDetailedNavigation } from '../components/PointDetailedNavigation.js';
 import { SamplingStrategySelector } from '../components/SamplingStrategySelector.js';
 import { QuickActionBar } from '../components/QuickActionBar.js';
 import { SmartWizardEngine } from '../components/SmartWizardEngine.js';
@@ -182,10 +183,21 @@ export class ComponentInitializer {
                 console.log('策略变化:', strategy, config);
             });
 
-            // 监听标记点击
+            // 监听标记点击 - 显示操作弹窗（查看详情 / 精准导航）
             interactiveMarkers.setOnMarkerClick((rec) => {
-                console.log('标记点击:', rec);
-                enhancedRecommendationPanel.previewPointEffect(rec);
+                // 将点击事件改为显示弹窗，弹窗中包含"查看详情"和"精准导航"
+                const mouseEvent = window.event as MouseEvent;
+                if (mouseEvent) {
+                    interactiveMarkers.showPopup(rec, mouseEvent.clientX, mouseEvent.clientY);
+                } else {
+                    // 回退：直接显示详情
+                    enhancedRecommendationPanel.previewPointEffect(rec);
+                }
+            });
+
+            // 监导航请求 - 启动精准导航
+            interactiveMarkers.setOnNavigate((rec) => {
+                this.startPointNavigation(rec);
             });
 
             // 监听标记拖拽
@@ -629,6 +641,40 @@ export class ComponentInitializer {
     }
 
     /**
+     * 启动点位精准导航
+     */
+    private currentNavigation: PointDetailedNavigation | null = null;
+
+    private startPointNavigation(rec: { x: number; y: number; id: number | string }): void {
+        // 关闭已有导航
+        if (this.currentNavigation) {
+            this.currentNavigation.stop();
+            this.currentNavigation = null;
+        }
+
+        const target = {
+            latitude: rec.y,  // y 对应纬度
+            longitude: rec.x, // x 对应经度
+            label: `采样点 #${rec.id}`,
+        };
+
+        const navigation = new PointDetailedNavigation(target);
+        navigation.setOnClose(() => {
+            this.currentNavigation = null;
+        });
+        navigation.setOnArrived(() => {
+            console.log('[PointDetailedNavigation] 已到达目标点');
+            // 到达后可自动退出或显示提示
+        });
+
+        navigation.start().catch((err) => {
+            console.error('[PointDetailedNavigation] 启动失败:', err);
+        });
+
+        this.currentNavigation = navigation;
+    }
+
+    /**
      * 更新界面文本
      */
     private updateUIText(): void {
@@ -641,6 +687,12 @@ export class ComponentInitializer {
      */
     public destroy(): void {
         console.log('[ComponentInitializer] 销毁所有组件...');
+
+        // 关闭精准导航
+        if (this.currentNavigation) {
+            this.currentNavigation.stop();
+            this.currentNavigation = null;
+        }
 
         // 销毁各个组件
         this.components.forEach((component, name) => {

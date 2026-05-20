@@ -1,0 +1,305 @@
+/**
+ * 点位精确导航 (AirTag模式) 样式
+ * 全屏沉浸式Overlay，箭头旋转动画，脉冲效果
+ */
+
+/* ==================== 覆盖层容器 ==================== */
+
+.point-navigation-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: navOverlayFadeIn 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+@keyframes navOverlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ==================== 导航主体容器 ==================== */
+
+.point-navigation-overlay .navigation-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: env(safe-area-inset-top, 20px) 24px env(safe-area-inset-bottom, 32px) 24px;
+  max-width: 480px;
+}
+
+/* 中间弹性区域让箭头居中 */
+.navigation-arrow-rotator {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ==================== 顶部信息栏 ==================== */
+
+.navigation-header {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding-top: 12px;
+  width: 100%;
+}
+
+.navigation-target-label {
+  font-size: 17px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: 0.2px;
+}
+
+/* ==================== 精度徽章 ==================== */
+
+.navigation-accuracy-badge {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.navigation-accuracy-badge.accuracy-poor {
+  background: rgba(255, 59, 48, 0.15);
+  color: #ff3b30;
+}
+
+.navigation-accuracy-badge .accuracy-icon {
+  font-size: 12px;
+}
+
+/* ==================== 警告提示 ==================== */
+
+.navigation-no-compass-hint,
+.navigation-signal-warning {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 12px;
+  animation: navHintFadeIn 400ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.navigation-signal-warning {
+  color: #ff9500;
+}
+
+@keyframes navHintFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==================== 中心箭头区域 ==================== */
+
+/* 外层：处理旋转 (JS通过transform: rotate控制) */
+.navigation-arrow-rotator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  will-change: transform;
+}
+
+/* 内层：处理脉冲动画 (CSS动画) */
+.navigation-arrow-inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navigation-arrow {
+  width: 160px;
+  height: 192px;
+  color: #007AFF;
+  transition: color 500ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.navigation-arrow svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* 到达状态箭头样式 */
+.navigation-arrow.navigation-arrived {
+  width: 120px;
+  height: 120px;
+}
+
+/* 脉冲动画 (在内层元素上) */
+.navigation-arrow-inner.navigation-pulse {
+  animation: navPulse var(--pulse-duration, 1.5s) cubic-bezier(0.4, 0.0, 0.2, 1) infinite;
+}
+
+@keyframes navPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(var(--pulse-scale, 1.08));
+  }
+}
+
+/* ==================== 底部信息区 ==================== */
+
+.navigation-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 24px;
+  width: 100%;
+}
+
+.navigation-distance {
+  font-size: 56px;
+  font-weight: 300;
+  color: #ffffff;
+  letter-spacing: -1px;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  animation: navFadeSlideUp 300ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+.navigation-status {
+  font-size: 15px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.3px;
+  transition: color 500ms cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+
+@keyframes navFadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ==================== 关闭按钮 ==================== */
+
+.navigation-close-btn {
+  position: fixed;
+  bottom: calc(env(safe-area-inset-bottom, 20px) + 40px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 200ms ease, color 200ms ease;
+  z-index: 1;
+}
+
+.navigation-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.navigation-close-btn:active {
+  transform: translateX(-50%) scale(0.92);
+  transition: transform 100ms ease;
+}
+
+/* ==================== 响应式 ==================== */
+
+@media (max-width: 380px) {
+  .navigation-arrow {
+    width: 140px;
+    height: 168px;
+  }
+
+  .navigation-arrow.navigation-arrived {
+    width: 100px;
+    height: 100px;
+  }
+
+  .navigation-distance {
+    font-size: 44px;
+  }
+
+  .navigation-target-label {
+    font-size: 15px;
+  }
+}
+
+@media (min-width: 768px) {
+  .navigation-arrow {
+    width: 200px;
+    height: 240px;
+  }
+
+  .navigation-arrow.navigation-arrived {
+    width: 150px;
+    height: 150px;
+  }
+
+  .navigation-distance {
+    font-size: 64px;
+  }
+}
+
+/* ==================== 减少动画偏好 ==================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .navigation-arrow-inner.navigation-pulse {
+    animation-duration: 3s;
+  }
+
+  @keyframes navPulse {
+    0%, 100% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.02);
+    }
+  }
+}

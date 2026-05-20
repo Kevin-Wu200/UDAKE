@@ -41,7 +41,11 @@ export class InteractiveSamplingMarkers {
     private markerConfig: MarkerConfig;
     private onMarkerClick: ((rec: Recommendation) => void) | null = null;
     private onMarkerDrag: ((rec: Recommendation, newPosition: { x: number; y: number }) => void) | null = null;
+    private onNavigateRequest: ((rec: Recommendation) => void) | null = null;
     private activeMarkerId: number | null = null;
+
+    // 自定义弹窗
+    private activePopupEl: HTMLElement | null = null;
 
     constructor(mapEngine: IMapAdapterExtended) {
         this.mapEngine = mapEngine;
@@ -76,6 +80,83 @@ export class InteractiveSamplingMarkers {
             });
         } catch (error) {
             console.error('创建标记失败:', error);
+        }
+    }
+
+    /**
+     * 显示标记操作弹窗
+     */
+    public showPopup(rec: Recommendation, screenX: number, screenY: number): void {
+        this.closePopup();
+
+        const mapContainer = document.querySelector('.map-container');
+        if (!mapContainer) return;
+
+        const popup = document.createElement('div');
+        popup.className = 'marker-action-popup';
+        popup.style.cssText = `
+            position: absolute;
+            left: ${screenX}px;
+            top: ${screenY}px;
+            z-index: 1000;
+            background: var(--bg-primary, #ffffff);
+            border-radius: 14px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+            padding: 4px;
+            min-width: 140px;
+            animation: fadeIn 200ms cubic-bezier(0.4, 0.0, 0.2, 1);
+        `;
+
+        const actions = [
+            { label: '查看详情', icon: '📊', action: () => {
+                if (this.onMarkerClick) {
+                    this.onMarkerClick(rec);
+                }
+                this.closePopup();
+            }},
+            { label: '精准导航', icon: '🧭', action: () => {
+                if (this.onNavigateRequest) {
+                    this.onNavigateRequest(rec);
+                }
+                this.closePopup();
+            }, primary: true },
+        ];
+
+        actions.forEach((action) => {
+            const btn = document.createElement('button');
+            btn.className = `marker-action-btn${action.primary ? ' marker-action-btn-primary' : ''}`;
+            btn.innerHTML = `<span class="marker-action-icon">${action.icon}</span><span>${action.label}</span>`;
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                action.action();
+            });
+            popup.appendChild(btn);
+        });
+
+        mapContainer.appendChild(popup);
+        this.activePopupEl = popup;
+
+        // 点击其他地方关闭弹窗
+        const closeHandler = (e: Event) => {
+            if (!popup.contains(e.target as Node)) {
+                this.closePopup();
+                mapContainer.removeEventListener('click', closeHandler);
+                document.removeEventListener('click', closeHandler);
+            }
+        };
+        setTimeout(() => {
+            mapContainer.addEventListener('click', closeHandler);
+            document.addEventListener('click', closeHandler);
+        }, 0);
+    }
+
+    /**
+     * 关闭弹窗
+     */
+    public closePopup(): void {
+        if (this.activePopupEl) {
+            this.activePopupEl.remove();
+            this.activePopupEl = null;
         }
     }
 
@@ -159,6 +240,7 @@ export class InteractiveSamplingMarkers {
      * 清除所有标记
      */
     public clearMarkers(): void {
+        this.closePopup();
         this.markers.forEach((entry) => {
             entry.marker.remove();
             entry.popup.remove();
@@ -179,6 +261,13 @@ export class InteractiveSamplingMarkers {
      */
     public setOnMarkerClick(callback: ((rec: Recommendation) => void) | null): void {
         this.onMarkerClick = callback;
+    }
+
+    /**
+     * 设置导航请求回调
+     */
+    public setOnNavigate(callback: ((rec: Recommendation) => void) | null): void {
+        this.onNavigateRequest = callback;
     }
 
     /**
@@ -206,8 +295,10 @@ export class InteractiveSamplingMarkers {
      * 销毁所有标记
      */
     public destroy(): void {
+        this.closePopup();
         this.clearMarkers();
         this.onMarkerClick = null;
         this.onMarkerDrag = null;
+        this.onNavigateRequest = null;
     }
 }

@@ -2448,3 +2448,70 @@ input[type="number"] {
         -webkit-backdrop-filter: none;
     }
 }
+
+/* ==================== 标记操作弹窗 ==================== */
+
+.marker-action-popup {
+    transform: translate(-50%, -110%);
+    pointer-events: auto;
+}
+
+.marker-action-popup::after {
+    content: '';
+    position: absolute;
+    bottom: -6px;
+    left: 50%;
+    transform: translateX(-50%) rotate(45deg);
+    width: 12px;
+    height: 12px;
+    background: var(--bg-primary, #ffffff);
+    border-radius: 2px;
+    box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.06);
+}
+
+.marker-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 14px;
+    border: none;
+    border-radius: 11px;
+    background: transparent;
+    color: var(--text-primary, #000);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: left;
+    transition: background 200ms ease;
+    -webkit-tap-highlight-color: transparent;
+    white-space: nowrap;
+}
+
+.marker-action-btn:hover {
+    background: rgba(0, 0, 0, 0.04);
+}
+
+.marker-action-btn:active {
+    background: rgba(0, 0, 0, 0.08);
+    transform: scale(0.98);
+    transition: transform 100ms ease;
+}
+
+.marker-action-btn-primary {
+    color: var(--primary-color, #007aff);
+    font-weight: 600;
+}
+
+.marker-action-btn-primary:hover {
+    background: rgba(0, 122, 255, 0.06);
+}
+
+.marker-action-btn-primary:active {
+    background: rgba(0, 122, 255, 0.1);
+}
+
+.marker-action-icon {
+    font-size: 16px;
+    line-height: 1;
+}

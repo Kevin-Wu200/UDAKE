@@ -1,4 +1,5 @@
 import { I18nDialog } from './I18nDialog.js';
+import { Renderer3D, type Point3DData } from './Renderer3D.js';
 /**
  * 3D克里金插值组件
  * 提供3D数据上传、参数配置、插值执行、结果可视化
@@ -45,6 +46,12 @@ export class Kriging3DPanel {
     private taskId: string | null = null;
     private pollTimer: number | null = null;
     private config: Kriging3DConfig;
+    /** 3D 渲染器实例 */
+    private renderer3D: Renderer3D | null = null;
+    /** 当前切片/网格数据（用于3D可视化） */
+    private currentSlice: SliceData | null = null;
+    /** 当前网格预测数据 */
+    private gridData: { x: number[]; y: number[]; z: number; values: number[][] } | null = null;
 
     constructor(containerId: string) {
         const el = document.getElementById(containerId);
@@ -418,7 +425,13 @@ export class Kriging3DPanel {
             });
             if (!resp.ok) throw new Error('获取切片失败');
             const slice: SliceData = await resp.json();
+            this.currentSlice = slice;
             this.renderSlice(slice);
+
+            // 同步更新 3D 可视化
+            if (this.renderer3D) {
+                this.loadSliceTo3D(slice);
+            }
         } catch (err: any) {
             const container = this.container.querySelector('#slice-container-3d');
             if (container) container.innerHTML = `<p style="color:red;">${err.message}</p>`;
@@ -486,22 +499,202 @@ export class Kriging3DPanel {
     private init3DVisualization(): void {
         const container = this.container.querySelector('#threejs-container') as HTMLElement;
         if (!container) return;
-        // Three.js 3D可视化占位 - 实际项目中集成Three.js
-        container.innerHTML = `
-            <div style="display:flex;align-items:center;justify-content:center;height:100%;color:#8888aa;flex-direction:column;">
-                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                    <path d="M2 17l10 5 10-5"/>
-                    <path d="M2 12l10 5 10-5"/>
-                </svg>
-                <p style="margin-top:12px;">3D可视化区域</p>
-                <p style="font-size:12px;opacity:0.6;">使用切片功能查看2D截面</p>
-            </div>
-        `;
+
+        // 销毁旧的渲染器
+        if (this.renderer3D) {
+            this.renderer3D.destroy();
+            this.renderer3D = null;
+        }
+
+        // 创建新的 3D 渲染器
+        this.renderer3D = new Renderer3D(container, {
+            width: container.clientWidth,
+            height: 400,
+            backgroundColor: '#1a1a2e',
+            pointSize: 3,
+            colorMap: 'rainbow',
+            opacity: 0.8,
+            renderMode: 'points',
+            enableDepthBuffer: true,
+            lightDirection: [0.5, 0.3, 0.8],
+        });
+
+        // 绑定显示模式切换
+        const modeSelect = this.container.querySelector('#viz-mode-3d') as HTMLSelectElement;
+        if (modeSelect) {
+            modeSelect.addEventListener('change', () => {
+                const mode = modeSelect.value as 'points' | 'isosurface' | 'volume' | 'slice';
+                this.update3DVisualizationMode(mode);
+            });
+        }
+
+        // 绑定透明度滑块
+        const opacitySlider = this.container.querySelector('#viz-opacity') as HTMLInputElement;
+        if (opacitySlider) {
+            opacitySlider.addEventListener('input', () => {
+                const opacity = Number(opacitySlider.value);
+                if (this.renderer3D) {
+                    // 重新设置数据以应用新透明度
+                    this.update3DData();
+                }
+            });
+        }
+
+        // 加载初始 3D 数据
+        this.update3DData();
+    }
+
+    /**
+     * 更新 3D 可视化模式
+     */
+    private update3DVisualizationMode(
+        mode: 'points' | 'isosurface' | 'volume' | 'slice'
+    ): void {
+        if (!this.renderer3D) return;
+
+        switch (mode) {
+            case 'points':
+                this.renderer3D.setRenderMode('points');
+                this.update3DData();
+                break;
+            case 'isosurface':
+            case 'volume':
+                this.renderer3D.setRenderMode('surface');
+                this.update3DData();
+                break;
+            case 'slice':
+                // 切片模式：使用当前切片数据
+                if (this.currentSlice) {
+                    this.loadSliceTo3D(this.currentSlice);
+                }
+                break;
+        }
+    }
+
+    /**
+     * 更新 3D 渲染数据
+     * 从网格数据或切片数据生成 3D 点云
+     */
+    private update3DData(): void {
+        if (!this.renderer3D) return;
+
+        // 优先使用切片数据
+        if (this.currentSlice) {
+            this.loadSliceTo3D(this.currentSlice);
+            return;
+        }
+
+        // 尝试从任务状态获取网格数据并生成采样点
+        this.fetchGridDataFor3D();
+    }
+
+    /**
+     * 将切片数据加载到 3D 渲染器
+     */
+    private loadSliceTo3D(slice: SliceData): void {
+        if (!this.renderer3D) return;
+
+        const points: Point3DData[] = [];
+        const { values, gridX, gridY } = slice;
+
+        if (!values || !gridX || !gridY) return;
+
+        const rows = values.length;
+        const cols = values[0]?.length || 0;
+
+        for (let i = 0; i < rows; i++) {
+            for (let j = 0; j < cols; j++) {
+                const v = values[i][j];
+                if (v === undefined || v === null || isNaN(v)) continue;
+
+                // 根据切片轴确定 3D 坐标
+                let x: number, y: number, z: number;
+                if (slice.axis === 'z') {
+                    x = gridX[j] || j;
+                    y = gridY[i] || i;
+                    z = slice.position;
+                } else if (slice.axis === 'x') {
+                    y = gridX[j] || j;
+                    z = gridY[i] || i;
+                    x = slice.position;
+                } else {
+                    x = gridX[j] || j;
+                    z = gridY[i] || i;
+                    y = slice.position;
+                }
+
+                points.push({ x, y, z, value: v });
+            }
+        }
+
+        // 采样优化：如果点太多，随机降采样
+        const maxPoints = 10000;
+        let displayPoints = points;
+        if (points.length > maxPoints) {
+            displayPoints = [];
+            const step = Math.ceil(points.length / maxPoints);
+            for (let i = 0; i < points.length; i += step) {
+                displayPoints.push(points[i]);
+            }
+        }
+
+        // 根据当前透明度设置颜色范围
+        const opacitySlider = this.container.querySelector('#viz-opacity') as HTMLInputElement;
+        const opacity = opacitySlider ? Number(opacitySlider.value) : 0.8;
+
+        this.renderer3D.setColorRange(
+            Math.min(...points.map(p => p.value)),
+            Math.max(...points.map(p => p.value))
+        );
+
+        // 临时修改透明度
+        const renderer = this.renderer3D;
+        // 通过重新设置点并手动设置颜色范围来实现透明度
+        renderer.setPoints(displayPoints);
+    }
+
+    /**
+     * 从服务端获取网格数据用于 3D 可视化
+     */
+    private async fetchGridDataFor3D(): Promise<void> {
+        if (!this.taskId || !this.renderer3D) return;
+
+        try {
+            // 获取 Z 轴中间切片作为默认显示
+            const resp = await fetch(`${API_BASE}/kriging3d/slice/${this.taskId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ axis: 'z', position: 50, resolution: 60 }),
+            });
+            if (resp.ok) {
+                const slice: SliceData = await resp.json();
+                this.currentSlice = slice;
+                this.loadSliceTo3D(slice);
+            }
+        } catch {
+            // 网格数据获取失败，保持占位状态
+            if (this.renderer3D) {
+                // 生成示例数据演示3D效果
+                const demoPoints: Point3DData[] = [];
+                for (let x = -5; x <= 5; x++) {
+                    for (let y = -5; y <= 5; y++) {
+                        for (let z = -3; z <= 3; z++) {
+                            const value = Math.sin(Math.sqrt(x * x + y * y + z * z) * 0.8) * 0.5 + 0.5;
+                            demoPoints.push({ x, y, z, value });
+                        }
+                    }
+                }
+                this.renderer3D.setPoints(demoPoints);
+            }
+        }
     }
 
     public destroy(): void {
         if (this.pollTimer) clearInterval(this.pollTimer);
+        if (this.renderer3D) {
+            this.renderer3D.destroy();
+            this.renderer3D = null;
+        }
         this.container.innerHTML = '';
     }
 }

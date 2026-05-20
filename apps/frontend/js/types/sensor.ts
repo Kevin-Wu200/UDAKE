@@ -181,6 +181,28 @@ export interface GeofenceEvent {
 }
 
 /**
+ * 点位精确导航目标点
+ */
+export interface NavigationTarget {
+    /** 纬度 */
+    latitude: number;
+    /** 经度 */
+    longitude: number;
+    /** 目标点名称/标签 */
+    label?: string;
+}
+
+/**
+ * 导航状态
+ */
+export type NavigationState = 'idle' | 'acquiring_signal' | 'navigating' | 'arrived' | 'signal_lost';
+
+/**
+ * 导航反馈级别
+ */
+export type NavigationFeedbackLevel = 'no_signal' | 'far' | 'guiding' | 'near' | 'arrived';
+
+/**
  * 传感器状态接口
  */
 export interface SensorStatus {

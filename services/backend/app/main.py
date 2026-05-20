@@ -34,7 +34,7 @@ from .api_versioning import (
     DEPRECATED_API_VERSIONS,
 )
 from .api_response import unified_api_response_middleware
-from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 分布式计算接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口, 数据质量接口, 数据安全接口, GPU加速接口, 数据反馈接口, 主动学习接口, 用户验证与自评估接口, 移动端GPS接口, 历史对比与趋势分析接口, 智能工作流接口, 时空克里金接口
+from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 分布式计算接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口, 数据质量接口, 数据安全接口, GPU加速接口, 数据反馈接口, 主动学习接口, 用户验证与自评估接口, 移动端GPS接口, 历史对比与趋势分析接口, 智能工作流接口, 时空克里金接口, 航测像片采样接口
 from .api.app_download_api import router as download_router
 from .api.admin_api import router as admin_router
 from .api.auth_api import router as auth_router
@@ -258,6 +258,7 @@ app.include_router(kriging_3d_router, prefix="/api", tags=["3D克里金"])
 # 注册深度学习路由
 app.include_router(deep_learning_router, prefix="/api", tags=["深度学习"])
 app.include_router(时空克里金接口.router, prefix="/api", tags=["时空克里金"])
+app.include_router(航测像片采样接口.router, prefix="/api", tags=["航测像片采样"])
 
 
 @app.middleware("http")

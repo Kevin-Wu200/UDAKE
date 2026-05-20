@@ -168,7 +168,7 @@ export class GeoSceneAdapter extends MapAdapter {
             // 使用用户名密码生成 Token
             const serverInfo = new ServerInfo.default({
                 server: portalUrl,
-                tokenServiceUrl: config.tokenUrl || `${portalUrl}/portal/sharing/rest/generateToken`
+                tokenServiceUrl: config.tokenUrl || `${portalUrl}/sharing/rest/generateToken`
             });
 
             const tokenResponse = await IdentityManager.default.generateToken(serverInfo, {
