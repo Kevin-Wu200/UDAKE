@@ -17,6 +17,10 @@ export interface Render3DOptions {
     enableDepthBuffer: boolean;
     /** 光照方向 (归一化) */
     lightDirection: [number, number, number];
+    /** 是否启用视角 LOD 降采样 (无人机飞行模式) */
+    enableLOD?: boolean;
+    /** LOD 降采样步长 (值越大点越稀疏, 默认 1=不降采样) */
+    lodStep?: number;
 }
 
 export interface Point3DData {
@@ -358,15 +362,22 @@ export class Renderer3D {
             const proj = this.project(nx, ny, nz);
             return { ...proj, nx, ny, nz, value: p.value };
         });
-        projected.sort((a, b) => a.depth - b.depth);
+
+        // 视角 LOD 降采样 (无人机飞行模式)
+        let renderPoints = projected;
+        if (options.enableLOD) {
+            renderPoints = this.applyLOD(projected, options.lodStep ?? 2);
+        }
+
+        renderPoints.sort((a, b) => a.depth - b.depth);
 
         // 根据渲染模式绘制
         if (options.renderMode === 'spheres') {
-            this.renderSpheres(ctx, projected, options);
+            this.renderSpheres(ctx, renderPoints, options);
         } else if (options.renderMode === 'surface') {
-            this.renderSurface(ctx, projected, options);
+            this.renderSurface(ctx, renderPoints, options);
         } else {
-            this.renderPoints(ctx, projected, options);
+            this.renderPoints(ctx, renderPoints, options);
         }
 
         // 绘制坐标轴
@@ -374,6 +385,56 @@ export class Renderer3D {
 
         // 绘制颜色条
         this.drawColorBar();
+    }
+
+    /**
+     * 基于视角的 LOD (细节层次) 降采样
+     * 无人机飞行模式下使用:
+     * - 根据深度(距离相机远近)分层降采样
+     * - 远处点使用较大步长, 近处点使用较小步长
+     * @param points 已投影的点数组(含深度信息)
+     * @param baseStep 基础降采样步长
+     */
+    private applyLOD(
+        points: Array<{ sx: number; sy: number; depth: number; nx: number; ny: number; nz: number; value: number }>,
+        baseStep: number
+    ): typeof points {
+        if (baseStep <= 1) return points;
+
+        // 按深度排序后分层
+        const sorted = [...points].sort((a, b) => b.depth - a.depth); // 远→近
+        const total = sorted.length;
+
+        // 深度范围
+        const minDepth = sorted[sorted.length - 1]?.depth ?? 0;
+        const maxDepth = sorted[0]?.depth ?? 1;
+        const depthRange = maxDepth - minDepth || 1;
+
+        // 分3层: 近(25%), 中(50%), 远(25%)
+        const result: typeof points = [];
+        for (let i = 0; i < total; i++) {
+            const p = sorted[i];
+            // 归一化深度 [0=近, 1=远]
+            const normalizedDepth = (p.depth - minDepth) / depthRange;
+
+            let step: number;
+            if (normalizedDepth <= 0.25) {
+                // 近层: 几乎不降采样
+                step = Math.max(1, baseStep * 0.5);
+            } else if (normalizedDepth <= 0.75) {
+                // 中层: 基础步长
+                step = baseStep;
+            } else {
+                // 远层: 加倍降采样
+                step = baseStep * 2;
+            }
+
+            if (i % Math.round(step) === 0) {
+                result.push(p);
+            }
+        }
+
+        return result;
     }
 
     /**
@@ -538,6 +599,28 @@ export class Renderer3D {
      */
     public setPointSize(size: number): void {
         this.options.pointSize = Math.max(1, Math.min(20, size));
+        this.render();
+    }
+
+    /**
+     * 启用/禁用 LOD 降采样 (无人机飞行模式)
+     */
+    public setLODEnabled(enabled: boolean, step?: number): void {
+        this.options.enableLOD = enabled;
+        if (step != null) {
+            this.options.lodStep = Math.max(1, Math.min(10, step));
+        }
+        this.render();
+    }
+
+    /**
+     * 全向相机视角更新
+     * 设置相机朝向(rotationZ)和俯仰(rotationX)
+     */
+    public setCameraView(heading: number, tilt: number): void {
+        // heading 映射到 rotationZ (Z轴旋转), tilt 映射到 rotationX
+        this.rotationZ = heading;
+        this.rotationX = Math.max(-85, Math.min(85, tilt));
         this.render();
     }
 
