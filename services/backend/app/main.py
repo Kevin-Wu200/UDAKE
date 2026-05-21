@@ -51,6 +51,7 @@ from realtime_interpolation.api import fastapi_routes as realtime_routes
 from multi_objective_optimization.api import fastapi_routes as multi_objective_routes
 from .kriging_3d.api.路由 import router as kriging_3d_router
 from .dl_services.api import router as deep_learning_router
+from .siri_assistant.api import router as siri_router
 import logging
 
 def _setup_logging() -> None:
@@ -259,6 +260,7 @@ app.include_router(kriging_3d_router, prefix="/api", tags=["3D克里金"])
 app.include_router(deep_learning_router, prefix="/api", tags=["深度学习"])
 app.include_router(时空克里金接口.router, prefix="/api", tags=["时空克里金"])
 app.include_router(航测像片采样接口.router, prefix="/api", tags=["航测像片采样"])
+app.include_router(siri_router, tags=["Siri智能助手"])
 
 
 @app.middleware("http")

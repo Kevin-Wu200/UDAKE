@@ -41,6 +41,7 @@ import { StartupManager } from './utils/StartupManager.js';
 import { ResourceOptimizationManager } from './config/ResourceOptimizationConfig.js';
 import { LanguageSwitcher, languageSwitcherStyles } from './components/LanguageSwitcher.js';
 import { CSSFeatureDetector } from './utils/CSSFeatureDetector.js';
+import { SiriAssistant } from './components/SiriAssistant.js';
 import { Logger } from './utils/Logger.js';
 import { RuntimeLifecycle } from './utils/RuntimeLifecycle.js';
 import { AppConfig } from './config/AppConfig.js';
@@ -873,6 +874,15 @@ class App {
 
             // 初始化位置服务
             await this.initializeLocationService();
+
+            // 初始化 Siri 智能助手
+            try {
+                const siriAssistant = new SiriAssistant();
+                siriAssistant.init(this.apiService as APIService);
+                console.log('[Siri助手] 初始化完成');
+            } catch (siriError) {
+                console.warn('[Siri助手] 初始化失败（非关键组件）:', siriError);
+            }
 
             // 初始化界面文本
             this.updateUIText();

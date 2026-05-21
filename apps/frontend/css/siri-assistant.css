@@ -1,0 +1,471 @@
+/* ============================================================
+   UDAKE Siri 智能助手悬浮球 - 样式表
+   遵循 Apple 设计语言，与项目 theme-variables.css 兼容
+   ============================================================ */
+
+/* --- 容器 --- */
+#siri-assistant-container {
+    position: fixed;
+    z-index: 10000;
+    pointer-events: none;
+}
+
+/* --- 悬浮球 --- */
+#siri-ball {
+    position: fixed;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+    box-shadow: 0 4px 16px rgba(0, 122, 255, 0.35), 0 2px 4px rgba(0, 0, 0, 0.1);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    transition: transform 0.2s var(--easing-standard, cubic-bezier(0.4, 0.0, 0.2, 1)),
+                box-shadow 0.2s var(--easing-standard, cubic-bezier(0.4, 0.0, 0.2, 1));
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    z-index: 10001;
+    pointer-events: all;
+}
+
+#siri-ball:hover {
+    transform: scale(1.08);
+    box-shadow: 0 6px 24px rgba(0, 122, 255, 0.5), 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+#siri-ball:active {
+    transform: scale(0.95);
+}
+
+#siri-ball.siri-ball-active {
+    transform: scale(1.05);
+    box-shadow: 0 8px 32px rgba(88, 86, 214, 0.5);
+    background: linear-gradient(135deg, #5856d6 0%, #007aff 100%);
+}
+
+/* 脉冲动画 */
+#siri-ball::after {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    right: -4px;
+    bottom: -4px;
+    border-radius: 50%;
+    border: 2px solid rgba(0, 122, 255, 0.3);
+    animation: siri-pulse 2s ease-in-out infinite;
+}
+
+@keyframes siri-pulse {
+    0%, 100% { transform: scale(1); opacity: 0.3; }
+    50% { transform: scale(1.1); opacity: 0; }
+}
+
+/* --- 徽章 --- */
+#siri-badge {
+    position: fixed;
+    top: -4px;
+    right: -4px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #ff3b30;
+    color: white;
+    font-size: 11px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    z-index: 10002;
+    pointer-events: none;
+}
+
+/* --- 面板 --- */
+#siri-panel {
+    position: fixed;
+    bottom: 96px;
+    right: 16px;
+    width: 380px;
+    max-width: calc(100vw - 32px);
+    height: 520px;
+    max-height: calc(100vh - 120px);
+    background: var(--bg-primary, #ffffff);
+    border-radius: 20px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.15), 0 2px 8px rgba(0, 0, 0, 0.08);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 10000;
+    animation: siri-panel-in 0.3s var(--easing-standard, cubic-bezier(0.4, 0.0, 0.2, 1));
+    border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+@keyframes siri-panel-in {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+/* 深色模式 */
+@media (prefers-color-scheme: dark) {
+    #siri-panel {
+        background: #1c1c1e;
+        border-color: rgba(255, 255, 255, 0.1);
+        box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
+    }
+
+    #siri-input {
+        background: #2c2c2e;
+        color: #f5f5f7;
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .siri-message-assistant .siri-message-bubble {
+        background: #2c2c2e;
+        color: #f5f5f7;
+    }
+
+    .siri-message-user .siri-message-bubble {
+        background: #0a84ff;
+    }
+}
+
+/* --- 面板头部 --- */
+#siri-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 18px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+    background: rgba(0, 122, 255, 0.03);
+    flex-shrink: 0;
+}
+
+.siri-panel-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary, #000000);
+}
+
+.siri-panel-icon {
+    font-size: 20px;
+}
+
+#siri-close-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary, #6e6e73);
+    cursor: pointer;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+#siri-close-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* --- 聊天区域 --- */
+#siri-chat-area {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    scroll-behavior: smooth;
+}
+
+/* 滚动条样式 */
+#siri-chat-area::-webkit-scrollbar {
+    width: 4px;
+}
+
+#siri-chat-area::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+#siri-chat-area::-webkit-scrollbar-thumb {
+    background: rgba(0, 0, 0, 0.15);
+    border-radius: 2px;
+}
+
+/* --- 消息气泡 --- */
+.siri-message {
+    display: flex;
+    flex-direction: column;
+    max-width: 85%;
+    animation: siri-msg-in 0.25s ease-out;
+}
+
+@keyframes siri-msg-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.siri-message-user {
+    align-self: flex-end;
+}
+
+.siri-message-assistant {
+    align-self: flex-start;
+    flex-direction: row;
+    gap: 8px;
+}
+
+.siri-message-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+}
+
+.siri-message-bubble {
+    padding: 10px 14px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.5;
+    word-break: break-word;
+    white-space: pre-wrap;
+}
+
+.siri-message-user .siri-message-bubble {
+    background: linear-gradient(135deg, #007aff 0%, #0051d5 100%);
+    color: white;
+    border-bottom-right-radius: 4px;
+}
+
+.siri-message-assistant .siri-message-bubble {
+    background: #f2f2f7;
+    color: var(--text-primary, #000000);
+    border-bottom-left-radius: 4px;
+}
+
+.siri-message-bubble code {
+    background: rgba(0, 0, 0, 0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: 'SF Mono', 'Menlo', monospace;
+}
+
+.siri-message-bubble strong {
+    font-weight: 600;
+}
+
+/* --- 输入区域 --- */
+#siri-input-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    border-top: 1px solid rgba(0, 0, 0, 0.06);
+    background: var(--bg-secondary, #f5f5f7);
+    flex-shrink: 0;
+}
+
+#siri-input {
+    flex: 1;
+    height: 40px;
+    padding: 0 14px;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 20px;
+    font-size: 14px;
+    outline: none;
+    background: var(--bg-primary, #ffffff);
+    color: var(--text-primary, #000000);
+    transition: border-color 0.2s;
+}
+
+#siri-input:focus {
+    border-color: #007aff;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+}
+
+#siri-send-btn,
+#siri-voice-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+#siri-send-btn {
+    background: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
+    color: white;
+}
+
+#siri-send-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.4);
+}
+
+#siri-send-btn:active {
+    transform: scale(0.95);
+}
+
+#siri-send-btn.siri-sending {
+    opacity: 0.7;
+    animation: siri-spin 1s linear infinite;
+}
+
+@keyframes siri-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+#siri-voice-btn {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary, #6e6e73);
+}
+
+#siri-voice-btn:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+#siri-voice-btn.siri-listening {
+    background: #ff3b30;
+    color: white;
+    animation: siri-listening-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes siri-listening-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(255, 59, 48, 0); }
+}
+
+/* --- 文档引用 --- */
+#siri-doc-ref {
+    padding: 6px 16px;
+    background: rgba(0, 122, 255, 0.05);
+    border-top: 1px solid rgba(0, 122, 255, 0.1);
+    flex-shrink: 0;
+}
+
+.doc-ref-text {
+    font-size: 12px;
+    color: #007aff;
+}
+
+/* --- 功能确认 --- */
+#siri-func-confirm {
+    padding: 12px 16px;
+    background: rgba(255, 149, 0, 0.08);
+    border-top: 1px solid rgba(255, 149, 0, 0.2);
+    flex-shrink: 0;
+}
+
+.func-confirm-inner {
+    font-size: 14px;
+    color: var(--text-primary, #000000);
+}
+
+.func-confirm-inner p {
+    margin: 0 0 8px 0;
+}
+
+.func-confirm-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.func-confirm-yes,
+.func-confirm-no {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: none;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.func-confirm-yes {
+    background: #34c759;
+    color: white;
+}
+
+.func-confirm-yes:hover {
+    background: #30b350;
+}
+
+.func-confirm-no {
+    background: rgba(0, 0, 0, 0.05);
+    color: var(--text-secondary, #6e6e73);
+}
+
+.func-confirm-no:hover {
+    background: rgba(0, 0, 0, 0.1);
+}
+
+/* --- 状态栏 --- */
+#siri-status-bar {
+    padding: 6px 16px;
+    font-size: 11px;
+    color: var(--text-secondary, #6e6e73);
+    text-align: center;
+    border-top: 1px solid rgba(0, 0, 0, 0.04);
+    background: var(--bg-secondary, #f5f5f7);
+    flex-shrink: 0;
+}
+
+/* --- 响应式适配 --- */
+@media (max-width: 480px) {
+    #siri-panel {
+        width: calc(100vw - 16px);
+        height: 60vh;
+        right: 8px;
+        bottom: 80px;
+        border-radius: 16px;
+    }
+
+    #siri-ball {
+        width: 50px;
+        height: 50px;
+    }
+
+    #siri-ball::after {
+        display: none;
+    }
+}
+
+/* --- 减少动画偏好 --- */
+@media (prefers-reduced-motion: reduce) {
+    #siri-panel,
+    .siri-message,
+    #siri-ball::after {
+        animation: none !important;
+    }
+
+    #siri-ball {
+        transition: none !important;
+    }
+}
