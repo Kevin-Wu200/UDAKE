@@ -14,6 +14,45 @@ import { Logger } from '../utils/Logger';
 
 // --- 接口定义 ---
 
+type SpeechRecognitionConstructor = new () => SpeechRecognition;
+
+interface SpeechRecognition extends EventTarget {
+    continuous: boolean;
+    interimResults: boolean;
+    lang: string;
+    onresult: ((event: SpeechRecognitionEvent) => void) | null;
+    onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+    onend: (() => void) | null;
+    start(): void;
+    stop(): void;
+}
+
+interface SpeechRecognitionEvent extends Event {
+    results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionResultList {
+    readonly length: number;
+    item(index: number): SpeechRecognitionResult;
+    [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionResult {
+    readonly length: number;
+    item(index: number): SpeechRecognitionAlternative;
+    [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+    transcript: string;
+    confidence: number;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+    error: string;
+    message: string;
+}
+
 interface SiriResponse {
     success: boolean;
     intent: string;
@@ -151,7 +190,7 @@ export class SiriAssistant {
         // 设置初始位置
         this._updateBallPosition();
 
-        Logger.info('Siri 助手组件已初始化');
+        Logger.info('SiriAssistant', '小U 助手组件已初始化');
     }
 
     /**
@@ -159,7 +198,7 @@ export class SiriAssistant {
      */
     destroy(): void {
         this.container.remove();
-        Logger.info('Siri 助手组件已销毁');
+        Logger.info('SiriAssistant', '小U 助手组件已销毁');
     }
 
     /**
@@ -423,7 +462,7 @@ export class SiriAssistant {
             const response = await this._callSiriAPI(text);
             this._handleResponse(response);
         } catch (error) {
-            Logger.error('Siri API 调用失败:', error);
+            Logger.error('SiriAssistant', '小U API 调用失败', error);
             this._addMessage('assistant', '抱歉，助手服务暂时不可用。请检查网络连接和后端服务状态。');
         } finally {
             this._setTyping(false);
@@ -457,7 +496,7 @@ export class SiriAssistant {
                 voice_input: false,
             }),
         });
-        const data = await response.json();
+        const data = await response.json() as SiriResponse;
         this.sessionId = data.session_id;
         return data;
     }
@@ -562,13 +601,17 @@ export class SiriAssistant {
     // --- 语音识别 ---
 
     private _initSpeechRecognition(): void {
-        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (!SpeechRecognition) {
+        const speechWindow = window as Window & {
+            SpeechRecognition?: SpeechRecognitionConstructor;
+            webkitSpeechRecognition?: SpeechRecognitionConstructor;
+        };
+        const SpeechRecognitionCtor = speechWindow.SpeechRecognition || speechWindow.webkitSpeechRecognition;
+        if (!SpeechRecognitionCtor) {
             this.voiceBtn.style.display = 'none';
             return;
         }
 
-        this.recognition = new SpeechRecognition();
+        this.recognition = new SpeechRecognitionCtor();
         this.recognition.continuous = false;
         this.recognition.interimResults = false;
         this.recognition.lang = 'zh-CN';
@@ -582,7 +625,7 @@ export class SiriAssistant {
         };
 
         this.recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
-            Logger.warn('语音识别错误:', event.error);
+            Logger.warn('SiriAssistant', '语音识别错误', event.error);
             this._stopListening();
         };
 
