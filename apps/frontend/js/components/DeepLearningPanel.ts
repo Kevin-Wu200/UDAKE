@@ -13,7 +13,6 @@ export class DeepLearningPanel {
     private section: HTMLElement;
     private container: HTMLElement;
     private apiService: IAPIService;
-    private isExpanded: boolean = false;
 
     private spatialPanel: SpatialInterpolationPanel | null = null;
     private anomalyPanel: AnomalyDetectionPanel | null = null;
@@ -63,18 +62,6 @@ export class DeepLearningPanel {
     }
 
     private bindEvents(): void {
-        const titleButton = this.section.querySelector('.panel-title-toggle') as HTMLButtonElement | null;
-        const title = this.section.querySelector('.panel-title') as HTMLElement | null;
-        if (titleButton) {
-            titleButton.addEventListener('click', () => {
-                this.toggleExpanded();
-            });
-        } else {
-            title?.addEventListener('click', () => {
-                this.toggleExpanded();
-            });
-        }
-
         this.container.querySelector('#dl-health-check-btn')?.addEventListener('click', () => {
             void this.checkHealth();
         });
@@ -96,23 +83,6 @@ export class DeepLearningPanel {
         this.samplingRLPanel = new SamplingRLPanel(samplingRLContainer, this.apiService);
         this.spatiotemporalPanel = new SpatiotemporalPredictionPanel(spatiotemporalContainer, this.apiService);
         this.spatiotemporalExplainPanel = new SpatiotemporalExplainPanel(spatiotemporalExplainContainer, this.apiService);
-    }
-
-    private toggleExpanded(force?: boolean): void {
-        this.isExpanded = typeof force === 'boolean' ? force : !this.isExpanded;
-        this.container.style.display = this.isExpanded ? 'block' : 'none';
-
-        const titleButton = this.section.querySelector('.panel-title-toggle') as HTMLButtonElement | null;
-        if (titleButton) {
-            titleButton.innerHTML = `<span data-i18n="panel.deepLearning">深度学习</span> ${this.isExpanded ? '▾' : '▸'}`;
-            titleButton.setAttribute('aria-expanded', String(this.isExpanded));
-            return;
-        }
-
-        const title = this.section.querySelector('.panel-title') as HTMLElement | null;
-        if (title) {
-            title.textContent = this.isExpanded ? I18n.t('deeplearning.titleCollapsed') : I18n.t('deeplearning.titleExpanded');
-        }
     }
 
     private async checkHealth(): Promise<void> {

@@ -190,6 +190,24 @@ class CacheInvalidateRequest(BaseModel):
     workflow_id: Optional[str] = Field(default=None, max_length=120)
 
 
+class WorkflowACLUpdateRequest(BaseModel):
+    """工作流访问控制更新请求。"""
+    is_public: Optional[bool] = Field(default=None)
+
+class BranchCreateRequest(BaseModel):
+    """创建分支请求 —— 当冲突时自动触发或管理员主动创建。"""
+    created_by: str = Field(..., min_length=1, max_length=80)
+    data: Optional[Dict[str, Any]] = Field(default=None)
+
+class BranchMergeRequest(BaseModel):
+    """分支合并请求。"""
+    resolver_user_id: str = Field(..., min_length=1, max_length=80)
+
+class BranchRejectRequest(BaseModel):
+    """分支拒绝请求。"""
+    resolver_user_id: str = Field(..., min_length=1, max_length=80)
+
+
 class SMTPValidateRequest(BaseModel):
     test_recipient: str = Field(default="", max_length=255)
     host: Optional[str] = Field(default=None, max_length=255)
@@ -962,6 +980,100 @@ async def delete_workflow(workflow_id: str) -> Dict[str, Any]:
     try:
         smart_workflow_service.delete_workflow(workflow_id)
         return {"deleted": True, "workflow_id": workflow_id}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+# -------- 访问控制 (ACL) --------
+
+@router.get("/workflow/{workflow_id}/acl")
+async def get_workflow_acl(workflow_id: str) -> Dict[str, Any]:
+    """获取工作流的访问控制信息。"""
+    try:
+        return smart_workflow_service.get_workflow_acl(workflow_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.patch("/workflow/{workflow_id}/acl")
+async def update_workflow_acl(workflow_id: str, payload: WorkflowACLUpdateRequest) -> Dict[str, Any]:
+    """管理员更新工作流公有/私有属性。"""
+    try:
+        return smart_workflow_service.set_workflow_acl(
+            workflow_id=workflow_id,
+            is_public=payload.is_public,
+        )
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/access/{user_id}")
+async def check_workflow_access(workflow_id: str, user_id: str) -> Dict[str, Any]:
+    """校验用户对工作流的访问权限。"""
+    try:
+        return smart_workflow_service.check_workflow_access(workflow_id, user_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+# -------- 分支管理 (Branch) --------
+
+@router.post("/workflow/{workflow_id}/branch")
+async def create_workflow_branch(workflow_id: str, payload: BranchCreateRequest) -> Dict[str, Any]:
+    """为工作流创建分支 (冲突触发或管理员主动创建)。"""
+    try:
+        branch = smart_workflow_service.create_branch(
+            workflow_id=workflow_id,
+            created_by=payload.created_by,
+            data=payload.data,
+        )
+        return {"branch": branch}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/{workflow_id}/branches")
+async def list_workflow_branches(workflow_id: str) -> Dict[str, Any]:
+    """列出工作流的所有分支。"""
+    try:
+        branches = smart_workflow_service.list_branches(workflow_id)
+        return {"workflow_id": workflow_id, "branches": branches, "count": len(branches)}
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/branches/{branch_id}")
+async def get_workflow_branch(branch_id: str) -> Dict[str, Any]:
+    """获取分支详情。"""
+    try:
+        return smart_workflow_service.get_branch(branch_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.get("/workflow/branches/{branch_id}/diff")
+async def get_branch_diff(branch_id: str) -> Dict[str, Any]:
+    """获取分支与主工作流的差异对比。"""
+    try:
+        return smart_workflow_service.get_branch_diff(branch_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/branches/{branch_id}/merge")
+async def merge_workflow_branch(branch_id: str, payload: BranchMergeRequest) -> Dict[str, Any]:
+    """将分支合并入主工作流 (管理员操作)。"""
+    try:
+        return smart_workflow_service.merge_branch(branch_id, payload.resolver_user_id)
+    except Exception as exc:  # pylint: disable=broad-except
+        _handle_error(exc)
+
+
+@router.post("/workflow/branches/{branch_id}/reject")
+async def reject_workflow_branch(branch_id: str, payload: BranchRejectRequest) -> Dict[str, Any]:
+    """拒绝分支 (管理员操作)。"""
+    try:
+        return smart_workflow_service.reject_branch(branch_id, payload.resolver_user_id)
     except Exception as exc:  # pylint: disable=broad-except
         _handle_error(exc)
 

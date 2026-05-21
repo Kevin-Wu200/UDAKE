@@ -234,8 +234,13 @@ describe('SmartCache', () => {
     it('应通过回调和事件上报持久化失败', () => {
       const persistenceErrors = [];
       const eventErrors = [];
-      const setItemSpy = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
-        throw new Error('quota exceeded');
+      vi.stubGlobal('localStorage', {
+        getItem: () => null,
+        setItem: () => {
+          throw new Error('quota exceeded');
+        },
+        removeItem: () => {},
+        clear: () => {}
       });
 
       const persistentCache = new SmartCache({
@@ -261,7 +266,7 @@ describe('SmartCache', () => {
       expect(eventErrors).toContainEqual({ event: 'persistence-error', key: 'save' });
 
       persistentCache.destroy();
-      setItemSpy.mockRestore();
+      vi.unstubAllGlobals();
     });
   });
 
@@ -393,21 +398,40 @@ describe('TwoLevelCache', () => {
   describe('持久化错误处理', () => {
     it('应统计并通知磁盘层持久化失败', async () => {
       const captured = [];
-      const setItemSpy = vi.spyOn(window.localStorage, 'setItem').mockImplementation(() => {
-        throw new Error('quota exceeded');
+      vi.stubGlobal('localStorage', {
+        getItem: () => null,
+        setItem: () => {
+          throw new Error('quota exceeded');
+        },
+        removeItem: () => {},
+        clear: () => {}
       });
-      const unsubscribe = cache.onPersistenceError((operation) => {
+      const persistentCache = new TwoLevelCache(
+        {
+          maxSize: 3,
+          ttl: 1000,
+          strategy: 'lru'
+        },
+        {
+          maxSize: 10,
+          ttl: 5000,
+          strategy: 'lfu',
+          persistence: true
+        }
+      );
+      const unsubscribe = persistentCache.onPersistenceError((operation) => {
         captured.push(operation);
       });
 
-      await cache.set('key-persist', 'value-persist');
+      await persistentCache.set('key-persist', 'value-persist');
 
-      const stats = cache.getStats();
+      const stats = persistentCache.getStats();
       expect(stats.total.persistenceErrorCount).toBeGreaterThan(0);
       expect(captured).toContain('save');
 
       unsubscribe();
-      setItemSpy.mockRestore();
+      persistentCache.destroy();
+      vi.unstubAllGlobals();
     });
   });
 

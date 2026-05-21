@@ -62,6 +62,7 @@ import {
 import { ComponentInitializer } from './managers/ComponentInitializer.js';
 import { EventBinder } from './managers/EventBinder.js';
 import { StateManager } from './managers/StateManager.js';
+import { PanelManager } from './managers/PanelManager.js';
 import { createStateBridge, type StateBridge } from './store/StateBridge.js';
 
 // 导入类型
@@ -252,6 +253,7 @@ class App {
     private startupBackendPort: number = 8000;
     private languageSwitcher: LanguageSwitcher | null = null;
     private accessibilityManager: AccessibilityManager | null = null;
+    private panelManager: PanelManager | null = null;
     private lastAnnouncedProgressBucket: number = -1;
     private authService: AuthService;
     private productKeyService: ProductKeyService;
@@ -1172,6 +1174,9 @@ class App {
                 KeyboardManager.toggleShortcutPanel();
             }
         });
+
+        // 初始化可折叠面板管理器
+        this.panelManager = new PanelManager();
         this.accessibilityManager.init();
     }
 

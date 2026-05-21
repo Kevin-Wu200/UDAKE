@@ -101,6 +101,7 @@ class SmartWorkflowService:
         self._share_links: Dict[str, Dict[str, Any]] = {}
         self._comments: Dict[str, Dict[str, Any]] = {}
         self._notifications: Dict[str, Dict[str, Any]] = {}
+        self._branches: Dict[str, Dict[str, Any]] = {}
 
         dao_bundle = build_smart_workflow_daos(
             backend=os.getenv("SMART_WORKFLOW_DAO_BACKEND", "auto"),
@@ -214,6 +215,9 @@ class SmartWorkflowService:
             "share_link_ids": [],
             "param_revision": {},
             "contributor_stats": {},
+            "locked_by": None,
+            "locked_at": None,
+            "branch_ids": [],
             "analytics": {
                 "total_operations": 0,
                 "total_conflicts": 0,
@@ -2581,6 +2585,300 @@ class SmartWorkflowService:
             reverse=True,
         )
         return templates[: max(1, min(limit, 100))]
+
+    # -------- 访问控制 (ACL) --------
+    def check_workflow_access(
+        self,
+        workflow_id: str,
+        user_id: str,
+        required_permission: str = "view_workflow",
+    ) -> Dict[str, Any]:
+        """校验用户对工作流的访问权限。
+        公有工作流: 任何人可读(仅view_workflow权限)，编辑需ACL授权
+        私有工作流: 需在ACL中或被显式授权方可访问，未授权guest不可访问
+        """
+        uid = str(user_id or "").strip()
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            is_public = bool(workflow.get("is_public", False))
+            owner_id = str(workflow.get("owner_id") or "")
+
+            # 拥有者始终有全部权限
+            if uid and owner_id == uid:
+                return {"workflow_id": workflow_id, "user_id": uid, "access": "granted", "role": "owner"}
+
+            if is_public and required_permission in ("view_workflow",):
+                return {"workflow_id": workflow_id, "user_id": uid, "access": "granted", "role": "public_viewer"}
+
+            # 私有工作流：检查用户是否有显式授权 (非默认 guest)
+            perms = self.get_effective_permissions(workflow_id, uid)
+            user_roles = set(perms.get("roles") or [])
+
+            # 私有工作流：guest(无显式授权)不可访问
+            if not is_public and user_roles == {"guest"}:
+                raise PermissionError(
+                    f"access denied for user '{uid}' on private workflow '{workflow_id}'"
+                )
+
+            # 公有工作流但需要更高权限(如编辑)：检查显式 ACL
+            if required_permission in set(perms.get("permissions") or []):
+                return {"workflow_id": workflow_id, "user_id": uid, "access": "granted",
+                        "roles": perms.get("roles", []), "permissions": perms.get("permissions", [])}
+
+            raise PermissionError(
+                f"access denied for user '{uid}' on workflow '{workflow_id}' "
+                f"(required: {required_permission})"
+            )
+
+    def get_workflow_acl(self, workflow_id: str) -> Dict[str, Any]:
+        """获取工作流的 ACL 信息。"""
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            return {
+                "workflow_id": workflow_id,
+                "is_public": bool(workflow.get("is_public", False)),
+                "owner_id": str(workflow.get("owner_id") or ""),
+                "collaborators": deepcopy(workflow.get("collaborators") or []),
+            }
+
+    def set_workflow_acl(
+        self,
+        workflow_id: str,
+        is_public: Optional[bool] = None,
+        owner_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """管理员更新工作流公有/私有属性。"""
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            if is_public is not None:
+                workflow["is_public"] = bool(is_public)
+            if owner_id is not None:
+                workflow["owner_id"] = str(owner_id)
+            workflow["updated_at"] = self._now_iso()
+            self._persist_workflow_record(workflow)
+            self._invalidate_permission_cache(workflow_id)
+            self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
+            return self.get_workflow_acl(workflow_id)
+
+    # -------- 分支管理 (Branch) --------
+    def _lock_workflow(self, workflow_id: str, user_id: str) -> Dict[str, Any]:
+        """锁定工作流 (写入者获取锁)。"""
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            state = workflow["collab_state"]
+            state["locked_by"] = str(user_id)
+            state["locked_at"] = self._now_iso()
+            workflow["updated_at"] = state["locked_at"]
+            self._persist_workflow_record(workflow)
+            self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
+            return {"workflow_id": workflow_id, "locked_by": user_id, "locked_at": state["locked_at"]}
+
+    def _unlock_workflow(self, workflow_id: str, user_id: str) -> Dict[str, Any]:
+        """解锁工作流。"""
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            state = workflow["collab_state"]
+            if state.get("locked_by") != str(user_id):
+                raise PermissionError(f"only lock holder can unlock workflow '{workflow_id}'")
+            state["locked_by"] = None
+            state["locked_at"] = None
+            workflow["updated_at"] = self._now_iso()
+            self._persist_workflow_record(workflow)
+            self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
+            return {"workflow_id": workflow_id, "unlocked": True}
+
+    def _is_workflow_locked(self, workflow_id: str) -> bool:
+        """检查工作流是否处于锁定状态。"""
+        workflow = self._workflows.get(workflow_id)
+        if not workflow:
+            return False
+        state = workflow.get("collab_state") or {}
+        return bool(state.get("locked_by"))
+
+    def create_branch(
+        self,
+        workflow_id: str,
+        created_by: str,
+        data: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """创建冲突分支。
+        当 Workflow 处于锁定状态且收到非锁定用户的 write 请求时自动触发。
+        也可由管理员主动调用以创建实验性分支。
+        """
+        user_id = str(created_by or "").strip()
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            state = workflow["collab_state"]
+
+            branch_id = f"branch_{uuid4().hex[:12]}"
+            branch_data = deepcopy(data) if data else deepcopy(workflow["current"])
+            now = self._now_iso()
+
+            branch = {
+                "branch_id": branch_id,
+                "workflow_id": workflow_id,
+                "parent_branch_id": None,
+                "created_by": user_id,
+                "data": branch_data,
+                "status": "open",
+                "created_at": now,
+                "updated_at": now,
+            }
+            self._branches[branch_id] = branch
+
+            # 将分支 ID 注册到工作流 collab_state
+            branch_ids = list(state.get("branch_ids") or [])
+            branch_ids.append(branch_id)
+            state["branch_ids"] = branch_ids
+            workflow["updated_at"] = now
+            self._persist_workflow_record(workflow)
+            self._cache.set(self._cache_key_workflow(workflow_id), workflow, ttl=self._WORKFLOW_CACHE_TTL)
+
+            # 通知相关协作者
+            self._notify(
+                workflow,
+                user_id,
+                "branch_created",
+                f"工作流 '{workflow.get('name', workflow_id)}' 已自动创建分支 (冲突处理)",
+                {"branch_id": branch_id, "workflow_id": workflow_id},
+            )
+
+            return deepcopy(branch)
+
+    def list_branches(self, workflow_id: str) -> List[Dict[str, Any]]:
+        """列出工作流的所有分支。"""
+        with self._lock:
+            workflow = self._workflow_or_error(workflow_id)
+            state = workflow.get("collab_state") or {}
+            branch_ids = state.get("branch_ids") or []
+            branches = []
+            for bid in branch_ids:
+                branch = self._branches.get(bid)
+                if branch:
+                    branches.append({
+                        "branch_id": branch["branch_id"],
+                        "workflow_id": branch["workflow_id"],
+                        "created_by": branch["created_by"],
+                        "status": branch["status"],
+                        "created_at": branch["created_at"],
+                        "updated_at": branch["updated_at"],
+                    })
+            return branches
+
+    def get_branch(self, branch_id: str) -> Dict[str, Any]:
+        """获取单个分支详情。"""
+        with self._lock:
+            branch = self._branches.get(branch_id)
+            if not branch:
+                raise KeyError(f"branch '{branch_id}' not found")
+            return deepcopy(branch)
+
+    def get_branch_diff(self, branch_id: str) -> Dict[str, Any]:
+        """获取分支与主工作流当前版本的差异。"""
+        with self._lock:
+            branch = self._branches.get(branch_id)
+            if not branch:
+                raise KeyError(f"branch '{branch_id}' not found")
+
+            workflow_id = branch["workflow_id"]
+            workflow = self._workflow_or_error(workflow_id)
+            main_data = workflow["current"]
+            branch_data = branch["data"]
+
+            # 计算差异：对比 nodes 和 edges
+            main_nodes = {n["node_id"]: n for n in (main_data.get("nodes") or [])}
+            branch_nodes = {n["node_id"]: n for n in (branch_data.get("nodes") or [])}
+            main_edges = {f"{e['source']}->{e['target']}": e for e in (main_data.get("edges") or [])}
+            branch_edges = {f"{e['source']}->{e['target']}": e for e in (branch_data.get("edges") or [])}
+
+            diff = {
+                "branch_id": branch_id,
+                "workflow_id": workflow_id,
+                "nodes_added": [nid for nid in branch_nodes if nid not in main_nodes],
+                "nodes_removed": [nid for nid in main_nodes if nid not in branch_nodes],
+                "nodes_modified": [
+                    nid for nid in branch_nodes
+                    if nid in main_nodes and branch_nodes[nid] != main_nodes[nid]
+                ],
+                "edges_added": [eid for eid in branch_edges if eid not in main_edges],
+                "edges_removed": [eid for eid in main_edges if eid not in branch_edges],
+                "main": {"nodes": deepcopy(main_data.get("nodes", [])), "edges": deepcopy(main_data.get("edges", []))},
+                "branch": {"nodes": deepcopy(branch_data.get("nodes", [])), "edges": deepcopy(branch_data.get("edges", []))},
+            }
+            return diff
+
+    def merge_branch(self, branch_id: str, resolver_user_id: str) -> Dict[str, Any]:
+        """将分支并入主工作流。仅工作流管理员可执行。"""
+        user_id = str(resolver_user_id or "").strip()
+        with self._lock:
+            branch = self._branches.get(branch_id)
+            if not branch:
+                raise KeyError(f"branch '{branch_id}' not found")
+            if branch["status"] != "open":
+                raise ValueError(f"branch '{branch_id}' is not open (status: {branch['status']})")
+
+            workflow_id = branch["workflow_id"]
+            workflow = self._workflow_or_error(workflow_id)
+
+            # 权限校验：仅管理员可合并
+            if not self.has_permission(workflow_id, user_id, "resolve_conflict"):
+                raise PermissionError(f"user '{user_id}' lacks resolve_conflict permission on workflow '{workflow_id}'")
+
+            # 合并数据：将分支数据作为新版本写入主工作流
+            branch_data = branch["data"]
+            note = f"merge branch '{branch_id}' by {user_id}"
+            self.update_workflow(workflow_id, branch_data, note=note)
+
+            # 更新分支状态
+            branch["status"] = "merged"
+            branch["updated_at"] = self._now_iso()
+
+            # 清除工作流锁定
+            state = workflow["collab_state"]
+            state["locked_by"] = None
+            state["locked_at"] = None
+            self._persist_workflow_record(self._workflows[workflow_id])
+            self._cache.set(self._cache_key_workflow(workflow_id), self._workflows[workflow_id],
+                           ttl=self._WORKFLOW_CACHE_TTL)
+
+            self._notify(
+                workflow,
+                branch["created_by"],
+                "branch_merged",
+                f"分支 '{branch_id}' 已被管理员 '{user_id}' 合并到主工作流",
+                {"branch_id": branch_id, "workflow_id": workflow_id, "merged_by": user_id},
+            )
+
+            return {"branch_id": branch_id, "status": "merged", "merged_by": user_id}
+
+    def reject_branch(self, branch_id: str, resolver_user_id: str) -> Dict[str, Any]:
+        """拒绝分支 (不合并)。仅工作流管理员可执行。"""
+        user_id = str(resolver_user_id or "").strip()
+        with self._lock:
+            branch = self._branches.get(branch_id)
+            if not branch:
+                raise KeyError(f"branch '{branch_id}' not found")
+            if branch["status"] != "open":
+                raise ValueError(f"branch '{branch_id}' is not open (status: {branch['status']})")
+
+            workflow_id = branch["workflow_id"]
+            workflow = self._workflow_or_error(workflow_id)
+
+            if not self.has_permission(workflow_id, user_id, "resolve_conflict"):
+                raise PermissionError(f"user '{user_id}' lacks resolve_conflict permission on workflow '{workflow_id}'")
+
+            branch["status"] = "rejected"
+            branch["updated_at"] = self._now_iso()
+
+            self._notify(
+                workflow,
+                branch["created_by"],
+                "branch_rejected",
+                f"分支 '{branch_id}' 已被管理员 '{user_id}' 拒绝",
+                {"branch_id": branch_id, "workflow_id": workflow_id, "rejected_by": user_id},
+            )
+
+            return {"branch_id": branch_id, "status": "rejected", "rejected_by": user_id}
 
     # -------- 调度 --------
     def create_schedule(

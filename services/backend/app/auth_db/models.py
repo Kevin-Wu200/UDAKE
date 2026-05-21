@@ -780,6 +780,44 @@ class Notification(Base):
     )
 
 
+class WorkflowBranch(Base):
+    """工作流冲突分支表 —— 当 Workflow 处于锁定状态且收到非锁定用户的 write 请求时自动创建。"""
+
+    __tablename__ = "workflow_branches"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    workflow_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("workflows.id", ondelete="CASCADE"), nullable=False
+    )
+    parent_branch_id: Mapped[Optional[int]] = mapped_column(
+        BigInteger, ForeignKey("workflow_branches.id", ondelete="SET NULL"), nullable=True
+    )
+    created_by: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    data: Mapped[Dict[str, Any]] = mapped_column(JSON, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, server_default=text("'open'")
+    )
+    created_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('open', 'merged', 'rejected')",
+            name="ck_workflow_branches_status_enum",
+        ),
+        Index("ix_workflow_branches_workflow_id", "workflow_id"),
+        Index("ix_workflow_branches_parent_branch_id", "parent_branch_id"),
+        Index("ix_workflow_branches_created_by", "created_by"),
+        Index("ix_workflow_branches_status", "status"),
+    )
+
+
 class CollaborationOperation(Base):
     __tablename__ = "collaboration_operations"
 

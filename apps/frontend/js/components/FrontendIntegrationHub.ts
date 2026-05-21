@@ -1,4 +1,3 @@
-import { I18n } from '../utils/I18n';
 import { APIService } from '../services/API封装.js';
 import { DataQualityPanel } from './integration/DataQualityPanel.js';
 import { HistorySnapshotPanel } from './integration/HistorySnapshotPanel.js';
@@ -85,54 +84,10 @@ export class FrontendIntegrationHub {
             return;
         }
 
-        this.bindToggle(section, container);
-
         if (!this.initialized) {
             this.renderPanels(container);
             this.initialized = true;
         }
-    }
-
-    private bindToggle(section: HTMLElement, container: HTMLElement): void {
-        const titleButton = section.querySelector('.panel-title-toggle') as HTMLButtonElement | null;
-        if (titleButton) {
-            if (titleButton.getAttribute('data-toggle-bound') === 'true') {
-                return;
-            }
-
-            titleButton.innerHTML = '<span data-i18n="panel.frontendIntegration">前端功能集成补齐</span> ▸';
-            titleButton.setAttribute('aria-expanded', 'false');
-
-            titleButton.addEventListener('click', () => {
-                const isHidden = container.style.display === 'none';
-                container.style.display = isHidden ? 'block' : 'none';
-                titleButton.innerHTML = `<span data-i18n="panel.frontendIntegration">前端功能集成补齐</span> ${isHidden ? '▾' : '▸'}`;
-                titleButton.setAttribute('aria-expanded', String(isHidden));
-            });
-
-            titleButton.setAttribute('data-toggle-bound', 'true');
-            return;
-        }
-
-        const title = section.querySelector('.panel-title') as HTMLElement | null;
-        if (!title) {
-            return;
-        }
-
-        if (title.getAttribute('data-toggle-bound') === 'true') {
-            return;
-        }
-
-        title.style.cursor = 'pointer';
-        title.textContent = I18n.t('frontendintegration.titleExpanded');
-
-        title.addEventListener('click', () => {
-            const isHidden = container.style.display === 'none';
-            container.style.display = isHidden ? 'block' : 'none';
-            title.textContent = isHidden ? I18n.t('frontendintegration.titleCollapsed') : I18n.t('frontendintegration.titleExpanded');
-        });
-
-        title.setAttribute('data-toggle-bound', 'true');
     }
 
     private renderPanels(container: HTMLElement, preferredOpenPanelId?: string): void {

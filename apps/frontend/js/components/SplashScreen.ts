@@ -74,20 +74,6 @@ export class SplashScreen {
         const splash = document.createElement('div');
         splash.className = 'splash-screen';
         splash.innerHTML = `
-            <div class="splash-background" aria-hidden="true">
-                <div class="splash-grid"></div>
-                <div class="splash-terrain"></div>
-                <div class="splash-data-flow">
-                    <span class="flow-line flow-line-1"></span>
-                    <span class="flow-line flow-line-2"></span>
-                    <span class="flow-line flow-line-3"></span>
-                </div>
-                <div class="splash-sampling-points">
-                    <span class="sample-point point-1"></span>
-                    <span class="sample-point point-2"></span>
-                    <span class="sample-point point-3"></span>
-                </div>
-            </div>
             <div class="splash-content">
                 <div class="splash-logo">
                     <div class="logo-icon">UDAKE</div>

@@ -26,6 +26,20 @@
         <el-button type="primary" @click="loadData">{{ t('search') }}</el-button>
         <el-button @click="resetFilters">{{ t('reset') }}</el-button>
         <el-button type="success" @click="goEditor()">{{ t('createWorkflow') }}</el-button>
+        <div class="quick-entry">
+          <el-input
+            v-model="quickWorkflowId"
+            placeholder="ID 进入工作流..."
+            size="default"
+            style="width: 200px"
+            clearable
+            @keyup.enter="goEditor(quickWorkflowId)"
+          >
+            <template #append>
+              <el-button @click="goEditor(quickWorkflowId)">{{ t('go') }}</el-button>
+            </template>
+          </el-input>
+        </div>
       </div>
 
       <el-table :data="filteredWorkflows" border>
@@ -82,6 +96,7 @@ import { useI18nText } from '../../i18n/useI18n';
 
 const router = useRouter();
 const loading = ref(false);
+const quickWorkflowId = ref('');
 const workflows = ref<WorkflowListItem[]>([]);
 const metrics = reactive<WorkflowMetrics>({
   total_runs: 0,
@@ -268,6 +283,10 @@ onMounted(() => {
   display: grid;
   grid-template-columns: 1.2fr 130px 1fr 80px;
   gap: 8px;
+}
+
+.quick-entry {
+  margin-left: auto;
 }
 
 @media (max-width: 1080px) {

@@ -97,6 +97,57 @@
         />
       </aside>
     </div>
+
+    <!-- 协作滑动面板 -->
+    <WorkflowCollaborationSlider
+      :visible="sliderVisible"
+      :position="sliderPosition"
+      :title="sliderTitle"
+      :online-count="onlineUserCount"
+      :branch-count="branchList.length"
+      :is-locked="isWorkflowLocked"
+      :lock-holder="lockHolderName"
+      @close="sliderVisible = false"
+    >
+      <!-- 分支列表 -->
+      <div v-if="branchList.length" class="branch-section">
+        <h4>冲突分支 ({{ branchList.length }})</h4>
+        <div v-for="branch in branchList" :key="branch.branch_id" class="branch-item">
+          <div class="branch-info">
+            <el-tag :type="branch.status === 'open' ? 'warning' : branch.status === 'merged' ? 'success' : 'danger'" size="small">
+              {{ branch.status === 'open' ? '待处理' : branch.status === 'merged' ? '已合并' : '已拒绝' }}
+            </el-tag>
+            <span class="branch-id">{{ branch.branch_id }}</span>
+            <span class="branch-date">{{ branch.created_at }}</span>
+          </div>
+          <el-button v-if="branch.status === 'open'" size="small" type="primary" @click="openBranchDiff(branch.branch_id)">
+            查看差异
+          </el-button>
+        </div>
+      </div>
+      <div v-else class="no-branches">
+        <p>暂无冲突分支</p>
+      </div>
+    </WorkflowCollaborationSlider>
+
+    <!-- 分支差异对比弹窗 -->
+    <el-dialog
+      v-model="branchDiffDialogVisible"
+      title="分支差异对比"
+      width="900px"
+      :close-on-click-modal="false"
+      destroy-on-close
+    >
+      <BranchDiffView
+        v-if="selectedBranchId"
+        :branch-id="selectedBranchId"
+        :workflow-id="persistedWorkflowId || ''"
+        :resolver-user-id="currentUserId"
+        @close="branchDiffDialogVisible = false"
+        @merged="onBranchMerged"
+        @rejected="onBranchRejected"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -131,6 +182,8 @@ import CollaborationCursorLayer from './CollaborationCursorLayer.vue';
 import CommentThread from './CommentThread.vue';
 import WorkflowNotificationCenter from './WorkflowNotificationCenter.vue';
 import WorkflowCollaborationSharePanel from './WorkflowCollaborationSharePanel.vue';
+import WorkflowCollaborationSlider from './WorkflowCollaborationSlider.vue';
+import BranchDiffView from './BranchDiffView.vue';
 import { workflowService } from '../../services/WorkflowService';
 import { useAuthStore } from '../../stores/auth';
 import type {
@@ -162,6 +215,17 @@ const persistedWorkflowId = ref('');
 const canvasWrapRef = ref<HTMLElement | null>(null);
 const focusPulse = ref<{ x: number; y: number; label: string } | null>(null);
 let focusPulseTimer: number | null = null;
+
+// -------- 协作滑动面板状态 --------
+const sliderVisible = ref(false);
+const sliderPosition = ref<'left' | 'right'>('right');
+const sliderTitle = ref('协作面板');
+const onlineUserCount = ref(0);
+const isWorkflowLocked = ref(false);
+const lockHolderName = ref('');
+const branchList = ref<Array<{ branch_id: string; workflow_id: string; created_by: string; status: string; created_at: string; updated_at: string }>>([]);
+const branchDiffDialogVisible = ref(false);
+const selectedBranchId = ref('');
 
 const meta = reactive({
   workflow_id: '',
@@ -733,6 +797,39 @@ watch(
     syncSelectedNode();
   }
 );
+
+// -------- 分支管理方法 --------
+function openBranchDiff(branchId: string) {
+  selectedBranchId.value = branchId;
+  branchDiffDialogVisible.value = true;
+}
+
+function onBranchMerged() {
+  // 分支合并后刷新分支列表
+  refreshBranches();
+}
+
+function onBranchRejected() {
+  // 分支被拒绝后刷新分支列表
+  refreshBranches();
+}
+
+async function refreshBranches() {
+  if (!persistedWorkflowId.value) return;
+  try {
+    const result = await workflowService.listBranches(persistedWorkflowId.value);
+    branchList.value = result.branches;
+  } catch {
+    // 静默失败
+  }
+}
+
+function toggleSlider() {
+  sliderVisible.value = !sliderVisible.value;
+  if (sliderVisible.value) {
+    refreshBranches();
+  }
+}
 
 onMounted(() => {
   void ensureNodeTypeCatalog();

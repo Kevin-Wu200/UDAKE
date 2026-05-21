@@ -46,6 +46,7 @@
     <link rel="stylesheet" href="css/safari-compat.css">
     <link rel="stylesheet" href="css/accessibility.css">
     <link rel="stylesheet" href="css/point-navigation.css">
+    <link rel="stylesheet" href="css/collapsible-panel.css">
 </head>
 
 <body>
@@ -86,14 +87,14 @@
             <!-- 左侧控制面板 -->
             <aside class="sidebar" aria-label="主控制面板">
                 <!-- 项目面板 -->
-                <div class="panel" id="project-panel" style="display: none;">
+                <div class="panel" id="project-panel" data-collapsible="project-panel" style="display: none;">
                     <h2 class="panel-title" data-i18n="panel.project">当前项目</h2>
                     <div class="panel-content" id="project-content">
                         <!-- 采样组件将动态插入这里 -->
                     </div>
                 </div>
 
-                <div class="panel">
+                <div class="panel" id="upload-panel" data-collapsible="upload-panel">
                     <h2 class="panel-title" data-i18n="upload.title">数据上传</h2>
                     <div class="panel-content">
                         <div id="file-picker" class="file-picker" role="button" tabindex="0" aria-label="选择 GeoJSON 文件">
@@ -106,7 +107,7 @@
                     </div>
                 </div>
 
-                <div class="panel">
+                <div class="panel" id="kriging-params-panel" data-collapsible="kriging-params-panel">
                     <h2 class="panel-title" data-i18n="kriging.title">插值参数</h2>
                     <div class="panel-content">
                         <div class="kriging-template-toolbar">
@@ -250,7 +251,7 @@
                     </div>
                 </div>
 
-                <div class="panel">
+                <div class="panel" id="task-panel" data-collapsible="task-panel">
                     <h2 class="panel-title" data-i18n="task.title">任务状态</h2>
                     <div class="panel-content">
                         <div id="task-status" class="task-status" role="status" aria-live="polite" aria-atomic="true">
@@ -263,7 +264,7 @@
                     </div>
                 </div>
 
-                <div class="panel" id="export-panel" style="display: none;">
+                <div class="panel" id="export-panel" data-collapsible="export-panel" style="display: none;">
                     <h2 class="panel-title" data-i18n="export.title">结果导出</h2>
                     <div class="panel-content">
                         <div class="export-section">
@@ -293,7 +294,7 @@
                     </div>
                 </div>
 
-                <div class="panel">
+                <div class="panel" id="layer-panel" data-collapsible="layer-panel">
                     <h2 class="panel-title" data-i18n="layer.title">图层控制</h2>
                     <div class="panel-content">
                         <div class="layer-control">
@@ -314,41 +315,32 @@
                 </div>
 
                 <!-- 3D克里金面板 -->
-                <div class="panel" id="kriging3d-section">
+                <div class="panel" id="kriging3d-section" data-collapsible="kriging3d-section">
                     <h2 class="panel-title">
-                        <button class="panel-title-toggle" type="button" data-collapse-target="kriging3d-container"
-                            data-a11y-collapse="simple" aria-expanded="false">
-                            <span data-i18n="panel.kriging3d">3D克里金插值</span> ▾
-                        </button>
+                        <span data-i18n="panel.kriging3d">3D克里金插值</span>
                     </h2>
-                    <div id="kriging3d-container" data-lazy-component="Kriging3DPanel" style="display:none;"></div>
+                    <div id="kriging3d-container" class="panel-content" data-lazy-component="Kriging3DPanel"></div>
                 </div>
 
                 <!-- 深度学习面板 -->
-                <div class="panel" id="deep-learning-section">
+                <div class="panel" id="deep-learning-section" data-collapsible="deep-learning-section">
                     <h2 class="panel-title">
-                        <button class="panel-title-toggle" type="button" data-collapse-target="deep-learning-container"
-                            aria-expanded="false">
-                            <span data-i18n="panel.deepLearning">深度学习</span> ▸
-                        </button>
+                        <span data-i18n="panel.deepLearning">深度学习</span>
                     </h2>
-                    <div id="deep-learning-container" data-lazy-component="DeepLearningPanel" style="display:none;">
+                    <div id="deep-learning-container" class="panel-content" data-lazy-component="DeepLearningPanel">
                     </div>
                 </div>
 
                 <!-- 前端功能集成补齐面板 -->
-                <div class="panel" id="frontend-integration-section">
+                <div class="panel" id="frontend-integration-section" data-collapsible="frontend-integration-section">
                     <h2 class="panel-title">
-                        <button class="panel-title-toggle" type="button"
-                            data-collapse-target="frontend-integration-container" aria-expanded="false">
-                            <span data-i18n="panel.frontendIntegration">前端功能集成补齐</span> ▸
-                        </button>
+                        <span data-i18n="panel.frontendIntegration">前端功能集成补齐</span>
                     </h2>
-                    <div id="frontend-integration-container" data-lazy-component="FrontendIntegrationHub"
-                        style="display:none;"></div>
+                    <div id="frontend-integration-container" class="panel-content" data-lazy-component="FrontendIntegrationHub">
+                    </div>
                 </div>
 
-                <div class="panel cache-status-panel" id="cache-status-panel">
+                <div class="panel cache-status-panel" id="cache-status-panel" data-collapsible="cache-status-panel">
                     <h2 class="panel-title" data-i18n="cache.title">缓存状态</h2>
                     <div class="panel-content">
                         <div class="cache-status-item">

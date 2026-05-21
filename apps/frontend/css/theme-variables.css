@@ -10,8 +10,6 @@
     --success-color: #34c759;
     --warning-color: #ff9500;
     --error-color: #ff3b30;
-    --splash-bg-start: #007aff;
-    --splash-bg-end: #5856d6;
 
     /* 浅色模式背景 */
     --bg-primary: #ffffff;
@@ -67,11 +65,10 @@
     --transition-fast: 200ms var(--easing-standard);
     --transition-normal: 240ms var(--easing-standard);
     --transition-slow: 300ms var(--easing-standard);
-    --splash-progress-fill-duration: 240ms;
 
-    /* 启动画面颜色 */
-    --splash-bg-light: linear-gradient(135deg, #007aff 0%, #5856d6 100%);
-    --splash-bg-dark: linear-gradient(135deg, #0044cc 0%, #3a3a8a 100%);
+    /* 启动画面颜色 — Apple 极简纯色 */
+    --splash-bg-light: #FFFFFF;
+    --splash-bg-dark: #000000;
     --splash-bg: var(--splash-bg-light);
 
     /* 启动画面尺寸 */
@@ -80,9 +77,11 @@
     --splash-slogan-size: var(--font-size-lg);
     --splash-spinner-size: 50px;
 
-    /* 启动画面动画 */
-    --splash-fade-duration: var(--transition-normal);
-    --splash-bounce-duration: var(--transition-slow);
+    /* 启动画面动画 — 放慢节奏 (0.8s-1.2s) */
+    --splash-fade-duration: 1s;
+
+    /* 启动画面进度条 */
+    --splash-progress-track: rgba(0, 0, 0, 0.1);
 
     /* 启动画面最小显示时间 */
     --splash-min-display-time: 2500ms;
@@ -91,9 +90,10 @@
 /* 深色模式 - 自动跟随系统 */
 @media (prefers-color-scheme: dark) {
     :root {
-        --splash-bg-start: #0044cc;
-        --splash-bg-end: #3a3a8a;
         --splash-bg: var(--splash-bg-dark);
+
+        /* 深色模式进度条轨道 */
+        --splash-progress-track: rgba(255, 255, 255, 0.15);
 
         /* 深色模式背景 */
         --bg-primary: #1c1c1e;

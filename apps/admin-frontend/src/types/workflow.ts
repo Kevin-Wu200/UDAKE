@@ -269,3 +269,57 @@ export interface WorkflowNotificationPreferences {
   frequency: 'realtime' | '5m' | '15m' | 'daily';
   updated_at?: string;
 }
+
+// -------- 访问控制 (ACL) --------
+
+export interface WorkflowACLInfo {
+  workflow_id: string;
+  is_public: boolean;
+  owner_id: string;
+  collaborators: WorkflowCollaborator[];
+}
+
+export interface WorkflowAccessCheck {
+  workflow_id: string;
+  user_id: string;
+  access: 'granted' | 'denied';
+  role?: string;
+  roles?: string[];
+  permissions?: string[];
+}
+
+// -------- 分支管理 (Branch) --------
+
+export type WorkflowBranchStatus = 'open' | 'merged' | 'rejected';
+
+export interface WorkflowBranchItem {
+  branch_id: string;
+  workflow_id: string;
+  created_by: string;
+  status: WorkflowBranchStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkflowBranchDetail extends WorkflowBranchItem {
+  parent_branch_id: string | null;
+  data: WorkflowDefinition;
+}
+
+export interface WorkflowBranchDiff {
+  branch_id: string;
+  workflow_id: string;
+  nodes_added: string[];
+  nodes_removed: string[];
+  nodes_modified: string[];
+  edges_added: string[];
+  edges_removed: string[];
+  main: {
+    nodes: WorkflowNodeDefinition[];
+    edges: WorkflowEdgeDefinition[];
+  };
+  branch: {
+    nodes: WorkflowNodeDefinition[];
+    edges: WorkflowEdgeDefinition[];
+  };
+}

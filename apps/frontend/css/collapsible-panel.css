@@ -1,0 +1,108 @@
+/**
+ * 可折叠面板样式
+ * 极简动画曲线 cubic-bezier(0.4, 0, 0.2, 1)，Apple 风格
+ * 与 ui-interaction.css 保持一致的设计语言
+ */
+
+/* ========== 面板内容容器过渡动画 ========== */
+.panel-content {
+    overflow: hidden;
+    transition: max-height 350ms cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 350ms cubic-bezier(0.4, 0, 0.2, 1),
+                padding-top 350ms cubic-bezier(0.4, 0, 0.2, 1),
+                padding-bottom 350ms cubic-bezier(0.4, 0, 0.2, 1),
+                margin-top 350ms cubic-bezier(0.4, 0, 0.2, 1),
+                margin-bottom 350ms cubic-bezier(0.4, 0, 0.2, 1);
+    max-height: 4000px;
+    opacity: 1;
+    will-change: max-height, opacity;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+}
+
+/* ========== 折叠状态 ========== */
+.collapsible-panel.collapsed .panel-content {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    margin-top: 0;
+    margin-bottom: 0;
+}
+
+/* ========== 面板标题 - 可点击交互 ========== */
+.collapsible-panel .panel-title {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    transition: margin-bottom 350ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 折叠状态下标题与内容间距归零 */
+.collapsible-panel.collapsed .panel-title {
+    margin-bottom: 0;
+}
+
+/* 面板标题悬停态 */
+.collapsible-panel .panel-title:hover {
+    color: #1d1d1f;
+}
+
+.dark .collapsible-panel .panel-title:hover {
+    color: #f5f5f7;
+}
+
+/* 标题聚焦态 - 键盘导航 */
+.collapsible-panel .panel-title:focus-visible {
+    outline: 2px solid #0071e3;
+    outline-offset: 2px;
+    border-radius: 6px;
+}
+
+.dark .collapsible-panel .panel-title:focus-visible {
+    outline-color: #0a84ff;
+}
+
+/* ========== Chevron 箭头图标 ========== */
+.panel-title-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+    transition: transform 350ms cubic-bezier(0.4, 0, 0.2, 1);
+    flex-shrink: 0;
+    font-size: 12px;
+    color: #86868b;
+    line-height: 1;
+}
+
+/* 折叠状态 - 箭头逆时针旋转 90 度指向右侧 */
+.collapsible-panel.collapsed .panel-title-chevron {
+    transform: rotate(-90deg);
+}
+
+/* ========== 展开状态 ========== */
+.collapsible-panel.expanded .panel-content {
+    max-height: 4000px;
+    opacity: 1;
+}
+
+/* ========== 深色模式适配 ========== */
+.dark .panel-title-chevron {
+    color: #98989d;
+}
+
+/* ========== 防止快速连续点击导致动画错乱 ========== */
+.collapsible-panel.no-transition .panel-content,
+.collapsible-panel.no-transition .panel-title-chevron {
+    transition: none;
+}
+
+/* ========== 性能优化 ========== */
+.collapsible-panel .panel-content,
+.collapsible-panel .panel-title-chevron {
+    will-change: transform, max-height, opacity;
+}

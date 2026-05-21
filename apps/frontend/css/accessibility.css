@@ -163,8 +163,7 @@ html.a11y-high-contrast {
     --text-tertiary: #111111;
     --border-color: #000000;
     --primary-color: #0039a6;
-    --splash-bg-start: #0039a6;
-    --splash-bg-end: #001f5c;
+    --splash-bg: #FFFFFF;
 }
 
 html[data-theme="dark"].a11y-high-contrast {

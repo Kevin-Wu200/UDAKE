@@ -43,7 +43,7 @@ export class TwoLevelCache<K = string, V = any> {
       maxSize: diskConfig.maxSize || 500,
       ttl: diskConfig.ttl || 60 * 60 * 1000, // 1小时
       strategy: diskConfig.strategy || 'lfu',
-      persistence: true,
+      persistence: diskConfig.persistence ?? true,
       storageKey: diskConfig.storageKey || 'disk-cache',
       enableStats: true,
       onPersistenceError: (operation, error) => this._handlePersistenceError(operation, error)

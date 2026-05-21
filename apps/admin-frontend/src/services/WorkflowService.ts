@@ -1,5 +1,10 @@
 import { http } from './http';
 import type {
+  WorkflowACLInfo,
+  WorkflowAccessCheck,
+  WorkflowBranchItem,
+  WorkflowBranchDetail,
+  WorkflowBranchDiff,
   WorkflowCollaborationCursor,
   WorkflowComment,
   WorkflowCommentListResult,
@@ -438,6 +443,72 @@ export const workflowService = {
   async updateNotificationPreferences(workflowId: string, payload: WorkflowNotificationPreferences) {
     const { data } = await http.put<WorkflowNotificationPreferences>(
       `/workflow/${workflowId}/notifications/preferences`,
+      payload
+    );
+    return data;
+  },
+
+  // -------- 访问控制 (ACL) --------
+
+  async checkAccess(workflowId: string, userId: string) {
+    const { data } = await http.get<WorkflowAccessCheck>(
+      `/workflow/${workflowId}/access/${userId}`
+    );
+    return data;
+  },
+
+  async getACL(workflowId: string) {
+    const { data } = await http.get<WorkflowACLInfo>(`/workflow/${workflowId}/acl`);
+    return data;
+  },
+
+  async updateACL(workflowId: string, payload: { is_public?: boolean }) {
+    const { data } = await http.patch<WorkflowACLInfo>(`/workflow/${workflowId}/acl`, payload);
+    return data;
+  },
+
+  // -------- 分支管理 (Branch) --------
+
+  async createBranch(workflowId: string, payload: { created_by: string; data?: WorkflowDefinition }) {
+    const { data } = await http.post<{ branch: WorkflowBranchItem }>(
+      `/workflow/${workflowId}/branch`,
+      payload
+    );
+    return data.branch;
+  },
+
+  async listBranches(workflowId: string) {
+    const { data } = await http.get<{
+      workflow_id: string;
+      branches: WorkflowBranchItem[];
+      count: number;
+    }>(`/workflow/${workflowId}/branches`);
+    return data;
+  },
+
+  async getBranch(branchId: string) {
+    const { data } = await http.get<WorkflowBranchDetail>(`/workflow/branches/${branchId}`);
+    return data;
+  },
+
+  async getBranchDiff(branchId: string) {
+    const { data } = await http.get<WorkflowBranchDiff>(
+      `/workflow/branches/${branchId}/diff`
+    );
+    return data;
+  },
+
+  async mergeBranch(branchId: string, payload: { resolver_user_id: string }) {
+    const { data } = await http.post<{ branch_id: string; status: string; merged_by: string }>(
+      `/workflow/branches/${branchId}/merge`,
+      payload
+    );
+    return data;
+  },
+
+  async rejectBranch(branchId: string, payload: { resolver_user_id: string }) {
+    const { data } = await http.post<{ branch_id: string; status: string; rejected_by: string }>(
+      `/workflow/branches/${branchId}/reject`,
       payload
     );
     return data;
