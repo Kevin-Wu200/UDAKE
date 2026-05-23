@@ -64,8 +64,7 @@ jobs:
           ruff check services/backend deep_learning multi_objective_optimization \
             realtime_interpolation spatial_data_mining time_series_analysis \
             adaptive_sampling ai_extension uncertainty_dashboard tests \
-            --output-format=github \
-            --statistics
+            --output-format=github
 
   coverage:
     name: Test Coverage Gate
@@ -96,8 +95,10 @@ jobs:
           pip install numpy==1.24.3 scipy==1.11.4
           GDAL_VERSION="$(gdal-config --version)"
           pip install "GDAL==${GDAL_VERSION}.*"
-          grep -viE '^\s*GDAL([<>=!~].*)?$' requirements.txt > /tmp/requirements-no-gdal.txt
+          grep -viE '^\s*(GDAL|torch-scatter|torch-sparse)([<>=!~].*)?$' requirements.txt > /tmp/requirements-no-gdal.txt
           pip install -r /tmp/requirements-no-gdal.txt
+          # torch-scatter/torch-sparse 需要在 torch 安装后再构建
+          pip install torch-scatter==2.1.2 torch-sparse==0.6.18
           pip install pytest-cov
 
       - name: Run tests with coverage
