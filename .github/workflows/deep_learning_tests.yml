@@ -73,8 +73,8 @@ jobs:
 
       - name: Install remaining dependencies
         run: |
-          grep -viE '^\s*GDAL([<>=!~].*)?$' requirements.txt > /tmp/requirements-no-gdal.txt
-          pip install -r /tmp/requirements-no-gdal.txt
+          grep -viE '^\s*(GDAL|torch|torch-scatter|torch-sparse)([<>=!~].*)?$' requirements.txt > /tmp/requirements-no-gdal-torch.txt
+          pip install -r /tmp/requirements-no-gdal-torch.txt
           pip install pytest-cov
           pip check
 

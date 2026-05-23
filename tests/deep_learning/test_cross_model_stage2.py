@@ -480,8 +480,8 @@ def test_stage2_compatibility_browser_os_python_dependency_and_backward_compatib
     assert len(compatibility_matrix["os"]) == 3
 
     py_version = platform.python_version()
-    major_minor = ".".join(py_version.split(".")[:2])
-    assert major_minor >= "3.9"
+    major_minor = tuple(int(x) for x in py_version.split(".")[:2])
+    assert major_minor >= (3, 9)
 
     dep_versions = {
         "numpy": importlib.metadata.version("numpy"),
