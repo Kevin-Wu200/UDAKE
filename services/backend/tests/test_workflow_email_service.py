@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import time
 
-from app.services.workflow_email_service import SMTPSettings, WorkflowEmailNotificationService
+from app.services.workflow_email_service import (
+    SMTPSettings,
+    WorkflowEmailNotificationService,
+)
 
 
 def _build_service(**kwargs) -> WorkflowEmailNotificationService:

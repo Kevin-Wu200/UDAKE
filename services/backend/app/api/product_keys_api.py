@@ -2,26 +2,26 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import time
-import asyncio
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, Field
 
+from ..audit.audit_logger import ProductKeyAuditLogger
 from ..auth import JWTValidationError, ProductKeyValidationError, get_auth_service
 from ..auth.input_sanitizer import ensure_safe_text
-from ..audit.audit_logger import ProductKeyAuditLogger
 from ..cache.validation_cache import ValidationCacheManager
+from ..config import settings
 from ..monitoring.alerting import ValidationAlerting
 from ..monitoring.dashboard import ValidationDashboard
 from ..monitoring.metrics import ValidationMetrics
 from ..security.ip_reputation import IPReputationService
-from ..validation_config import load_validation_runtime_config
-from ..config import settings
 from ..services.product_key_validation_queue import ProductKeyValidationQueue
 from ..services.websocket_service import websocket_service
+from ..validation_config import load_validation_runtime_config
 
 router = APIRouter(prefix="/product-keys")
 

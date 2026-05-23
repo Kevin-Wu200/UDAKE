@@ -1,14 +1,15 @@
 """
 3D克里金API接口
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks, UploadFile, File
-from ..schemas.参数模型 import KrigingParameters3D, SliceParams, TaskStartResponse3D
-from ..schemas.数据模型 import SpatialData3D
-from ..schemas.结果模型 import DataUploadResponse3D
-from ..services.计算服务3D import Kriging3DService
-from ..services.数据处理3D import DataProcessor3D
 import json
 import uuid
+
+from fastapi import APIRouter, BackgroundTasks, File, HTTPException, UploadFile
+
+from ..schemas.参数模型 import KrigingParameters3D, SliceParams, TaskStartResponse3D
+from ..schemas.结果模型 import DataUploadResponse3D
+from ..services.数据处理3D import DataProcessor3D
+from ..services.计算服务3D import Kriging3DService
 
 router = APIRouter()
 kriging_3d_service = Kriging3DService()

@@ -3,10 +3,12 @@
 Variance Minimization Objective
 """
 
+from typing import Any, Dict, List, Tuple
+
 import numpy as np
-from typing import List, Tuple, Dict, Any
-from .base import BaseObjective
+
 from ..core.population import Individual
+from .base import BaseObjective
 
 
 class VarianceObjective(BaseObjective):

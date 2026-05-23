@@ -2,37 +2,36 @@
 路径规划模块单元测试
 """
 
-import unittest
 import sys
+import unittest
 from pathlib import Path
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from app.route_planning.core.dijkstra import DijkstraAlgorithm, Graph
+from app.route_planning.core.aco import ACOAlgorithm
 from app.route_planning.core.astar import AStarAlgorithm
+from app.route_planning.core.dijkstra import DijkstraAlgorithm, Graph
 from app.route_planning.core.tsp_solver import (
     NearestNeighborTSPSolver,
+    SimulatedAnnealingTSPSolver,
     TwoOptTSPSolver,
-    SimulatedAnnealingTSPSolver
-)
-from app.route_planning.core.aco import ACOAlgorithm
-from app.route_planning.utils.geo_utils import (
-    haversine_distance,
-    calculate_bearing,
-    calculate_midpoint
-)
-from app.route_planning.utils.route_utils import (
-    build_distance_matrix,
-    build_time_matrix,
-    build_cost_matrix,
-    calculate_route_statistics
 )
 from app.route_planning.utils.constraint_utils import (
+    check_cost_constraint,
     check_distance_constraint,
     check_duration_constraint,
-    check_cost_constraint
+)
+from app.route_planning.utils.geo_utils import (
+    calculate_bearing,
+    calculate_midpoint,
+    haversine_distance,
+)
+from app.route_planning.utils.route_utils import (
+    build_cost_matrix,
+    build_distance_matrix,
+    build_time_matrix,
 )
 
 

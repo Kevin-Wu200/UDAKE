@@ -3,8 +3,9 @@
 """
 
 import math
-from typing import List, Tuple, Dict, Any
-from ..models import SamplingPoint, PlannedRoute, RouteSegment
+from typing import Any, Dict, List, Tuple
+
+from ..models import PlannedRoute, SamplingPoint
 
 
 def build_distance_matrix(points: List[Tuple[str, float, float]]) -> List[List[float]]:

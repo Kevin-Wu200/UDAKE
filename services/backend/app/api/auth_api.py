@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, Literal, Optional
 
+from app.config import settings
 from fastapi import APIRouter, HTTPException, Request, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-
-from app.config import settings
 
 from ..auth import (
     CSRFValidationError,

@@ -5,13 +5,12 @@ Cache Strategy Module
 实现多级缓存策略、替换策略和预热策略
 """
 
-import numpy as np
-from typing import List, Dict, Optional, Any, Tuple
-from dataclasses import dataclass
-from enum import Enum
-from collections import OrderedDict, deque
 import logging
 import time
+from collections import OrderedDict, deque
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 

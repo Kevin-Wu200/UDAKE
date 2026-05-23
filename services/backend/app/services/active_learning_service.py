@@ -7,7 +7,7 @@ import statistics
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from threading import RLock
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Dict, Iterable, List, Optional
 from uuid import uuid4
 
 
@@ -997,7 +997,7 @@ class ActiveLearningService:
 
     def create_batch_annotation(self, payload: Dict[str, Any], user_id: Optional[str] = None) -> Dict[str, Any]:
         with self._lock:
-            uid = self.resolve_user_id(user_id)
+            uid = self.resolve_user_id(user_id)  # noqa: F841
             session = self._require_session(str(payload.get("session_id")))
             batch_size = max(1, _safe_int(payload.get("batch_size"), 20))
             pool = list(session["unlabeled_pool"].values())[:batch_size]

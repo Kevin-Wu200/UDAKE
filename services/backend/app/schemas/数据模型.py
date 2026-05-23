@@ -1,9 +1,10 @@
 """
 数据模型
 """
+from typing import Any, Dict, List, Optional
+
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-from datetime import datetime
+
 
 class Point(BaseModel):
     """空间点"""

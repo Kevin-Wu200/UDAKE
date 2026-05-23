@@ -2,27 +2,26 @@
 多目标优化系统 FastAPI 路由
 Multi-Objective Optimization System API Routes
 """
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
-import numpy as np
 import sys
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from ..core.optimizer import BaseOptimizer
-from ..core.nsga2 import NSGA2Optimizer
-from ..core.population import Population, Individual
-from ..objectives.variance import VarianceObjective
-from ..objectives.cost import CostObjective
-from ..objectives.accessibility import AccessibilityObjective
 from ..constraints.boundary import BoundaryConstraint
-from ..constraints.distance import DistanceConstraint
 from ..constraints.budget import BudgetConstraint
+from ..constraints.distance import DistanceConstraint
+from ..core.nsga2 import NSGA2Optimizer
+from ..objectives.accessibility import AccessibilityObjective
+from ..objectives.cost import CostObjective
+from ..objectives.variance import VarianceObjective
 
 router = APIRouter()
 
@@ -118,7 +117,7 @@ async def create_optimization_task(request: OptimizationRequest):
             constraints.append(BudgetConstraint(request.constraints['budget']))
 
         # 创建优化器
-        optimizer = NSGA2Optimizer(
+        optimizer = NSGA2Optimizer(  # noqa: F841
             objectives=objectives,
             constraints=constraints,
             n_candidates=request.algorithm_params.get('n_candidates', 1000) if request.algorithm_params else 1000,

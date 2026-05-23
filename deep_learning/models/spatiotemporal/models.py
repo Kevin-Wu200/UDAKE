@@ -8,7 +8,6 @@ from typing import Any, Literal
 import numpy as np
 
 from .attention import (
-    AttentionOutput,
     attention_pooling,
     multi_head_attention,
     spatial_multi_head_attention,

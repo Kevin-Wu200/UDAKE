@@ -10,7 +10,10 @@ from typing import Any, Dict, Optional
 from ..auth import get_auth_service
 from ..auth_db.session import get_auth_session_factory
 from ..config import settings
-from ..services.company_admin_policy_service import mark_expired_product_keys, send_expiry_reminders
+from ..services.company_admin_policy_service import (
+    mark_expired_product_keys,
+    send_expiry_reminders,
+)
 
 logger = logging.getLogger(__name__)
 

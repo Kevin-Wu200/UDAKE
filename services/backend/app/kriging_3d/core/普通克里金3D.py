@@ -1,11 +1,12 @@
 """
 3D普通克里金引擎
 """
-import numpy as np
-from typing import Dict, Any, Optional
-from .变异函数3D import Variogram3D
-from .距离计算 import Distance3D
 import logging
+from typing import Any, Dict, Optional
+
+import numpy as np
+
+from .变异函数3D import Variogram3D
 
 logger = logging.getLogger(__name__)
 

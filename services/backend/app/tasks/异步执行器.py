@@ -2,9 +2,9 @@
 异步执行器
 """
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from typing import Callable, Any
 import logging
+from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
 

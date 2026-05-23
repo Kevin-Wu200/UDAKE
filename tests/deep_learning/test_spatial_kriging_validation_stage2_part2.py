@@ -4,13 +4,20 @@ import time
 
 import numpy as np
 
-from deep_learning.models.spatial_interpolation import AttentionKrigingModel, GNNKrigingModel, ResidualKrigingModel
+from deep_learning.models.spatial_interpolation import (
+    AttentionKrigingModel,
+    GNNKrigingModel,
+    ResidualKrigingModel,
+)
 from deep_learning.utils.spatial_interpolation_data import SyntheticSpatialDataset
 from services.backend.app.dl_services.attention_kriging_explainer import (
     AttentionKrigingExplanationConfig,
     AttentionKrigingLIMEAdapter,
 )
-from services.backend.app.dl_services.gnn_kriging_explainer import GNNKrigingExplanationConfig, GNNKrigingLIMEAdapter
+from services.backend.app.dl_services.gnn_kriging_explainer import (
+    GNNKrigingExplanationConfig,
+    GNNKrigingLIMEAdapter,
+)
 from services.backend.app.dl_services.residual_kriging_explainer import (
     ResidualKrigingExplanationConfig,
     ResidualKrigingLIMEAdapter,

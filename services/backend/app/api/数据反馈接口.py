@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Literal, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
+from ..config import settings
 from ..services.feedback_service import feedback_service
 
 router = APIRouter()
@@ -41,10 +42,10 @@ def _auth(required_scope: str):
     ) -> AuthContext:
         if settings.is_development or settings.is_testing:
             return AuthContext(user_id=x_user_id or "dev_user", api_key=x_api_key or "dev_key")
-        
+
         if not x_api_key:
              raise HTTPException(status_code=401, detail="X-API-Key header is required")
-             
+
         try:
             _enforce_rate_limit(x_api_key)
             feedback_service.verify_api_key(x_api_key, required_scope=required_scope)

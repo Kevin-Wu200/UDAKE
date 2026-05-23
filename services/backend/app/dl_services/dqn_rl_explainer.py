@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import hashlib
 import json
 import threading
 import time
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -399,7 +399,7 @@ class DQNLIMEAdapter(_DQNBaseAdapter):
         batch_explanations: list[dict[str, Any]] = []
         raw_weight_rows: list[np.ndarray] = []
         surrogate: Ridge = context["surrogate"]
-        baseline = np.asarray(context["baseline"], dtype=float)
+        baseline = np.asarray(context["baseline"], dtype=float)  # noqa: F841
         local_weight_matrix = np.asarray(context["surrogate_local_weights"], dtype=float)
 
         explained_batches = self._split_explained_batches(explained_nodes)

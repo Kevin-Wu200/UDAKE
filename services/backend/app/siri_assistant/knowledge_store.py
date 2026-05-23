@@ -9,7 +9,6 @@
 
 import fcntl
 import logging
-import os
 import platform
 import re
 from datetime import datetime

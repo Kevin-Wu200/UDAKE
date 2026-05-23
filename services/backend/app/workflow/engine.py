@@ -12,7 +12,10 @@ from typing import Any, Callable, Dict, List, Mapping, MutableMapping, Optional,
 from uuid import uuid4
 
 from .expression import evaluate_condition, resolve_value, safe_eval_bool
-from .schema import WorkflowValidationError, get_node_param_rules, validate_and_normalize_definition
+from .schema import (
+    get_node_param_rules,
+    validate_and_normalize_definition,
+)
 
 NodeHandler = Callable[[Mapping[str, Any], MutableMapping[str, Any], List[Any], int], Any]
 ExecutionEventCallback = Callable[[str, Dict[str, Any]], None]

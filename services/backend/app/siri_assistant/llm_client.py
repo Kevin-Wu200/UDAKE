@@ -7,8 +7,7 @@ Ollama LLM 客户端
 
 import json
 import logging
-import time
-from typing import Optional, AsyncGenerator
+from typing import AsyncGenerator, Optional
 
 import httpx
 

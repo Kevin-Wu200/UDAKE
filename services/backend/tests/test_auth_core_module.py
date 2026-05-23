@@ -5,12 +5,8 @@ from __future__ import annotations
 import time
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from app.api.auth_api import router as auth_router
 from app.api.devices_api import router as devices_router
-from app.config import settings
 from app.auth import (
     AuthCacheManager,
     JWTManager,
@@ -27,10 +23,16 @@ from app.auth import (
     reset_auth_service,
     verify_password,
 )
-from app.auth.product_key_service import PRODUCT_KEY_PATTERN, verify_rsa_signature_sha256
+from app.auth.product_key_service import (
+    PRODUCT_KEY_PATTERN,
+    verify_rsa_signature_sha256,
+)
 from app.auth.rate_limiter import AuthRateLimiter, RateLimitExceededError, RateRule
 from app.auth.verification import EmailVerificationService, VerificationCodeError
+from app.config import settings
 from app.security_middleware import security_guard_middleware
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 def test_tokens_enc_encrypt_and_decrypt_roundtrip():

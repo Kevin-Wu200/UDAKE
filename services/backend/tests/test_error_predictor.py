@@ -1,10 +1,11 @@
 """
 误差预测模型测试
 """
-import pytest
-import numpy as np
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 # 添加模块路径
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -173,7 +174,7 @@ class TestErrorPredictor:
 
         # 预测
         x, y, pred_values = sample_prediction_data
-        errors = predictor.predict_error(x, y, pred_values)
+        errors = predictor.predict_error(x, y, pred_values)  # noqa: F841
         confidence = predictor.estimate_confidence(x, y, pred_values)
 
         # 验证关系：置信度高意味着误差低
@@ -211,10 +212,10 @@ class TestErrorPredictor:
         x, y, actual_values, predicted_values = sample_training_data
 
         # 计算期望的误差
-        expected_errors = np.abs(actual_values - predicted_values)
+        expected_errors = np.abs(actual_values - predicted_values)  # noqa: F841
 
         # 训练模型
-        result = predictor.train(x, y, actual_values, predicted_values)
+        result = predictor.train(x, y, actual_values, predicted_values)  # noqa: F841
 
         # 模型应该学习到误差模式
         # 测试一些预测
@@ -329,7 +330,7 @@ class TestErrorPredictor:
         result = predictor.train(x, y, actual_values, predicted_values)
 
         # 验证测试集大小（应该是20%）
-        expected_test_size = int(len(x) * 0.2)
+        expected_test_size = int(len(x) * 0.2)  # noqa: F841
 
         # 训练集R²通常高于测试集R²
         # 这是一个常见的现象

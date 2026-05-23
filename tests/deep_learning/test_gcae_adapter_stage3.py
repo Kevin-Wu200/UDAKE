@@ -84,7 +84,7 @@ def test_gcae_preprocess_strategy_and_predict_function_contract() -> None:
     assert scaled.shape == matrix.shape
     idx_map = {name: idx for idx, name in enumerate(feature_names)}
 
-    value_idx = idx_map["value"]
+    value_idx = idx_map["value"]  # noqa: F841
     node_degree_idx = idx_map["node_degree"]
     adj_density_idx = idx_map["adj_density"]
 

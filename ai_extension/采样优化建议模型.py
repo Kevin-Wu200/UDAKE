@@ -1,9 +1,11 @@
 """
 采样优化建议模型
 """
-from sklearn.cluster import KMeans
+from typing import Dict, List
+
 import numpy as np
-from typing import List, Dict
+from sklearn.cluster import KMeans
+
 
 class SamplingOptimizer:
     """采样优化建议模型"""
@@ -95,7 +97,7 @@ class SamplingOptimizer:
         # 聚类
         X = np.column_stack([high_var_x, high_var_y])
         self.kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-        labels = self.kmeans.fit_predict(X)
+        labels = self.kmeans.fit_predict(X)  # noqa: F841
 
         # 聚类中心
         centers = self.kmeans.cluster_centers_

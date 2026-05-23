@@ -3,11 +3,13 @@ NSGA-II算法实现
 NSGA-II Algorithm Implementation
 """
 
-import numpy as np
-from typing import List, Tuple
 import time
+from typing import List, Tuple
+
+import numpy as np
+
 from .optimizer import BaseOptimizer
-from .population import Population, Individual
+from .population import Individual, Population
 
 
 class NSGA2Optimizer(BaseOptimizer):

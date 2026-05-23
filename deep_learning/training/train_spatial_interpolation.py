@@ -5,9 +5,11 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import numpy as np
-
-from deep_learning.models.spatial_interpolation import AttentionKrigingModel, GNNKrigingModel, ResidualKrigingModel
+from deep_learning.models.spatial_interpolation import (
+    AttentionKrigingModel,
+    GNNKrigingModel,
+    ResidualKrigingModel,
+)
 from deep_learning.training.spatial_interpolation_trainer import (
     HyperparameterOptimizer,
     ModelSelector,

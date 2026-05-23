@@ -1,10 +1,11 @@
 """
 进度详情接口
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
+
+from ..dependencies import verify_task_id
 from ..schemas.进度详情模型 import ProgressDetail, ProgressStage
 from ..tasks.任务管理器 import TaskManager
-from ..dependencies import verify_task_id
 
 router = APIRouter()
 task_manager = TaskManager()

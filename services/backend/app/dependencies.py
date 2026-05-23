@@ -1,10 +1,12 @@
 """
 依赖注入
 """
-from fastapi import Depends, HTTPException, status
-from .config import settings
-from typing import Optional
 import logging
+from typing import Optional
+
+from fastapi import HTTPException, status
+
+from .config import settings
 
 logger = logging.getLogger(__name__)
 

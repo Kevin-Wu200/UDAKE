@@ -3,10 +3,12 @@
 Budget Constraint
 """
 
+from typing import List, Optional, Tuple
+
 import numpy as np
-from typing import List, Tuple, Optional
-from .base import BaseConstraint
+
 from ..core.population import Individual
+from .base import BaseConstraint
 
 
 class BudgetConstraint(BaseConstraint):

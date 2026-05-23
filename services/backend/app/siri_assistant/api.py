@@ -14,19 +14,15 @@ import logging
 from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
 
 from .knowledge_store import knowledge_store
 from .models import (
-    FunctionTarget,
-    IntentType,
     KnowledgeUpdateRequest,
     SiriAssistantResponse,
     SiriFeedbackRequest,
     SiriQueryRequest,
 )
 from .retriever import retriever
-from .security import security
 from .service import siri_service
 
 logger = logging.getLogger(__name__)

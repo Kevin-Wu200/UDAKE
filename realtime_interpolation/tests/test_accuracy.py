@@ -3,14 +3,14 @@
 Accuracy Validation Tests
 """
 
-import pytest
-import numpy as np
 from datetime import datetime
-from typing import List
 
-from ..core.incremental_kriging import IncrementalKriging
+import numpy as np
+import pytest
+
 from ..api.realtime_service import RealtimeService
-from ..models import DataPoint, BoundingBox, Subscription
+from ..core.incremental_kriging import IncrementalKriging
+from ..models import BoundingBox, DataPoint, Subscription
 
 
 class TestIncrementalAccuracy:
@@ -31,7 +31,7 @@ class TestIncrementalAccuracy:
 
         # 全量计算
         kriging.initial_fit(initial_data)
-        full_predictions = kriging.predict([(5.0, 5.0), (10.0, 10.0)])
+        full_predictions = kriging.predict([(5.0, 5.0), (10.0, 10.0)])  # noqa: F841
 
         # 增量更新
         new_data = [
@@ -157,7 +157,7 @@ class TestIncrementalAccuracy:
         mean_error = np.mean(errors)
         std_error = np.std(errors)
 
-        print(f"交叉验证结果:")
+        print("交叉验证结果:")
         print(f"  平均误差: {mean_error:.6f}")
         print(f"  标准差: {std_error:.6f}")
         print(f"  最大误差: {max(errors):.6f}")
@@ -206,7 +206,7 @@ class TestRealtimeServiceAccuracy:
         mean_prediction = np.mean(predictions)
         std_prediction = np.std(predictions)
 
-        print(f"多次预测结果:")
+        print("多次预测结果:")
         for i, pred in enumerate(predictions):
             print(f"  第{i+1}次: {pred:.6f}")
         print(f"  平均值: {mean_prediction:.6f}")
@@ -251,7 +251,7 @@ class TestRealtimeServiceAccuracy:
         # 验证预测值发生了变化
         assert initial_pred[0].value != updated_pred[0].value
 
-        print(f"批量更新前后预测:")
+        print("批量更新前后预测:")
         print(f"  更新前: {initial_pred[0].value:.6f}")
         print(f"  更新后: {updated_pred[0].value:.6f}")
 
@@ -283,7 +283,7 @@ class TestRealtimeServiceAccuracy:
         for i in range(1, len(predictions)):
             assert predictions[i].value > predictions[i-1].value
 
-        print(f"梯度预测结果:")
+        print("梯度预测结果:")
         for i, pred in enumerate(predictions):
             print(f"  点 {gradient_points[i]}: {pred.value:.6f}")
 
@@ -324,7 +324,7 @@ class TestRealtimeServiceAccuracy:
             # 预测值应该在数据点的范围内
             assert 10.0 <= pred.value <= 25.0
 
-        print(f"边界预测结果:")
+        print("边界预测结果:")
         for i, point in enumerate(test_points):
             print(f"  点 {point}: {predictions[i].value:.6f}")
 

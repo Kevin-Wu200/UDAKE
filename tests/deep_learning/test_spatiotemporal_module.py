@@ -6,7 +6,6 @@ from deep_learning.inference import SpatioTemporalInference
 from deep_learning.models.spatiotemporal import (
     ConvLSTMModel,
     GCNLSTMModel,
-    STGCNModel,
     SlidingWindowDataLoader,
     SpatialNormalizer,
     SpatioTemporalDataAugmentation,
@@ -15,6 +14,7 @@ from deep_learning.models.spatiotemporal import (
     SpatioTemporalSystemIntegrator,
     SpatioTemporalTrainingConfig,
     SpatioTemporalTransformer,
+    STGCNModel,
     SyntheticSpatioTemporalDataset,
     TemporalNormalizer,
     acf,

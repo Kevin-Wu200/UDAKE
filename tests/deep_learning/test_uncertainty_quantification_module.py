@@ -12,13 +12,13 @@ from deep_learning.models.uncertainty import (
     GaussianMixturePrior,
     MCDropoutConfig,
     MCDropoutRegressor,
-    UQTrainingConfig,
-    UQTrainingManager,
     UncertaintyAggregator,
     UncertaintyCalibrator,
     UncertaintyDatasetBuilder,
     UncertaintyEvaluator,
     UncertaintySystemIntegrator,
+    UQTrainingConfig,
+    UQTrainingManager,
 )
 
 

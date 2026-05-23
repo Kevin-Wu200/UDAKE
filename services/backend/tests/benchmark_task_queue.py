@@ -2,19 +2,18 @@
 任务队列性能测试
 测试任务队列在优化前后的性能对比
 """
-import time
 import asyncio
-import threading
-import statistics
-from typing import Dict, Any
-import sys
 import os
+import statistics
+import sys
+import time
+from typing import Any, Dict
 
 # 添加项目根目录到Python路径
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from app.schemas.任务队列模型 import QueueConfig, QueueTaskPriority
 from app.services.任务队列管理器 import TaskQueueManager
-from app.schemas.任务队列模型 import QueueTaskPriority, QueueConfig
 
 
 class BenchmarkResults:
@@ -34,28 +33,28 @@ class BenchmarkResults:
         print("=" * 60)
 
         if self.add_times:
-            print(f"\n添加任务性能:")
+            print("\n添加任务性能:")
             print(f"  平均耗时: {statistics.mean(self.add_times):.4f}s")
             print(f"  最小耗时: {min(self.add_times):.4f}s")
             print(f"  最大耗时: {max(self.add_times):.4f}s")
             print(f"  中位数: {statistics.median(self.add_times):.4f}s")
 
         if self.process_times:
-            print(f"\n处理任务性能:")
+            print("\n处理任务性能:")
             print(f"  平均耗时: {statistics.mean(self.process_times):.4f}s")
             print(f"  最小耗时: {min(self.process_times):.4f}s")
             print(f"  最大耗时: {max(self.process_times):.4f}s")
             print(f"  中位数: {statistics.median(self.process_times):.4f}s")
 
         if self.concurrent_add_times:
-            print(f"\n并发添加任务性能:")
+            print("\n并发添加任务性能:")
             print(f"  平均耗时: {statistics.mean(self.concurrent_add_times):.4f}s")
             print(f"  最小耗时: {min(self.concurrent_add_times):.4f}s")
             print(f"  最大耗时: {max(self.concurrent_add_times):.4f}s")
             print(f"  中位数: {statistics.median(self.concurrent_add_times):.4f}s")
 
         if self.concurrent_process_times:
-            print(f"\n并发处理任务性能:")
+            print("\n并发处理任务性能:")
             print(f"  平均耗时: {statistics.mean(self.concurrent_process_times):.4f}s")
             print(f"  最小耗时: {min(self.concurrent_process_times):.4f}s")
             print(f"  最大耗时: {max(self.concurrent_process_times):.4f}s")
@@ -153,13 +152,13 @@ async def benchmark_lock_contention(queue_manager: TaskQueueManager, num_tasks: 
                 parameters={"data": task_id},
                 priority=QueueTaskPriority.MEDIUM
             )
-            task = queue_manager.get_task(f"test_task_{task_id}")
+            task = queue_manager.get_task(f"test_task_{task_id}")  # noqa: F841
 
             # 收集锁统计信息
             lock_stats = queue_manager.get_lock_statistics()
             lock_stats_list.append(lock_stats)
 
-        except Exception as e:
+        except Exception:
             nonlocal lock_contention_count
             lock_contention_count += 1
 

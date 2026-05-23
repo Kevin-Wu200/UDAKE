@@ -1,5 +1,4 @@
 import numpy as np
-
 from app.core.spatiotemporal_kriging.utils.low_rank_approx import truncated_svd
 
 

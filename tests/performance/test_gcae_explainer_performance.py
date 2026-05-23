@@ -5,7 +5,10 @@ import time
 import numpy as np
 
 from deep_learning.models.anomaly_detection import GCAEAnomalyDetector
-from services.backend.app.dl_services.gcae_anomaly_explainer import GCAEExplanationConfig, GCAELimeAdapter
+from services.backend.app.dl_services.gcae_anomaly_explainer import (
+    GCAEExplanationConfig,
+    GCAELimeAdapter,
+)
 
 
 def _make_data(n: int = 120, seed: int = 23) -> tuple[np.ndarray, np.ndarray]:

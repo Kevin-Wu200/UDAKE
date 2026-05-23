@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import numpy as np
 
-from deep_learning.models.uncertainty import BayesianNeuralRegressor, GaussianMixturePrior
-from services.backend.app.dl_services.bnn_explainer import BNNExplanationConfig, BNNLIMEAdapter, BNNSHAPAdapter
+from deep_learning.models.uncertainty import (
+    BayesianNeuralRegressor,
+    GaussianMixturePrior,
+)
+from services.backend.app.dl_services.bnn_explainer import (
+    BNNExplanationConfig,
+    BNNLIMEAdapter,
+    BNNSHAPAdapter,
+)
 
 
 def _make_features(n: int = 52, seed: int = 101) -> np.ndarray:

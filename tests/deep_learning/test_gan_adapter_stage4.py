@@ -8,7 +8,11 @@ from fastapi.testclient import TestClient
 
 from deep_learning.models.anomaly_detection import GANAnomalyDetector
 from services.backend.app.dl_services.api import router
-from services.backend.app.dl_services.gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter, GANExplanationConfig
+from services.backend.app.dl_services.gan_anomaly_explainer import (
+    GANAnomalyLimeAdapter,
+    GANAnomalySHAPAdapter,
+    GANExplanationConfig,
+)
 from services.backend.app.dl_services.service import DeepLearningService
 
 

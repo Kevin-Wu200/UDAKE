@@ -12,7 +12,6 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-
 # --- 意图分类枚举 ---
 
 class IntentType(str, Enum):

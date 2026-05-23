@@ -3,16 +3,16 @@
 Performance Tests
 """
 
-import pytest
 import time
-import numpy as np
 from datetime import datetime
-from typing import List
 
-from ..core.incremental_kriging import IncrementalKriging
-from ..cache.cache_manager import CacheManager
+import numpy as np
+import pytest
+
 from ..api.realtime_service import RealtimeService
-from ..models import DataPoint, BoundingBox, Subscription
+from ..cache.cache_manager import CacheManager
+from ..core.incremental_kriging import IncrementalKriging
+from ..models import BoundingBox, DataPoint, Subscription
 
 
 class TestIncrementalPerformance:

@@ -1,15 +1,15 @@
 """
 融合引擎
 """
-import numpy as np
-from typing import List, Dict, Any, Optional
-from .fusion_models import (
-    FusionConfig, FusionResult, ModelPrediction, FusionStrategy
-)
-from .weight_calculator import WeightCalculator
-from ..strategies.fusion_strategies import FusionStrategies
-from ..evaluation.model_evaluator import ModelEvaluator
 import logging
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+
+from ..evaluation.model_evaluator import ModelEvaluator
+from ..strategies.fusion_strategies import FusionStrategies
+from .fusion_models import FusionConfig, FusionResult, FusionStrategy, ModelPrediction
+from .weight_calculator import WeightCalculator
 
 logger = logging.getLogger(__name__)
 

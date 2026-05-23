@@ -2,57 +2,102 @@
 FastAPI主应用
 """
 import sys
-import os
-from pathlib import Path
-from datetime import datetime
-from contextlib import asynccontextmanager
 import uuid
+from contextlib import asynccontextmanager
+from datetime import datetime
+from pathlib import Path
 
 # 添加项目根目录到Python路径
 # 当前文件位于 services/backend/app/main.py，需要回退4层到仓库根目录
 project_root = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(project_root))
 
+import logging
 from typing import Optional
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request
+from fastapi import FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.openapi.utils import get_openapi
-from starlette.middleware.base import BaseHTTPMiddleware
-from .config import settings
-from .security_middleware import security_guard_middleware
-from .startup_manager import StartupManager
-from .services.websocket_service import websocket_service
-from .services.智能工作流服务 import smart_workflow_service
-from .api_versioning import (
-    router as api_versioning_router,
-    api_versioning_middleware,
-    SUPPORTED_API_VERSIONS,
-    CURRENT_API_VERSION,
-    DEPRECATED_API_VERSIONS,
-)
-from .api_response import unified_api_response_middleware
-from .api import 数据上传接口, 插值任务接口, 结果查询接口, 任务状态接口, 报告生成接口, 模型推荐接口, 采样建议接口, 采样点影响评估接口, 行业配置接口, 批量插值接口, 参数批量应用接口, 结果对比分析接口, 批量报告生成接口, 进度详情接口, 资源监控接口, 任务队列接口, 分布式计算接口, 性能报告接口, 不确定性分级接口, 风险指数接口, 决策阈值接口, 风险报告接口, 异常检测接口, 误差预测接口, 模型评估接口, 配置接口, 路径规划接口, 模型融合接口, 项目管理接口, 通用数据处理接口, 数据质量接口, 数据安全接口, GPU加速接口, 数据反馈接口, 主动学习接口, 用户验证与自评估接口, 移动端GPS接口, 历史对比与趋势分析接口, 智能工作流接口, 时空克里金接口, 航测像片采样接口
-from .api.app_download_api import router as download_router
-from .api.admin_api import router as admin_router
-from .api.auth_api import router as auth_router
-from .api.product_keys_api import router as product_keys_router
-from .api.company_management_api import router as company_management_router
-from .api.devices_api import router as devices_router
-from .api.scheduler_api import router as scheduler_router
-from .api.tickets_api import router as tickets_router
-from .scheduler.key_expiry_scheduler import get_scheduler_manager
-from .services.mobile_gps_service import mobile_gps_service
+
+from multi_objective_optimization.api import fastapi_routes as multi_objective_routes
 
 # 导入新增的系统路由
 from realtime_interpolation.api import fastapi_routes as realtime_routes
-from multi_objective_optimization.api import fastapi_routes as multi_objective_routes
-from .kriging_3d.api.路由 import router as kriging_3d_router
+
+from .api import (
+    GPU加速接口,
+    移动端GPS接口,
+    不确定性分级接口,
+    主动学习接口,
+    任务状态接口,
+    任务队列接口,
+    决策阈值接口,
+    分布式计算接口,
+    历史对比与趋势分析接口,
+    参数批量应用接口,
+    异常检测接口,
+    性能报告接口,
+    批量报告生成接口,
+    批量插值接口,
+    报告生成接口,
+    插值任务接口,
+    数据上传接口,
+    数据反馈接口,
+    数据安全接口,
+    数据质量接口,
+    时空克里金接口,
+    智能工作流接口,
+    模型推荐接口,
+    模型融合接口,
+    模型评估接口,
+    用户验证与自评估接口,
+    结果对比分析接口,
+    结果查询接口,
+    航测像片采样接口,
+    行业配置接口,
+    误差预测接口,
+    资源监控接口,
+    路径规划接口,
+    进度详情接口,
+    通用数据处理接口,
+    配置接口,
+    采样建议接口,
+    采样点影响评估接口,
+    项目管理接口,
+    风险报告接口,
+    风险指数接口,
+)
+from .api.admin_api import router as admin_router
+from .api.app_download_api import router as download_router
+from .api.auth_api import router as auth_router
+from .api.company_management_api import router as company_management_router
+from .api.devices_api import router as devices_router
+from .api.product_keys_api import router as product_keys_router
+from .api.scheduler_api import router as scheduler_router
+from .api.tickets_api import router as tickets_router
+from .api_response import unified_api_response_middleware
+from .api_versioning import (
+    CURRENT_API_VERSION,
+    DEPRECATED_API_VERSIONS,
+    SUPPORTED_API_VERSIONS,
+    api_versioning_middleware,
+)
+from .api_versioning import (
+    router as api_versioning_router,
+)
+from .config import settings
 from .dl_services.api import router as deep_learning_router
+from .kriging_3d.api.路由 import router as kriging_3d_router
+from .scheduler.key_expiry_scheduler import get_scheduler_manager
+from .security_middleware import security_guard_middleware
+from .services.mobile_gps_service import mobile_gps_service
+from .services.websocket_service import websocket_service
+from .services.智能工作流服务 import smart_workflow_service
 from .siri_assistant.api import router as siri_router
-import logging
+from .startup_manager import StartupManager
+
 
 def _setup_logging() -> None:
     """按配置初始化日志输出（控制台 + 可选文件）。"""

@@ -5,12 +5,12 @@ Prophet 时序预测器
 如prophet不可用，回退到基本的季节性分解+趋势预测。
 """
 
-import numpy as np
-from typing import Optional, Dict, Any, List
 import logging
-from datetime import datetime
+from typing import Any, Dict, Optional
 
-from .models import TimeSeriesData, ForecastResult, ForecastConfig
+import numpy as np
+
+from .models import ForecastConfig, ForecastResult, TimeSeriesData
 
 logger = logging.getLogger(__name__)
 
@@ -144,8 +144,6 @@ class ProphetForecaster:
 
     def _predict_prophet(self, horizon: int, config: Optional[ForecastConfig] = None) -> ForecastResult:
         """使用Prophet预测"""
-        import pandas as pd
-        from prophet import Prophet
 
         future = self._fitted_model.make_future_dataframe(periods=horizon)
         forecast = self._fitted_model.predict(future)

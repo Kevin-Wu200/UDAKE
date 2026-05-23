@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import math
-from collections import OrderedDict
 import threading
+from collections import OrderedDict
 
 import numpy as np
 
-from .common import AdaptiveLearningMode, EPS, ModelMetric, WeightMethod, normalize_weights
+from .common import (
+    EPS,
+    AdaptiveLearningMode,
+    ModelMetric,
+    WeightMethod,
+    normalize_weights,
+)
 
 
 class FusionWeightCalculator:

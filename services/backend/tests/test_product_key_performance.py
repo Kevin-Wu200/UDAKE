@@ -12,15 +12,14 @@ from pathlib import Path
 from statistics import mean
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
-
 from app.api.admin_api import router as admin_router
 from app.auth import ProductKeyRegistry, get_auth_service, reset_auth_service
 from app.auth_db.models import Base, Company, ProductKey, User
 from app.auth_db.session import get_auth_db_session
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine, text
+from sqlalchemy.orm import sessionmaker
 
 
 @pytest.fixture()

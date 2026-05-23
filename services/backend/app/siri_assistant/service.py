@@ -4,7 +4,6 @@ Siri 助手核心服务
 整合检索、LLM、安全、意图识别等模块，提供统一的智能交互服务。
 """
 
-import json
 import logging
 import time
 import uuid
@@ -19,10 +18,10 @@ from .models import (
     FunctionTarget,
     IntentType,
     InteractionLogEntry,
+    RetrievedDocument,
     SiriAssistantResponse,
     SiriFeedbackRequest,
     SiriQueryRequest,
-    RetrievedDocument,
 )
 from .retriever import retriever
 from .security import security

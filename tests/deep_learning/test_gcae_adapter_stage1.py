@@ -4,7 +4,10 @@ import numpy as np
 import pytest
 
 from deep_learning.models.anomaly_detection import GCAEAnomalyDetector
-from services.backend.app.dl_services.gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
+from services.backend.app.dl_services.gcae_anomaly_explainer import (
+    GCAELimeAdapter,
+    GCAEShapAdapter,
+)
 from services.backend.app.dl_services.service import DeepLearningService
 
 

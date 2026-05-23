@@ -2,7 +2,8 @@
 锁管理器
 管理不同类型的分段锁，提供统一的锁管理接口
 """
-from typing import Dict, Any
+from typing import Any, Dict
+
 from .segmented_lock import SegmentedLock
 
 

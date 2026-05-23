@@ -5,12 +5,12 @@ QuadTree Spatial Index
 实现高效的2D空间索引，用于快速查询和更新
 """
 
-import numpy as np
-from typing import List, Optional, Tuple
-from dataclasses import dataclass
 import logging
+from typing import List, Optional, Tuple
 
-from ..models import DataPoint, BoundingBox
+import numpy as np
+
+from ..models import BoundingBox, DataPoint
 
 logger = logging.getLogger(__name__)
 

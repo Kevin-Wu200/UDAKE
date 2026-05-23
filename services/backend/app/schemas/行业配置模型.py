@@ -1,9 +1,11 @@
 """
 行业配置模型 - 不同行业的克里金插值预设参数
 """
-from pydantic import BaseModel, Field
-from typing import Dict, Any, Optional
 from enum import Enum
+from typing import Any, Dict, Optional
+
+from pydantic import BaseModel, Field
+
 
 class Industry(str, Enum):
     """行业类型枚举"""

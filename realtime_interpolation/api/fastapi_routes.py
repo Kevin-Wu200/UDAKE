@@ -2,18 +2,19 @@
 实时插值系统 FastAPI 路由
 Real-time Interpolation System API Routes
 """
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
-from typing import List, Dict, Any, Optional
 import sys
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, ConfigDict, Field
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root))
 
-from .realtime_service import RealtimeInterpolationService, ServiceManager
 from ..services import RealtimeSpatioTemporalService
+from .realtime_service import ServiceManager
 
 # 创建服务管理器
 service_manager = ServiceManager()

@@ -1,11 +1,13 @@
 """
 数据上传接口
 """
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from ..schemas.数据模型 import DataUploadResponse, SpatialData, BoundingBox
-from ..services.数据预处理服务 import DataPreprocessor
 import json
 import uuid
+
+from fastapi import APIRouter, File, HTTPException, UploadFile
+
+from ..schemas.数据模型 import BoundingBox, DataUploadResponse
+from ..services.数据预处理服务 import DataPreprocessor
 
 router = APIRouter()
 preprocessor = DataPreprocessor()

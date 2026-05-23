@@ -6,14 +6,7 @@ Index Module
 """
 
 from .quadtree import QuadTree, QuadTreeNode
-
-from .spatial_index import (
-    KDTreeNode,
-    KDTree,
-    RTreeNode,
-    RTree,
-    GridIndex
-)
+from .spatial_index import GridIndex, KDTree, KDTreeNode, RTree, RTreeNode
 
 __all__ = [
     # QuadTree

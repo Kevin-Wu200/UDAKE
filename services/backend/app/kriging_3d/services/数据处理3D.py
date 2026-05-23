@@ -2,13 +2,14 @@
 3D数据处理模块
 支持数据导入、预处理、分层、采样
 """
-import numpy as np
 import json
-from pathlib import Path
-from typing import Dict, Any, Optional, List, Tuple
-from ..schemas.数据模型 import SpatialData3D, Point3D, BoundingBox3D
-from ...config import settings
 import logging
+from typing import Any, Dict, List, Tuple
+
+import numpy as np
+
+from ...config import settings
+from ..schemas.数据模型 import BoundingBox3D, Point3D, SpatialData3D
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +192,7 @@ class DataProcessor3D:
                 layer_points = [p for p in data.points if edges[i] <= p.z <= edges[i + 1]]
             if layer_points:
                 layers[i] = SpatialData3D(points=layer_points, crs=data.crs, z_unit=data.z_unit)
-        logger.info(f"垂直分层: {n_layers} 层, 各层点数: {[len(l.points) for l in layers.values()]}")
+        logger.info(f"垂直分层: {n_layers} 层, 各层点数: {[len(layer.points) for layer in layers.values()]}")
         return layers
 
     def horizontal_layers(self, data: SpatialData3D, n_layers_x: int = 3,

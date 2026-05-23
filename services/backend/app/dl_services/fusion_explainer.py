@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
-from dataclasses import dataclass
 import copy
 import hashlib
 import json
 import threading
 import time
+from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Any, Optional
 
 import numpy as np
@@ -1063,7 +1063,7 @@ class _BaseFusionAdapter:
         performance: dict[str, Any],
         stability: dict[str, Any],
     ) -> dict[str, Any]:
-        ranked = {str(item.get("model_id", "")): item for item in list(contribution_ranking.get("ranking", []))}
+        ranked = {str(item.get("model_id", "")): item for item in list(contribution_ranking.get("ranking", []))}  # noqa: F841
         replace_rows = list(selection_recommendation.get("replacement_candidates", []))
         replacement_plans = list(alternative_solutions.get("replacement_plans", []))
         perf_rows = {str(item.get("model_id", "")): item for item in list(performance.get("ranking", []))}

@@ -2,24 +2,29 @@
 任务队列管理器
 优化版本：使用分段锁和异步执行器提升并发性能
 """
+import asyncio
 import threading
 import time
-import asyncio
-from datetime import datetime, timedelta
-from typing import Dict, Optional, List, Any
-from queue import PriorityQueue, Empty
+import uuid
+from datetime import datetime
+from queue import Empty, PriorityQueue
+from typing import Any, Dict, List, Optional
+
+from ..core.async_executor import AsyncTaskExecutor
+from ..core.lock_manager import LockManager
+from ..core.task_storage import FileTaskStorage
 from ..schemas.任务队列模型 import (
-    QueueTaskInfo, QueueTaskStatus, QueueTaskPriority,
-    QueueStatistics, QueueVisualization, QueueConfig,
-    TaskControlResponse
+    QueueConfig,
+    QueueStatistics,
+    QueueTaskInfo,
+    QueueTaskPriority,
+    QueueTaskStatus,
+    QueueVisualization,
+    TaskControlResponse,
 )
-from ..schemas.输出结果模型 import TaskStatus
 from ..tasks.任务管理器 import TaskManager
 from .websocket_service import websocket_service
-from ..core.lock_manager import LockManager
-from ..core.async_executor import AsyncTaskExecutor
-from ..core.task_storage import FileTaskStorage
-import uuid
+
 
 class TaskQueueManager:
     """任务队列管理器"""
@@ -444,7 +449,7 @@ class TaskQueueManager:
             throughput = completed_in_last_hour
 
             # 获取锁统计信息
-            lock_stats = self.lock_manager.get_lock_stats()
+            lock_stats = self.lock_manager.get_lock_stats()  # noqa: F841
 
             return QueueStatistics(
                 total_tasks=total,

@@ -3,17 +3,14 @@
 Integration Tests for Realtime Interpolation System
 """
 
-import pytest
-import asyncio
 import time
 from datetime import datetime
-from typing import List
 
-from ..core.incremental_kriging import IncrementalKriging
-from ..cache.cache_manager import CacheManager
-from ..events.event_system import EventBus, EventType
+import pytest
+
 from ..api.realtime_service import RealtimeService
-from ..models import DataPoint, BoundingBox, Subscription, UpdateResult
+from ..events.event_system import EventBus, EventType
+from ..models import BoundingBox, DataPoint, Subscription
 
 
 class TestRealtimeServiceIntegration:
@@ -420,7 +417,7 @@ class TestAccuracyIntegration:
         realtime_service.add_data_points(subscription.id, initial_data)
 
         # 获取初始预测
-        initial_predictions = realtime_service.query_predictions(
+        initial_predictions = realtime_service.query_predictions(  # noqa: F841
             subscription.id,
             [(2.5, 2.5)]
         )

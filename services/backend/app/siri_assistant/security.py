@@ -7,8 +7,8 @@
 - System Prompt 安全管理
 """
 
-import re
 import logging
+import re
 from typing import Optional
 
 from .config import siri_config

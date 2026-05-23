@@ -2,26 +2,28 @@
 多目标优化采样接口
 Multi-Objective Optimization Sampling API
 """
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from typing import Dict, Any, Optional, List
-from datetime import datetime
-import numpy as np
-import uuid
-import logging
 import asyncio
+import logging
+import uuid
+from datetime import datetime
+from typing import Any, Dict, Optional
+
+import numpy as np
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+
+from multi_objective_optimization import (
+    AccessibilityObjective,
+    BoundaryConstraint,
+    BudgetConstraint,
+    CostObjective,
+    DistanceConstraint,
+    NSGA2Optimizer,
+    VarianceObjective,
+)
+from multi_objective_optimization.utils.metrics import calculate_performance_metrics
 
 from ..dependencies import verify_task_id
 from ..tasks.任务管理器 import TaskManager
-from multi_objective_optimization import (
-    NSGA2Optimizer,
-    VarianceObjective,
-    CostObjective,
-    AccessibilityObjective,
-    BoundaryConstraint,
-    DistanceConstraint,
-    BudgetConstraint
-)
-from multi_objective_optimization.utils.metrics import calculate_performance_metrics
 
 logger = logging.getLogger(__name__)
 

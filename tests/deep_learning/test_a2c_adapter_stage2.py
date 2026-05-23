@@ -3,7 +3,10 @@ from __future__ import annotations
 import numpy as np
 
 from deep_learning.models.sampling_rl import ActorCriticAgent, SamplingEnv
-from services.backend.app.dl_services.a2c_rl_explainer import A2CLIMEAdapter, A2CSHAPAdapter
+from services.backend.app.dl_services.a2c_rl_explainer import (
+    A2CLIMEAdapter,
+    A2CSHAPAdapter,
+)
 
 
 def _uncertainty_map(size: int = 10, seed: int = 73) -> np.ndarray:

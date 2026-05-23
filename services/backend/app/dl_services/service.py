@@ -3,24 +3,35 @@
 from __future__ import annotations
 
 import copy
-from dataclasses import dataclass
 import hashlib
 import json
 import os
-from typing import Any
-import time
 import tempfile
+import time
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 
 from ai_extension.异常检测模块 import DeepAnomalyFusionDetector
-from deep_learning.inference import BatchPredictor
 from deep_learning.fusion.service import fusion_platform_service
-from deep_learning.models.anomaly_detection import AnomalyTrainingConfig, AnomalyTrainingManager
-from deep_learning.models import AttentionKrigingModel, GNNKrigingModel, ModelRegistry, ResidualKrigingModel
+from deep_learning.inference import BatchPredictor
+from deep_learning.models import (
+    AttentionKrigingModel,
+    GNNKrigingModel,
+    ModelRegistry,
+    ResidualKrigingModel,
+)
+from deep_learning.models.anomaly_detection import (
+    AnomalyTrainingConfig,
+    AnomalyTrainingManager,
+)
 from deep_learning.models.sampling_rl import SamplingRLIntegrator
 from deep_learning.models.spatial_interpolation import SpatialInterpolationIntegrator
-from deep_learning.models.spatiotemporal import SpatioTemporalSystemIntegrator, SpatioTemporalTrainingConfig
+from deep_learning.models.spatiotemporal import (
+    SpatioTemporalSystemIntegrator,
+    SpatioTemporalTrainingConfig,
+)
 from deep_learning.models.uncertainty import (
     BayesianNeuralRegressor,
     DeepEnsembleRegressor,
@@ -29,27 +40,47 @@ from deep_learning.models.uncertainty import (
     MCDropoutConfig,
     MCDropoutRegressor,
 )
-from deep_learning.training import LightningTrainer, SpatialTrainingConfig, TrainingConfig, train_spatial_model
+from deep_learning.training import (
+    LightningTrainer,
+    SpatialTrainingConfig,
+    TrainingConfig,
+    train_spatial_model,
+)
 from deep_learning.utils.device import DeviceManager
-from deep_learning.utils.monitoring import AlertManager, AlertRule, MetricMonitor, SystemResourceMonitor
+from deep_learning.utils.monitoring import (
+    AlertManager,
+    AlertRule,
+    MetricMonitor,
+    SystemResourceMonitor,
+)
+
 from .a2c_rl_explainer import A2CLIMEAdapter, A2CSHAPAdapter
 from .anomaly_cache import AnomalyModelCache
 from .anomaly_features import AnomalyFeatureRegistry
-from .attention_kriging_explainer import AttentionKrigingLIMEAdapter, AttentionKrigingSHAPAdapter
+from .attention_kriging_explainer import (
+    AttentionKrigingLIMEAdapter,
+    AttentionKrigingSHAPAdapter,
+)
 from .bnn_explainer import BNNLIMEAdapter, BNNSHAPAdapter
-from .contrastive_anomaly_explainer import ContrastiveLimeAdapter, ContrastiveShapAdapter
+from .contrastive_anomaly_explainer import (
+    ContrastiveLimeAdapter,
+    ContrastiveShapAdapter,
+)
 from .deep_ensemble_explainer import DeepEnsembleLIMEAdapter, DeepEnsembleSHAPAdapter
 from .dqn_rl_explainer import DQNLIMEAdapter, DQNSHAPAdapter
 from .edl_explainer import EDLLIMEAdapter, EDLSHAPAdapter
 from .fusion_explainer import FusionLIMEAdapter, FusionSHAPAdapter
-from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
 from .gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter
+from .gcae_anomaly_explainer import GCAELimeAdapter, GCAEShapAdapter
 from .gnn_kriging_explainer import GNNKrigingLIMEAdapter, GNNKrigingSHAPAdapter
 from .lime_explainer import SpatiotemporalLIMEExplainer
 from .mc_dropout_explainer import MCDropoutLIMEAdapter, MCDropoutSHAPAdapter
 from .parallel_runtime import ParallelExecutionManager, ParallelTask
 from .ppo_rl_explainer import PPOLIMEAdapter, PPOSHAPAdapter
-from .residual_kriging_explainer import ResidualKrigingLIMEAdapter, ResidualKrigingSHAPAdapter
+from .residual_kriging_explainer import (
+    ResidualKrigingLIMEAdapter,
+    ResidualKrigingSHAPAdapter,
+)
 from .shap_explainer import SpatiotemporalSHAPExplainer
 from .vae_anomaly_explainer import VAEAnomalyLIMEAdapter, VAEAnomalySHAPAdapter
 

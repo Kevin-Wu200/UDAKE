@@ -14,9 +14,9 @@ from fastapi import APIRouter, HTTPException, Query, status
 from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel, Field
 
-from .common import raise_api_error
 from ..services.mobile_gps_service import mobile_gps_service
 from ..services.spatiotemporal_kriging_service import spatiotemporal_kriging_service
+from .common import raise_api_error
 
 try:
     import brotli  # type: ignore

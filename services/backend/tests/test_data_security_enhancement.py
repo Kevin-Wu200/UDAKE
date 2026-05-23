@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
 import pytest
-
 from app.api.数据安全接口 import router as security_router
 from app.config import settings
 from app.security_middleware import security_guard_middleware
-from app.services.数据安全服务 import get_data_security_service, reset_data_security_service
+from app.services.数据安全服务 import (
+    get_data_security_service,
+    reset_data_security_service,
+)
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture()

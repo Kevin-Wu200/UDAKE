@@ -5,19 +5,24 @@ Incremental Kriging Interpolation
 实现基于Sherman-Morrison公式的增量克里金插值
 """
 
-import numpy as np
-from typing import List, Optional, Tuple, Dict, Any
-from datetime import datetime
 import logging
 import threading
+from datetime import datetime
 from types import SimpleNamespace
+from typing import List, Optional, Tuple
 
-from ..models import (
-    DataPoint, BoundingBox, VariogramModel,
-    UpdateResult, Subscription, PredictionResult
-)
-from ..index.quadtree import QuadTree
+import numpy as np
+
 from ..config import KrigingConfig
+from ..index.quadtree import QuadTree
+from ..models import (
+    BoundingBox,
+    DataPoint,
+    PredictionResult,
+    Subscription,
+    UpdateResult,
+    VariogramModel,
+)
 from .matrix_update import ShermanMorrisonUpdater, WoodburyUpdater
 
 logger = logging.getLogger(__name__)
@@ -330,7 +335,7 @@ class IncrementalKriging:
         if self.covariance_matrix_inv is None:
             return
 
-        n = len(self.data_points)
+        n = len(self.data_points)  # noqa: F841
 
         # 计算新点与已有点的协方差向量
         k_new = np.array([
@@ -501,7 +506,7 @@ class IncrementalKriging:
         results = []
 
         # 合并相邻的影响域
-        influence_domains = [
+        influence_domains = [  # noqa: F841
             self._calculate_influence_domain(point)
             for point in new_points
         ]

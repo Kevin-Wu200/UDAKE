@@ -1,15 +1,14 @@
 """
 结果对比分析服务
 """
-from ..schemas.批量处理模型 import (
-    ResultComparisonMetrics, ResultComparisonResponse
-)
-from ..tasks.批量任务管理器 import BatchTaskManager
-from ..tasks.任务管理器 import TaskManager
-from typing import Dict, List, Optional, Any
 import logging
-from datetime import datetime
 import statistics
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from ..schemas.批量处理模型 import ResultComparisonMetrics, ResultComparisonResponse
+from ..tasks.任务管理器 import TaskManager
+from ..tasks.批量任务管理器 import BatchTaskManager
 
 logger = logging.getLogger(__name__)
 

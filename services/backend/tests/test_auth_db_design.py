@@ -5,10 +5,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
-
 from app.auth_db.database import build_engine_options, create_auth_engine, ping_database
 from app.auth_db.models import (
     AuditLog,
@@ -38,6 +34,9 @@ from app.auth_db.models import (
     WorkflowVersion,
 )
 from app.config import settings
+from sqlalchemy import create_engine
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 
 @pytest.fixture()
@@ -487,7 +486,7 @@ def test_ticket_crud_and_business_rules(sqlite_engine):
 
 
 def test_ticket_validation_and_constraints(sqlite_engine):
-    with Session(sqlite_engine) as session:
+    with Session(sqlite_engine) as session:  # noqa: F841
         with pytest.raises(ValueError):
             Ticket(
                 id=2,

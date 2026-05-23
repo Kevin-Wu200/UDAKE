@@ -4,8 +4,8 @@ Dijkstra最短路径算法实现
 """
 
 import heapq
-from typing import Dict, List, Optional, Set, Tuple
 import math
+from typing import Dict, List, Optional, Set, Tuple
 
 
 class Graph:

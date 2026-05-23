@@ -85,7 +85,7 @@ def brier_score(probabilities: np.ndarray, labels: np.ndarray) -> float:
     y = ensure_1d(labels).astype(int)
     if probs.ndim == 1:
         probs = np.vstack([1.0 - probs, probs]).T
-    n_classes = probs.shape[1]
+    n_classes = probs.shape[1]  # noqa: F841
     target = np.zeros_like(probs)
     target[np.arange(len(y)), y] = 1.0
     return float(np.mean(np.sum((probs - target) ** 2, axis=1)))

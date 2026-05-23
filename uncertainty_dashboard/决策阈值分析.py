@@ -1,9 +1,10 @@
 """
 决策阈值分析
 """
+from typing import Dict, List
+
 import numpy as np
-from typing import Dict, List, Tuple
-from scipy import stats
+
 
 class DecisionThresholdAnalyzer:
     """决策阈值分析器"""
@@ -115,7 +116,7 @@ class DecisionThresholdAnalyzer:
         """
         计算决策风险
         """
-        exceeds_threshold = prediction > threshold
+        exceeds_threshold = prediction > threshold  # noqa: F841
 
         # 计算置信区间
         std = np.sqrt(variance)

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 
-from deep_learning.inference.spatial_interpolation_inference import SpatialInterpolationInference
+from deep_learning.inference.spatial_interpolation_inference import (
+    SpatialInterpolationInference,
+)
 from deep_learning.models.spatial_interpolation.evaluation import evaluate_metrics
 from deep_learning.utils.spatial_interpolation_data import SyntheticSpatialDataset
 

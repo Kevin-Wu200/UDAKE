@@ -5,13 +5,12 @@ Spatial Index Module
 实现KD树、R树和网格索引
 """
 
-import numpy as np
-from typing import List, Optional, Tuple, Dict, Any
-from dataclasses import dataclass
-from enum import Enum
 import logging
+from typing import List, Optional, Tuple
 
-from ..models import DataPoint, BoundingBox
+import numpy as np
+
+from ..models import BoundingBox, DataPoint
 
 logger = logging.getLogger(__name__)
 
@@ -542,7 +541,7 @@ def test_kdtree():
 
     # 查询K近邻
     knn = kdtree.query_knn(center, 5)
-    print(f"5个最近邻:")
+    print("5个最近邻:")
     for point, dist in knn:
         print(f"  {point.id}: {dist:.2f}")
 

@@ -3,12 +3,12 @@
 Incremental Kriging Algorithm Tests
 """
 
-import pytest
-import numpy as np
 from datetime import datetime
 
+import pytest
+
 from ..core.incremental_kriging import IncrementalKriging
-from ..models import DataPoint, BoundingBox
+from ..models import BoundingBox, DataPoint
 
 
 class TestIncrementalKriging:

@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -13,7 +13,12 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from deep_learning.models.sampling_rl import ActorCriticAgent, DQNAgent, PPOAgent, SamplingEnv
+from deep_learning.models.sampling_rl import (
+    ActorCriticAgent,
+    DQNAgent,
+    PPOAgent,
+    SamplingEnv,
+)
 from services.backend.app.dl_services.a2c_rl_explainer import (
     A2CExplanationConfig,
     A2CLIMEAdapter,

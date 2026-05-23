@@ -1,14 +1,17 @@
 """
 性能报告接口
 """
+
 from fastapi import APIRouter, HTTPException
+
 from ..schemas.性能报告模型 import (
-    PerformanceReportRequest, PerformanceReportResponse,
-    PerformanceTrendAnalysis, HistoricalPerformanceStats,
-    PerformanceMetricsBatch
+    HistoricalPerformanceStats,
+    PerformanceMetricsBatch,
+    PerformanceReportRequest,
+    PerformanceReportResponse,
+    PerformanceTrendAnalysis,
 )
 from ..services.性能报告服务 import performance_report_service
-from typing import Optional, List
 
 router = APIRouter()
 

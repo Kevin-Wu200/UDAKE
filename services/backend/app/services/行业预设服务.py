@@ -1,10 +1,11 @@
 """
 行业预设服务 - 管理不同行业的克里金插值预设参数
 """
-from ..schemas.行业配置模型 import Industry, IndustryConfig
-from ..schemas.插值参数模型 import VariogramModel, KrigingMethod
-from typing import Dict, Any, List
 import logging
+from typing import Any, Dict, List
+
+from ..schemas.插值参数模型 import KrigingMethod, VariogramModel
+from ..schemas.行业配置模型 import Industry, IndustryConfig
 
 logger = logging.getLogger(__name__)
 
@@ -276,7 +277,7 @@ class IndustryPresetService:
         Returns:
             是否有效
         """
-        config = self.get_industry_config(industry)
+        config = self.get_industry_config(industry)  # noqa: F841
 
         # 验证必需参数
         required_params = ["method", "variogram_model", "grid_resolution", "nlags"]

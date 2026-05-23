@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import builtins
+
 import numpy as np
 import pytest
-
 from app.dl_services.vae_anomaly_explainer import (
     VAEAnomalyLIMEAdapter,
     VAEAnomalySHAPAdapter,
     VAEExplanationConfig,
     _safe_float,
 )
+
 from deep_learning.models.anomaly_detection import VAEAnomalyDetector
 
 

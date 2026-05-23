@@ -178,8 +178,8 @@ class StartupManager:
 
         # 优化 ready 逻辑：P0 和 P1 任务必须全部成功才视为 ready
         p0_p1_success = all(
-            report.success 
-            for report in self._task_reports 
+            report.success
+            for report in self._task_reports
             if report.priority in [StartupPriority.P0, StartupPriority.P1]
         )
         self._ready = self._fatal_error is None and p0_p1_success

@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 import json
+import sys
+from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
 import numpy as np
-from pathlib import Path
-import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -16,7 +16,10 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from deep_learning.fusion.service import FusionPlatformService
 from deep_learning.models.sampling_rl import SamplingRLIntegrator
-from deep_learning.models.uncertainty import UncertaintyDatasetBuilder, UncertaintySystemIntegrator
+from deep_learning.models.uncertainty import (
+    UncertaintyDatasetBuilder,
+    UncertaintySystemIntegrator,
+)
 
 
 def _build_demo_series(seed: int = 2026, n_points: int = 180) -> tuple[np.ndarray, np.ndarray]:

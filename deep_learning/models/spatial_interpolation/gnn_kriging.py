@@ -9,7 +9,11 @@ import numpy as np
 
 from .attention import MultiScaleAttention
 from .baselines import UniversalKrigingBaseline
-from .feature_extractors import CovarianceFeatureExtractor, SpatialFeatureExtractor, TrendFeatureExtractor
+from .feature_extractors import (
+    CovarianceFeatureExtractor,
+    SpatialFeatureExtractor,
+    TrendFeatureExtractor,
+)
 from .graph_builder import SpatialGraphBuilder
 from .graph_layers import EdgeConvLayer, GATLayer, GCNLayer
 from .heads import MultiTaskHead

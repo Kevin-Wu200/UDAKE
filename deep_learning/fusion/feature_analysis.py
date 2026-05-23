@@ -7,7 +7,13 @@ from typing import Any
 
 import numpy as np
 
-from .common import EPS, FusionStrategy, ModelPrediction, ensure_prediction_matrix, normalize_weights
+from .common import (
+    EPS,
+    FusionStrategy,
+    ModelPrediction,
+    ensure_prediction_matrix,
+    normalize_weights,
+)
 
 
 class FusionFeatureAnalyzer:

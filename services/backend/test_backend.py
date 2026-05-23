@@ -2,8 +2,9 @@
 后端关键链路集成测试（基于 TestClient 生命周期 fixture）
 """
 
-import pytest
 import json
+
+import pytest
 
 
 def test_health_check(integration_client):

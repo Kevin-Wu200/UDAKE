@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from services.backend.app.core.performance_optimization import PerformanceMonitoringFramework, ResultPreloader
+from services.backend.app.core.performance_optimization import (
+    PerformanceMonitoringFramework,
+    ResultPreloader,
+)
 
 
 def test_performance_monitoring_framework_full_cycle_stage2() -> None:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.workflow.engine import WorkflowEngine
 from app.workflow.schema import WorkflowValidationError
 

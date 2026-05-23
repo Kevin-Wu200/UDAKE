@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import random
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from itertools import product
 from typing import Any, Callable
-import random
 
 import numpy as np
 

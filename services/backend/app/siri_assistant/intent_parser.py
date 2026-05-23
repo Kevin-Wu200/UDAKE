@@ -9,9 +9,8 @@ import logging
 import re
 from typing import Optional
 
-from .config import siri_config
 from .llm_client import ollama_client
-from .models import IntentType, FunctionTarget
+from .models import FunctionTarget, IntentType
 
 logger = logging.getLogger(__name__)
 

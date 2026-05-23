@@ -1,9 +1,10 @@
 """
 3D克里金参数模型
 """
-from pydantic import BaseModel, Field
-from typing import Optional, List
 from enum import Enum
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class VariogramModel3D(str, Enum):

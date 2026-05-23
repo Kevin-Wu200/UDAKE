@@ -6,7 +6,6 @@ import time
 from typing import Any
 
 import numpy as np
-
 from anomaly_examples_common import build_demo_dataset, create_model, train_model
 
 

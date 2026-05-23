@@ -3,10 +3,12 @@
 Distance Constraint
 """
 
-import numpy as np
 from typing import List, Tuple
-from .base import BaseConstraint
+
+import numpy as np
+
 from ..core.population import Individual
+from .base import BaseConstraint
 
 
 class DistanceConstraint(BaseConstraint):

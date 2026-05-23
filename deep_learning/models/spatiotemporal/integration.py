@@ -31,7 +31,13 @@ from .evaluation import (
     generate_report,
 )
 from .graph import build_knn_graph
-from .models import ConvLSTMModel, GCNLSTMModel, STGCNModel, SpatioTemporalOutput, SpatioTemporalTransformer
+from .models import (
+    ConvLSTMModel,
+    GCNLSTMModel,
+    SpatioTemporalOutput,
+    SpatioTemporalTransformer,
+    STGCNModel,
+)
 from .online import OnlineModelUpdater, OnlineSpatioTemporalPredictor
 from .optimization import SpatioTemporalPerformanceOptimizer
 from .training import SpatioTemporalTrainingConfig, train_spatiotemporal_model

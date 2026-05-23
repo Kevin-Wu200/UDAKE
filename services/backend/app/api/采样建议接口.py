@@ -1,17 +1,23 @@
 """
 采样建议接口 - 基于不确定性分析的智能采样点推荐
 """
-from fastapi import APIRouter, HTTPException, Depends
-from ..schemas.输出结果模型 import SamplingRecommendation, SamplingRecommendationsResponse
-from ..tasks.任务管理器 import TaskManager
-from ..dependencies import verify_task_id
+import logging
+from datetime import datetime
+
+import numpy as np
+from fastapi import APIRouter, Depends, HTTPException
+
 from adaptive_sampling.采样点推荐生成 import SamplingRecommender
 from adaptive_sampling.高不确定性区域识别 import HighUncertaintyIdentifier
 from ai_extension.采样优化建议模型 import SamplingOptimizer
-import numpy as np
-from datetime import datetime
-from typing import Dict, Any, Optional
-import logging
+
+from ..dependencies import verify_task_id
+from ..config import settings
+from ..schemas.输出结果模型 import (
+    SamplingRecommendation,
+    SamplingRecommendationsResponse,
+)
+from ..tasks.任务管理器 import TaskManager
 
 logger = logging.getLogger(__name__)
 
@@ -106,7 +112,6 @@ async def generate_recommendations(
             try:
                 task_info = task_manager.get_task_info(task_id)
                 if task_info and task_info.data_id:
-                    from ..schemas.数据模型 import SpatialData
                     spatial_data = task_manager.get_spatial_data(task_info.data_id)
                     if spatial_data:
                         existing_points = np.array([[p.x, p.y] for p in spatial_data.points])
@@ -189,13 +194,12 @@ async def generate_recommendations(
         # 使用原有算法
         # 直接从文件路径读取结果
         from ..utils.栅格工具 import RasterUtils
-        from ..config import settings
 
-        raster_utils = RasterUtils()
+        raster_utils = RasterUtils()  # noqa: F841
 
         # 构建文件路径
         variance_path = settings.RESULTS_DIR / f"{task_id}_variance.tif"
-        prediction_path = settings.RESULTS_DIR / f"{task_id}_prediction.tif"
+        prediction_path = settings.RESULTS_DIR / f"{task_id}_prediction.tif"  # noqa: F841
 
         if not variance_path.exists():
             raise HTTPException(status_code=404, detail="方差栅格不存在，请先完成插值计算")
@@ -258,7 +262,6 @@ async def generate_recommendations(
         try:
             task_info = task_manager.get_task_info(task_id)
             if task_info and task_info.data_id:
-                from ..schemas.数据模型 import SpatialData
                 spatial_data = task_manager.get_spatial_data(task_info.data_id)
                 if spatial_data:
                     existing_points = np.array([[p.x, p.y] for p in spatial_data.points])

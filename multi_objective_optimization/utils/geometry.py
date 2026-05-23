@@ -3,9 +3,10 @@
 Geometry utility functions
 """
 
-import numpy as np
 from typing import List, Tuple, Union
-from shapely.geometry import Point, Polygon, MultiPolygon, LineString
+
+import numpy as np
+from shapely.geometry import LineString, MultiPolygon, Point, Polygon
 
 
 def calculate_distance(point1: Tuple[float, float], point2: Tuple[float, float]) -> float:

@@ -5,9 +5,10 @@ Matrix Update Module
 实现Sherman-Morrison和Woodbury矩阵更新公式
 """
 
-import numpy as np
-from typing import Tuple, Optional, List
 import logging
+from typing import List, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -462,7 +463,7 @@ class BlockMatrixUpdater:
         update_indices: set
     ) -> np.ndarray:
         """更新稀疏行"""
-        n = K_inv.shape[0]
+        n = K_inv.shape[0]  # noqa: F841
         row = K_inv[idx, :].copy()
 
         for i in update_indices:
@@ -482,7 +483,7 @@ class BlockMatrixUpdater:
         update_indices: set
     ) -> np.ndarray:
         """更新稀疏列"""
-        n = K_inv.shape[0]
+        n = K_inv.shape[0]  # noqa: F841
         col = K_inv[:, idx].copy()
 
         for i in update_indices:

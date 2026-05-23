@@ -8,8 +8,21 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from threading import RLock
-from typing import Any, Dict, Generic, Iterable, List, Mapping, MutableMapping, Optional, Protocol, Tuple, TypeVar
+from typing import (
+    Any,
+    Dict,
+    Generic,
+    Iterable,
+    List,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Protocol,
+    Tuple,
+    TypeVar,
+)
 
+from app.auth_db.database import create_auth_engine
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -25,8 +38,6 @@ from sqlalchemy import (
 from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
-
-from app.auth_db.database import create_auth_engine
 
 logger = logging.getLogger(__name__)
 

@@ -1,9 +1,11 @@
 """
 不确定性分级模型
 """
-import numpy as np
-from typing import Dict, List, Tuple
 from enum import Enum
+from typing import Dict, List
+
+import numpy as np
+
 
 class UncertaintyLevel(str, Enum):
     """不确定性等级"""

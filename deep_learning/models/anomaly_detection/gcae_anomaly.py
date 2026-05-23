@@ -6,7 +6,15 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .common import ThresholdMethod, compute_threshold, knn_graph, multiscale_value_features, normalize_adjacency, safe_minmax, standardize
+from .common import (
+    ThresholdMethod,
+    compute_threshold,
+    knn_graph,
+    multiscale_value_features,
+    normalize_adjacency,
+    safe_minmax,
+    standardize,
+)
 
 
 @dataclass

@@ -5,15 +5,16 @@ Update Strategy Module
 实现多尺度更新策略和更新优先级管理
 """
 
-import numpy as np
-from typing import List, Dict, Optional, Tuple
-from dataclasses import dataclass, field
-from enum import Enum
 import heapq
-from datetime import datetime
 import logging
+from dataclasses import dataclass, field
+from datetime import datetime
+from enum import Enum
+from typing import List, Optional
 
-from ..models import DataPoint, BoundingBox, UpdateResult
+import numpy as np
+
+from ..models import BoundingBox, DataPoint
 
 logger = logging.getLogger(__name__)
 
@@ -217,7 +218,7 @@ class UpdatePriorityManager:
         """
         # 检查队列大小
         if len(self.task_queue) >= self.max_queue_size:
-            logger.warning(f"任务队列已满，丢弃最旧的任务")
+            logger.warning("任务队列已满，丢弃最旧的任务")
             heapq.heappop(self.task_queue)
 
         # 创建任务

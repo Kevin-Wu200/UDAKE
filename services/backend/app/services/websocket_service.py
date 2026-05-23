@@ -1,6 +1,5 @@
 import asyncio
 import heapq
-import json
 import re
 from collections import deque
 from datetime import datetime, timedelta, timezone

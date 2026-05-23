@@ -1,11 +1,12 @@
 """
 模型评估报告生成测试
 """
-import pytest
-import numpy as np
-from pathlib import Path
 import sys
 from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 # 添加模块路径
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -239,7 +240,7 @@ class TestModelEvaluator:
         )
 
         # 应该有关于相关性的建议
-        recommendations_text = " ".join(report["recommendations"])
+        recommendations_text = " ".join(report["recommendations"])  # noqa: F841
         # 注意：偏移预测的相关性仍然很高，所以可能不会触发这个建议
         assert isinstance(report["recommendations"], list)
 

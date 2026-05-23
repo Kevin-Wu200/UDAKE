@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
-from dataclasses import dataclass
 import hashlib
 import json
 import threading
 import time
+from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 import numpy as np
 from sklearn.linear_model import Ridge
 
-from deep_learning.models.spatial_interpolation.baselines import OrdinaryKrigingBaseline, UniversalKrigingBaseline
+from deep_learning.models.spatial_interpolation.baselines import (
+    OrdinaryKrigingBaseline,
+    UniversalKrigingBaseline,
+)
 
 
 def _safe_float(value: Any, default: float = 0.0) -> float:

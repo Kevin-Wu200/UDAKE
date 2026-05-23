@@ -5,10 +5,19 @@ from typing import Any
 
 import numpy as np
 
-from services.backend.app.dl_services.lime_explainer import LIMEConfig, SpatiotemporalLIMEExplainer
-from services.backend.app.dl_services.parallel_runtime import ParallelExecutionManager, ParallelTask
+from services.backend.app.dl_services.lime_explainer import (
+    LIMEConfig,
+    SpatiotemporalLIMEExplainer,
+)
+from services.backend.app.dl_services.parallel_runtime import (
+    ParallelExecutionManager,
+    ParallelTask,
+)
 from services.backend.app.dl_services.service import DeepLearningService
-from services.backend.app.dl_services.shap_explainer import SHAPConfig, SpatiotemporalSHAPExplainer
+from services.backend.app.dl_services.shap_explainer import (
+    SHAPConfig,
+    SpatiotemporalSHAPExplainer,
+)
 
 
 def _build_case(n_nodes: int = 36, seq_len: int = 8, n_features: int = 3, seed: int = 20260410) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

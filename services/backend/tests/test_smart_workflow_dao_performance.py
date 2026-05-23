@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-
 from app.services.smart_workflow_dao import (
     KVBase,
     QueryResultCache,
@@ -12,6 +9,8 @@ from app.services.smart_workflow_dao import (
     SQLAlchemyNotificationDAO,
     SQLAlchemyWorkflowDAO,
 )
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 
 def _build_sqlite_session_factory():

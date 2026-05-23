@@ -2,16 +2,16 @@
 插值结果存储服务
 提供插值结果的存储和检索功能
 """
-from typing import Dict, Any, Optional
 import logging
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
 class InterpolationResultStorage:
     """插值结果存储服务（内存存储，生产环境应使用数据库）"""
-    
+
     _instance = None
-    
+
     def __new__(cls):
         """单例模式"""
         if cls._instance is None:
@@ -19,11 +19,11 @@ class InterpolationResultStorage:
             cls._instance.results: Dict[str, Dict[str, Any]] = {}
             logger.info("创建插值结果存储单例")
         return cls._instance
-    
+
     def __init__(self):
         # 不要在这里初始化 results，在 __new__ 中初始化
         pass
-    
+
     def save_result(
         self,
         interpolation_id: str,
@@ -52,7 +52,7 @@ class InterpolationResultStorage:
             'statistics': statistics
         }
         logger.info(f"已保存插值结果: {interpolation_id}, 当前存储结果数: {len(self.results)}")
-    
+
     def get_result(self, interpolation_id: str) -> Optional[Dict[str, Any]]:
         """
         获取插值结果
@@ -69,7 +69,7 @@ class InterpolationResultStorage:
         else:
             logger.warning(f"插值结果不存在: {interpolation_id}")
         return result
-    
+
     def delete_result(self, interpolation_id: str) -> bool:
         """
         删除插值结果
@@ -85,7 +85,7 @@ class InterpolationResultStorage:
             logger.info(f"已删除插值结果: {interpolation_id}")
             return True
         return False
-    
+
     def clear_all(self) -> None:
         """清除所有结果"""
         self.results.clear()

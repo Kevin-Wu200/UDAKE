@@ -4,7 +4,12 @@ from pathlib import Path
 
 from deep_learning.monitoring import DashboardBuilder
 from deep_learning.utils.logger import StructuredLogger
-from deep_learning.utils.monitoring import MetricMonitor, SystemResourceMonitor, AlertManager, AlertRule
+from deep_learning.utils.monitoring import (
+    AlertManager,
+    AlertRule,
+    MetricMonitor,
+    SystemResourceMonitor,
+)
 
 
 def test_monitoring_alert_dashboard(tmp_path: Path) -> None:

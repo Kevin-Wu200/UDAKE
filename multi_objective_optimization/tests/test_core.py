@@ -4,13 +4,14 @@ Core algorithm tests
 """
 
 import unittest
+
 import numpy as np
-from multi_objective_optimization.core.population import Individual, Population
-from multi_objective_optimization.core.optimizer import BaseOptimizer
+
 from multi_objective_optimization.core.nsga2 import NSGA2Optimizer
-from multi_objective_optimization.objectives.variance import VarianceObjective
-from multi_objective_optimization.objectives.cost import CostObjective
+from multi_objective_optimization.core.population import Individual, Population
 from multi_objective_optimization.objectives.accessibility import AccessibilityObjective
+from multi_objective_optimization.objectives.cost import CostObjective
+from multi_objective_optimization.objectives.variance import VarianceObjective
 
 
 class TestIndividual(unittest.TestCase):

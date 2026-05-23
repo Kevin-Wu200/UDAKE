@@ -5,11 +5,11 @@ Spatial Clustering Algorithms
 实现 DBSCAN、ST-DBSCAN（时空DBSCAN）等聚类算法。
 """
 
-import numpy as np
-from typing import List, Tuple, Dict, Any, Optional, Set
-from dataclasses import dataclass
-from collections import defaultdict
 import logging
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional, Set
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

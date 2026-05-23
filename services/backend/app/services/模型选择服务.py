@@ -1,13 +1,15 @@
 """
 模型选择服务 - 基于交叉验证的自动模型选择
 """
-from ..schemas.插值参数模型 import VariogramModel, KrigingMethod
-from pykrige.ok import OrdinaryKriging
-from sklearn.model_selection import KFold
-from sklearn.metrics import mean_squared_error
-from typing import Dict, Any, List, Tuple
-import numpy as np
 import logging
+from typing import Any, Dict, Tuple
+
+import numpy as np
+from pykrige.ok import OrdinaryKriging
+from sklearn.metrics import mean_squared_error
+from sklearn.model_selection import KFold
+
+from ..schemas.插值参数模型 import KrigingMethod, VariogramModel
 
 logger = logging.getLogger(__name__)
 

@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
-from dataclasses import dataclass
 import copy
 import hashlib
 import json
 import threading
+from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Any, Sequence, Union
 
 import numpy as np

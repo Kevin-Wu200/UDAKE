@@ -9,17 +9,18 @@ Kriging Performance Acceleration
 - 稀疏协方差矩阵支持
 """
 
-import numpy as np
-from typing import List, Tuple, Optional, Callable
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import Callable, Optional, Tuple
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
 # 尝试导入Numba，不可用时回退到纯NumPy
 try:
-    from numba import jit, prange, float64, int64, boolean
+    from numba import boolean, float64, int64, jit, prange
     NUMBA_AVAILABLE = True
     logger.info("Numba加速已启用")
 except ImportError:

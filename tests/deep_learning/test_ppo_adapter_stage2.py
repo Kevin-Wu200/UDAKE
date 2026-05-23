@@ -3,7 +3,10 @@ from __future__ import annotations
 import numpy as np
 
 from deep_learning.models.sampling_rl import PPOAgent, SamplingEnv
-from services.backend.app.dl_services.ppo_rl_explainer import PPOLIMEAdapter, PPOSHAPAdapter
+from services.backend.app.dl_services.ppo_rl_explainer import (
+    PPOLIMEAdapter,
+    PPOSHAPAdapter,
+)
 
 
 def _uncertainty_map(size: int = 10, seed: int = 41) -> np.ndarray:

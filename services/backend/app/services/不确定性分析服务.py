@@ -1,9 +1,11 @@
 """
 不确定性分析服务
 """
-import numpy as np
 from typing import Dict, Tuple
+
+import numpy as np
 from scipy import stats
+
 
 class UncertaintyAnalyzer:
     """不确定性分析器"""

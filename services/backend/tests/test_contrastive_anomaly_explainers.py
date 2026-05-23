@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import numpy as np
+from app.dl_services.contrastive_anomaly_explainer import (
+    ContrastiveLimeAdapter,
+    ContrastiveShapAdapter,
+)
 
-from app.dl_services.contrastive_anomaly_explainer import ContrastiveLimeAdapter, ContrastiveShapAdapter
 from deep_learning.models.anomaly_detection import ContrastiveAnomalyDetector
 
 

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Iterator, Sequence, Any
 import random
+from typing import Any, Iterator, Sequence
 
 
 class BatchDataLoader:

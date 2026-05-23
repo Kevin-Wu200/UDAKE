@@ -3,11 +3,10 @@
 实现多种TSP求解算法
 """
 
-import random
 import math
-from typing import List, Tuple, Dict, Optional
+import random
 from abc import ABC, abstractmethod
-import time
+from typing import List, Tuple
 
 
 class TSPSolver(ABC):

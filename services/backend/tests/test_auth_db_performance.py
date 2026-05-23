@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from app.auth_db.performance import (
+    QueryStatsCollector,
+    ReadWriteSessionRouter,
+    ReplicaSyncMonitor,
+)
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
-
-from app.auth_db.performance import QueryStatsCollector, ReadWriteSessionRouter, ReplicaSyncMonitor
 
 
 def test_query_stats_collector_report() -> None:

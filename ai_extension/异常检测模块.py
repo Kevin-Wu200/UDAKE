@@ -1,11 +1,12 @@
 """
 异常检测模块
 """
-from sklearn.ensemble import IsolationForest
-from sklearn.covariance import EllipticEnvelope
-import numpy as np
-from typing import Any, Dict
 import logging
+from typing import Any, Dict
+
+import numpy as np
+from sklearn.covariance import EllipticEnvelope
+from sklearn.ensemble import IsolationForest
 
 from deep_learning.models.anomaly_detection import (
     AnomalyEnsembleIntegrator,
@@ -15,8 +16,8 @@ from deep_learning.models.anomaly_detection import (
     VAEAnomalyDetector,
 )
 from realtime_interpolation.utils.confidence_calculator import (
-    compute_confidence_score,
     ConfidenceInsufficientError,
+    compute_confidence_score,
 )
 
 logger = logging.getLogger(__name__)

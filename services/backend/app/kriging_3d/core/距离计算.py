@@ -2,8 +2,9 @@
 3D距离计算模块
 支持欧氏距离、方向距离、各向异性距离
 """
-import numpy as np
 from typing import Optional, Tuple
+
+import numpy as np
 
 
 class Distance3D:

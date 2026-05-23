@@ -5,10 +5,9 @@ from __future__ import annotations
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import create_engine, pool
-
-from app.auth_db.database import build_engine_options, get_auth_database_url
+from app.auth_db.database import get_auth_database_url
 from app.auth_db.models import Base
+from sqlalchemy import create_engine, pool
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

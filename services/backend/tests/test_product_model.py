@@ -1,5 +1,4 @@
 import numpy as np
-
 from app.core.spatiotemporal_kriging.models.product_model import ProductModel
 
 

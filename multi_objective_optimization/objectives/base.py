@@ -4,8 +4,7 @@ Base Objective Function class
 """
 
 from abc import ABC, abstractmethod
-import numpy as np
-from typing import Dict, Any
+
 from ..core.population import Individual
 
 

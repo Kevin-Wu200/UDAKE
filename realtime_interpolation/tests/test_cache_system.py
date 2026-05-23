@@ -3,12 +3,12 @@
 Cache System Tests
 """
 
-import pytest
 import time
-from datetime import datetime, timedelta
+
+import pytest
 
 from ..cache.cache_manager import CacheManager
-from ..cache.cache_strategy import MultiLevelCacheStrategy, CacheLevel
+from ..cache.cache_strategy import CacheLevel, MultiLevelCacheStrategy
 
 
 class TestCacheManager:

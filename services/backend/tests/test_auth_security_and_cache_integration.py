@@ -7,9 +7,6 @@ import time
 import types
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from app.api.auth_api import router as auth_router
 from app.api.devices_api import router as devices_router
 from app.auth import CacheUnavailableError, get_auth_service, reset_auth_service
@@ -17,6 +14,8 @@ from app.auth.cache import AuthCacheManager
 from app.auth.rate_limiter import RateRule
 from app.config import settings
 from app.security_middleware import security_guard_middleware
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture()

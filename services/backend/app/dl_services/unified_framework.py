@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import csv
 from abc import ABC, abstractmethod
 from collections import Counter, OrderedDict
-import csv
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
+
 try:
     from enum import StrEnum
 except ImportError:  # pragma: no cover - Python < 3.11 compatibility
@@ -21,11 +22,11 @@ import importlib
 import inspect
 import json
 import logging
-from pathlib import Path
 import pkgutil
 import shutil
-from threading import RLock
 import traceback
+from pathlib import Path
+from threading import RLock
 from types import ModuleType
 from typing import Any, Callable, Iterable
 from uuid import uuid4

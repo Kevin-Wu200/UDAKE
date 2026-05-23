@@ -1,11 +1,12 @@
 """
 性能监控工具
 """
-import time
-import psutil
-from functools import wraps
-from typing import Callable, Any
 import logging
+import time
+from functools import wraps
+from typing import Any, Callable
+
+import psutil
 
 logger = logging.getLogger(__name__)
 

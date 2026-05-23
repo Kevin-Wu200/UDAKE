@@ -9,7 +9,6 @@ from alembic.migration import MigrationContext
 from alembic.operations import Operations
 from sqlalchemy import create_engine, inspect, text
 
-
 MIGRATION_PATH = (
     Path(__file__).resolve().parents[1] / "alembic" / "versions" / "001_create_tickets_table.py"
 )

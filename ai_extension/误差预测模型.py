@@ -3,16 +3,15 @@
 """
 from __future__ import annotations
 
+import logging
+from typing import Dict
+
+import numpy as np
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
-import numpy as np
-from typing import Dict, Tuple
-import logging
 
 from realtime_interpolation.utils.confidence_calculator import (
     compute_confidence_score,
-    ConfidenceInsufficientError,
-    get_confidence_calculator,
 )
 
 logger = logging.getLogger(__name__)

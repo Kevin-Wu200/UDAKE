@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
-from dataclasses import dataclass
 import copy
 import hashlib
 import json
 import threading
+from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Any, Literal
 
 import numpy as np
 
-from .common import PredictiveMoments, confidence_interval, decompose_uncertainty, ensure_1d, ensure_2d
+from .common import (
+    PredictiveMoments,
+    confidence_interval,
+    decompose_uncertainty,
+    ensure_1d,
+    ensure_2d,
+)
 
 EnsembleAgg = Literal["mean", "weighted", "median"]
 SelectMethod = Literal["validation", "diversity", "adaptive"]

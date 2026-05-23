@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import numpy as np
-
 from app.dl_services.shap_explainer import SpatiotemporalSHAPExplainer
 
 

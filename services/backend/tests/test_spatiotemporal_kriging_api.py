@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-import numpy as np
-import pytest
 import sys
 from pathlib import Path
+
+import numpy as np
+import pytest
 from fastapi.testclient import TestClient
 
 services_root = Path(__file__).resolve().parents[2]

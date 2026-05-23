@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from services.backend.app.dl_services.shap_explainer import SHAPConfig, SpatiotemporalSHAPExplainer
+from services.backend.app.dl_services.shap_explainer import (
+    SHAPConfig,
+    SpatiotemporalSHAPExplainer,
+)
 
 
 def _build_case(n_nodes: int = 48, seq_len: int = 8, n_features: int = 3, seed: int = 20260409) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

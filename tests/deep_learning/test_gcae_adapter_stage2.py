@@ -3,7 +3,11 @@ from __future__ import annotations
 import numpy as np
 
 from deep_learning.models.anomaly_detection import GCAEAnomalyDetector
-from services.backend.app.dl_services.gcae_anomaly_explainer import GCAEExplanationConfig, GCAELimeAdapter, GCAEShapAdapter
+from services.backend.app.dl_services.gcae_anomaly_explainer import (
+    GCAEExplanationConfig,
+    GCAELimeAdapter,
+    GCAEShapAdapter,
+)
 
 
 def _make_data(n: int = 84, seed: int = 11) -> tuple[np.ndarray, np.ndarray]:

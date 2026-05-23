@@ -5,15 +5,15 @@ from pathlib import Path
 
 import numpy as np
 
+from deep_learning.utils.data_loader import BatchDataLoader
+from deep_learning.utils.geojson_dataset import geojson_to_dataset
 from deep_learning.utils.preprocessing import (
-    SpatialNormalizer,
-    FeatureScaler,
     DataAugmentation,
     DataSplitter,
     DataValidatorCleaner,
+    FeatureScaler,
+    SpatialNormalizer,
 )
-from deep_learning.utils.geojson_dataset import geojson_to_dataset
-from deep_learning.utils.data_loader import BatchDataLoader
 
 
 def test_spatial_normalizer_and_scaler() -> None:

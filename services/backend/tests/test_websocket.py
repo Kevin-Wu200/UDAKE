@@ -2,9 +2,9 @@
 WebSocket 服务测试
 """
 import pytest
-from fastapi.testclient import TestClient
 from app.main import app
 from app.services.websocket_service import websocket_service
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)
@@ -122,7 +122,6 @@ async def test_websocket_subscribe_workflow():
 @pytest.mark.asyncio
 async def test_websocket_service_connect():
     """测试 WebSocket 服务连接"""
-    from fastapi import WebSocket
 
     # 创建模拟 WebSocket
     class MockWebSocket:
@@ -143,7 +142,6 @@ async def test_websocket_service_connect():
 @pytest.mark.asyncio
 async def test_websocket_service_disconnect():
     """测试 WebSocket 服务断开"""
-    from fastapi import WebSocket
 
     class MockWebSocket:
         async def accept(self):
@@ -183,7 +181,6 @@ async def test_websocket_service_unsubscribe_task():
 @pytest.mark.asyncio
 async def test_websocket_service_send_personal_message():
     """测试发送个人消息"""
-    from fastapi import WebSocket
 
     class MockWebSocket:
         async def accept(self):
@@ -208,7 +205,6 @@ async def test_websocket_service_send_personal_message():
 @pytest.mark.asyncio
 async def test_websocket_service_notify_task_update():
     """测试任务更新通知"""
-    from fastapi import WebSocket
 
     class MockWebSocket:
         async def accept(self):

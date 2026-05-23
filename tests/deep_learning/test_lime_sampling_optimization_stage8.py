@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from services.backend.app.dl_services.lime_explainer import LIMEConfig, SpatiotemporalLIMEExplainer
+from services.backend.app.dl_services.lime_explainer import (
+    LIMEConfig,
+    SpatiotemporalLIMEExplainer,
+)
 
 
 def _build_case(n_nodes: int = 40, seq_len: int = 8, n_features: int = 3) -> tuple[np.ndarray, np.ndarray, np.ndarray]:

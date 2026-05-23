@@ -15,7 +15,11 @@ from deep_learning.models.spatial_interpolation import (
     SpatialInterpolationIntegrator,
     evaluate_metrics,
 )
-from deep_learning.models.spatial_interpolation.graph_layers import EdgeConvLayer, GATLayer, GCNLayer
+from deep_learning.models.spatial_interpolation.graph_layers import (
+    EdgeConvLayer,
+    GATLayer,
+    GCNLayer,
+)
 from deep_learning.models.spatial_interpolation.position_encoding import (
     LearnablePositionEncoding,
     relative_position_encoding,

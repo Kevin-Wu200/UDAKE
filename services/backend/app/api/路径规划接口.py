@@ -3,22 +3,19 @@
 提供路径规划的REST API服务
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
-from typing import Dict, Any, List, Optional
-import json
 from datetime import datetime
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, HTTPException
 
 from ..route_planning.models import (
+    OptimizationGoal,
     RoutePlanningRequest,
     RoutePlanningResponse,
+    RouteTemplate,
     SamplingPoint,
-    RouteConstraint,
-    OptimizationGoal,
-    VehicleType,
-    RouteTemplate
 )
-from ..route_planning.services import RoutePlanningService, RouteOptimizer
-
+from ..route_planning.services import RouteOptimizer, RoutePlanningService
 
 router = APIRouter(prefix="/api/route-planning", tags=["路径规划"])
 
@@ -453,7 +450,7 @@ async def validate_route(route: Dict[str, Any], constraints: Dict[str, Any]):
         验证结果
     """
     try:
-        from ..route_planning.models import PlannedRoute, RouteSegment, RouteConstraint
+        from ..route_planning.models import PlannedRoute, RouteConstraint, RouteSegment
 
         # 转换为路径对象
         segments = []

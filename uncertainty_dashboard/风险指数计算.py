@@ -1,8 +1,10 @@
 """
 风险指数计算
 """
+from typing import Dict
+
 import numpy as np
-from typing import Dict, Tuple
+
 
 class RiskIndexCalculator:
     """风险指数计算器"""

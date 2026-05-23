@@ -6,17 +6,17 @@ Events Module
 """
 
 from .event_system import (
-    EventType,
-    EventPriority,
     Event,
-    EventHandler,
-    EventFilter,
-    EventTypeFilter,
-    EventPriorityFilter,
     EventBus,
+    EventFilter,
+    EventHandler,
+    EventMonitor,
+    EventPriority,
+    EventPriorityFilter,
+    EventType,
+    EventTypeFilter,
     NotificationChannel,
     RealtimeNotifier,
-    EventMonitor
 )
 
 __all__ = [

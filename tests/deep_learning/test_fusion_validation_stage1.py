@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import numpy as np
 
+from deep_learning.fusion.common import ModelMetric, WeightMethod
 from deep_learning.fusion.service import FusionPlatformService
 from deep_learning.fusion.weighting import FusionWeightCalculator
-from deep_learning.fusion.common import ModelMetric, WeightMethod
-from services.backend.app.dl_services.fusion_explainer import FusionExplanationConfig, FusionLIMEAdapter
+from services.backend.app.dl_services.fusion_explainer import (
+    FusionExplanationConfig,
+    FusionLIMEAdapter,
+)
 
 
 def _models() -> list[dict]:

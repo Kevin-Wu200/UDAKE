@@ -2,11 +2,10 @@
 3D克里金系统测试
 覆盖：变异函数、距离计算、普通克里金、泛克里金、指示克里金、数据处理、API接口
 """
-import pytest
-import numpy as np
 import json
-from pathlib import Path
 
+import numpy as np
+import pytest
 
 # ============================================================
 # 测试数据生成
@@ -372,8 +371,8 @@ class TestDataProcessor3D:
         assert data.points[0].label == "BH1"
 
     def test_clean_data(self):
+        from app.kriging_3d.schemas.数据模型 import Point3D, SpatialData3D
         from app.kriging_3d.services.数据处理3D import DataProcessor3D
-        from app.kriging_3d.schemas.数据模型 import SpatialData3D, Point3D
         processor = DataProcessor3D()
         points = [
             Point3D(x=1, y=2, z=3, value=10),
@@ -386,8 +385,8 @@ class TestDataProcessor3D:
         assert len(cleaned.points) == 2
 
     def test_detect_outliers_iqr(self):
+        from app.kriging_3d.schemas.数据模型 import Point3D, SpatialData3D
         from app.kriging_3d.services.数据处理3D import DataProcessor3D
-        from app.kriging_3d.schemas.数据模型 import SpatialData3D, Point3D
         processor = DataProcessor3D()
         rng = np.random.RandomState(42)
         points = [Point3D(x=float(i), y=0, z=0, value=float(rng.normal(10, 1))) for i in range(50)]
@@ -398,8 +397,8 @@ class TestDataProcessor3D:
         assert len(cleaned.points) < len(data.points)
 
     def test_normalize_coordinates(self):
+        from app.kriging_3d.schemas.数据模型 import Point3D, SpatialData3D
         from app.kriging_3d.services.数据处理3D import DataProcessor3D
-        from app.kriging_3d.schemas.数据模型 import SpatialData3D, Point3D
         processor = DataProcessor3D()
         points = [
             Point3D(x=0, y=0, z=0, value=1),
@@ -412,8 +411,8 @@ class TestDataProcessor3D:
         assert "min_x" in transform
 
     def test_vertical_layers(self):
+        from app.kriging_3d.schemas.数据模型 import Point3D, SpatialData3D
         from app.kriging_3d.services.数据处理3D import DataProcessor3D
-        from app.kriging_3d.schemas.数据模型 import SpatialData3D, Point3D
         processor = DataProcessor3D()
         rng = np.random.RandomState(42)
         points = [Point3D(x=float(rng.uniform(0, 10)), y=float(rng.uniform(0, 10)),
@@ -422,12 +421,12 @@ class TestDataProcessor3D:
         data = SpatialData3D(points=points)
         layers = processor.vertical_layers(data, n_layers=5)
         assert len(layers) <= 5
-        total = sum(len(l.points) for l in layers.values())
+        total = sum(len(layer.points) for layer in layers.values())
         assert total == 100
 
     def test_downsample_grid(self):
+        from app.kriging_3d.schemas.数据模型 import Point3D, SpatialData3D
         from app.kriging_3d.services.数据处理3D import DataProcessor3D
-        from app.kriging_3d.schemas.数据模型 import SpatialData3D, Point3D
         processor = DataProcessor3D()
         rng = np.random.RandomState(42)
         points = [Point3D(x=float(rng.uniform(0, 10)), y=float(rng.uniform(0, 10)),
@@ -438,8 +437,8 @@ class TestDataProcessor3D:
         assert len(downsampled.points) < len(data.points)
 
     def test_get_bounds(self):
+        from app.kriging_3d.schemas.数据模型 import Point3D, SpatialData3D
         from app.kriging_3d.services.数据处理3D import DataProcessor3D
-        from app.kriging_3d.schemas.数据模型 import SpatialData3D, Point3D
         processor = DataProcessor3D()
         points = [
             Point3D(x=1, y=2, z=3, value=10),
@@ -451,8 +450,8 @@ class TestDataProcessor3D:
         assert bounds.max_z == 30
 
     def test_get_statistics(self):
+        from app.kriging_3d.schemas.数据模型 import Point3D, SpatialData3D
         from app.kriging_3d.services.数据处理3D import DataProcessor3D
-        from app.kriging_3d.schemas.数据模型 import SpatialData3D, Point3D
         processor = DataProcessor3D()
         points = [Point3D(x=float(i), y=float(i), z=float(i), value=float(i * 10))
                   for i in range(10)]
@@ -472,7 +471,7 @@ class TestKrigingScheduler3D:
     """3D克里金调度器测试"""
 
     def _make_spatial_data(self, n=30):
-        from app.kriging_3d.schemas.数据模型 import SpatialData3D, Point3D
+        from app.kriging_3d.schemas.数据模型 import Point3D, SpatialData3D
         rng = np.random.RandomState(42)
         points = [
             Point3D(
@@ -557,7 +556,7 @@ class TestSchemas:
         assert p.z == 3.0
 
     def test_spatial_data_3d(self):
-        from app.kriging_3d.schemas.数据模型 import SpatialData3D, Point3D
+        from app.kriging_3d.schemas.数据模型 import Point3D, SpatialData3D
         points = [Point3D(x=i, y=i, z=i, value=i * 10) for i in range(5)]
         data = SpatialData3D(points=points)
         assert len(data.points) == 5
@@ -613,8 +612,8 @@ class TestKriging3DAPI:
 
     @pytest.fixture
     def client(self):
-        from fastapi.testclient import TestClient
         from app.main import app
+        from fastapi.testclient import TestClient
         return TestClient(app)
 
     def test_upload_3d_geojson(self, client, tmp_path):

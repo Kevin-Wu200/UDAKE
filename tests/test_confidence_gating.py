@@ -35,7 +35,6 @@ from realtime_interpolation.utils.confidence_calculator import (
     requires_confidence,
 )
 
-
 # ============================================================================
 # 辅助函数
 # ============================================================================
@@ -339,7 +338,7 @@ class TestIndustryAdapterSwitching:
 
     def test_compute_confidence_score_dispatches_correctly(self) -> None:
         """compute_confidence_score 根据 industry 分发到正确计算器"""
-        low_var = _make_low_variance(100)
+        low_var = _make_low_variance(100)  # noqa: F841
         high_var = _make_high_variance(100)
 
         # 地形测绘 (0.90): 高方差应不通过
@@ -347,7 +346,7 @@ class TestIndustryAdapterSwitching:
         assert r_topo.is_sufficient is False
 
         # 农业遥感 (0.80): 同样的高方差可能通过 (阈值更低)
-        r_agri = compute_confidence_score(high_var, industry="agriculture", anomaly_score=1.0)
+        r_agri = compute_confidence_score(high_var, industry="agriculture", anomaly_score=1.0)  # noqa: F841
         # 0.80 阈值更低, 但高方差可能仍不通过
         # 此测试验证分发机制而非具体阈值
 

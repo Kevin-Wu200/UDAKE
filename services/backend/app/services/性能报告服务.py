@@ -3,21 +3,28 @@
 """
 import json
 import threading
-from datetime import datetime, timedelta
-from typing import Dict, Optional, List, Any
-from pathlib import Path
-from ..schemas.性能报告模型 import (
-    TaskPerformanceData, PerformanceMetrics, PerformanceBottleneck,
-    PerformanceOptimization, PerformanceAnalysis, PerformanceReport,
-    PerformanceReportRequest, PerformanceReportResponse,
-    HistoricalPerformanceStats, PerformanceTrendAnalysis,
-    ReportFormat, StagePerformance
-)
-from ..schemas.输出结果模型 import CrossValidationMetrics
-from ..schemas.进度详情模型 import ProgressDetail
-from ..tasks.任务管理器 import TaskManager
-from ..services.资源监控服务 import resource_monitoring_service
 import uuid
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Dict, List, Optional
+
+from ..schemas.性能报告模型 import (
+    HistoricalPerformanceStats,
+    PerformanceAnalysis,
+    PerformanceBottleneck,
+    PerformanceMetrics,
+    PerformanceOptimization,
+    PerformanceReport,
+    PerformanceReportRequest,
+    PerformanceReportResponse,
+    PerformanceTrendAnalysis,
+    ReportFormat,
+    StagePerformance,
+    TaskPerformanceData,
+)
+from ..services.资源监控服务 import resource_monitoring_service
+from ..tasks.任务管理器 import TaskManager
+
 
 class PerformanceReportService:
     """性能报告服务"""

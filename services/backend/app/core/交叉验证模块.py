@@ -1,13 +1,15 @@
 """
 交叉验证模块
 """
-from sklearn.model_selection import KFold
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from pykrige.ok import OrdinaryKriging
-from ..schemas.插值参数模型 import KrigingParameters
-import numpy as np
-from typing import Dict
 import logging
+from typing import Dict
+
+import numpy as np
+from pykrige.ok import OrdinaryKriging
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import KFold
+
+from ..schemas.插值参数模型 import KrigingParameters
 
 logger = logging.getLogger(__name__)
 

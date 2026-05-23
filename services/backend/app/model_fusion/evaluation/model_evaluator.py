@@ -1,11 +1,13 @@
 """
 模型评估器
 """
-import numpy as np
-from typing import List, Dict, Any, Optional
-from ..core.fusion_models import ModelPrediction, ModelMetrics
-from sklearn.model_selection import KFold
 import logging
+from typing import Dict, List, Optional
+
+import numpy as np
+from sklearn.model_selection import KFold
+
+from ..core.fusion_models import ModelMetrics, ModelPrediction
 
 logger = logging.getLogger(__name__)
 
@@ -123,11 +125,11 @@ class ModelEvaluator:
 
         for train_idx, test_idx in kfold.split(range(n_samples)):
             # 提取训练集和测试集
-            train_true = [true_values[i] for i in train_idx]
+            train_true = [true_values[i] for i in train_idx]  # noqa: F841
             test_true = [true_values[i] for i in test_idx]
 
             for model in models:
-                train_pred = [model.predictions[i] for i in train_idx]
+                train_pred = [model.predictions[i] for i in train_idx]  # noqa: F841
                 test_pred = [model.predictions[i] for i in test_idx]
 
                 # 计算RMSE

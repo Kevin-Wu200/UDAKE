@@ -52,7 +52,7 @@ class SamplingRLIntegrator:
             max_steps=max(10, budget * 2),
             seed=self.seed,
         )
-        obs = env.reset()
+        obs = env.reset()  # noqa: F841
 
         # 将已有采样点注入环境状态。
         points = np.asarray(existing_points, dtype=float) if existing_points is not None else np.zeros((0, 2), dtype=float)

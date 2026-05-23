@@ -2,9 +2,9 @@
 分段锁实现
 通过将数据分成多个段，每个段有独立的锁，减少锁竞争，提升并发性能
 """
+import hashlib
 import threading
 from typing import Dict
-import hashlib
 
 
 class SegmentedLock:

@@ -1,9 +1,11 @@
 """
 插值参数模型
 """
-from pydantic import BaseModel, Field
-from typing import Optional, List
 from enum import Enum
+from typing import Optional
+
+from pydantic import BaseModel, Field
+
 
 class VariogramModel(str, Enum):
     """变异函数模型"""

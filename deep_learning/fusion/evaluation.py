@@ -7,7 +7,13 @@ from typing import Callable
 
 import numpy as np
 
-from .common import EPS, FusionResult, ModelMetric, ModelPrediction, ensure_prediction_matrix
+from .common import (
+    EPS,
+    FusionResult,
+    ModelMetric,
+    ModelPrediction,
+    ensure_prediction_matrix,
+)
 
 
 @dataclass

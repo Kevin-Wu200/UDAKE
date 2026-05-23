@@ -4,9 +4,8 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from copy import deepcopy
-from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, MutableMapping, Tuple
 from uuid import uuid4
-
 
 ALLOWED_NODE_KINDS = {"input", "process", "output", "control", "custom"}
 

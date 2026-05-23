@@ -1,10 +1,11 @@
 """
 决策阈值分析测试
 """
-import pytest
-import numpy as np
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 # 添加模块路径
 sys.path.append(str(Path(__file__).parent.parent.parent))

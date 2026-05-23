@@ -4,9 +4,11 @@ Base Optimizer class
 """
 
 from abc import ABC, abstractmethod
-from typing import List, Dict, Any, Optional
+from typing import Dict, List, Optional
+
 import numpy as np
-from .population import Population, Individual
+
+from .population import Individual, Population
 
 
 class BaseOptimizer(ABC):

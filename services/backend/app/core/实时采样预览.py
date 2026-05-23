@@ -2,12 +2,12 @@
 实时采样预览
 实时预览添加新采样点后的效果
 """
-from pykrige.ok import OrdinaryKriging
-import numpy as np
-from typing import Dict, Any, Optional, Tuple
 import logging
+from typing import Any, Dict
+
+import numpy as np
+from pykrige.ok import OrdinaryKriging
 from scipy.ndimage import gaussian_filter
-from scipy.spatial.distance import cdist
 
 from .采样点影响评估器 import SamplingPointImpactEvaluator
 
@@ -277,7 +277,7 @@ class RealTimeSamplingPreview:
             # 创建与variance_reduction相同维度的mask
             y_range, x_range = variance_reduction.shape
             y_indices, x_indices = np.ogrid[:y_range, :x_range]
-            
+
             # 计算每个点到新点的距离
             dist_from_new_point = ((x_indices - x_idx)**2 + (y_indices - y_idx)**2)
             mask = dist_from_new_point <= radius**2
@@ -484,7 +484,7 @@ class RealTimeSamplingPreview:
         # 计算添加新点后的效果
         combined_points = np.vstack([existing_points, new_points])
         combined_values = np.append(existing_values, new_values)
-        new_results = self._calculate_with_new_point(
+        new_results = self._calculate_with_new_point(  # noqa: F841
             existing_points, existing_values,
             new_points[0], new_values[0],  # 使用第一个点作为参考
             grid_resolution

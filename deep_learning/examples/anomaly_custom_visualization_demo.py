@@ -7,7 +7,6 @@ from pathlib import Path
 
 from anomaly_examples_common import build_demo_dataset, create_model, train_model
 
-
 OUTPUT_DIR = Path("deep_learning/examples/output")
 
 

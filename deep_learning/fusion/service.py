@@ -20,7 +20,12 @@ from .common import (
 from .engine import ModelFusionEngine
 from .evaluation import FusionEvaluator
 from .feature_analysis import FusionFeatureAnalyzer
-from .hybrid import HybridFusionBridge, HybridFusionMode, MultiModalFusion, MultiModalStrategy
+from .hybrid import (
+    HybridFusionBridge,
+    HybridFusionMode,
+    MultiModalFusion,
+    MultiModalStrategy,
+)
 from .model_management import FusionModelManager
 
 

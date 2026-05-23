@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from fastapi.testclient import TestClient
-
 from backend.app.main import app
+from fastapi.testclient import TestClient
 
 
 def _payload(nodes: int = 8, seq_len: int = 20, horizon: int = 4) -> dict:

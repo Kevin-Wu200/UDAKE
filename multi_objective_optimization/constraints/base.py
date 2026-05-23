@@ -4,7 +4,7 @@ Base Constraint class
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any
+
 from ..core.population import Individual
 
 

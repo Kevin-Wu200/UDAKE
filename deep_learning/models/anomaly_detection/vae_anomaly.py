@@ -134,7 +134,7 @@ class VAEAnomalyDetector:
         mu = centered @ self.components
         residual = centered - mu @ self.components.T
         variance = np.var(residual, axis=1, keepdims=True) + 1e-6
-        logvar = np.log(np.repeat(variance, mu.shape[1], axis=1))
+        logvar = np.log(np.repeat(variance, mu.shape[1], axis=1))  # noqa: F841
         recon = mu @ self.components.T + self.feature_center
         return normalized, mu, recon
 

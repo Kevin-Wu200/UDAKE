@@ -6,17 +6,24 @@ from datetime import datetime, timedelta, timezone
 from typing import Dict
 
 import pytest
+from app.api.admin_api import _product_key_cipher
+from app.api.admin_api import router as admin_router
+from app.auth import ProductKeyRegistry, get_auth_service, reset_auth_service
+from app.auth_db.models import (
+    AuditLog,
+    Base,
+    Company,
+    PasswordHistory,
+    ProductKey,
+    User,
+    UserDevice,
+)
+from app.auth_db.session import get_auth_db_session
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
-
-from app.api.admin_api import router as admin_router
-from app.auth import ProductKeyRegistry, get_auth_service, reset_auth_service
-from app.api.admin_api import _product_key_cipher
-from app.auth_db.models import AuditLog, Base, Company, PasswordHistory, ProductKey, User, UserDevice
-from app.auth_db.session import get_auth_db_session
 
 
 @pytest.fixture()

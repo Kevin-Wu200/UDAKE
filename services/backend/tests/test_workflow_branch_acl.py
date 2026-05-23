@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from app.api import 智能工作流接口 as workflow_api
 from app.services.智能工作流服务 import SmartWorkflowService
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 def _basic_workflow_definition(name: str = "test-workflow") -> dict:

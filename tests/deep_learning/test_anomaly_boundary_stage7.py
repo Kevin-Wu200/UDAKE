@@ -3,9 +3,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from services.backend.app.dl_services.explain_service import SpatiotemporalExplainTaskService
+from services.backend.app.dl_services.explain_service import (
+    SpatiotemporalExplainTaskService,
+)
 from services.backend.app.dl_services.service import DeepLearningService
-
 
 MODELS = ("vae", "gcae", "gan", "contrastive")
 

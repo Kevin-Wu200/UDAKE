@@ -1,11 +1,14 @@
 """
 批量处理模型
 """
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
-from .插值参数模型 import KrigingParameters, KrigingMethod, VariogramModel
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
+
+from .插值参数模型 import KrigingParameters
+
 
 class BatchTaskExecutionMode(str, Enum):
     """批量任务执行模式"""

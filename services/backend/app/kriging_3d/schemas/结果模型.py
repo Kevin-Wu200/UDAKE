@@ -1,9 +1,10 @@
 """
 3D克里金结果模型
 """
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
 from enum import Enum
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel
 
 
 class TaskStatus3D(str, Enum):
@@ -27,7 +28,7 @@ class Stats3D(BaseModel):
 class VariogramResult3D(BaseModel):
     """3D变异函数结果"""
     model_config = {'protected_namespaces': ()}
-    
+
     model_type: str
     nugget: float
     sill: float

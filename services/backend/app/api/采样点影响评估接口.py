@@ -2,20 +2,20 @@
 采样点影响评估接口
 提供候选采样点评估、实时预览、最优推荐和批量模拟功能
 """
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
-from datetime import datetime
-import numpy as np
 import logging
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from ..dependencies import verify_task_id
-from ..tasks.任务管理器 import TaskManager
-from ..core.采样点影响评估器 import SamplingPointImpactEvaluator
-from ..core.改进的采样推荐器 import ImprovedSamplingRecommender
-from ..core.实时采样预览 import RealTimeSamplingPreview
-from ..utils.栅格工具 import RasterUtils
+import numpy as np
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+from pydantic import BaseModel, Field
+
 from ..config import settings
+from ..core.实时采样预览 import RealTimeSamplingPreview
+from ..core.改进的采样推荐器 import ImprovedSamplingRecommender
+from ..core.采样点影响评估器 import SamplingPointImpactEvaluator
+from ..tasks.任务管理器 import TaskManager
+from ..utils.栅格工具 import RasterUtils
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +185,6 @@ def _get_task_data(task_id: str):
     try:
         task_info = task_manager.get_task_info(task_id)
         if task_info and task_info.data_id:
-            from ..schemas.数据模型 import SpatialData
             spatial_data = task_manager.get_spatial_data(task_info.data_id)
             if spatial_data:
                 existing_points = np.array([[p.x, p.y] for p in spatial_data.points])
@@ -199,16 +198,16 @@ def _get_task_data(task_id: str):
             from ..services.插值结果存储 import get_interpolation_storage
             storage = get_interpolation_storage()
             result = storage.get_result(task_id)
-            
+
             # 从栅格边界生成虚拟点（用于影响评估计算）
             if result:
                 grid = np.array(result['grid'])
                 grid_shape = grid.shape
-                
+
                 # 使用栅格的几个关键点作为虚拟点，并获取对应的预测值
                 # 从grid中提取对应位置的值
                 rows, cols = grid_shape
-                
+
                 # 定义关键点位置（左上、右上、左下、右下、中心）
                 corner_positions = [
                     (0, 0),  # 左上角
@@ -217,17 +216,17 @@ def _get_task_data(task_id: str):
                     (rows-1, cols-1),  # 右下角
                     (rows//2, cols//2)  # 中心点
                 ]
-                
+
                 existing_points = []
                 existing_values = []
-                
+
                 for r, c in corner_positions:
                     existing_points.append([x_coords[c], y_coords[r]])
                     existing_values.append(grid[r, c])
-                
+
                 existing_points = np.array(existing_points)
                 existing_values = np.array(existing_values)
-                
+
                 logger.info(f"使用虚拟点进行影响评估: {task_id}, 点数: {len(existing_points)}")
                 logger.info(f"虚拟点坐标范围: X[{existing_points[:, 0].min():.6f}, {existing_points[:, 0].max():.6f}], Y[{existing_points[:, 1].min():.6f}, {existing_points[:, 1].max():.6f}]")
                 logger.info(f"虚拟点值范围: [{existing_values.min():.6f}, {existing_values.max():.6f}]")
@@ -417,7 +416,7 @@ async def recommend_optimal(request: RecommendOptimalRequest):
 
         # 执行推荐
         logger.info(f"推荐最优采样点，策略: {request.strategy}, 数量: {request.n_recommendations}")
-        start_time = datetime.now()
+        start_time = datetime.now()  # noqa: F841
 
         results = sampling_recommender.recommend_optimal_points(
             existing_points=existing_points,
@@ -482,7 +481,7 @@ async def batch_simulate(request: BatchSimulateRequest):
                 combined_values = np.append(existing_values, new_values)
 
                 # 计算新方差
-                new_results = sampling_preview._calculate_with_new_point(
+                new_results = sampling_preview._calculate_with_new_point(  # noqa: F841
                     existing_points, existing_values,
                     new_points[0], new_values[0],  # 使用第一个点作为参考
                     request.grid_resolution

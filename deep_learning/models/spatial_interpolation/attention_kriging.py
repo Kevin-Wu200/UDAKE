@@ -10,7 +10,11 @@ import numpy as np
 from .attention import MultiHeadSpatialAttention
 from .baselines import UniversalKrigingBaseline
 from .heads import MultiTaskHead
-from .position_encoding import LearnablePositionEncoding, relative_position_encoding, sinusoidal_position_encoding
+from .position_encoding import (
+    LearnablePositionEncoding,
+    relative_position_encoding,
+    sinusoidal_position_encoding,
+)
 
 
 def _layer_norm(x: np.ndarray, eps: float = 1e-6) -> np.ndarray:

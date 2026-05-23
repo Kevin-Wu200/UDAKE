@@ -1,17 +1,17 @@
 """
 3D克里金计算服务
 """
-import numpy as np
 import json
-from pathlib import Path
-from typing import Dict, Any, Optional
-from ..schemas.参数模型 import KrigingParameters3D, SliceParams
-from ..schemas.结果模型 import TaskStatus3D, Kriging3DResult, Stats3D
-from ..schemas.数据模型 import SpatialData3D
-from ..services.数据处理3D import DataProcessor3D
-from ..core.调度器3D import KrigingScheduler3D
-from ...config import settings
 import logging
+from typing import Any, Dict, Optional
+
+import numpy as np
+
+from ...config import settings
+from ..core.调度器3D import KrigingScheduler3D
+from ..schemas.参数模型 import KrigingParameters3D, SliceParams
+from ..schemas.结果模型 import TaskStatus3D
+from ..services.数据处理3D import DataProcessor3D
 
 logger = logging.getLogger(__name__)
 

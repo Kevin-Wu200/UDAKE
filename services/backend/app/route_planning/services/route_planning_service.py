@@ -3,34 +3,27 @@
 提供路径规划的核心业务逻辑
 """
 
-import uuid
 import time
-from typing import List, Dict, Any, Optional, Tuple
+import uuid
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
+from ..core import ACOAlgorithm, AStarAlgorithm
 from ..models import (
+    OptimizationGoal,
+    PlannedRoute,
     RoutePlanningRequest,
     RoutePlanningResponse,
-    PlannedRoute,
     RouteSegment,
     SamplingPoint,
-    RouteConstraint,
-    OptimizationGoal,
-    VehicleType
-)
-from ..core import (
-    DijkstraAlgorithm,
-    AStarAlgorithm,
-    TSPSolver,
-    ACOAlgorithm
+    VehicleType,
 )
 from ..utils import (
+    build_cost_matrix,
     build_distance_matrix,
     build_time_matrix,
-    build_cost_matrix,
     calculate_route_statistics,
-    validate_route,
-    check_all_constraints
+    check_all_constraints,
 )
 
 
@@ -148,7 +141,7 @@ class RoutePlanningService:
                            cost_matrix: List[List[float]],
                            request: RoutePlanningRequest) -> List[PlannedRoute]:
         """使用Dijkstra算法规划路径"""
-        from ..core.dijkstra import DijkstraAlgorithm, Graph
+        from ..core.dijkstra import DijkstraAlgorithm
 
         # 构建图
         graph = DijkstraAlgorithm.build_graph_from_points(
@@ -158,7 +151,7 @@ class RoutePlanningService:
         dijkstra = DijkstraAlgorithm(graph)
 
         # 计算所有点之间的最短路径
-        all_paths = dijkstra.find_all_shortest_paths(all_points[0].id)
+        all_paths = dijkstra.find_all_shortest_paths(all_points[0].id)  # noqa: F841
 
         # 构建路径（简单版本：按顺序访问）
         point_ids = [p.id for p in all_points]
@@ -451,6 +444,6 @@ class RoutePlanningService:
 # 导入TSP求解器类
 from ..core.tsp_solver import (
     NearestNeighborTSPSolver,
+    SimulatedAnnealingTSPSolver,
     TwoOptTSPSolver,
-    SimulatedAnnealingTSPSolver
 )

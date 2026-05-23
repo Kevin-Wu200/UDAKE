@@ -10,21 +10,26 @@ import re
 import threading
 import time
 import uuid
-from datetime import datetime, timezone
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from app.config import settings
 from sqlalchemy import func
 
+from app.config import settings
+
 from .cache import AuthCacheManager
-from .input_sanitizer import ensure_safe_text
-from .ip_control import IPAccessController
 from .email_service import SMTPEmailService
 from .email_templates import EmailTemplateManager
+from .input_sanitizer import ensure_safe_text
+from .ip_control import IPAccessController
 from .jwt_service import JWTManager, JWTValidationError
-from .product_key_service import ProductKeyRecord, ProductKeyRegistry, ProductKeyValidationError
-from .rate_limiter import AuthRateLimiter, RateLimitExceededError
+from .product_key_service import (
+    ProductKeyRecord,
+    ProductKeyRegistry,
+    ProductKeyValidationError,
+)
+from .rate_limiter import AuthRateLimiter
 from .security import SensitiveDataCipher, hash_password, verify_password
 from .verification import EmailVerificationService, VerificationCodeError
 
@@ -817,7 +822,7 @@ class AuthService:
 
         session_factory = get_auth_session_factory()
         db_session = session_factory()
-        
+
         try:
             # 检查邮箱是否已在数据库中注册
             existing_db_user = db_session.query(User).filter(func.lower(User.email) == normalized_email).one_or_none()
@@ -838,7 +843,7 @@ class AuthService:
 
                 role = "admin" if use_bootstrap_admin_role else "user"
                 pwd_hash = hash_password(password)
-                
+
                 # 持久化用户到数据库 (pending 状态)
                 new_user_row = User(
                     email=normalized_email,
@@ -854,10 +859,10 @@ class AuthService:
                 db_session.add(new_user_row)
                 db_session.commit()
                 db_session.refresh(new_user_row)
-                
+
                 user_id = new_user_row.id
                 permissions = self._build_permissions_for_role(role)
-                
+
                 user = AuthUser(
                     id=user_id,
                     email=normalized_email,
@@ -1259,7 +1264,7 @@ class AuthService:
 
         session_factory = get_auth_session_factory()
         db_session = session_factory()
-        
+
         try:
             # 更新数据库中的用户状态
             row = db_session.query(User).filter(func.lower(User.email) == normalized_email).one_or_none()

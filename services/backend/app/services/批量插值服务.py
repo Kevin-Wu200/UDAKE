@@ -1,19 +1,21 @@
 """
 批量插值服务
 """
-from typing import Optional, List
+import asyncio
+import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from typing import List, Optional
+
 from ..schemas.批量处理模型 import (
-    BatchKrigingRequest, BatchTaskSummary, BatchTaskDetail,
-    BatchTaskFullResponse, BatchTaskExecutionMode
+    BatchKrigingRequest,
+    BatchTaskExecutionMode,
+    BatchTaskFullResponse,
 )
 from ..schemas.插值参数模型 import KrigingParameters
 from ..schemas.输出结果模型 import TaskStatus
 from ..tasks.批量任务管理器 import BatchTaskManager
 from .插值计算服务 import KrigingService
 from .数据预处理服务 import DataPreprocessor
-import asyncio
-import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 logger = logging.getLogger(__name__)
 

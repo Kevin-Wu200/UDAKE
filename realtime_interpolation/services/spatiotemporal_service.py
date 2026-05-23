@@ -6,7 +6,10 @@ from typing import Any
 
 import numpy as np
 
-from deep_learning.models.spatiotemporal import SpatioTemporalSystemIntegrator, SpatioTemporalTrainingConfig
+from deep_learning.models.spatiotemporal import (
+    SpatioTemporalSystemIntegrator,
+    SpatioTemporalTrainingConfig,
+)
 from realtime_interpolation.utils.confidence_calculator import compute_confidence_score
 
 

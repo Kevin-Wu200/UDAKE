@@ -3,7 +3,7 @@
 提供应用配置信息给前端
 """
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -39,7 +39,7 @@ async def get_map_config():
     前端根据需要选择使用哪个地图引擎
     """
     from ..config import settings
-    
+
     # 返回地图配置，但不暴露敏感信息
     config = {
         "geoscene": {
@@ -66,7 +66,7 @@ async def get_map_config():
             "token": settings.TIANDITU_TOKEN
         }
     }
-    
+
     return ConfigResponse(success=True, config=config)
 
 @router.get("/app", response_model=ConfigResponse)
@@ -77,7 +77,7 @@ async def get_app_config():
     返回应用的基本配置信息
     """
     from ..config import settings
-    
+
     config = {
         "appName": settings.APP_NAME,
         "version": settings.VERSION,
@@ -87,7 +87,7 @@ async def get_app_config():
         "maxConcurrentTasks": settings.MAX_CONCURRENT_TASKS,
         "taskTimeout": settings.TASK_TIMEOUT
     }
-    
+
     return ConfigResponse(success=True, config=config)
 
 @router.get("/ai", response_model=ConfigResponse)
@@ -98,13 +98,13 @@ async def get_ai_config():
     返回AI相关的配置信息
     """
     from ..config import settings
-    
+
     config = {
         "cacheEnabled": settings.AI_CACHE_ENABLED,
         "maxBatchSize": settings.AI_MAX_BATCH_SIZE,
         "modelPath": settings.AI_MODEL_PATH
     }
-    
+
     return ConfigResponse(success=True, config=config)
 
 @router.get("/all", response_model=ConfigResponse)
@@ -115,7 +115,7 @@ async def get_all_config():
     返回所有可公开的配置信息
     """
     from ..config import settings
-    
+
     config = {
         "app": {
             "appName": settings.APP_NAME,
@@ -158,7 +158,7 @@ async def get_all_config():
             "taskTimeout": settings.TASK_TIMEOUT
         }
     }
-    
+
     return ConfigResponse(success=True, config=config)
 
 

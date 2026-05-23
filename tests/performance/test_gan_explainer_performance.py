@@ -5,7 +5,10 @@ import time
 import numpy as np
 
 from deep_learning.models.anomaly_detection import GANAnomalyDetector
-from services.backend.app.dl_services.gan_anomaly_explainer import GANAnomalyLimeAdapter, GANExplanationConfig
+from services.backend.app.dl_services.gan_anomaly_explainer import (
+    GANAnomalyLimeAdapter,
+    GANExplanationConfig,
+)
 
 
 def _make_data(n: int = 140, seed: int = 23) -> tuple[np.ndarray, np.ndarray]:

@@ -1,6 +1,10 @@
 """Spatial interpolation neural models and supporting components."""
 
-from .attention_kriging import AttentionKrigingModel, AttentionKrigingOutput, TransformerEncoderBlock
+from .attention_kriging import (
+    AttentionKrigingModel,
+    AttentionKrigingOutput,
+    TransformerEncoderBlock,
+)
 from .baselines import OrdinaryKrigingBaseline, UniversalKrigingBaseline
 from .evaluation import (
     MetricResult,
@@ -9,7 +13,11 @@ from .evaluation import (
     hyperparam_sensitivity,
     prediction_comparison,
 )
-from .feature_extractors import CovarianceFeatureExtractor, SpatialFeatureExtractor, TrendFeatureExtractor
+from .feature_extractors import (
+    CovarianceFeatureExtractor,
+    SpatialFeatureExtractor,
+    TrendFeatureExtractor,
+)
 from .gnn_kriging import GNNKrigingModel, GNNKrigingOutput
 from .graph_builder import GraphData, SpatialGraphBuilder
 from .graph_layers import EdgeConvLayer, GATLayer, GCNLayer
@@ -32,7 +40,11 @@ from .optimization import (
     MemoryOptimizer,
     ModelCompressor,
 )
-from .position_encoding import LearnablePositionEncoding, relative_position_encoding, sinusoidal_position_encoding
+from .position_encoding import (
+    LearnablePositionEncoding,
+    relative_position_encoding,
+    sinusoidal_position_encoding,
+)
 from .residual_kriging import ResidualKrigingModel, ResidualKrigingOutput
 
 __all__ = [

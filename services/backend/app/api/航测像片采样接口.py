@@ -13,37 +13,40 @@
 - POST /api/aerial/full-pipeline   - 全流程一键处理
 - GET  /api/aerial/status/{task_id} - 查询任务状态
 """
-import os
 import sys
-from pathlib import Path
 import tempfile
 import uuid
-import shutil
 from datetime import datetime
-from typing import Optional, Dict, Any, List
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, BackgroundTasks
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
 import numpy as np
+from fastapi import APIRouter, BackgroundTasks, File, Form, HTTPException, UploadFile
+from pydantic import BaseModel, Field
 
 # 确保项目根目录在路径中
 _project_root = Path(__file__).resolve().parents[3]
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from photogrammetry.exif_parser import ExifParser, AerialImageMetadata
-from photogrammetry.image_quality import ImageQualityAssessor, QualityReport
-from photogrammetry.orthorectification import OrthorectificationEngine, OrthorectificationResult
-from photogrammetry.geo_alignment import GeoAlignmentEngine
-from remote_sensing.water_quality import WaterQualityInverter, SpectralBands, WaterQualityResult
-from remote_sensing.forestry import ForestryInverter, ForestryResult
-from remote_sensing.environment import EnvironmentInverter, EnvironmentResult
-from remote_sensing.uncertainty_mapping import UncertaintyMapper, UncertaintyGrid
-from adaptive_sampling.采样策略融合 import SamplingFusionEngine, FusionResult
-from adaptive_sampling.采样点推荐生成 import SamplingRecommender
-
 import logging
+
+from adaptive_sampling.采样点推荐生成 import SamplingRecommender
+from adaptive_sampling.采样策略融合 import SamplingFusionEngine
+from photogrammetry.exif_parser import AerialImageMetadata, ExifParser
+from photogrammetry.geo_alignment import GeoAlignmentEngine
+from photogrammetry.image_quality import ImageQualityAssessor
+from photogrammetry.orthorectification import (
+    OrthorectificationEngine,
+)
+from remote_sensing.environment import EnvironmentInverter, EnvironmentResult
+from remote_sensing.forestry import ForestryInverter, ForestryResult
+from remote_sensing.uncertainty_mapping import UncertaintyGrid, UncertaintyMapper
+from remote_sensing.water_quality import (
+    SpectralBands,
+    WaterQualityInverter,
+    WaterQualityResult,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -2,9 +2,10 @@
 约束条件检查工具函数
 """
 
-from typing import List, Tuple, Dict, Any
 from datetime import datetime, timedelta
-from ..models import SamplingPoint, RouteConstraint, PlannedRoute
+from typing import Any, Dict, List, Tuple
+
+from ..models import PlannedRoute, RouteConstraint, SamplingPoint
 
 
 def check_time_window_constraint(route: PlannedRoute,

@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-import os
 import smtplib
 import ssl
 import threading
@@ -16,7 +15,7 @@ from dataclasses import dataclass
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from itertools import count
-from queue import LifoQueue, Empty, Full
+from queue import Empty, Full, LifoQueue
 from typing import Any, Deque, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
 
 from ..config import settings
@@ -219,7 +218,12 @@ class WorkflowEmailTemplateEngine:
 
         self._jinja_env = None
         try:
-            from jinja2 import BaseLoader, Environment, StrictUndefined, select_autoescape  # type: ignore
+            from jinja2 import (  # type: ignore
+                BaseLoader,
+                Environment,
+                StrictUndefined,
+                select_autoescape,
+            )
 
             self._jinja_env = Environment(
                 loader=BaseLoader(),

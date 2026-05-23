@@ -3,12 +3,14 @@
 Boundary Constraint
 """
 
-import numpy as np
 from typing import List, Tuple, Union
-from shapely.geometry import Point, Polygon, MultiPolygon
+
+import numpy as np
+from shapely.geometry import MultiPolygon, Point, Polygon
 from shapely.prepared import prep
-from .base import BaseConstraint
+
 from ..core.population import Individual
+from .base import BaseConstraint
 
 
 class BoundaryConstraint(BaseConstraint):

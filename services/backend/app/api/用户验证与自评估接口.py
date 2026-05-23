@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..config import settings
 from ..services.self_evaluation_service import self_evaluation_service
 
 router = APIRouter()

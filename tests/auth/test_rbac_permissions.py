@@ -5,7 +5,11 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
-from services.backend.app.auth.dependencies import RoleChecker, ensure_same_company_scope, get_current_user_context
+from services.backend.app.auth.dependencies import (
+    RoleChecker,
+    ensure_same_company_scope,
+    get_current_user_context,
+)
 
 
 class _FakeJWT:

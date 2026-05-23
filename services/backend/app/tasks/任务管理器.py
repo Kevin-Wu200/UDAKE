@@ -1,12 +1,24 @@
 """
 任务管理器
 """
-from ..schemas.输出结果模型 import TaskStatus, TaskStatusResponse, PredictionResult, VarianceResult
-from ..schemas.插值参数模型 import KrigingParameters
-from ..schemas.进度详情模型 import ProgressDetail, ProgressStage, StageInfo, BlockProgress
-from datetime import datetime
-from typing import Dict, Optional, Any, List
 import threading
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from ..schemas.插值参数模型 import KrigingParameters
+from ..schemas.输出结果模型 import (
+    PredictionResult,
+    TaskStatus,
+    TaskStatusResponse,
+    VarianceResult,
+)
+from ..schemas.进度详情模型 import (
+    BlockProgress,
+    ProgressDetail,
+    ProgressStage,
+    StageInfo,
+)
+
 
 class TaskManager:
     """任务管理器"""

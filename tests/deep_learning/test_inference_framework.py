@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
-from deep_learning.inference import BatchPredictor, StreamPredictor, AsyncInferenceEngine
+from deep_learning.inference import (
+    AsyncInferenceEngine,
+    BatchPredictor,
+    StreamPredictor,
+)
 
 
 class DemoModel:

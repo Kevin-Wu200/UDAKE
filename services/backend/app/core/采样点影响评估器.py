@@ -2,13 +2,13 @@
 采样点影响评估器
 通过LOO交叉验证评估候选采样点对插值精度的影响
 """
-from pykrige.ok import OrdinaryKriging
-from sklearn.metrics import mean_squared_error
-import numpy as np
-from typing import Dict, List, Tuple, Any
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import lru_cache
+from typing import Any, Dict, List
+
+import numpy as np
+from pykrige.ok import OrdinaryKriging
+from sklearn.metrics import mean_squared_error
 
 logger = logging.getLogger(__name__)
 
@@ -278,7 +278,7 @@ class SamplingPointImpactEvaluator:
             return 0.0
 
         # 获取影响半径内的点
-        local_points = existing_points[in_radius_mask]
+        local_points = existing_points[in_radius_mask]  # noqa: F841
         local_values = existing_values[in_radius_mask]
 
         # 计算局部方差

@@ -3,11 +3,11 @@ from __future__ import annotations
 from pathlib import Path
 
 from deep_learning.models.registry import (
-    ModelRegistry,
-    ModelVersioning,
-    ModelSerializer,
     ModelExporter,
     ModelQuantizer,
+    ModelRegistry,
+    ModelSerializer,
+    ModelVersioning,
     build_metadata,
 )
 

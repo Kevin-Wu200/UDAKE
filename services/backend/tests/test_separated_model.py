@@ -1,5 +1,4 @@
 import numpy as np
-
 from app.core.spatiotemporal_kriging.models.separated_model import SeparatedModel
 
 

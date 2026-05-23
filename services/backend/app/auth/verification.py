@@ -6,7 +6,6 @@ import random
 import string
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 from .cache import AuthCacheManager
 

@@ -1,13 +1,19 @@
 """
 批量插值接口
 """
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+import logging
+
+from fastapi import APIRouter, HTTPException
+
 from ..schemas.批量处理模型 import (
-    BatchKrigingRequest, BatchTaskStartResponse, BatchTaskFullResponse,
-    BatchTaskControlRequest, BatchTaskControlResponse, BatchTaskResultsSummary
+    BatchKrigingRequest,
+    BatchTaskControlRequest,
+    BatchTaskControlResponse,
+    BatchTaskFullResponse,
+    BatchTaskResultsSummary,
+    BatchTaskStartResponse,
 )
 from ..services.批量插值服务 import BatchKrigingService
-import logging
 
 logger = logging.getLogger(__name__)
 

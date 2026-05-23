@@ -2,7 +2,6 @@ import asyncio
 
 import numpy as np
 import pytest
-
 from app.services.spatiotemporal_kriging_service import SpatiotemporalKrigingService
 
 

@@ -7,7 +7,6 @@ import sys
 import time
 from pathlib import Path
 
-
 EXAMPLES = [
     "deep_learning/examples/anomaly_vae_full_demo.py",
     "deep_learning/examples/anomaly_gcae_full_demo.py",

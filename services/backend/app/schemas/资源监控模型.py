@@ -1,10 +1,12 @@
 """
 资源监控模型
 """
-from pydantic import BaseModel, Field
-from typing import Optional, List, Dict, Any
 from datetime import datetime
 from enum import Enum
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel, Field
+
 
 class ResourceType(str, Enum):
     """资源类型"""

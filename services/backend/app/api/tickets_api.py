@@ -19,8 +19,21 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from ..auth import JWTValidationError, ProductKeyRegistry, get_auth_service, hash_password
-from ..auth_db.models import AuditLog, Company, ProductKey, Ticket, TicketStatus, TicketType, User
+from ..auth import (
+    JWTValidationError,
+    ProductKeyRegistry,
+    get_auth_service,
+    hash_password,
+)
+from ..auth_db.models import (
+    AuditLog,
+    Company,
+    ProductKey,
+    Ticket,
+    TicketStatus,
+    TicketType,
+    User,
+)
 from ..auth_db.session import get_auth_db_session
 
 logger = logging.getLogger(__name__)
@@ -55,6 +68,7 @@ _ADMIN_RSA_D = int(
     "64759349273"
 )
 from ..utils.email_service import ticket_email_service as email_service
+
 _key_registry = ProductKeyRegistry()
 
 
@@ -296,7 +310,7 @@ def validate_usage_purpose(purpose: str) -> bool:
     chinese_chars = re.findall(r'[\u4e00-\u9fa5]', purpose)
     # 匹配英文字符
     english_chars = re.findall(r'[a-zA-Z]', purpose)
-    
+
     return len(chinese_chars) >= 15 or len(english_chars) >= 50
 
 
@@ -414,16 +428,16 @@ def handle_key_request(ticket: Ticket, db: Session) -> str:
     company = None
     company_id = ticket.company_id
     company_name = None
-    
+
     if ticket.key_type.startswith("enterprise_"):
         if company_id:
             company = db.query(Company).filter(Company.id == company_id).one_or_none()
-        
+
         if not company:
             company = _resolve_company_for_ticket(db, ticket.organization)
             company_id = company.id
             ticket.company_id = company_id
-            
+
         company_name = company.name
 
     user = _resolve_or_create_ticket_user(db, ticket, company_id)
@@ -583,7 +597,7 @@ def create_ticket(
         import secrets
         random_suffix = "".join(secrets.choice(string.ascii_uppercase + string.digits) for _ in range(8))
         ticket_id = f"TKT-{random_suffix}"
-        
+
         ticket = Ticket(
             id=_next_model_id(db, Ticket),
             ticket_id=ticket_id,
@@ -835,8 +849,8 @@ def approve_ticket(
         db.refresh(ticket)
         try:
             email_service.send_ticket_notification(
-                ticket, 
-                "approved", 
+                ticket,
+                "approved",
                 {
                     "assigned_key": assigned_key,
                     "approval_notes": notes,
@@ -912,8 +926,8 @@ def reject_ticket(
         db.refresh(ticket)
         try:
             email_service.send_ticket_notification(
-                ticket, 
-                "rejected", 
+                ticket,
+                "rejected",
                 {
                     "assigned_key": ticket.assigned_key or "无",
                     "approval_notes": reason,

@@ -14,17 +14,17 @@ from .common import (
     WeightMethod,
 )
 from .engine import ModelFusionEngine
+from .enhanced_dynamic import (
+    LocalPrecisionAdaptiveFusion,
+    MultiLevelUncertaintyFusion,
+    SpatialHeterogeneityFusion,
+)
 from .evaluation import FusionEvaluator
 from .feature_analysis import FusionFeatureAnalyzer
 from .hybrid import HybridFusionBridge, MultiModalFusion
 from .model_management import FusionModelManager
 from .service import FusionPlatformService, fusion_platform_service
 from .weighting import FusionWeightCalculator
-from .enhanced_dynamic import (
-    SpatialHeterogeneityFusion,
-    MultiLevelUncertaintyFusion,
-    LocalPrecisionAdaptiveFusion,
-)
 
 __all__ = [
     "AdaptiveFusionSystem",

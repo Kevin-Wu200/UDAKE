@@ -4,8 +4,8 @@ A*启发式搜索算法实现
 """
 
 import heapq
-from typing import Dict, List, Optional, Set, Tuple, Callable
 import math
+from typing import Callable, Dict, List, Optional, Set, Tuple
 
 
 class AStarAlgorithm:

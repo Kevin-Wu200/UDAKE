@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import time
-import os
 from pathlib import Path
-
 
 EXAMPLES: list[tuple[str, str]] = [
     ("异常检测使用示例", "anomaly_inference_demo.py"),

@@ -7,11 +7,12 @@ ARIMA 时序预测器
 - 置信区间估计
 """
 
-import numpy as np
-from typing import Optional, Dict, Any, Tuple
 import logging
+from typing import Any, Dict, Optional, Tuple
 
-from .models import TimeSeriesData, ForecastResult, ForecastConfig
+import numpy as np
+
+from .models import ForecastConfig, ForecastResult, TimeSeriesData
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +191,7 @@ class ARIMAForecaster:
 
         # 使用最后一个已知值和AR系数进行预测
         last_diff = np.diff(self._last_values) if d > 0 else self._last_values
-        current = last_diff[-1] if d > 0 else self._last_values[-1]
+        current = last_diff[-1] if d > 0 else self._last_values[-1]  # noqa: F841
 
         history = list(last_diff[-max(p, 1):])
 

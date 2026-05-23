@@ -5,7 +5,7 @@ from __future__ import annotations
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Any, Callable, Dict, Tuple
+from typing import Any, Callable, Dict
 
 import numpy as np
 
@@ -166,7 +166,7 @@ class GPUComputeEngine:
 
         a = np.array(matrix, dtype=float, copy=True)
         n = a.shape[0]
-        l = np.eye(n)
+        lower = np.eye(n)
         u = np.zeros_like(a)
         p = np.eye(n)
 
@@ -177,22 +177,22 @@ class GPUComputeEngine:
                 a[[i, pivot]] = a[[pivot, i]]
                 p[[i, pivot]] = p[[pivot, i]]
                 if i > 0:
-                    l[[i, pivot], :i] = l[[pivot, i], :i]
+                    lower[[i, pivot], :i] = lower[[pivot, i], :i]
 
             if np.isclose(a[i, i], 0.0):
                 raise np.linalg.LinAlgError("矩阵奇异，无法进行LU分解")
 
             u[i, i:] = a[i, i:]
             for j in range(i + 1, n):
-                l[j, i] = a[j, i] / u[i, i]
-                a[j, i:] = a[j, i:] - l[j, i] * u[i, i:]
+                lower[j, i] = a[j, i] / u[i, i]
+                a[j, i:] = a[j, i:] - lower[j, i] * u[i, i:]
 
         elapsed_ms = (perf_counter() - start) * 1000
         self.performance_monitor.record("lu_decomposition", ComputeBackend.CPU, elapsed_ms, int(matrix.size))
         return ComputeResult(
             backend=ComputeBackend.CPU,
             elapsed_ms=elapsed_ms,
-            payload={"l": l, "u": u, "p": p},
+            payload={"l": lower, "u": u, "p": p},
         )
 
     def vector_dot(self, a: np.ndarray, b: np.ndarray, prefer_gpu: bool = True) -> ComputeResult:

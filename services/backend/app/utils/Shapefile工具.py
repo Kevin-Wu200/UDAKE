@@ -1,11 +1,11 @@
 """
 Shapefile工具
 """
-import shapefile
-import numpy as np
-from pathlib import Path
-from typing import Optional
 import logging
+from pathlib import Path
+
+import numpy as np
+import shapefile
 
 logger = logging.getLogger(__name__)
 

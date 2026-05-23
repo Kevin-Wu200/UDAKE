@@ -8,7 +8,6 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from .models import QualityDimension, RuleDefinition, RuleType, RuleViolation
 
-
 _ALLOWED_EVAL_FUNCTIONS = {
     "abs": abs,
     "min": min,

@@ -1,10 +1,11 @@
 """
 任务状态接口
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, Depends, HTTPException
+
+from ..dependencies import verify_task_id
 from ..schemas.输出结果模型 import TaskStatusResponse
 from ..tasks.任务管理器 import TaskManager
-from ..dependencies import verify_task_id
 
 router = APIRouter()
 task_manager = TaskManager()

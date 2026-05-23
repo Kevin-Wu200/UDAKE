@@ -1,10 +1,12 @@
 """
 报告生成服务
 """
-from ..schemas.输出结果模型 import KrigingReport, CrossValidationMetrics
-from ..tasks.任务管理器 import TaskManager
 from datetime import datetime
 from typing import Optional
+
+from ..schemas.输出结果模型 import CrossValidationMetrics, KrigingReport
+from ..tasks.任务管理器 import TaskManager
+
 
 class ReportGenerator:
     """报告生成器"""

@@ -1,10 +1,12 @@
 """
 权重计算器
 """
-import numpy as np
-from typing import List, Dict, Tuple, Optional
-from .fusion_models import WeightMethod, ModelMetrics
 import logging
+from typing import Dict, List, Optional
+
+import numpy as np
+
+from .fusion_models import ModelMetrics, WeightMethod
 
 logger = logging.getLogger(__name__)
 

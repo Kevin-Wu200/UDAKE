@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-
 from app.core.spatiotemporal_kriging.st_variogram_fitter import STVariogramFitter
 from app.services.spatiotemporal_core import STDataset
 

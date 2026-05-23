@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-
 from app.api.product_keys_api import router as product_keys_router
 from app.auth import ProductKeyValidationError, get_auth_service, reset_auth_service
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 
 @pytest.fixture()

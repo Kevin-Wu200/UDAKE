@@ -1,5 +1,4 @@
 import numpy as np
-
 from app.core.spatiotemporal_kriging.utils.matrix_utils import stable_cholesky_solve
 
 

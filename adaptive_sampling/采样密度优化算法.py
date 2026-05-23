@@ -1,9 +1,11 @@
 """
 采样密度优化算法
 """
-import numpy as np
 from typing import Dict, List
+
+import numpy as np
 from scipy.spatial import distance_matrix
+
 
 class SamplingDensityOptimizer:
     """采样密度优化器"""

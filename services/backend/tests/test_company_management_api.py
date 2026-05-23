@@ -6,16 +6,15 @@ from datetime import datetime
 from typing import Dict
 
 import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, sessionmaker
-from sqlalchemy.pool import StaticPool
-
 from app.api.company_management_api import router as company_router
 from app.auth import get_auth_service, reset_auth_service
 from app.auth_db.models import AuditLog, Base, Company, ProductKey, User
 from app.auth_db.session import get_auth_db_session
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 
 @pytest.fixture()

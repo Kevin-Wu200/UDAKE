@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
 import time
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 import pytest
@@ -17,10 +17,18 @@ from services.backend.app.dl_services.contrastive_anomaly_explainer import (
     ContrastiveExplanationConfig,
     ContrastiveLimeAdapter,
 )
-from services.backend.app.dl_services.gan_anomaly_explainer import GANAnomalyLimeAdapter, GANExplanationConfig
-from services.backend.app.dl_services.gcae_anomaly_explainer import GCAEExplanationConfig, GCAELimeAdapter
-from services.backend.app.dl_services.vae_anomaly_explainer import VAEAnomalyLIMEAdapter, VAEExplanationConfig
-
+from services.backend.app.dl_services.gan_anomaly_explainer import (
+    GANAnomalyLimeAdapter,
+    GANExplanationConfig,
+)
+from services.backend.app.dl_services.gcae_anomaly_explainer import (
+    GCAEExplanationConfig,
+    GCAELimeAdapter,
+)
+from services.backend.app.dl_services.vae_anomaly_explainer import (
+    VAEAnomalyLIMEAdapter,
+    VAEExplanationConfig,
+)
 
 PERF_PLAN = {
     "single_sample_ms": 10_000.0,

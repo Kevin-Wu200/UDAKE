@@ -1,16 +1,23 @@
 """
 任务队列接口
 """
+from typing import List, Optional
+
 from fastapi import APIRouter, HTTPException
+
 from ..schemas.任务队列模型 import (
-    QueueTaskInfo, QueueTaskStatus, QueueTaskPriority,
-    QueueStatistics, QueueVisualization, TaskControlRequest,
-    TaskControlResponse, TaskPriorityUpdateRequest,
-    BatchTaskControlRequest, BatchTaskControlResponse,
-    QueueConfig
+    BatchTaskControlRequest,
+    QueueConfig,
+    QueueStatistics,
+    QueueTaskInfo,
+    QueueTaskPriority,
+    QueueTaskStatus,
+    QueueVisualization,
+    TaskControlRequest,
+    TaskControlResponse,
+    TaskPriorityUpdateRequest,
 )
 from ..services.任务队列管理器 import task_queue_manager
-from typing import List, Optional
 
 router = APIRouter()
 

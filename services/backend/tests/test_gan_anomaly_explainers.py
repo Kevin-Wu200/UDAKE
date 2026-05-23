@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import numpy as np
+from app.dl_services.gan_anomaly_explainer import (
+    GANAnomalyLimeAdapter,
+    GANAnomalySHAPAdapter,
+)
 
-from app.dl_services.gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter
 from deep_learning.models.anomaly_detection import GANAnomalyDetector
 
 

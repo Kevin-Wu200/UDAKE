@@ -97,8 +97,8 @@ jobs:
           pip install "GDAL==${GDAL_VERSION}.*"
           grep -viE '^\s*(GDAL|torch-scatter|torch-sparse)([<>=!~].*)?$' requirements.txt > /tmp/requirements-no-gdal.txt
           pip install -r /tmp/requirements-no-gdal.txt
-          # torch-scatter/torch-sparse 需要在 torch 安装后再构建
-          pip install torch-scatter==2.1.2 torch-sparse==0.6.18
+          # torch-scatter/torch-sparse 需要在 torch 安装后再构建，使用 --no-build-isolation
+          pip install --no-build-isolation torch-scatter==2.1.2 torch-sparse==0.6.18
           pip install pytest-cov
 
       - name: Run tests with coverage

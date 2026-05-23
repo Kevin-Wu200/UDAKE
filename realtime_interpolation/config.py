@@ -3,11 +3,10 @@
 Real-time Interpolation System Configuration
 """
 
-from typing import Dict, Any, Optional
-from dataclasses import dataclass, field
 import os
+from dataclasses import dataclass, field
 from pathlib import Path
-
+from typing import Any, Dict, Optional
 
 _DOTENV_CACHE: Optional[Dict[str, str]] = None
 

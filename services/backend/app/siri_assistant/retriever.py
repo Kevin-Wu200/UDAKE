@@ -6,12 +6,10 @@
 """
 
 import logging
+import math
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import Optional
-
-import math
 
 from .config import siri_config
 
@@ -94,7 +92,7 @@ class DocumentRetriever:
 
                 if q_match:
                     title = q_match.group(1).strip()
-                    question = entry
+                    question = entry  # noqa: F841
                     answer = a_match.group(1).strip() if a_match else ""
 
                     self._documents.append({

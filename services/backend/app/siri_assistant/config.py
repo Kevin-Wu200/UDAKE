@@ -6,7 +6,6 @@ Siri 助手模块配置
 
 import os
 from pathlib import Path
-from typing import Optional
 
 
 class SiriAssistantConfig:

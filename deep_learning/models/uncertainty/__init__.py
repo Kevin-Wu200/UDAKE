@@ -14,7 +14,7 @@ from .common import ActivationType, DropoutType, PredictiveMoments
 from .data_pipeline import UncertaintyDataset, UncertaintyDatasetBuilder
 from .deep_ensemble import DeepEnsembleRegressor, EnsembleMemberMetadata
 from .edl import EDLClassifier, EDLConfig
-from .evaluation import UQMetricResult, UncertaintyEvaluator
+from .evaluation import UncertaintyEvaluator, UQMetricResult
 from .features import (
     BNN_FEATURE_KEYS,
     DEEP_ENSEMBLE_FEATURE_KEYS,

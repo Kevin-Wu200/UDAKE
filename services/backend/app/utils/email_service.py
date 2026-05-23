@@ -87,10 +87,10 @@ class EmailService:
         msg["From"] = f"{self.email_from_name} <{self.email_from}>"
         msg["To"] = to
         msg["Subject"] = subject
-        
+
         msg.attach(MIMEText(text_body or "请查看HTML版本的邮件", "plain"))
         msg.attach(MIMEText(html_body, "html"))
-        
+
         try:
             if self.use_ssl:
                 import ssl
@@ -119,12 +119,12 @@ class EmailService:
             "approved": "ticket_approved.html",
             "rejected": "ticket_rejected.html",
         }
-        
+
         template_name = template_map.get(notification_type)
         if not template_name:
             logger.error(f"Unknown notification type: {notification_type}")
             return
-            
+
         template = self.template_env.get_template(template_name)
         # 将 created_at 转换为 UTC 时间字符串显示
         created_at_str = ""
@@ -138,13 +138,13 @@ class EmailService:
             **(extra_data or {})
         }
         html_body = template.render(**data)
-        
+
         subject_map = {
             "submitted": "工单申请成功 - UDAKE",
             "approved": "工单申请已批准 - UDAKE",
             "rejected": "工单申请已拒绝 - UDAKE",
         }
-        
+
         self.send_email(ticket.email, subject_map.get(notification_type, "工单更新"), html_body)
 
 

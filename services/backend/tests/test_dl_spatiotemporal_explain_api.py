@@ -6,11 +6,13 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
+from app.dl_services import api as dl_api
+from app.dl_services.explain_service import (
+    ExplainPermissionError,
+    ExplainRateLimitError,
+)
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from app.dl_services import api as dl_api
-from app.dl_services.explain_service import ExplainPermissionError, ExplainRateLimitError
 
 
 def _payload() -> dict:

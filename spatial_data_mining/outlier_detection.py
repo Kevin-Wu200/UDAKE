@@ -5,9 +5,10 @@ Spatial Outlier Detection
 检测空间数据中的异常点。
 """
 
-import numpy as np
-from typing import List, Tuple, Dict, Any, Optional
 import logging
+from typing import Any, Dict
+
+import numpy as np
 
 logger = logging.getLogger(__name__)
 

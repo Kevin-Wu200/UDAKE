@@ -664,7 +664,7 @@ class DistributedComputeService:
             task = self._tasks.get(task_id)
             if not task or task.status != DistributedTaskStatus.RUNNING:
                 return
-            node = self._nodes.get(task.node_id) if task.node_id else None
+            node = self._nodes.get(task.node_id) if task.node_id else None  # noqa: F841
             start_time = task.started_at or datetime.utcnow()
             current_attempt = task.attempt
 

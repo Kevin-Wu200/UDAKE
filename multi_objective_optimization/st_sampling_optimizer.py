@@ -5,12 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Dict, List, Sequence
 
-import numpy as np
-
+from .constraints.base import BaseConstraint
 from .core.nsga2 import NSGA2Optimizer
 from .core.population import Individual
 from .objectives.base import BaseObjective
-from .constraints.base import BaseConstraint
 from .st_constraints import STConstraintConfig, STConstraints
 from .st_objectives import STObjectiveFunctions, STSamplingPoint
 

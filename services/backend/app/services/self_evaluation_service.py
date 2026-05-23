@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 import statistics
-from collections import Counter, defaultdict
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from threading import RLock
 from typing import Any, Dict, Iterable, List, Optional
@@ -435,7 +435,7 @@ class SelfEvaluationService:
             trend.append({"hour": hour, "mae": round(_mean(vals), 6), "count": len(vals)})
 
         x_values = [e.get("x", 0.0) for e in events]
-        y_values = [e.get("y", 0.0) for e in events]
+        y_values = [e.get("y", 0.0) for e in events]  # noqa: F841
         corr_space = self._corr(x_values, abs_errors)
         corr_time = self._corr([e["timestamp_epoch"] for e in events], abs_errors)
 

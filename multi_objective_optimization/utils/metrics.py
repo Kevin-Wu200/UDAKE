@@ -3,9 +3,11 @@
 Performance metrics utility functions
 """
 
+from typing import Any, Dict, List
+
 import numpy as np
-from typing import List, Dict, Any
-from ..core.population import Population, Individual
+
+from ..core.population import Population
 
 
 def calculate_hypervolume(

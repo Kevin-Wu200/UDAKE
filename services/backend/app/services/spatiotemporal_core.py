@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import math
 import time
-import copy
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -348,9 +348,9 @@ class SpatiotemporalVariogramModeler:
         k = covariance(points, points)
         k = k + np.eye(len(k)) * max(params.get("spatial_nugget", 1e-6), 1e-8)
         try:
-            l = np.linalg.cholesky(k)
-            alpha = np.linalg.solve(l.T, np.linalg.solve(l, centered_values))
-            log_det = 2.0 * np.sum(np.log(np.diag(l)))
+            chol_lower = np.linalg.cholesky(k)
+            alpha = np.linalg.solve(chol_lower.T, np.linalg.solve(chol_lower, centered_values))
+            log_det = 2.0 * np.sum(np.log(np.diag(chol_lower)))
         except np.linalg.LinAlgError:
             return float("inf")
         return float(0.5 * (log_det + centered_values.T @ alpha + len(centered_values) * math.log(2.0 * math.pi)))
@@ -557,9 +557,9 @@ class SpatiotemporalKrigingSolver:
         jitter = 1e-8
         for _ in range(5):
             try:
-                l = np.linalg.cholesky(matrix + np.eye(len(matrix)) * jitter)
-                y = np.linalg.solve(l, rhs)
-                return np.linalg.solve(l.T, y)
+                chol_lower = np.linalg.cholesky(matrix + np.eye(len(matrix)) * jitter)
+                y = np.linalg.solve(chol_lower, rhs)
+                return np.linalg.solve(chol_lower.T, y)
             except np.linalg.LinAlgError:
                 jitter *= 10.0
         try:
@@ -620,9 +620,9 @@ class SpatiotemporalKrigingSolver:
             x, y, z, t_value = job
             target = np.array([[x, y, z, t_value]], dtype=np.float64)
             k_vec = covariance_fn(train_points, target).reshape(-1)
-            pred = float(k_vec @ alpha)
+            pred = float(k_vec @ alpha)  # noqa: F821
 
-            solve_k = self.solve_cholesky(k_train, k_vec)
+            solve_k = self.solve_cholesky(k_train, k_vec)  # noqa: F821
             variance = float(max(covariance_fn(target, target)[0, 0] - k_vec @ solve_k, 1e-9))
             row = {"x": x, "y": y, "z": z, "t": t_value, "value": pred, "variance": variance}
             return row, solve_k.tolist()

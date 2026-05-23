@@ -1,23 +1,23 @@
 """
 行业配置接口 - 提供行业配置查询和基于行业的参数推荐
 """
-from fastapi import APIRouter, HTTPException, File, UploadFile
+import logging
+import os
+
+import numpy as np
+from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
+
 from ..schemas.行业配置模型 import (
     Industry,
     IndustryConfig,
     IndustryListResponse,
     IndustryRecommendationRequest,
-    IndustryRecommendationResponse
+    IndustryRecommendationResponse,
 )
-from ..services.行业预设服务 import IndustryPresetService
 from ..services.数据预处理服务 import DataPreprocessor
 from ..services.模型选择服务 import ModelSelector
-from pydantic import BaseModel
-from typing import Dict, Any
-import numpy as np
-import os
-import logging
+from ..services.行业预设服务 import IndustryPresetService
 
 logger = logging.getLogger(__name__)
 

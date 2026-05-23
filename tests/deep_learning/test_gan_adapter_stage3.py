@@ -3,7 +3,11 @@ from __future__ import annotations
 import numpy as np
 
 from deep_learning.models.anomaly_detection import GANAnomalyDetector
-from services.backend.app.dl_services.gan_anomaly_explainer import GANAnomalyLimeAdapter, GANAnomalySHAPAdapter, GANExplanationConfig
+from services.backend.app.dl_services.gan_anomaly_explainer import (
+    GANAnomalyLimeAdapter,
+    GANAnomalySHAPAdapter,
+    GANExplanationConfig,
+)
 
 
 def _make_data(n: int = 88, seed: int = 23) -> tuple[np.ndarray, np.ndarray]:

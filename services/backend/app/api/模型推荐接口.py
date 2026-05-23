@@ -1,13 +1,14 @@
 """
 模型推荐接口 - 自动参数推荐
 """
+from typing import Dict
+
+import numpy as np
 from fastapi import APIRouter, HTTPException
-from ..schemas.数据模型 import SpatialData
+from pydantic import BaseModel, ConfigDict
+
 from ..services.数据预处理服务 import DataPreprocessor
 from ..services.模型选择服务 import ModelSelector
-from pydantic import BaseModel, ConfigDict
-from typing import Dict, Any
-import numpy as np
 
 router = APIRouter()
 preprocessor = DataPreprocessor()
@@ -21,7 +22,7 @@ class ModelRecommendationRequest(BaseModel):
 class ModelRecommendationResponse(BaseModel):
     """模型推荐响应"""
     model_config = ConfigDict(protected_namespaces=())
-    
+
     recommended_variogram_model: str
     recommended_method: str
     recommended_grid_resolution: int

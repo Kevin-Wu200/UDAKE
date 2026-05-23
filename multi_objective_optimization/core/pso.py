@@ -6,11 +6,13 @@ Particle Swarm Optimization (PSO) Algorithm
 支持标准PSO、惯性权重自适应PSO、带约束PSO。
 """
 
-import numpy as np
-from typing import List, Dict, Any, Optional, Callable, Tuple
 import time
+from typing import Any, Callable, Dict, List, Optional, Tuple
+
+import numpy as np
+
 from .optimizer import BaseOptimizer
-from .population import Population, Individual
+from .population import Individual, Population
 
 
 class Particle:

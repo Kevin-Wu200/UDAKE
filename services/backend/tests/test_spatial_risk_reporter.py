@@ -1,13 +1,14 @@
 """
 空间风险报告生成测试
 """
-import pytest
-import numpy as np
 import json
-from pathlib import Path
 import sys
-from datetime import datetime
 import tempfile
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 # 添加模块路径
 sys.path.append(str(Path(__file__).parent.parent.parent))
@@ -441,8 +442,8 @@ class TestSpatialRiskReporter:
         prediction = np.array([])
         variance = np.array([])
         risk_index = np.array([])
-        uncertainty_levels = {"statistics": {}}
-        threshold_analysis = {}
+        uncertainty_levels = {"statistics": {}}  # noqa: F841
+        threshold_analysis = {}  # noqa: F841
 
         with pytest.raises((ValueError, IndexError)):
             reporter._generate_executive_summary(prediction, variance, risk_index)

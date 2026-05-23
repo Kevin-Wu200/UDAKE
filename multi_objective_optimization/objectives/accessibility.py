@@ -3,10 +3,12 @@
 Accessibility Maximization Objective
 """
 
+from typing import Dict, List, Optional, Tuple
+
 import numpy as np
-from typing import List, Tuple, Dict, Optional
-from .base import BaseObjective
+
 from ..core.population import Individual
+from .base import BaseObjective
 
 
 class AccessibilityObjective(BaseObjective):

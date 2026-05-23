@@ -1,15 +1,16 @@
 """
 批量报告生成服务
 """
-from ..schemas.批量处理模型 import BatchReportRequest, BatchReportResponse
-from ..tasks.批量任务管理器 import BatchTaskManager
-from ..services.报告生成服务 import ReportGenerator
-from ..services.结果对比分析服务 import ResultComparisonService
-from datetime import datetime
-from typing import Dict, List, Optional, Any
 import logging
 import uuid
+from datetime import datetime
 from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from ..schemas.批量处理模型 import BatchReportRequest, BatchReportResponse
+from ..services.报告生成服务 import ReportGenerator
+from ..services.结果对比分析服务 import ResultComparisonService
+from ..tasks.批量任务管理器 import BatchTaskManager
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +212,7 @@ class BatchReportGenerator:
 
             # 分析结果
             if batch_summary.failed_tasks > 0:
-                content.append(f"### 风险提示\n")
+                content.append("### 风险提示\n")
                 content.append(f"- 有 {batch_summary.failed_tasks} 个任务失败，建议检查数据质量和参数配置\n")
                 content.append("\n")
 
@@ -226,7 +227,7 @@ class BatchReportGenerator:
 
                     if cv > 20:
                         content.append(f"- **RMSE 变异性较高** ({cv:.2f}%)，不同数据集的插值精度差异较大\n")
-                        content.append(f"  建议：考虑对不同数据集使用不同的参数配置\n")
+                        content.append("  建议：考虑对不同数据集使用不同的参数配置\n")
                     else:
                         content.append(f"- **RMSE 变异性较低** ({cv:.2f}%)，参数配置较为稳定\n")
 
@@ -235,10 +236,10 @@ class BatchReportGenerator:
                     r2_mean = comparison.statistics["r2"]["mean"]
                     if r2_mean < 0.5:
                         content.append(f"- **模型拟合度较低** (平均 R² = {r2_mean:.4f})\n")
-                        content.append(f"  建议：检查数据的空间相关性，考虑使用更复杂的变异函数模型\n")
+                        content.append("  建议：检查数据的空间相关性，考虑使用更复杂的变异函数模型\n")
                     elif r2_mean > 0.8:
                         content.append(f"- **模型拟合度较高** (平均 R² = {r2_mean:.4f})\n")
-                        content.append(f"  当前参数配置效果良好\n")
+                        content.append("  当前参数配置效果良好\n")
 
                 content.append("\n")
 

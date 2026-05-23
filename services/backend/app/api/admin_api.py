@@ -23,7 +23,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import String, and_, cast, func, or_
 from sqlalchemy.orm import Session
 
-from ..auth import JWTValidationError, ProductKeyRegistry, SensitiveDataCipher, get_auth_service, hash_password
+from ..auth import (
+    JWTValidationError,
+    ProductKeyRegistry,
+    SensitiveDataCipher,
+    get_auth_service,
+    hash_password,
+)
 from ..auth.input_sanitizer import sanitize_payload
 from ..auth_db.models import (
     AuditLog,

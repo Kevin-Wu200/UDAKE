@@ -21,16 +21,16 @@ def _softmax(logits: np.ndarray, axis: int = -1) -> np.ndarray:
 
 
 def _split_heads(x: np.ndarray, num_heads: int) -> np.ndarray:
-    n, l, d = x.shape
+    n, seq_len, d = x.shape
     if d % num_heads != 0:
         raise ValueError("feature dim must be divisible by num_heads")
     head_dim = d // num_heads
-    return x.reshape(n, l, num_heads, head_dim).transpose(0, 2, 1, 3)
+    return x.reshape(n, seq_len, num_heads, head_dim).transpose(0, 2, 1, 3)
 
 
 def _merge_heads(x: np.ndarray) -> np.ndarray:
-    n, h, l, d = x.shape
-    return x.transpose(0, 2, 1, 3).reshape(n, l, h * d)
+    n, h, seq_len, d = x.shape
+    return x.transpose(0, 2, 1, 3).reshape(n, seq_len, h * d)
 
 
 def multi_head_attention(query: np.ndarray, key: np.ndarray, value: np.ndarray, num_heads: int = 4) -> AttentionOutput:

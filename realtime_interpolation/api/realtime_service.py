@@ -5,32 +5,25 @@ Realtime Interpolation Service
 实现后端API接口、数据处理、性能优化、系统集成和高可用设计
 """
 
-import numpy as np
-from typing import List, Dict, Optional, Any
-from dataclasses import dataclass, field
-from datetime import datetime
-import logging
-import asyncio
-import json
 import hashlib
+import json
+import logging
 from concurrent.futures import ThreadPoolExecutor
-import traceback
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from ..models import (
-    DataPoint, BoundingBox, Subscription, UpdateResult
-)
-from ..core import (
-    IncrementalKriging,
-    MultiScaleUpdater,
-    UpdatePriorityManager,
-    BatchUpdateManager,
-    ThrottleController
-)
+import numpy as np
+
 from ..cache import CacheManager, MultiLevelCacheStrategy, RedisCacheManager
 from ..config import get_config
-from ..events import (
-    EventBus, EventType, EventPriority, Event, EventMonitor
+from ..core import (
+    BatchUpdateManager,
+    IncrementalKriging,
+    ThrottleController,
+    UpdatePriorityManager,
 )
+from ..events import Event, EventBus, EventMonitor, EventPriority, EventType
+from ..models import BoundingBox, DataPoint, Subscription
 
 logger = logging.getLogger(__name__)
 
@@ -800,7 +793,7 @@ def test_realtime_service():
 
     # 获取统计
     stats = service.get_stats()
-    print(f"服务统计:")
+    print("服务统计:")
     print(f"  订阅数: {stats['subscriptions']['total']}")
     print(f"  总请求数: {stats['requests']['total_requests']}")
     print(f"  成功请求数: {stats['requests']['successful_requests']}")

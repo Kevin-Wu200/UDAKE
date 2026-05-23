@@ -1,10 +1,11 @@
 """
 模型融合API接口
 """
-from fastapi import APIRouter, HTTPException
-from typing import List, Dict, Any, Optional
-from pydantic import BaseModel, ConfigDict
 import logging
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, ConfigDict
 
 from ..model_fusion.services.fusion_service import fusion_service
 
@@ -16,7 +17,7 @@ router = APIRouter()
 class ModelInput(BaseModel):
     """模型输入"""
     model_config = ConfigDict(protected_namespaces=())
-    
+
     model_id: str
     model_name: str
     predictions: List[float]

@@ -3,9 +3,10 @@
 Data Models
 """
 
-from typing import List, Optional, Dict, Any
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import numpy as np
 
 

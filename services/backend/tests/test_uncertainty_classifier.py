@@ -1,16 +1,17 @@
 """
 不确定性分级模型测试
 """
-import pytest
-import numpy as np
-from pathlib import Path
 import sys
+from pathlib import Path
+
+import numpy as np
+import pytest
 
 # 添加模块路径
 sys.path.append(str(Path(__file__).parent.parent.parent))
 from uncertainty_dashboard.不确定性分级模型 import (
     UncertaintyClassifier,
-    UncertaintyLevel
+    UncertaintyLevel,
 )
 
 
@@ -78,8 +79,8 @@ class TestUncertaintyClassifier:
             UncertaintyLevel.HIGH: 0.9
         }
 
-        result1 = classifier.classify_uncertainty(sample_variance.copy())
-        result2 = classifier.classify_uncertainty(sample_variance.copy(), custom_thresholds)
+        result1 = classifier.classify_uncertainty(sample_variance.copy())  # noqa: F841
+        result2 = classifier.classify_uncertainty(sample_variance.copy(), custom_thresholds)  # noqa: F841
 
         # 验证阈值被更新
         assert classifier.thresholds[UncertaintyLevel.VERY_LOW] == 0.3

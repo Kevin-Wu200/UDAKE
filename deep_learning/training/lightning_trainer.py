@@ -7,8 +7,9 @@ import pickle
 from dataclasses import asdict
 from typing import Any
 
-from .base_trainer import BaseTrainer, TrainingConfig
 from deep_learning.utils.monitoring import MetricMonitor
+
+from .base_trainer import BaseTrainer, TrainingConfig
 
 
 class _SummaryWriterStub:

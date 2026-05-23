@@ -2,7 +2,8 @@
 任务状态机
 """
 from enum import Enum
-from typing import Set, Dict
+from typing import Dict, Set
+
 
 class TaskState(str, Enum):
     """任务状态"""

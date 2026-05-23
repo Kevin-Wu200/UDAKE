@@ -1,11 +1,11 @@
 """
 报告生成接口
 """
-from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Depends, HTTPException
+
+from ..dependencies import verify_task_id
 from ..schemas.输出结果模型 import KrigingReport
 from ..services.报告生成服务 import ReportGenerator
-from ..dependencies import verify_task_id
 
 router = APIRouter()
 report_generator = ReportGenerator()

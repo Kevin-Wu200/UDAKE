@@ -1,8 +1,7 @@
 import numpy as np
 import pytest
-
 from app.core.spatiotemporal_kriging.st_kriging_solver import STKrigingSolver
-from app.services.spatiotemporal_core import STDataset, SpatiotemporalVariogramModeler
+from app.services.spatiotemporal_core import SpatiotemporalVariogramModeler, STDataset
 
 
 def _dataset(n: int = 14) -> STDataset:

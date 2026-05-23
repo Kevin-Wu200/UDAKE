@@ -1,7 +1,7 @@
 import asyncio
 
-from app.core.spatiotemporal_kriging.st_prediction_engine import STPredictionEngine
 import app.services.spatiotemporal_core as st_core
+from app.core.spatiotemporal_kriging.st_prediction_engine import STPredictionEngine
 
 
 class _FakeCacheService:

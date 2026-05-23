@@ -3,10 +3,11 @@
 定义采样路径规划系统中的数据结构
 """
 
-from pydantic import BaseModel, Field
-from typing import List, Optional, Dict, Any
-from enum import Enum
 from datetime import datetime
+from enum import Enum
+from typing import Any, Dict, List, Optional
+
+from pydantic import BaseModel, Field
 
 
 class VehicleType(str, Enum):

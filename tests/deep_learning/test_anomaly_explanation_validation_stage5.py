@@ -6,7 +6,6 @@ import numpy as np
 
 from services.backend.app.dl_services.service import DeepLearningService
 
-
 MODELS = ("vae", "gcae", "gan", "contrastive")
 
 

@@ -5,10 +5,9 @@ from __future__ import annotations
 import time
 
 import pytest
+from app.dl_services import api as dl_api
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
-from app.dl_services import api as dl_api
 
 
 def _wait_task(client: TestClient, path: str, headers: dict[str, str], timeout: float = 3.0) -> dict:

@@ -1,9 +1,11 @@
 """
 变异函数拟合器
 """
+from typing import Tuple
+
 import numpy as np
 from scipy.optimize import curve_fit
-from typing import Tuple, Callable
+
 
 class VariogramFitter:
     """变异函数拟合器"""
@@ -63,6 +65,6 @@ class VariogramFitter:
                 bounds=([0, 0, 0], [np.inf, np.inf, np.inf])
             )
             return tuple(params)
-        except:
+        except Exception:
             # 拟合失败，返回初始估计
             return (nugget_init, sill_init, range_init)

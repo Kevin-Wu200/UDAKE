@@ -2,13 +2,15 @@
 模型融合系统测试
 """
 import pytest
-import numpy as np
+from app.model_fusion.core.fusion_engine import FusionEngine
 from app.model_fusion.core.fusion_models import (
-    FusionConfig, ModelPrediction, WeightConfig,
-    FusionStrategy, WeightMethod
+    FusionConfig,
+    FusionStrategy,
+    ModelPrediction,
+    WeightConfig,
+    WeightMethod,
 )
 from app.model_fusion.core.weight_calculator import WeightCalculator
-from app.model_fusion.core.fusion_engine import FusionEngine
 from app.model_fusion.evaluation.model_evaluator import ModelEvaluator
 
 

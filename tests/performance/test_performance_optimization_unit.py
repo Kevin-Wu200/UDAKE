@@ -4,7 +4,10 @@ import numpy as np
 import pytest
 
 from deep_learning.models.anomaly_detection import GANAnomalyDetector
-from services.backend.app.dl_services.gan_anomaly_explainer import GANAnomalyLimeAdapter, GANExplanationConfig
+from services.backend.app.dl_services.gan_anomaly_explainer import (
+    GANAnomalyLimeAdapter,
+    GANExplanationConfig,
+)
 
 
 @pytest.fixture(scope="module")

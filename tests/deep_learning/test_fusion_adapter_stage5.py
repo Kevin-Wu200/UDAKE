@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-from deep_learning.fusion import AdaptiveFusionSystem, FusionConfig, FusionStrategy, ModelPrediction, WeightMethod
+from deep_learning.fusion import (
+    AdaptiveFusionSystem,
+    FusionConfig,
+    FusionStrategy,
+    ModelPrediction,
+    WeightMethod,
+)
 
 
 def _fault_models() -> list[ModelPrediction]:

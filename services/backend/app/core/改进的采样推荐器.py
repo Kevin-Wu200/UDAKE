@@ -2,13 +2,12 @@
 改进的采样推荐器
 推荐最优采样点，支持多种策略
 """
-import numpy as np
-from typing import Dict, List, Any, Optional, Tuple
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, List
+
+import numpy as np
 from scipy.spatial.distance import cdist
 from sklearn.cluster import KMeans
-import heapq
 
 from .采样点影响评估器 import SamplingPointImpactEvaluator
 
@@ -439,7 +438,7 @@ class ImprovedSamplingRecommender:
         if len(sampled_points) >= n_clusters:
             kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
             cluster_labels = kmeans.fit_predict(sampled_points)
-            cluster_centers = kmeans.cluster_centers_
+            cluster_centers = kmeans.cluster_centers_  # noqa: F841
 
             # 找到每个簇中方差最大的点
             for i in range(n_clusters):

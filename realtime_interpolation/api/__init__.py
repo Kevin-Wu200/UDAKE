@@ -8,7 +8,7 @@ API Module
 from .realtime_service import (
     DataValidator,
     RealtimeInterpolationService,
-    ServiceManager
+    ServiceManager,
 )
 
 __all__ = [

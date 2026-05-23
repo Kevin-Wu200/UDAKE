@@ -2,11 +2,12 @@
 3D泛克里金引擎
 支持线性和二次趋势
 """
-import numpy as np
-from typing import Dict, Any, Optional, List
-from .变异函数3D import Variogram3D
-from .距离计算 import Distance3D
 import logging
+from typing import Any, Dict, List, Optional
+
+import numpy as np
+
+from .变异函数3D import Variogram3D
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +24,7 @@ class UniversalKriging3D:
         构建漂移矩阵
         drift_terms: ['linear_x', 'linear_y', 'linear_z', 'quadratic']
         """
-        n = len(coords)
+        n = len(coords)  # noqa: F841
         columns = []
         for term in drift_terms:
             if term == "linear_x":

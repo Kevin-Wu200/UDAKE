@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Literal
-import json
 
 import numpy as np
 
-from deep_learning.models.spatial_interpolation.feature_extractors import SpatialFeatureExtractor
+from deep_learning.models.spatial_interpolation.feature_extractors import (
+    SpatialFeatureExtractor,
+)
 from deep_learning.models.spatial_interpolation.graph_builder import SpatialGraphBuilder
 
 

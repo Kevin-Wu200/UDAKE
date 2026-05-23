@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import numpy as np
 
-from deep_learning.models.sampling_rl import ActorCriticAgent, DQNAgent, PPOAgent, SamplingEnv
+from deep_learning.models.sampling_rl import (
+    ActorCriticAgent,
+    DQNAgent,
+    PPOAgent,
+    SamplingEnv,
+)
 from services.backend.app.dl_services.a2c_rl_explainer import A2CLIMEAdapter
 from services.backend.app.dl_services.dqn_rl_explainer import DQNLIMEAdapter
 from services.backend.app.dl_services.ppo_rl_explainer import PPOLIMEAdapter

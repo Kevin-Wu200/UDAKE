@@ -1,9 +1,11 @@
 """
 高不确定性区域识别
 """
+from typing import Dict, List
+
 import numpy as np
-from typing import Dict, List, Tuple
 from scipy.ndimage import label
+
 
 class HighUncertaintyIdentifier:
     """高不确定性区域识别器"""

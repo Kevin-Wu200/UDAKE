@@ -2,10 +2,9 @@
 时序预测评估模块
 """
 
-import numpy as np
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
-from .models import ForecastResult
+import numpy as np
 
 
 def evaluate_forecast(

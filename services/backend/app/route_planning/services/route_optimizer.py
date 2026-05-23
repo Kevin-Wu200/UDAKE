@@ -3,10 +3,11 @@
 用于对现有路径进行优化和改进
 """
 
-from typing import List, Dict, Any, Optional
-from ..models import PlannedRoute, SamplingPoint, RouteConstraint, OptimizationGoal
-from ..core.tsp_solver import TwoOptTSPSolver, SimulatedAnnealingTSPSolver
-from ..utils import build_distance_matrix, build_time_matrix, build_cost_matrix
+from typing import Dict, List, Optional
+
+from ..core.tsp_solver import TwoOptTSPSolver
+from ..models import OptimizationGoal, PlannedRoute, SamplingPoint
+from ..utils import build_cost_matrix, build_distance_matrix, build_time_matrix
 
 
 class RouteOptimizer:
@@ -116,8 +117,8 @@ class RouteOptimizer:
                       time_matrix: List[List[float]],
                       cost_matrix: List[List[float]]) -> PlannedRoute:
         """重建路径对象"""
-        from datetime import datetime, timedelta
         import uuid
+        from datetime import datetime, timedelta
 
         # 创建点ID到索引的映射
         point_list = [sampling_points[pid] for pid in point_ids if pid in sampling_points]
@@ -224,7 +225,7 @@ class RouteOptimizer:
             if pid in all_sampling_points
         ]
 
-        from ..utils import build_distance_matrix, build_time_matrix, build_cost_matrix
+        from ..utils import build_cost_matrix, build_distance_matrix, build_time_matrix
 
         distance_matrix = build_distance_matrix(point_tuples)
         time_matrix = build_time_matrix(distance_matrix)

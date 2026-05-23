@@ -1,21 +1,24 @@
 """
 批量任务管理器
 """
-from ..schemas.批量处理模型 import (
-    BatchTaskStatus, BatchTaskSummary, BatchTaskDetail,
-    BatchTaskExecutionMode, BatchTaskPriority,
-    BatchTaskControlResponse
-)
-from ..schemas.输出结果模型 import TaskStatus, TaskStatusResponse
-from ..schemas.插值参数模型 import KrigingParameters
-from .任务管理器 import TaskManager
-from datetime import datetime
-from typing import Dict, Optional, List, Any
 import threading
-import queue
-import time
 import uuid
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
+from ..schemas.批量处理模型 import (
+    BatchTaskControlResponse,
+    BatchTaskDetail,
+    BatchTaskExecutionMode,
+    BatchTaskPriority,
+    BatchTaskStatus,
+    BatchTaskSummary,
+)
+from ..schemas.插值参数模型 import KrigingParameters
+from ..schemas.输出结果模型 import TaskStatus
+from .任务管理器 import TaskManager
+
 
 class BatchTaskManager:
     """批量任务管理器"""

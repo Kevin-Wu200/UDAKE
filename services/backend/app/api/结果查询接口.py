@@ -1,13 +1,14 @@
 """
 结果查询接口
 """
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import FileResponse
+
+from ..config import settings
+from ..dependencies import verify_task_id
 from ..schemas.输出结果模型 import PredictionResult, VarianceResult
 from ..tasks.任务管理器 import TaskManager
-from ..dependencies import verify_task_id
-from ..config import settings
-from pathlib import Path
 
 router = APIRouter()
 task_manager = TaskManager()

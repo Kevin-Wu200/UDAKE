@@ -4,7 +4,11 @@ from __future__ import annotations
 
 import numpy as np
 
-from deep_learning.models.uncertainty import UQTrainingConfig, UQTrainingManager, UncertaintyDatasetBuilder
+from deep_learning.models.uncertainty import (
+    UncertaintyDatasetBuilder,
+    UQTrainingConfig,
+    UQTrainingManager,
+)
 
 
 def make_demo_data(n: int = 150) -> tuple[np.ndarray, np.ndarray]:

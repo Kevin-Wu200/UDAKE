@@ -1,10 +1,12 @@
 """
 批量报告生成接口
 """
+import logging
+
 from fastapi import APIRouter, HTTPException
+
 from ..schemas.批量处理模型 import BatchReportRequest, BatchReportResponse
 from ..services.批量报告生成服务 import BatchReportGenerator
-import logging
 
 logger = logging.getLogger(__name__)
 

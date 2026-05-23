@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 import numpy as np
 from scipy import stats
@@ -11,10 +11,10 @@ from sklearn.ensemble import IsolationForest
 from sklearn.metrics import (
     auc,
     confusion_matrix,
+    f1_score,
     precision_recall_curve,
     precision_score,
     recall_score,
-    f1_score,
     roc_auc_score,
     roc_curve,
 )

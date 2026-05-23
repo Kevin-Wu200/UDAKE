@@ -3,15 +3,15 @@
 """
 from __future__ import annotations
 
+import logging
+from typing import Dict
+
+import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.preprocessing import PolynomialFeatures
-import numpy as np
-from typing import Tuple, Dict
-import logging
 
 from realtime_interpolation.utils.confidence_calculator import (
     compute_confidence_score,
-    get_confidence_calculator,
 )
 
 logger = logging.getLogger(__name__)

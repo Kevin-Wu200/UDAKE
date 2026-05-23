@@ -2,18 +2,21 @@
 
 from __future__ import annotations
 
-from collections import OrderedDict
-from dataclasses import dataclass
 import hashlib
 import json
 import threading
 import time
+from collections import OrderedDict
+from dataclasses import dataclass
 from typing import Any, Callable, Optional
 
 import numpy as np
 from sklearn.linear_model import Ridge
 
-from deep_learning.models.anomaly_detection.common import multiscale_value_features, robust_zscore
+from deep_learning.models.anomaly_detection.common import (
+    multiscale_value_features,
+    robust_zscore,
+)
 
 from .anomaly_features import AnomalyFeatureRegistry
 

@@ -3,7 +3,10 @@ from __future__ import annotations
 import numpy as np
 
 from deep_learning.models.sampling_rl import DQNAgent, SamplingEnv
-from services.backend.app.dl_services.dqn_rl_explainer import DQNLIMEAdapter, DQNSHAPAdapter
+from services.backend.app.dl_services.dqn_rl_explainer import (
+    DQNLIMEAdapter,
+    DQNSHAPAdapter,
+)
 
 
 def _uncertainty_map(size: int = 10, seed: int = 71) -> np.ndarray:

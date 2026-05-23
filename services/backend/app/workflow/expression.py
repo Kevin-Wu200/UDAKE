@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import ast
 import operator
-from typing import Any, Dict, Mapping
-
+from typing import Any, Mapping
 
 _COMPARE_OPERATORS = {
     "==": operator.eq,

@@ -14,7 +14,10 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from app.api import 分布式计算接口 as distributed_api  # noqa: E402
-from app.schemas.分布式计算模型 import DistributedFramework, DistributedTaskStatus  # noqa: E402
+from app.schemas.分布式计算模型 import (  # noqa: E402
+    DistributedFramework,
+    DistributedTaskStatus,
+)
 from app.services.分布式计算服务 import DistributedComputeService  # noqa: E402
 
 

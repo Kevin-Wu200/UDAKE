@@ -25,7 +25,6 @@ from ..schemas.历史对比与趋势分析模型 import (
 )
 from ..services.历史对比与趋势分析服务 import history_comparison_trend_service
 
-
 router = APIRouter()
 
 

@@ -1,9 +1,10 @@
-import pytest
 from datetime import datetime, timezone
+
+import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
 from services.backend.app.auth_db.models import Base, Ticket, TicketStatus, TicketType
-from services.backend.app.api.tickets_api import handle_key_request
 
 # 使用内存数据库进行测试
 engine = create_engine("sqlite:///:memory:")
@@ -40,14 +41,14 @@ def test_ticket_status_transition():
     )
     session.add(ticket)
     session.commit()
-    
+
     # 测试合法流转
     ticket.status = TicketStatus.APPROVED.value
     ticket.processed_by = 1
     ticket.processed_at = datetime.now(timezone.utc)
     session.commit()
     assert ticket.status == TicketStatus.APPROVED.value
-    
+
     # 测试非法流转 (APPROVED -> PENDING)
     ticket.status = TicketStatus.PENDING.value
     with pytest.raises(ValueError, match="不允许的工单状态流转"):

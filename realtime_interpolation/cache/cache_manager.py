@@ -5,22 +5,17 @@ Cache Manager Module
 实现缓存的管理、监控、一致性和性能优化
 """
 
-from typing import List, Dict, Optional, Any, Callable
-from dataclasses import dataclass
-from datetime import datetime, timedelta
 import logging
 import threading
 import time
-import hashlib
-import pickle
 import weakref
 from collections import defaultdict
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional
 
 from .cache_strategy import (
     MultiLevelCacheStrategy,
-    CacheLevel,
-    ReplacementPolicy,
-    CacheEntry
 )
 
 logger = logging.getLogger(__name__)
@@ -635,7 +630,7 @@ def test_cache_manager():
 
     # 获取统计信息
     stats = manager.get_stats()
-    print(f"\n统计信息:")
+    print("\n统计信息:")
     print(f"  总请求数: {stats['total_requests']}")
     print(f"  命中数: {stats['total_hits']}")
     print(f"  未命中数: {stats['total_misses']}")
@@ -693,7 +688,7 @@ def test_distributed_cache():
 
     # 获取统计信息
     stats = distributed.get_stats()
-    print(f"\n分布式缓存统计:")
+    print("\n分布式缓存统计:")
     print(f"  节点ID: {stats['node_id']}")
     print(f"  一致性级别: {stats['consistency_level']}")
     print(f"  同步队列大小: {stats['sync_queue_size']}")

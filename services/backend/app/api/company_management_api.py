@@ -17,7 +17,11 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from ..auth import ProductKeyRegistry, SensitiveDataCipher, get_auth_service
-from ..auth.dependencies import RoleChecker, ensure_same_company_scope, get_current_user_context
+from ..auth.dependencies import (
+    RoleChecker,
+    ensure_same_company_scope,
+    get_current_user_context,
+)
 from ..auth_db.models import AuditLog, Company, ProductKey, User
 from ..auth_db.session import get_auth_db_session
 from ..config import settings

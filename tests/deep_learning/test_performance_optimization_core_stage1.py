@@ -117,7 +117,7 @@ def test_memory_optimization_analysis_pool_monitor_recycle_and_leak_stage1() -> 
     assert buf2.shape == (8, 8)
 
     snap1 = manager.monitor({"arr": np.ones((8, 8), dtype=np.float32)})
-    snap2 = manager.monitor({"arr": np.ones((16, 16), dtype=np.float32)})
+    snap2 = manager.monitor({"arr": np.ones((16, 16), dtype=np.float32)})  # noqa: F841
     snap3 = manager.monitor({"arr": np.ones((32, 32), dtype=np.float32)})
     assert snap3["memory_bytes"] >= snap1["memory_bytes"]
 

@@ -1,18 +1,20 @@
 """
 模型融合服务
 """
-from typing import List, Dict, Any, Optional
-from datetime import datetime
-import uuid
 import logging
+import uuid
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
-from ..core.fusion_models import (
-    FusionConfig, FusionResult, FusionTask, ModelPrediction,
-    FusionStrategy, WeightMethod, WeightConfig
-)
 from ..core.fusion_engine import FusionEngine
-from ..core.weight_calculator import WeightCalculator
-from ..evaluation.model_evaluator import ModelEvaluator
+from ..core.fusion_models import (
+    FusionConfig,
+    FusionStrategy,
+    FusionTask,
+    ModelPrediction,
+    WeightConfig,
+    WeightMethod,
+)
 
 logger = logging.getLogger(__name__)
 

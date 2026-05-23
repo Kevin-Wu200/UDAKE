@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from deep_learning.inference import SpatialInterpolationInference
-from deep_learning.training import SpatialTrainingConfig, train_spatial_model
 from deep_learning.models.spatial_interpolation import GNNKrigingModel
+from deep_learning.training import SpatialTrainingConfig, train_spatial_model
 from deep_learning.utils.spatial_interpolation_data import SyntheticSpatialDataset
-
 
 if __name__ == "__main__":
     dataset = SyntheticSpatialDataset(seed=21).generate(n_points=72, noise_std=0.03)

@@ -1,5 +1,4 @@
 import numpy as np
-
 from app.core.spatiotemporal_kriging.models.nonseparable_model import NonseparableModel
 
 

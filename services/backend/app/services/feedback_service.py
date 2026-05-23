@@ -21,7 +21,6 @@ from uuid import uuid4
 from ..auth.security import _decrypt_aes_gcm, _encrypt_aes_gcm
 from ..config import settings
 
-
 ROLE_PERMISSIONS: Dict[str, set[str]] = {
     "admin": {
         "read_feedback",

@@ -1,6 +1,5 @@
 import numpy as np
 import pytest
-
 from app.core.spatiotemporal_kriging.st_model_selector import STModelSelector
 
 

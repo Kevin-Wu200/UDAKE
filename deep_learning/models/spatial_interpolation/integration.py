@@ -22,7 +22,9 @@ class SpatialInterpolationIntegrator:
 
     def __init__(self, cache_ttl_seconds: int = 300) -> None:
         # 延迟导入以避免循环导入
-        from deep_learning.inference.spatial_interpolation_inference import SpatialInterpolationInference
+        from deep_learning.inference.spatial_interpolation_inference import (
+            SpatialInterpolationInference,
+        )
 
         self.inference = SpatialInterpolationInference()
         self.cache = CacheManager(ttl_seconds=cache_ttl_seconds)
@@ -58,8 +60,14 @@ class SpatialInterpolationIntegrator:
         )
 
         try:
-            from realtime_interpolation.core.incremental_kriging import IncrementalKriging
-            from realtime_interpolation.models import BoundingBox, DataPoint, Subscription
+            from realtime_interpolation.core.incremental_kriging import (
+                IncrementalKriging,
+            )
+            from realtime_interpolation.models import (
+                BoundingBox,
+                DataPoint,
+                Subscription,
+            )
 
             bbox = BoundingBox(
                 min_x=float(np.min(sample_coords[:, 0])),

@@ -5,13 +5,12 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
-
 from app.auth_db.models import Base, Workflow
 from app.auth_db.workflow_migration import ImportOptions, WorkflowMigrationToolkit
 from app.services.智能工作流服务 import SmartWorkflowService
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 
 def _build_definition() -> dict:

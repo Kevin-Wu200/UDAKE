@@ -1,10 +1,11 @@
 """
 类型转换工具单元测试
 """
-import pytest
-import numpy as np
 import sys
 from pathlib import Path
+
+import numpy as np
+import pytest
 
 sys.path.append(str(Path(__file__).parent.parent))
 from backend.app.utils.type_converter import numpy_to_python
