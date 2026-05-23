@@ -30,6 +30,7 @@ def test_ticket_status_transition():
     session = TestingSessionLocal()
     ticket = Ticket(
         id=300,
+        ticket_id="TICKET-300",
         ticket_type=TicketType.KEY_REQUEST.value,
         status=TicketStatus.PENDING.value,
         email="test@example.com",

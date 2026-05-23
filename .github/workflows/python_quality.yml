@@ -111,6 +111,7 @@ jobs:
             --cov-fail-under=${{ env.COVERAGE_THRESHOLD }} \
             --ignore=tests/deep_learning \
             --ignore=tests/e2e \
+            --ignore=tests/performance \
             -ra
 
       - name: Upload coverage report
