@@ -71,6 +71,7 @@ class SamplingRecommendation(BaseModel):
     distance_to_nearest: float = Field(..., description="距离最近采样点的距离")
     sampling_reason: str = Field(..., description="采样理由")
     expected_benefit: float = Field(..., description="预期收益（方差减少量）")
+    confidence_score: Optional[float] = Field(None, description="该点置信度分数")
 
 class SamplingRecommendationsResponse(BaseModel):
     """采样建议响应"""
@@ -80,3 +81,7 @@ class SamplingRecommendationsResponse(BaseModel):
     recommendations: List[SamplingRecommendation] = Field(..., description="建议点列表")
     statistics: Dict[str, Any] = Field(..., description="统计信息")
     generated_at: datetime = Field(default_factory=datetime.now)
+    confidence_score: Optional[float] = Field(None, description="整体置信度分数")
+    confidence_threshold: Optional[float] = Field(None, description="行业置信度阈值")
+    is_confidence_sufficient: Optional[bool] = Field(None, description="置信度是否达标")
+    industry: Optional[str] = Field(None, description="行业类型")

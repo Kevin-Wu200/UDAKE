@@ -43,7 +43,8 @@ async def generate_recommendations(
     strategy: str = "hybrid",
     n_recommendations: int = 20,
     threshold_percentile: float = 75,
-    evaluate_impact: bool = False
+    evaluate_impact: bool = False,
+    industry: str = "unknown",
 ):
     """
     生成采样建议
@@ -60,6 +61,7 @@ async def generate_recommendations(
     - n_recommendations: 建议点数量（默认20）
     - threshold_percentile: 高不确定性阈值百分位（默认75）
     - evaluate_impact: 是否使用影响优化算法（默认False，保持向后兼容）
+    - industry: 行业类型 (topography/meteorology/agriculture/urban_heat/mining/geology/hydrology/pollution/soil/environment)
     """
     try:
         # 验证任务
@@ -177,7 +179,11 @@ async def generate_recommendations(
                 n_recommendations=len(recommendations),
                 recommendations=recommendations,
                 statistics=statistics,
-                generated_at=datetime.now()
+                generated_at=datetime.now(),
+                confidence_score=improved_results.get("confidence_score"),
+                confidence_threshold=improved_results.get("confidence_threshold"),
+                is_confidence_sufficient=improved_results.get("is_confidence_sufficient"),
+                industry=industry,
             )
 
         # 使用原有算法
@@ -267,7 +273,8 @@ async def generate_recommendations(
             y_coords=y_coords,
             existing_points=existing_points,
             n_recommendations=n_recommendations,
-            strategy=strategy
+            strategy=strategy,
+            industry=industry,
         )
 
         # 识别高不确定性区域
@@ -326,7 +333,8 @@ async def generate_recommendations(
                 region_id=region_id,
                 distance_to_nearest=distance_to_nearest,
                 sampling_reason=sampling_reason,
-                expected_benefit=expected_benefit
+                expected_benefit=expected_benefit,
+                confidence_score=rec.get("confidence_score"),
             ))
 
         # 统计信息
@@ -345,7 +353,11 @@ async def generate_recommendations(
             n_recommendations=len(recommendations),
             recommendations=recommendations,
             statistics=statistics,
-            generated_at=datetime.now()
+            generated_at=datetime.now(),
+            confidence_score=base_recommendations.get("confidence_score"),
+            confidence_threshold=base_recommendations.get("confidence_threshold"),
+            is_confidence_sufficient=base_recommendations.get("is_confidence_sufficient"),
+            industry=industry,
         )
 
     except HTTPException:

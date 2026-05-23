@@ -6,7 +6,15 @@ from __future__ import annotations
 import numpy as np
 from typing import List, Dict
 import json
+import logging
 from .强化学习采样优化 import RLSamplingOptimizer
+from realtime_interpolation.utils.confidence_calculator import (
+    compute_confidence_score,
+    ConfidenceInsufficientError,
+)
+
+logger = logging.getLogger(__name__)
+
 
 class SamplingRecommender:
     """采样点推荐生成器"""
@@ -21,11 +29,29 @@ class SamplingRecommender:
         y_coords: np.ndarray,
         existing_points: np.ndarray = None,
         n_recommendations: int = 20,
-        strategy: str = "variance_based"
+        strategy: str = "variance_based",
+        industry: str = "unknown",
+        confidence_threshold: float | None = None,
     ) -> Dict[str, any]:
         """
-        生成采样点推荐
+        生成采样点推荐 (含置信度校验)
+
+        当置信度不足时，自动降级为空间覆盖策略并附加警告。
         """
+        # --- 置信度校验 ---
+        conf_result = compute_confidence_score(variance, industry=industry)
+        effective_threshold = confidence_threshold if confidence_threshold is not None else conf_result.threshold
+        confidence_sufficient = conf_result.score >= effective_threshold
+
+        if not confidence_sufficient:
+            logger.warning(
+                f"置信度不足 (score={conf_result.score:.3f}, threshold={effective_threshold:.2f}), "
+                f"industry={industry}，自动降级为 spatial_coverage 策略"
+            )
+            # 自动降级：使用空间覆盖策略
+            strategy = "spatial_coverage"
+
+        # --- 策略分发 ---
         if strategy == "variance_based":
             recommendations = self._variance_based_sampling(
                 variance, x_coords, y_coords, n_recommendations
@@ -43,10 +69,19 @@ class SamplingRecommender:
                 variance, x_coords, y_coords, existing_points, n_recommendations
             )
 
+        # 为每个推荐点附加置信度标记
+        for rec in recommendations:
+            rec["confidence_score"] = conf_result.score
+            rec["confidence_sufficient"] = confidence_sufficient
+
         return {
             "strategy": strategy,
             "n_recommendations": len(recommendations),
-            "recommendations": recommendations
+            "recommendations": recommendations,
+            "confidence_score": conf_result.score,
+            "confidence_threshold": effective_threshold,
+            "is_confidence_sufficient": confidence_sufficient,
+            "industry": industry,
         }
 
     def _variance_based_sampling(

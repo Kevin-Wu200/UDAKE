@@ -753,4 +753,90 @@
     .settings-section {
         background: #374151;
     }
+
+/* ==================== 置信度相关样式 ==================== */
+
+/* 置信度不足警告横幅 */
+.confidence-alert-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    margin: 0 12px 12px;
+    background: #fef3c7;
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #92400e;
+    animation: confidenceAlertFadeIn 0.3s ease;
+}
+
+@keyframes confidenceAlertFadeIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.confidence-alert-icon {
+    font-size: 20px;
+    flex-shrink: 0;
+}
+
+.confidence-alert-text strong {
+    color: #b45309;
+}
+
+/* 低置信度推荐卡片置灰 */
+.recommendation-card.low-confidence {
+    opacity: 0.55;
+    filter: grayscale(20%);
+    pointer-events: auto; /* 仍可交互但视觉降级 */
+    border-left: 3px solid #f59e0b;
+}
+
+.recommendation-card.low-confidence:hover {
+    opacity: 0.75;
+    filter: grayscale(5%);
+}
+
+/* 置信度颜色指示 */
+.confidence-ok {
+    color: #10b981;
+    font-weight: 600;
+}
+
+.confidence-low {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+    .confidence-alert-banner {
+        background: #422006;
+        border-color: #92400e;
+        color: #fcd34d;
+    }
+
+    .confidence-alert-text strong {
+        color: #fbbf24;
+    }
+
+    .recommendation-card.low-confidence {
+        border-left-color: #f59e0b;
+        opacity: 0.5;
+    }
+
+    .recommendation-card.low-confidence:hover {
+        opacity: 0.7;
+    }
+
+    .confidence-ok {
+        color: #34d399;
+    }
+
+    .confidence-low {
+        color: #f87171;
+    }
+}
 }

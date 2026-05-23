@@ -5,6 +5,7 @@ from sklearn.ensemble import IsolationForest
 from sklearn.covariance import EllipticEnvelope
 import numpy as np
 from typing import Any, Dict
+import logging
 
 from deep_learning.models.anomaly_detection import (
     AnomalyEnsembleIntegrator,
@@ -13,6 +14,12 @@ from deep_learning.models.anomaly_detection import (
     GCAEAnomalyDetector,
     VAEAnomalyDetector,
 )
+from realtime_interpolation.utils.confidence_calculator import (
+    compute_confidence_score,
+    ConfidenceInsufficientError,
+)
+
+logger = logging.getLogger(__name__)
 
 class AnomalyDetector:
     """异常检测器"""
@@ -137,11 +144,38 @@ class DeepAnomalyFusionDetector:
         values: np.ndarray,
         threshold_method: str = "percentile",
         percentile: float = 95.0,
+        require_confidence: bool = False,
+        industry: str = "agriculture",
     ) -> Dict[str, Any]:
         if not self._fitted:
             self.fit(x, y, values)
 
         coords = np.column_stack([x, y])
+
+        # --- 置信度生成锁 ---
+        if require_confidence:
+            # 基于值的方差计算置信度
+            value_variance = np.var(values) * np.ones(len(values))
+            conf_result = compute_confidence_score(
+                value_variance,
+                industry=industry,
+                anomaly_score=1.0,  # 初始假设无异常
+            )
+            if not conf_result.is_sufficient:
+                logger.warning(
+                    f"异常检测生成锁触发: confidence={conf_result.score:.3f} "
+                    f"< threshold={conf_result.threshold:.2f} (industry={industry})"
+                )
+                raise ConfidenceInsufficientError(
+                    current_confidence=conf_result.score,
+                    threshold=conf_result.threshold,
+                    industry=industry,
+                    message=(
+                        f"农业遥感异常检测置信度不足 ({conf_result.score:.3f} < {conf_result.threshold:.2f})，"
+                        f"建议增加采样点密度或检查数据质量后再执行异常检测。"
+                    ),
+                )
+
         deep_result = self.ensemble.detect(
             coords,
             values,
@@ -155,6 +189,20 @@ class DeepAnomalyFusionDetector:
         threshold = float(np.percentile(fused, percentile))
         anomaly_idx = np.where(fused >= threshold)[0]
 
+        # 计算异常检测后的实际置信度
+        if len(anomaly_idx) > 0:
+            anomaly_ratio = len(anomaly_idx) / len(values)
+            anomaly_confidence = 1.0 - anomaly_ratio  # 异常越少，置信度越高
+        else:
+            anomaly_confidence = 1.0
+
+        value_variance = np.var(values) * np.ones(len(values))
+        post_conf = compute_confidence_score(
+            value_variance,
+            industry=industry,
+            anomaly_score=anomaly_confidence,
+        )
+
         return {
             "anomaly_count": int(len(anomaly_idx)),
             "anomaly_indices": anomaly_idx.tolist(),
@@ -164,4 +212,7 @@ class DeepAnomalyFusionDetector:
             "baseline_component": {
                 "scores": baseline_scores.tolist(),
             },
+            "confidence_score": post_conf.score,
+            "confidence_threshold": post_conf.threshold,
+            "is_confidence_sufficient": post_conf.is_sufficient,
         }

@@ -1,0 +1,63 @@
+# 行业插值置信区间配置
+# 各行业在空间插值预测中的置信度阈值标准
+# 配置按需热加载，修改后无需重启服务即可生效
+
+version: 1
+description: "行业置信度阈值配置 - 控制各行业插值预测的最低置信度要求"
+
+industries:
+  topography:
+    name: "地形测绘"
+    threshold: 0.90
+    description: "高精度地形测量与制图，要求极高的置信度以确保测绘精度"
+    core_file: "adaptive_sampling/采样策略评估.py"
+    dependencies:
+      - "spatiotemporal_service.py"
+    gating:
+      sampling_recommendation: true
+      raster_preview: true
+      export: true
+
+  meteorology:
+    name: "气象预报"
+    threshold: 0.85
+    description: "气象数据分析与预报，需要较高置信度以保证预报可靠性"
+    core_file: "ai_extension/误差预测模型.py"
+    dependencies:
+      - "realtime_interpolation/core"
+    gating:
+      sampling_recommendation: true
+      raster_preview: true
+      time_series_forecast: true
+
+  agriculture:
+    name: "农业遥感"
+    threshold: 0.80
+    description: "农业遥感监测，允许适度不确定性以覆盖大面积农田"
+    core_file: "ai_extension/异常检测模块.py"
+    dependencies:
+      - "realtime_interpolation/services"
+    gating:
+      anomaly_detection: true
+      crop_monitoring: true
+      yield_estimation: true
+
+  urban_heat:
+    name: "城市热岛监测"
+    threshold: 0.85
+    description: "城市热岛效应监测与分析，需要较高置信度以支持城市规划决策"
+    core_file: "ai_extension/趋势识别模型.py"
+    dependencies:
+      - "realtime_interpolation/core"
+    gating:
+      trend_analysis: true
+      heat_map_generation: true
+      temporal_comparison: true
+
+# 全局默认配置
+defaults:
+  fallback_confidence: 0.75
+  min_samples_for_confidence: 5
+  variance_weight: 0.6
+  error_weight: 0.4
+  enable_dynamic_threshold: false

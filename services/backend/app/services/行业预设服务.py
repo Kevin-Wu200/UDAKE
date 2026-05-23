@@ -173,7 +173,47 @@ class IndustryPresetService:
                 nugget_ratio=None,
                 custom_parameters={},
                 template_filename="custom_template.geojson"
-            )
+            ),
+            Industry.AGRICULTURE: IndustryConfig(
+                industry=Industry.AGRICULTURE,
+                name="农业遥感",
+                description="农业遥感监测，适合大面积农田植被指数分析和异常检测",
+                default_method=KrigingMethod.UNIVERSAL.value,
+                default_variogram=VariogramModel.EXPONENTIAL.value,
+                default_grid_resolution=100,
+                default_nlags=10,
+                enable_anisotropy=False,
+                enable_trend_detection=True,
+                max_range=5000,
+                nugget_ratio=0.12,
+                custom_parameters={
+                    "vegetation_index": "NDVI",
+                    "anomaly_detection": True,
+                    "crop_classification": True,
+                    "temporal_analysis": True,
+                },
+                template_filename="agriculture_template.geojson"
+            ),
+            Industry.URBAN_HEAT: IndustryConfig(
+                industry=Industry.URBAN_HEAT,
+                name="城市热岛监测",
+                description="城市热岛效应监测与分析，支持地表温度反演和趋势识别",
+                default_method=KrigingMethod.UNIVERSAL.value,
+                default_variogram=VariogramModel.GAUSSIAN.value,
+                default_grid_resolution=50,
+                default_nlags=8,
+                enable_anisotropy=True,
+                enable_trend_detection=True,
+                max_range=3000,
+                nugget_ratio=0.08,
+                custom_parameters={
+                    "land_surface_temperature": True,
+                    "land_cover_weighting": True,
+                    "temporal_comparison": True,
+                    "urban_rural_boundary": True,
+                },
+                template_filename="urban_heat_template.geojson"
+            ),
         }
 
     def get_industry_config(self, industry: Industry) -> IndustryConfig:

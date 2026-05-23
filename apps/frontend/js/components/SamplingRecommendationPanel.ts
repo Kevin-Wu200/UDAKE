@@ -22,6 +22,7 @@ interface Recommendation {
     uncertainty_level: number;
     distance_to_nearest: number;
     sampling_reason: string;
+    confidence_score?: number;
 }
 
 /** 标记条目 */
@@ -48,6 +49,8 @@ export class SamplingRecommendationPanel {
     private _viewChangeTimer: ReturnType<typeof setTimeout> | null;
     private clusterHint: HTMLDivElement | null;
     private markerLayer: any;
+    /** 整体置信度信息 */
+    private confidenceInfo: { score: number; threshold: number; sufficient: boolean } | null;
     private readonly LOCATION_CACHE_TTL_MS: number;
     private readonly SOURCE_APP_NAME: string;
     private devicePlatform: DevicePlatform;
@@ -75,6 +78,7 @@ export class SamplingRecommendationPanel {
         this.devicePlatform = this._detectDevicePlatform();
         this.isMobileDevice = this.devicePlatform !== 'web';
         this.cachedUserLocation = null;
+        this.confidenceInfo = null;
         this._onDocumentClick = null;
         this._setupViewportListener();
     }
@@ -211,8 +215,21 @@ export class SamplingRecommendationPanel {
                 task_id: this.currentTaskId,
                 strategy: strategy,
                 n_recommendations: count
-            }) as { recommendations: Recommendation[] };
+            }) as {
+                recommendations: Recommendation[];
+                confidence_score?: number;
+                confidence_threshold?: number;
+                is_confidence_sufficient?: boolean;
+            };
             this.recommendations = response.recommendations || [];
+            // 保存置信度信息
+            if (response.confidence_score !== undefined) {
+                this.confidenceInfo = {
+                    score: response.confidence_score,
+                    threshold: response.confidence_threshold || 0.75,
+                    sufficient: response.is_confidence_sufficient !== false,
+                };
+            }
             this.displayRecommendations();
             this.displayMarkers();
             statusDiv.className = 'status-message success';
@@ -235,6 +252,23 @@ export class SamplingRecommendationPanel {
         (container as HTMLElement).style.display = 'block';
         countSpan.textContent = `建议点：${this.recommendations.length}`;
         list.innerHTML = '';
+
+        // 置信度不足时显示警告横幅和增量采样提示
+        if (this.confidenceInfo && !this.confidenceInfo.sufficient) {
+            const alertBanner = document.createElement('div');
+            alertBanner.className = 'confidence-alert-banner';
+            alertBanner.setAttribute('role', 'alert');
+            alertBanner.innerHTML = `
+                <span class="confidence-alert-icon">⚠️</span>
+                <span class="confidence-alert-text">
+                    当前置信度为 <strong>${(this.confidenceInfo.score * 100).toFixed(1)}%</strong>，
+                    低于推荐阈值 <strong>${(this.confidenceInfo.threshold * 100).toFixed(0)}%</strong>。
+                    建议增加采样点以提高插值可靠性。
+                </span>
+            `;
+            list.appendChild(alertBanner);
+        }
+
         const sortedRecommendations = [...this.recommendations].sort((a, b) => b.variance - a.variance);
         sortedRecommendations.forEach((rec, index) => {
             const card = this.createRecommendationCard(rec, index);
@@ -244,13 +278,20 @@ export class SamplingRecommendationPanel {
 
     private createRecommendationCard(rec: Recommendation, index: number): HTMLDivElement {
         const card = document.createElement('div');
-        card.className = 'recommendation-card';
+        const isLowConfidence = this.confidenceInfo && !this.confidenceInfo.sufficient;
+        card.className = 'recommendation-card' + (isLowConfidence ? ' low-confidence' : '');
         card.dataset.id = String(rec.id);
         card.setAttribute('role', 'listitem');
         card.setAttribute('tabindex', '0');
         card.setAttribute('aria-label', `${I18n.t('recommendation.title')} #${rec.id}, ${I18n.t('recommendation.priority')} ${this.getPriorityText(rec.priority)}, ${I18n.t('recommendation.uncertainty')} ${rec.uncertainty_level}/5`);
         const priorityColor = this.getPriorityColor(rec.priority);
         const priorityText = this.getPriorityText(rec.priority);
+        const confDisplay = rec.confidence_score !== undefined
+            ? `<div class="card-info">
+                    <span class="info-label">置信度:</span>
+                    <span class="info-value ${isLowConfidence ? 'confidence-low' : 'confidence-ok'}">${(rec.confidence_score * 100).toFixed(1)}%</span>
+               </div>`
+            : '';
         card.innerHTML = `
             <div class="card-header">
                 <div class="card-title">
@@ -272,6 +313,7 @@ export class SamplingRecommendationPanel {
                     <span class="info-label">方差:</span>
                     <span class="info-value">${rec.variance.toFixed(4)}</span>
                 </div>
+                ${confDisplay}
                 <div class="card-info">
                     <span class="info-label">距最近点:</span>
                     <span class="info-value">${rec.distance_to_nearest.toFixed(2)}m</span>

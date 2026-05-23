@@ -15,6 +15,8 @@ class Industry(str, Enum):
     SOIL = "soil"  # 土壤
     ENVIRONMENT = "environment"  # 环境
     TOPOGRAPHY = "topography"  # 地形测绘
+    AGRICULTURE = "agriculture"  # 农业遥感
+    URBAN_HEAT = "urban_heat"  # 城市热岛监测
     CUSTOM = "custom"  # 自定义
 
 class IndustryConfig(BaseModel):

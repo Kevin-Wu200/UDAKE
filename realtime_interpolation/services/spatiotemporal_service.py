@@ -7,6 +7,7 @@ from typing import Any
 import numpy as np
 
 from deep_learning.models.spatiotemporal import SpatioTemporalSystemIntegrator, SpatioTemporalTrainingConfig
+from realtime_interpolation.utils.confidence_calculator import compute_confidence_score
 
 
 class RealtimeSpatioTemporalService:
@@ -96,6 +97,8 @@ class RealtimeSpatioTemporalService:
         enable_inference_acceleration: bool = True,
         enable_long_sequence_optimization: bool = False,
         long_sequence_chunk: int = 48,
+        industry: str = "unknown",
+        **kwargs: Any,
     ) -> dict[str, Any]:
         if model_type not in {"st_transformer", "gcn_lstm", "convlstm", "stgcn"}:
             raise ValueError("model_type must be one of st_transformer/gcn_lstm/convlstm/stgcn")
@@ -115,6 +118,14 @@ class RealtimeSpatioTemporalService:
             long_sequence_chunk=max(8, int(long_sequence_chunk)),
         )
 
+        # 计算置信度分数
+        conf_result = compute_confidence_score(
+            out.variance,
+            industry=industry,
+            predictions=out.mean,
+            **{k: v for k, v in kwargs.items() if k in ("r2_score", "anomaly_score")},
+        )
+
         return {
             "model_type": model_type,
             "prediction": out.mean.tolist(),
@@ -122,4 +133,8 @@ class RealtimeSpatioTemporalService:
             "source": out.source,
             "uncertainty_method": out.uncertainty_method,
             "optimization": out.optimization,
+            "confidence_score": conf_result.score,
+            "confidence_threshold": conf_result.threshold,
+            "is_confidence_sufficient": conf_result.is_sufficient,
+            "confidence_industry": conf_result.industry,
         }
