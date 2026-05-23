@@ -256,6 +256,37 @@ class UrbanHeatConfidenceCalculator(BaseConfidenceCalculator):
         )
 
 
+class DefaultConfidenceCalculator(BaseConfidenceCalculator):
+    """默认置信度计算器 —— 用于未知行业的通用方差归一化计算"""
+
+    def calculate(self, variance: Any, **kwargs: Any) -> ConfidenceResult:
+        import numpy as np
+
+        var_arr = np.asarray(variance, dtype=float)
+        if var_arr.size == 0:
+            return ConfidenceResult(
+                score=0.0, threshold=self.threshold,
+                is_sufficient=False, industry=self.industry,
+            )
+        mean_var = float(np.mean(var_arr))
+        var_max = float(var_arr.max())
+        if var_max < 1e-10:
+            return ConfidenceResult(
+                score=1.0, threshold=self.threshold,
+                is_sufficient=True, industry=self.industry,
+                details={"mean_variance": 0.0, "max_variance": 0.0},
+            )
+        norm_var = mean_var / var_max
+        score = float(np.clip(1.0 - norm_var, 0.0, 1.0))
+        return ConfidenceResult(
+            score=score,
+            threshold=self.threshold,
+            is_sufficient=score >= self.threshold,
+            industry=self.industry,
+            details={"mean_variance": mean_var, "max_variance": var_max},
+        )
+
+
 # ---------------------------------------------------------------------------
 # 置信度计算器注册表
 # ---------------------------------------------------------------------------
@@ -282,7 +313,7 @@ def get_confidence_calculator(
         "urban_heat": UrbanHeatConfidenceCalculator,
     }
 
-    calc_cls = calculator_map.get(industry, BaseConfidenceCalculator)
+    calc_cls = calculator_map.get(industry, DefaultConfidenceCalculator)
     calc = calc_cls(industry=industry, threshold=threshold)
     _calculator_registry[industry] = calc
     return calc

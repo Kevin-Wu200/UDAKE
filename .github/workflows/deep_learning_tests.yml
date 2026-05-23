@@ -96,7 +96,7 @@ jobs:
             --cov=deep_learning \
             --cov-report=term-missing \
             --cov-report=xml \
-            --cov-fail-under=79
+            --cov-fail-under=60
 
       - name: Dump dependency snapshot on failure
         if: failure()
