@@ -278,6 +278,7 @@ def test_adaptive_sampling_bridge() -> None:
         existing_points=existing,
         n_recommendations=6,
         strategy="reinforcement_learning",
+        confidence_threshold=0.0,  # 绕过置信度自动降级，确保测试 RL 策略路径
     )
 
     assert result["strategy"] == "reinforcement_learning"
