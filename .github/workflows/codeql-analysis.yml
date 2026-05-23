@@ -1,0 +1,60 @@
+name: CodeQL Security Analysis
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'services/backend/**'
+      - 'apps/frontend/**'
+      - 'apps/admin-frontend/**'
+      - 'deep_learning/**'
+      - '.github/workflows/codeql-analysis.yml'
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'services/backend/**'
+      - 'apps/frontend/**'
+      - 'apps/admin-frontend/**'
+      - 'deep_learning/**'
+      - '.github/workflows/codeql-analysis.yml'
+  schedule:
+    - cron: '0 6 * * 3'  # 每周三 UTC 06:00 运行
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: python
+            build-mode: none
+          - language: javascript-typescript
+            build-mode: none
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-extended,security-and-quality
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
