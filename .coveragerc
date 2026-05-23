@@ -1,13 +1,17 @@
 [run]
-source = deep_learning, services/backend/app/dl_services
+source = services/backend, deep_learning, multi_objective_optimization, realtime_interpolation, spatial_data_mining, time_series_analysis, adaptive_sampling, ai_extension, uncertainty_dashboard
 omit =
     # 排除命令行脚本
     deep_learning/inference/run_*.py
     deep_learning/training/train_*.py
     # 排除测试文件
     tests/*
+    test_*.py
+    api_test_complete.py
     # 排除 __pycache__
     */__pycache__/*
+    # 排除测试目录
+    */tests/*
     # 排除虚拟环境
     venv/*
     */venv/*

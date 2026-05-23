@@ -90,6 +90,9 @@ jobs:
           PYTHONPATH: services
         run: |
           pytest tests/deep_learning -q -ra -vv --maxfail=1 \
+            -n auto --dist loadscope \
+            --timeout=300 \
+            --durations=10 \
             --cov=deep_learning \
             --cov-report=term-missing \
             --cov-report=xml \
