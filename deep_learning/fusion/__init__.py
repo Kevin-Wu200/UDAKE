@@ -20,6 +20,11 @@ from .hybrid import HybridFusionBridge, MultiModalFusion
 from .model_management import FusionModelManager
 from .service import FusionPlatformService, fusion_platform_service
 from .weighting import FusionWeightCalculator
+from .enhanced_dynamic import (
+    SpatialHeterogeneityFusion,
+    MultiLevelUncertaintyFusion,
+    LocalPrecisionAdaptiveFusion,
+)
 
 __all__ = [
     "AdaptiveFusionSystem",
@@ -42,4 +47,7 @@ __all__ = [
     "MultiModalStrategy",
     "WeightMethod",
     "fusion_platform_service",
+    "SpatialHeterogeneityFusion",
+    "MultiLevelUncertaintyFusion",
+    "LocalPrecisionAdaptiveFusion",
 ]

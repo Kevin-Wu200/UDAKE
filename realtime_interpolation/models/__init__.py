@@ -106,6 +106,8 @@ class DataPoint:
     id: str
     timestamp: Optional[datetime] = None
     metadata: Optional[Dict[str, Any]] = None
+    # 协克里金扩展：辅助变量值
+    secondary_value: Optional[float] = None
 
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
@@ -114,6 +116,7 @@ class DataPoint:
             "x": self.x,
             "y": self.y,
             "value": self.value,
+            "secondary_value": self.secondary_value,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
             "metadata": self.metadata or {}
         }
@@ -131,7 +134,8 @@ class DataPoint:
             y=data["y"],
             value=data["value"],
             timestamp=timestamp,
-            metadata=data.get("metadata")
+            metadata=data.get("metadata"),
+            secondary_value=data.get("secondary_value")
         )
 
 
@@ -270,10 +274,11 @@ class CacheEntry:
 @dataclass
 class VariogramModel:
     """变异函数模型"""
-    model_type: str  # spherical, exponential, gaussian, linear
+    model_type: str  # spherical, exponential, gaussian, linear, power, logarithmic
     sill: float  # 基台值
     range: float  # 变程
     nugget: float  # 块金值
+    power: Optional[float] = None  # 幂函数模型指数（power模型专用）
 
     def covariance(self, point1: DataPoint, point2: DataPoint) -> float:
         """计算两点之间的协方差"""
@@ -305,8 +310,138 @@ class VariogramModel:
             else:
                 return self.nugget + self.sill
 
+        elif self.model_type == "power":
+            p = self.power if self.power is not None else 1.0
+            if h <= 1:
+                return self.nugget + self.sill * (h ** p)
+            else:
+                return self.nugget + self.sill
+
+        elif self.model_type == "logarithmic":
+            if h > 0 and h <= 1:
+                return self.nugget + self.sill * (-np.log(h + 1e-10))
+            else:
+                return self.nugget + self.sill
+
         else:
             raise ValueError(f"未知的变异函数模型类型: {self.model_type}")
+
+    def variogram_by_distance(self, distance: float) -> float:
+        """根据距离计算变异函数值（半方差）"""
+        cov = self._covariance_by_distance(distance)
+        return (self.sill + self.nugget) - cov
+
+    def auto_select_model(
+        self,
+        distances: np.ndarray,
+        empirical_variogram: np.ndarray,
+        candidate_types: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        自动选择最优变异函数模型
+
+        Args:
+            distances: 距离数组
+            empirical_variogram: 经验变异函数值
+            candidate_types: 候选模型类型列表
+
+        Returns:
+            Dict: 最优模型信息 {model_type, rmse, aic}
+        """
+        if candidate_types is None:
+            candidate_types = ['spherical', 'exponential', 'gaussian', 'power', 'linear', 'logarithmic']
+
+        best_model = None
+        best_rmse = float('inf')
+        n_points = len(distances)
+        results = []
+
+        for model_type in candidate_types:
+            # 使用加权最小二乘拟合参数
+            fitted = self._fit_model_parameters(distances, empirical_variogram, model_type)
+            if fitted is None:
+                continue
+
+            rmse = fitted['rmse']
+            n_params = 3 if model_type not in ('power',) else 4
+            # 使用 BIC 进行模型选择
+            bic = n_points * np.log(rmse + 1e-10) + n_params * np.log(n_points) if n_points > 1 else rmse
+
+            results.append({
+                'model_type': model_type,
+                'rmse': rmse,
+                'bic': bic,
+                'params': fitted,
+            })
+
+            if rmse < best_rmse:
+                best_rmse = rmse
+                best_model = fitted
+
+        # 按RMSE排序
+        results.sort(key=lambda x: x['rmse'])
+
+        return {
+            'best_model': best_model,
+            'candidates': results,
+        }
+
+    def _fit_model_parameters(
+        self,
+        distances: np.ndarray,
+        empirical_variogram: np.ndarray,
+        model_type: str,
+    ) -> Optional[Dict[str, Any]]:
+        """使用加权最小二乘法拟合变异函数参数"""
+        max_dist = float(np.max(distances)) * 1.5
+        max_semivar = float(np.max(empirical_variogram)) * 1.5
+
+        # 网格搜索粗调
+        best_rmse = float('inf')
+        best_params = None
+
+        sill_candidates = np.linspace(0.1, max_semivar, 10)
+        range_candidates = np.linspace(1.0, max_dist, 10)
+        nugget_candidates = np.linspace(0.0, max_semivar * 0.3, 5)
+        power_candidates = np.linspace(0.2, 2.0, 10) if model_type == 'power' else [None]
+
+        for sill in sill_candidates:
+            for range_val in range_candidates:
+                for nugget in nugget_candidates:
+                    for power_val in power_candidates:
+                        h = distances / range_val
+                        h = np.clip(h, 0, 10)
+
+                        if model_type == 'spherical':
+                            theoretical = np.where(h <= 1, sill * (1.5 * h - 0.5 * h**3), sill) + nugget
+                        elif model_type == 'exponential':
+                            theoretical = sill * (1 - np.exp(-3 * h)) + nugget
+                        elif model_type == 'gaussian':
+                            theoretical = sill * (1 - np.exp(-3 * h**2)) + nugget
+                        elif model_type == 'power':
+                            theoretical = sill * (h ** (power_val if power_val else 1.0)) + nugget
+                        elif model_type == 'linear':
+                            theoretical = np.where(h <= 1, sill * h, sill) + nugget
+                        elif model_type == 'logarithmic':
+                            theoretical = np.where(h > 0, sill * (-np.log(h + 1e-10)), sill) + nugget
+                        else:
+                            continue
+
+                        weights = 1.0 / (distances + 1e-6)
+                        rmse = float(np.sqrt(np.mean(weights * (empirical_variogram - theoretical) ** 2)))
+
+                        if rmse < best_rmse:
+                            best_rmse = rmse
+                            best_params = {
+                                'model_type': model_type,
+                                'sill': float(sill),
+                                'range': float(range_val),
+                                'nugget': float(nugget),
+                                'power': float(power_val) if power_val is not None else None,
+                                'rmse': float(rmse),
+                            }
+
+        return best_params
 
 
 @dataclass

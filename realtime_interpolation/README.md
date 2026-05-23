@@ -33,10 +33,10 @@
 
 ### 待完成功能
 - [x] Redis缓存集成
-- [ ] WebSocket服务集成
-- [ ] 前端与地图可视化集成
-- [ ] 文档完善
-- [ ] 部署上线
+- [x] WebSocket服务集成（后端: services/backend/app/services/websocket_service.py + 前端: apps/frontend/js/services/WebSocketService.ts）
+- [x] 前端与地图可视化集成（RealtimeInterpolation.ts + RealtimeMapUpdater.ts + RealtimeControlPanel.ts + RealtimeAlertManager.ts）
+- [x] 文档完善（需求分析、技术调研、算法设计、数据结构、接口设计）
+- [x] 部署上线（deployment/spatiotemporal_kriging/ 完整部署栈）
 
 ## 项目结构
 
@@ -187,10 +187,7 @@ print(f"更新时间: {result.statistics['update_time_ms']}ms")
 5. ✓ 编写测试（单元测试、集成测试、性能测试、准确性验证）
 
 ### 近期任务
-1. 集成WebSocket服务
-2. 前端与地图可视化集成
-3. 完善文档
-4. 生产环境部署
+（已完成，详见"已完成功能"章节）
 
 ## Redis 缓存集成
 
