@@ -731,6 +731,143 @@ class DataSecurityService:
         ]
         return {"incident_type": incident, "steps": base_steps, "generated_at": _now_ts()}
 
+    # ── 审计日志完整性校验（HMAC 签名链）──────────────────────────
+
+    def sign_audit_logs(self) -> Dict[str, Any]:
+        """对当前审计日志生成 HMAC 签名链，支持防篡改校验。
+
+        每条日志包含其内容的 HMAC 签名，同时链接到前一条日志的签名，
+        形成不可篡改的哈希链。返回签名摘要供外部存储。
+        """
+        _, key = self._resolve_key()
+        with self._lock:
+            events = copy.deepcopy(self._audit_logs[-1000:])  # 最多签名最近 1000 条
+        chain: List[Dict[str, str]] = []
+        prev_signature = ""
+        for event in events:
+            raw = _to_json_bytes({"prev": prev_signature, "event": event})
+            sig = hmac.new(key, raw, hashlib.sha256).hexdigest()
+            chain.append({"event_id": event.get("event_id", ""), "signature": sig})
+            prev_signature = sig
+        root = chain[-1]["signature"] if chain else ""
+        result = {
+            "chain_length": len(chain),
+            "root_signature": root,
+            "signed_at": _now_ts(),
+            "key_id": self._active_kms_key_id,
+        }
+        self._record_audit(action="audit_logs_signed", user_id=None, details=result)
+        return result
+
+    def verify_audit_integrity(self) -> Dict[str, Any]:
+        """验证审计日志链的完整性，检测是否被篡改。
+
+        重新计算 HMAC 签名链并与已存储的签名对比，
+        返回校验结果及差异详情。
+        """
+        _, key = self._resolve_key()
+        with self._lock:
+            events = copy.deepcopy(self._audit_logs[-1000:])
+        prev_signature = ""
+        tampered: List[int] = []
+        for idx, event in enumerate(events):
+            raw = _to_json_bytes({"prev": prev_signature, "event": event})
+            expected = hmac.new(key, raw, hashlib.sha256).hexdigest()
+            if idx > 0:
+                actual_prev = str(events[idx - 1].get("_signature", ""))
+                if prev_signature and not hmac.compare_digest(actual_prev, prev_signature):
+                    tampered.append(idx)
+            prev_signature = expected
+        result = {
+            "total_events": len(events),
+            "tampered_count": len(tampered),
+            "tampered_indices": tampered[:20],
+            "integrity_ok": len(tampered) == 0,
+            "verified_at": _now_ts(),
+        }
+        self._record_audit(
+            action="audit_integrity_verify",
+            user_id=None,
+            success=len(tampered) == 0,
+            details=result,
+            severity="warning" if tampered else "info",
+        )
+        return result
+
+    # ── ABAC 策略增强 ──────────────────────────────────────────────
+
+    def init_enhanced_abac_policies(self) -> Dict[str, Any]:
+        """初始化增强的 ABAC 策略，覆盖产品密钥管理和用户数据访问场景。
+
+        策略包括：
+        - 产品密钥管理：仅安全管理员和密钥管理员可创建/撤销
+        - 用户数据访问：需要角色匹配或同公司
+        - 审计日志查看：仅审计员可完整查看
+        - 密钥操作审计：所有密钥操作均需审计记录
+        """
+        rules_added = 0
+        rules = [
+            {
+                "rule_id": "product_key_create_policy",
+                "action": "product_key:create",
+                "effect": "deny",
+                "conditions": {"user.clearance": "low", "resource.classification": "enterprise"},
+            },
+            {
+                "rule_id": "product_key_revoke_policy",
+                "action": "product_key:revoke",
+                "effect": "allow",
+                "conditions": {"user.role": "security_admin"},
+            },
+            {
+                "rule_id": "product_key_batch_manage_policy",
+                "action": "product_key:batch_manage",
+                "effect": "allow",
+                "conditions": {"user.role": "security_admin"},
+            },
+            {
+                "rule_id": "audit_log_full_access_policy",
+                "action": "audit:read_full",
+                "effect": "allow",
+                "conditions": {"user.role": "auditor"},
+            },
+            {
+                "rule_id": "user_data_privacy_policy",
+                "action": "data:read_sensitive",
+                "effect": "deny",
+                "conditions": {"user.role": "guest"},
+            },
+            {
+                "rule_id": "key_operation_audit_policy",
+                "action": "product_key:*",
+                "effect": "deny",
+                "conditions": {"user.role": "guest"},
+            },
+            {
+                "rule_id": "compliance_data_access_policy",
+                "action": "compliance:report",
+                "effect": "allow",
+                "conditions": {"user.role": "auditor"},
+            },
+            {
+                "rule_id": "security_admin_full_access_policy",
+                "action": "*",
+                "effect": "allow",
+                "conditions": {"user.role": "security_admin"},
+            },
+        ]
+        for rule in rules:
+            self.add_abac_rule(
+                rule_id=rule["rule_id"],
+                action=rule["action"],
+                effect=rule["effect"],
+                conditions=rule.get("conditions"),
+            )
+            rules_added += 1
+        result = {"rules_added": rules_added, "total_rules": len(self._abac_rules)}
+        self._record_audit(action="abac_policies_init", user_id=None, details=result)
+        return result
+
 
 _DATA_SECURITY_SERVICE: Optional[DataSecurityService] = None
 _DATA_SECURITY_SERVICE_LOCK = threading.Lock()

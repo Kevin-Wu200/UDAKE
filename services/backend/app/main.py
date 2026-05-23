@@ -82,10 +82,22 @@ scheduler_manager = get_scheduler_manager()
 async def lifespan(app_instance: FastAPI):
     """应用生命周期：启动阶段执行预加载与降级判定。"""
     app_instance.state.startup_manager = startup_manager
+    _config_manager = None
     try:
         snapshot = await startup_manager.run()
         logging.info("启动流程完成: %s", snapshot)
         scheduler_manager.start()
+
+        # 启动配置热重载（watchdog + SIGHUP）
+        try:
+            from .runtime_config_manager import get_runtime_config_manager
+            _config_path = str(Path(__file__).resolve().parents[3] / "configs" / "validation_config.yaml")
+            _config_manager = get_runtime_config_manager(_config_path)
+            _config_manager.start_watchdog()
+            _config_manager.install_sighup_handler()
+            logging.info("配置热重载已启用 (watchdog + SIGHUP): %s", _config_path)
+        except Exception as exc:
+            logging.warning("配置热重载初始化失败（非致命）: %s", exc)
     except Exception as exc:  # pylint: disable=broad-except
         logging.exception("启动流程异常，进入降级模式: %s", exc)
         startup_manager.record_performance_event(
@@ -93,6 +105,11 @@ async def lifespan(app_instance: FastAPI):
             {"event": "startup_exception", "error": str(exc)},
         )
     yield
+    if _config_manager:
+        try:
+            _config_manager.stop_watchdog()
+        except Exception:
+            pass
     scheduler_manager.stop()
     await startup_manager.shutdown()
 
