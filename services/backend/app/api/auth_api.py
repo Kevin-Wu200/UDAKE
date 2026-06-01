@@ -58,6 +58,11 @@ class VerifyCodeRequest(BaseModel):
     code: str = Field(..., min_length=4, max_length=16)
 
 
+class ResendVerificationRequest(BaseModel):
+    email: str = Field(..., max_length=320)
+    product_key: str = Field(..., max_length=128)
+
+
 class ResetPasswordSendCodeRequest(BaseModel):
     email: str = Field(..., max_length=320)
     product_key: str = Field(..., max_length=128)
@@ -287,6 +292,25 @@ def verify_email_code(payload: VerifyCodeRequest):
         raise _fail(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
     except RateLimitExceededError as exc:
         raise _fail(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
+
+
+@router.post("/resend-verification-code")
+def resend_verification_code(payload: ResendVerificationRequest, request: Request):
+    service = get_auth_service()
+    try:
+        result = service.resend_verification_code(
+            email=ensure_safe_text(payload.email, max_len=settings.AUTH_XSS_MAX_INPUT_LEN, reject_sql=True),
+            product_key=ensure_safe_text(payload.product_key, max_len=128, reject_sql=True),
+            ip_address=_extract_client_ip(request),
+            user_agent=request.headers.get("user-agent"),
+        )
+        return _ok("验证码已重新发送", result)
+    except ProductKeyValidationError as exc:
+        raise _fail(status.HTTP_400_BAD_REQUEST, f"产品密钥校验失败: {exc}") from exc
+    except RateLimitExceededError as exc:
+        raise _fail(status.HTTP_429_TOO_MANY_REQUESTS, str(exc)) from exc
+    except ValueError as exc:
+        raise _fail(status.HTTP_400_BAD_REQUEST, str(exc)) from exc
 
 
 @router.post("/reset-password/send-code")

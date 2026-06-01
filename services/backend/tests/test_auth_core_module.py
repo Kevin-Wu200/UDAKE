@@ -248,6 +248,15 @@ def test_auth_api_register_login_refresh_logout(auth_client: TestClient):
     )
     assert register_resp.status_code == 200
     assert register_resp.json()["success"] is True
+    assert "verification_code" in register_resp.json()["data"]
+
+    # 验证邮箱
+    code = register_resp.json()["data"]["verification_code"]
+    verify_resp = auth_client.post(
+        "/api/auth/verify-email-code",
+        json={"email": "foo@example.com", "code": code},
+    )
+    assert verify_resp.status_code == 200
 
     login_resp = auth_client.post(
         "/api/auth/login",
@@ -301,7 +310,9 @@ def test_auth_service_change_password_reset_password_and_history(monkeypatch: py
 
     register_key = service.product_keys.generate_key("change-password-seed").product_key
     reset_key = service.product_keys.generate_key("reset-password-seed").product_key
-    service.register(email="history@example.com", password="StrongPass123", product_key=register_key)
+    result = service.register(email="history@example.com", password="StrongPass123", product_key=register_key)
+    code = result["verification_code"]
+    service.verify_email_code("history@example.com", code)
     login_payload = service.login(
         email="history@example.com",
         password="StrongPass123",

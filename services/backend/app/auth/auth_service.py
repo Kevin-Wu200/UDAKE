@@ -100,6 +100,16 @@ class EmailChangeRequestEntry:
     processed_at: Optional[int] = None
 
 
+@dataclass
+class PendingRegistration:
+    email: str
+    username: str
+    password_hash: str
+    role: str
+    product_key: str
+    created_at: int = field(default_factory=lambda: int(time.time()))
+
+
 class AuthService:
     """Core auth workflow including register/login/password/email operations."""
 
@@ -139,6 +149,7 @@ class AuthService:
         self._devices: Dict[Tuple[int, str], UserDeviceSession] = {}
         self._password_histories: Dict[int, List[PasswordHistoryEntry]] = {}
         self._email_change_requests: Dict[int, EmailChangeRequestEntry] = {}
+        self._pending_registrations: Dict[str, PendingRegistration] = {}
         self.audit_logs: List[Dict[str, Any]] = []
         self._super_admin_emails = self._parse_super_admin_emails()
 
@@ -798,7 +809,7 @@ class AuthService:
         self._ensure_rate_limit(identity=normalized_email, action="register")
 
         try:
-            record = self.product_keys.validate_key(
+            _ = self.product_keys.validate_key(
                 validate_product_key,
                 require_unused=True,
                 query_func=self._query_product_key_from_db,
@@ -832,6 +843,8 @@ class AuthService:
             with self._lock:
                 if normalized_email in self._users_by_email:
                     raise ValueError("邮箱已注册")
+                if normalized_email in self._pending_registrations:
+                    raise ValueError("邮箱已注册，验证码已发送，请先完成邮箱验证")
 
                 # 生成唯一用户名
                 base_name = normalized_email.split("@", 1)[0][:32] or "user"
@@ -844,50 +857,16 @@ class AuthService:
                 role = "admin" if use_bootstrap_admin_role else "user"
                 pwd_hash = hash_password(password)
 
-                # 持久化用户到数据库 (pending 状态)
-                new_user_row = User(
+                # 暂存注册信息，等邮箱验证通过后再写入数据库
+                self._pending_registrations[normalized_email] = PendingRegistration(
                     email=normalized_email,
                     username=username,
                     password_hash=pwd_hash,
                     role=role,
-                    status="pending",
-                    is_email_verified=False,
                     product_key=validate_product_key,
-                    key_status="active",
-                    created_at=datetime.now(timezone.utc)
                 )
-                db_session.add(new_user_row)
-                db_session.commit()
-                db_session.refresh(new_user_row)
-
-                user_id = new_user_row.id
-                permissions = self._build_permissions_for_role(role)
-
-                user = AuthUser(
-                    id=user_id,
-                    email=normalized_email,
-                    username=username,
-                    password_hash=pwd_hash,
-                    role=role,
-                    permissions=permissions,
-                    status="pending",
-                    product_key=validate_product_key,
-                    key_status="active",
-                )
-                self._apply_super_admin_role_if_needed(user)
-                self._activate_product_key_in_db(validate_product_key, user_id)
-                record.status = "active"
-                record.user_id = user_id
-                if int(record.total_quota or 0) > 0:
-                    record.used_count = min(int(record.total_quota), int(record.used_count or 0) + 1)
-                self.product_keys.register_key(record)
-                self._users_by_email[normalized_email] = user
-                self._users_by_id[user_id] = user
-                self._next_user_id = max(self._next_user_id, user_id + 1)
-                self._record_password_history(user_id, pwd_hash)
         except Exception as exc:
-            db_session.rollback()
-            logger.error(f"Register persistence failed: {exc}")
+            logger.error(f"Register pre-check failed: {exc}")
             raise
         finally:
             db_session.close()
@@ -900,18 +879,18 @@ class AuthService:
         )
         self._audit(
             operation="register",
-            user_id=user.id,
+            user_id=None,
             details={
                 "action": "register",
                 "email": normalized_email,
                 "result": "success",
-                "role": user.role,
+                "role": role,
                 "used_bootstrap_key": use_bootstrap_admin_role,
             },
             ip_address=ip_address,
             user_agent=user_agent,
         )
-        return {"user_id": user.id, "email": user.email, "role": user.role, "verification_code": code}
+        return {"email": normalized_email, "role": role, "verification_code": code}
 
     def login(
         self,
@@ -1256,40 +1235,160 @@ class AuthService:
         self._ensure_rate_limit(identity=normalized_email, action="verify_code")
         self.verifier.verify_code(normalized_email, code, namespace="verify_code")
 
-        try:
-            from app.auth_db.models import User
-            from app.auth_db.session import get_auth_session_factory
-        except ImportError:
-            pass
+        # 优先从暂存注册中取出待验证数据
+        with self._lock:
+            pending = self._pending_registrations.pop(normalized_email, None)
 
-        session_factory = get_auth_session_factory()
-        db_session = session_factory()
+        verified_user_id: Optional[int] = None
 
-        try:
-            # 更新数据库中的用户状态
-            row = db_session.query(User).filter(func.lower(User.email) == normalized_email).one_or_none()
-            if row:
-                row.is_email_verified = True
-                row.status = "active"
+        if pending:
+            # 邮箱验证通过，将用户写入数据库
+            try:
+                from app.auth_db.models import User
+                from app.auth_db.session import get_auth_session_factory
+            except ImportError:
+                logger.error("Failed to import DB models in verify_email_code")
+                raise RuntimeError("Database access failed")
+
+            session_factory = get_auth_session_factory()
+            db_session = session_factory()
+
+            try:
+                new_user_row = User(
+                    email=pending.email,
+                    username=pending.username,
+                    password_hash=pending.password_hash,
+                    role=pending.role,
+                    status="active",
+                    is_email_verified=True,
+                    product_key=pending.product_key,
+                    key_status="active",
+                    created_at=datetime.fromtimestamp(pending.created_at, tz=timezone.utc),
+                )
+                db_session.add(new_user_row)
                 db_session.commit()
+                db_session.refresh(new_user_row)
+                user_id = new_user_row.id
+                verified_user_id = user_id
+            except Exception as exc:
+                db_session.rollback()
+                logger.error(f"Verify email - create user failed: {exc}")
+                raise
+            finally:
+                db_session.close()
+
+            # 激活产品密钥
+            try:
+                self._activate_product_key_in_db(pending.product_key, user_id)
+            except Exception as exc:
+                logger.warning(f"Verify email - activate product key failed (non-fatal): {exc}")
+
+            # 添加到内存缓存
+            with self._lock:
+                permissions = self._build_permissions_for_role(pending.role)
+                user = AuthUser(
+                    id=user_id,
+                    email=pending.email,
+                    username=pending.username,
+                    password_hash=pending.password_hash,
+                    role=pending.role,
+                    permissions=permissions,
+                    status="active",
+                    is_email_verified=True,
+                    product_key=pending.product_key,
+                    key_status="active",
+                    created_at=pending.created_at,
+                )
+                self._apply_super_admin_role_if_needed(user)
+                self._users_by_email[pending.email] = user
+                self._users_by_id[user_id] = user
+                self._next_user_id = max(self._next_user_id, user_id + 1)
+                self._record_password_history(user_id, pending.password_hash)
+        else:
+            # 没有暂存注册（可能来自旧迁移或管理后台直接创建），更新已有用户
+            try:
+                from app.auth_db.models import User
+                from app.auth_db.session import get_auth_session_factory
+            except ImportError:
+                pass
+            else:
+                session_factory = get_auth_session_factory()
+                db_session = session_factory()
+                try:
+                    row = db_session.query(User).filter(func.lower(User.email) == normalized_email).one_or_none()
+                    if row:
+                        row.is_email_verified = True
+                        row.status = "active"
+                        db_session.commit()
+                        verified_user_id = int(row.id)
+                except Exception as exc:
+                    db_session.rollback()
+                    logger.error(f"Verify email persistence failed: {exc}")
+                finally:
+                    db_session.close()
 
             with self._lock:
                 user = self._users_by_email.get(normalized_email)
                 if user:
                     user.is_email_verified = True
                     user.status = "active"
-        except Exception as exc:
-            db_session.rollback()
-            logger.error(f"Verify email persistence failed: {exc}")
-            # 继续执行，因为验证码已经校验过了
-        finally:
-            db_session.close()
+                    verified_user_id = user.id
 
         self._audit(
             operation="verify_email",
-            user_id=user.id if 'user' in locals() and user else None,
+            user_id=verified_user_id,
             details={"action": "verify_email", "result": "success", "email": normalized_email},
         )
+
+    def resend_verification_code(
+        self,
+        *,
+        email: str,
+        product_key: str,
+        ip_address: Optional[str] = None,
+        user_agent: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """重新发送注册验证码（仅适用于尚未完成邮箱验证的暂存注册）。"""
+        normalized_email = self._normalize_email(email)
+        self.validate_email(normalized_email)
+        self._ensure_rate_limit(identity=normalized_email, action="resend_code")
+
+        self.product_keys.validate_key(product_key, require_unused=True)
+
+        with self._lock:
+            pending = self._pending_registrations.get(normalized_email)
+            if pending:
+                pending.product_key = product_key
+        if not pending:
+            raise ValueError("该邮箱没有待验证的注册，请先完成注册")
+
+        code = self.verifier.issue_code(normalized_email, namespace="verify_code")
+        self._send_template_email(
+            template_key="register_code",
+            to_email=normalized_email,
+            variables={"username": pending.username, "code": code, "valid_time": "10分钟"},
+        )
+        self._audit(
+            operation="resend_verification_code",
+            user_id=None,
+            details={"action": "resend_verification_code", "result": "success", "email": normalized_email},
+            ip_address=ip_address,
+            user_agent=user_agent,
+        )
+        return {"email": normalized_email, "verification_code": code}
+
+    def _sweep_expired_pending_registrations(self, max_age_seconds: int = 3600) -> int:
+        """清理过期的暂存注册（默认 1 小时后过期）。"""
+        now = int(time.time())
+        removed = 0
+        with self._lock:
+            expired = [email for email, reg in self._pending_registrations.items() if now - reg.created_at > max_age_seconds]
+            for email in expired:
+                self._pending_registrations.pop(email, None)
+                removed += 1
+        if removed:
+            logger.info(f"Swept {removed} expired pending registrations")
+        return removed
 
     def send_reset_password_code(
         self,

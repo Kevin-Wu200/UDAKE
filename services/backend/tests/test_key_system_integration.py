@@ -285,6 +285,15 @@ def test_register_can_use_database_created_admin_key(key_system_client, monkeypa
         },
     )
     assert register_resp.status_code == 200, register_resp.text
+    assert "verification_code" in register_resp.json()["data"]
+
+    # 邮箱验证后密钥才应被激活
+    code = register_resp.json()["data"]["verification_code"]
+    verify_resp = client.post(
+        "/api/auth/verify-email-code",
+        json={"email": "db_key_user@example.com", "code": code},
+    )
+    assert verify_resp.status_code == 200, verify_resp.text
 
     with session_factory() as db:
         stored = db.query(ProductKey).filter(ProductKey.product_key == created_key).one()
