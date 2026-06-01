@@ -56,6 +56,10 @@
           <el-icon><Document /></el-icon>
           <span>{{ t('auditLogs') }}</span>
         </el-menu-item>
+        <el-menu-item v-if="!authStore.isCompanyAdmin" index="/security-ip-management">
+          <el-icon><Lock /></el-icon>
+          <span>{{ t('securityIpManagement') }}</span>
+        </el-menu-item>
         <el-menu-item index="/tickets">
           <el-icon><Tickets /></el-icon>
           <span>{{ t('tickets') }}</span>
@@ -109,7 +113,7 @@
 import type { AppLanguage } from '../stores/app';
 import { computed, ref, onMounted, watch } from 'vue';
 import { ElMessage } from 'element-plus';
-import { DataAnalysis, Document, Histogram, Key, Message, Operation, Setting, UserFilled, Tickets } from '@element-plus/icons-vue';
+import { DataAnalysis, Document, Histogram, Key, Message, Operation, Setting, UserFilled, Tickets, Lock } from '@element-plus/icons-vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
 import { useAppStore } from '../stores/app';
@@ -160,7 +164,8 @@ const cachedRouteNames = [
   'history-analysis-trend',
   'history-analysis-anomaly',
   'history-analysis-forecast',
-  'history-analysis-reports'
+  'history-analysis-reports',
+  'security-ip-management'
 ];
 
 const onLanguageChange = (language: AppLanguage) => {

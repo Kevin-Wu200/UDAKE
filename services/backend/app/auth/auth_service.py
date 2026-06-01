@@ -140,6 +140,7 @@ class AuthService:
             auto_ban_threshold=settings.AUTH_IP_AUTO_BAN_THRESHOLD,
             auto_ban_window_seconds=settings.AUTH_IP_AUTO_BAN_WINDOW_SECONDS,
             auto_ban_seconds=settings.AUTH_IP_AUTO_BAN_SECONDS,
+            db_session_factory=self._get_db_session_factory(),
         )
 
         self._lock = threading.Lock()
@@ -265,6 +266,13 @@ class AuthService:
             user.permissions.append("admin")
         if "super_admin" not in user.permissions:
             user.permissions.append("super_admin")
+
+    @staticmethod
+    def _get_db_session_factory():
+        """返回延迟导入的数据库会话工厂，避免循环依赖。"""
+        from app.auth_db.session import get_auth_session_factory
+
+        return get_auth_session_factory()
 
     @staticmethod
     def _build_permissions_for_role(role: str) -> List[str]:

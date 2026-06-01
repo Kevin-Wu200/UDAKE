@@ -34,6 +34,8 @@ from ..auth.input_sanitizer import sanitize_payload
 from ..auth_db.models import (
     AuditLog,
     Company,
+    IPReputation,
+    IPRule,
     PasswordHistory,
     ProductKey,
     ProductKeyStatus,
@@ -1598,3 +1600,287 @@ def get_admin_stats(
         logger.warning("写入统计缓存失败: %s", exc)
 
     return _ok("统计数据获取成功", {**stats_payload, "cached": False})
+
+
+# ── 安全管理 API ──────────────────────────────────────────────
+
+
+class IPRuleCreateRequest(BaseModel):
+    ip_or_cidr: str = Field(..., description="IP 地址或 CIDR 网段")
+    rule_type: Literal["whitelist", "blacklist"] = Field(..., description="规则类型")
+    reason: Optional[str] = Field(default=None, max_length=255, description="操作原因")
+    expires_in_seconds: Optional[int] = Field(
+        default=None, ge=60, description="过期时间（秒），为空则使用默认封禁时长"
+    )
+
+
+class IPRuleResponse(BaseModel):
+    id: int
+    ip_or_cidr: str
+    rule_type: str
+    reason: Optional[str]
+    is_active: bool
+    expires_at: Optional[str]
+    created_at: str
+    updated_at: str
+
+
+def _ip_rule_to_response(rule: IPRule) -> Dict[str, Any]:
+    return {
+        "id": rule.id,
+        "ip_or_cidr": rule.ip_or_cidr,
+        "rule_type": rule.rule_type,
+        "reason": rule.reason,
+        "is_active": rule.is_active,
+        "expires_at": rule.expires_at.isoformat() if rule.expires_at else None,
+        "created_at": rule.created_at.isoformat() if rule.created_at else None,
+        "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,
+    }
+
+
+@router.get("/security/ip-rules")
+def list_ip_rules(
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=200),
+    ip_search: Optional[str] = Query(default=None, description="按 IP 地址搜索"),
+    rule_type: Optional[str] = Query(default=None, description="按类型筛选: whitelist/blacklist"),
+    is_active: Optional[bool] = Query(default=None, description="按激活状态筛选"),
+):
+    _require_super_admin_user(request, db)
+    query = db.query(IPRule)
+
+    if ip_search:
+        query = query.filter(IPRule.ip_or_cidr.ilike(f"%{ip_search.strip()}%"))
+    if rule_type and rule_type in ("whitelist", "blacklist"):
+        query = query.filter(IPRule.rule_type == rule_type)
+    if is_active is not None:
+        query = query.filter(IPRule.is_active == is_active)
+
+    total = query.count()
+    rules = (
+        query.order_by(IPRule.created_at.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    return _ok("获取IP规则列表成功", {
+        "items": [_ip_rule_to_response(r) for r in rules],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    })
+
+
+@router.post("/security/ip-rules")
+def create_ip_rule(
+    payload: IPRuleCreateRequest,
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+):
+    _require_super_admin_user(request, db)
+
+    ip_or_cidr = payload.ip_or_cidr.strip()
+    if not ip_or_cidr:
+        raise _fail(status.HTTP_400_BAD_REQUEST, "IP 地址不能为空")
+
+    # 检查是否已存在同类型活跃规则
+    existing = (
+        db.query(IPRule)
+        .filter(
+            IPRule.ip_or_cidr == ip_or_cidr,
+            IPRule.rule_type == payload.rule_type,
+            IPRule.is_active == True,
+        )
+        .first()
+    )
+    if existing:
+        raise _fail(status.HTTP_409_CONFLICT, f"该 IP 已存在活跃的 {payload.rule_type} 规则")
+
+    now_utc = datetime.now(timezone.utc)
+    expires_at = None
+    if payload.expires_in_seconds:
+        expires_at = now_utc + timedelta(seconds=payload.expires_in_seconds)
+
+    rule = IPRule(
+        ip_or_cidr=ip_or_cidr,
+        rule_type=payload.rule_type,
+        reason=payload.reason,
+        is_active=True,
+        expires_at=expires_at,
+    )
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+
+    # 同步更新缓存
+    auth_service = get_auth_service()
+    if payload.rule_type == "blacklist":
+        ttl = payload.expires_in_seconds if payload.expires_in_seconds else auth_service.ip_controller.auto_ban_seconds
+        auth_service.ip_controller.ban_ip(
+            ip_or_cidr,
+            seconds=ttl,
+            reason=payload.reason or "manual_admin",
+            persist_to_db=False,  # 已手动写入 DB
+        )
+    elif payload.rule_type == "whitelist":
+        auth_service.ip_controller.whitelist.add(ip_or_cidr)
+
+    return _ok("IP 规则创建成功", _ip_rule_to_response(rule))
+
+
+@router.delete("/security/ip-rules/{rule_id}")
+def delete_ip_rule(
+    rule_id: int,
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+):
+    _require_super_admin_user(request, db)
+
+    rule = db.query(IPRule).filter(IPRule.id == rule_id).one_or_none()
+    if not rule:
+        raise _fail(status.HTTP_404_NOT_FOUND, "IP 规则不存在")
+
+    # 逻辑删除：标记为不活跃
+    rule.is_active = False
+    db.commit()
+
+    # 从缓存中撤销封禁
+    auth_service = get_auth_service()
+    if rule.rule_type == "blacklist":
+        auth_service.ip_controller.unban_ip(rule.ip_or_cidr, remove_from_db=False)
+    elif rule.rule_type == "whitelist":
+        auth_service.ip_controller.whitelist.discard(rule.ip_or_cidr)
+
+    return _ok("IP 规则已删除")
+
+
+@router.put("/security/ip-rules/{rule_id}")
+def update_ip_rule(
+    rule_id: int,
+    payload: IPRuleCreateRequest,
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+):
+    _require_super_admin_user(request, db)
+
+    rule = db.query(IPRule).filter(IPRule.id == rule_id).one_or_none()
+    if not rule:
+        raise _fail(status.HTTP_404_NOT_FOUND, "IP 规则不存在")
+
+    ip_or_cidr = payload.ip_or_cidr.strip()
+    if not ip_or_cidr:
+        raise _fail(status.HTTP_400_BAD_REQUEST, "IP 地址不能为空")
+
+    # 如果 IP 或类型变更，检查冲突
+    if ip_or_cidr != rule.ip_or_cidr or payload.rule_type != rule.rule_type:
+        existing = (
+            db.query(IPRule)
+            .filter(
+                IPRule.ip_or_cidr == ip_or_cidr,
+                IPRule.rule_type == payload.rule_type,
+                IPRule.is_active == True,
+                IPRule.id != rule_id,
+            )
+            .first()
+        )
+        if existing:
+            raise _fail(status.HTTP_409_CONFLICT, f"该 IP 已存在活跃的 {payload.rule_type} 规则")
+
+    # 先从旧规则清除缓存
+    auth_service = get_auth_service()
+    if rule.rule_type == "blacklist":
+        auth_service.ip_controller.unban_ip(rule.ip_or_cidr, remove_from_db=False)
+    elif rule.rule_type == "whitelist":
+        auth_service.ip_controller.whitelist.discard(rule.ip_or_cidr)
+
+    now_utc = datetime.now(timezone.utc)
+    expires_at = None
+    if payload.expires_in_seconds:
+        expires_at = now_utc + timedelta(seconds=payload.expires_in_seconds)
+
+    rule.ip_or_cidr = ip_or_cidr
+    rule.rule_type = payload.rule_type
+    rule.reason = payload.reason
+    rule.expires_at = expires_at
+    db.commit()
+    db.refresh(rule)
+
+    # 同步新规则到缓存
+    if payload.rule_type == "blacklist":
+        ttl = payload.expires_in_seconds if payload.expires_in_seconds else auth_service.ip_controller.auto_ban_seconds
+        auth_service.ip_controller.ban_ip(
+            ip_or_cidr,
+            seconds=ttl,
+            reason=payload.reason or "manual_admin",
+            persist_to_db=False,
+        )
+    elif payload.rule_type == "whitelist":
+        auth_service.ip_controller.whitelist.add(ip_or_cidr)
+
+    return _ok("IP 规则更新成功", _ip_rule_to_response(rule))
+
+
+@router.get("/security/ip-reputations")
+def list_ip_reputations(
+    request: Request,
+    db: Session = Depends(get_auth_db_session),
+    page: int = Query(default=1, ge=1),
+    page_size: int = Query(default=20, ge=1, le=200),
+    ip_search: Optional[str] = Query(default=None, description="按 IP 地址搜索"),
+    min_score: Optional[int] = Query(default=None, ge=0, le=100, description="最低信誉分"),
+    max_score: Optional[int] = Query(default=None, ge=0, le=100, description="最高信誉分"),
+    sort_by: str = Query(default="updated_at", description="排序字段: score/updated_at"),
+):
+    _require_super_admin_user(request, db)
+    query = db.query(IPReputation)
+
+    if ip_search:
+        query = query.filter(IPReputation.ip_address.ilike(f"%{ip_search.strip()}%"))
+    if min_score is not None:
+        query = query.filter(IPReputation.score >= min_score)
+    if max_score is not None:
+        query = query.filter(IPReputation.score <= max_score)
+
+    total = query.count()
+
+    sort_column = getattr(IPReputation, sort_by, IPReputation.updated_at)
+    records = (
+        query.order_by(sort_column.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+
+    def _format_record(r: IPReputation) -> Dict[str, Any]:
+        score = int(r.score)
+        if score >= 90:
+            risk_level = "low"
+        elif score >= 60:
+            risk_level = "normal"
+        elif score >= 30:
+            risk_level = "medium"
+        elif score >= 15:
+            risk_level = "high"
+        else:
+            risk_level = "critical"
+        return {
+            "id": r.id,
+            "ip_address": r.ip_address,
+            "score": score,
+            "success_count": int(r.success_count),
+            "failed_count": int(r.failed_count),
+            "rate_limited_count": int(r.rate_limited_count),
+            "risk_level": risk_level,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+            "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+        }
+
+    return _ok("获取IP信誉度数据成功", {
+        "items": [_format_record(r) for r in records],
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+    })

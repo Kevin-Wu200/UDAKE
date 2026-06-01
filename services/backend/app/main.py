@@ -133,6 +133,14 @@ async def lifespan(app_instance: FastAPI):
         logging.info("启动流程完成: %s", snapshot)
         scheduler_manager.start()
 
+        # 从数据库预加载 IP 安全规则到缓存
+        try:
+            from .auth import get_auth_service
+            auth_svc = get_auth_service()
+            auth_svc.ip_controller.preload_active_rules_from_db()
+        except Exception as exc:  # pragma: no cover
+            logging.warning("IP 安全规则预加载失败（非致命）: %s", exc)
+
         # 启动配置热重载（watchdog + SIGHUP）
         try:
             from .runtime_config_manager import get_runtime_config_manager

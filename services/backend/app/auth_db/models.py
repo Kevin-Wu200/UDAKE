@@ -744,6 +744,67 @@ class ShareLink(Base):
     )
 
 
+class IPRule(Base):
+    """IP 黑白名单规则持久化模型。"""
+
+    __tablename__ = "ip_rules"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ip_or_cidr: Mapped[str] = mapped_column(String(45), nullable=False)
+    rule_type: Mapped[str] = mapped_column(String(20), nullable=False)
+    reason: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
+    expires_at: Mapped[Any] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        CheckConstraint(
+            "rule_type IN ('whitelist', 'blacklist')",
+            name="ck_ip_rules_rule_type_enum",
+        ),
+        Index("ix_ip_rules_ip_or_cidr", "ip_or_cidr"),
+        Index("ix_ip_rules_rule_type", "rule_type"),
+        Index("ix_ip_rules_is_active", "is_active"),
+        Index("ix_ip_rules_expires_at", "expires_at"),
+        Index("ix_ip_rules_active_expires", "is_active", "expires_at"),
+    )
+
+
+class IPReputation(Base):
+    """IP 信誉度持久化模型。"""
+
+    __tablename__ = "ip_reputations"
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    ip_address: Mapped[str] = mapped_column(String(45), nullable=False)
+    score: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("60"))
+    success_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    failed_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    rate_limited_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    created_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[Any] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
+
+    __table_args__ = (
+        UniqueConstraint("ip_address", name="uq_ip_reputations_ip_address"),
+        CheckConstraint("score >= 0 AND score <= 100", name="ck_ip_reputations_score_range"),
+        CheckConstraint("success_count >= 0", name="ck_ip_reputations_success_count_non_negative"),
+        CheckConstraint("failed_count >= 0", name="ck_ip_reputations_failed_count_non_negative"),
+        CheckConstraint("rate_limited_count >= 0", name="ck_ip_reputations_rate_limited_count_non_negative"),
+        Index("ix_ip_reputations_ip_address", "ip_address", unique=True),
+        Index("ix_ip_reputations_score", "score"),
+        Index("ix_ip_reputations_updated_at", "updated_at"),
+    )
+
+
 class Comment(Base):
     __tablename__ = "comments"
 

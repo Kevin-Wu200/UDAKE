@@ -244,7 +244,11 @@ def _get_validation_cache(service: Any) -> ValidationCacheManager:
 def _get_ip_reputation_service(service: Any) -> IPReputationService:
     global _IP_REPUTATION_SERVICE
     if _IP_REPUTATION_SERVICE is None:
-        _IP_REPUTATION_SERVICE = IPReputationService(service.cache)
+        from ..auth_db.session import get_auth_session_factory
+
+        _IP_REPUTATION_SERVICE = IPReputationService(
+            service.cache, db_session_factory=get_auth_session_factory()
+        )
     return _IP_REPUTATION_SERVICE
 
 

@@ -12,6 +12,7 @@ const SMTPSettingsView = () => import('../views/SMTPSettings.vue');
 const EmailLogsView = () => import('../views/EmailLogs.vue');
 const UsersView = () => import('../views/UsersView.vue');
 const AuditLogsView = () => import('../views/AuditLogsView.vue');
+const SecurityManagementView = () => import('../views/SecurityManagementView.vue');
 const EnterpriseManagementView = () => import('../views/EnterpriseManagementView.vue');
 const TicketsView = () => import('../views/TicketsView.vue');
 const TicketDetailView = () => import('../views/TicketDetailView.vue');
@@ -349,6 +350,17 @@ const router = createRouter({
           name: 'audit-logs',
           component: AuditLogsView,
           meta: { titleKey: 'auditLogs', breadcrumbKey: 'auditLogs', roles: ADMIN_ALLOWED_ROLES }
+        },
+        {
+          path: '/security-ip-management',
+          name: 'security-ip-management',
+          component: SecurityManagementView,
+          meta: {
+            titleKey: 'securityIpManagementTitle',
+            breadcrumbKey: 'securityIpManagement',
+            roles: ['super_admin', 'admin'],
+            requiredRoles: ['super_admin', 'admin']
+          }
         }
       ]
     },
