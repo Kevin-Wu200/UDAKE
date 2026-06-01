@@ -9,7 +9,6 @@ import logging
 import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Optional
 
 logger = logging.getLogger(__name__)
@@ -110,7 +109,6 @@ class IPReputationService:
                     .filter(IPReputation.ip_address == ip_address)
                     .one_or_none()
                 )
-                now_utc = datetime.now(timezone.utc)
                 if record:
                     record.score = int(profile.get("score", self._default_score))
                     record.success_count = int(profile.get("success_count", 0))

@@ -10,7 +10,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Callable, Dict, Iterable, List, Optional
+from typing import Any, Callable, Iterable, Optional
 
 from .cache import AuthCacheManager
 
@@ -109,7 +109,7 @@ class IPAccessController:
                     .filter(
                         IPRule.ip_or_cidr == ip_address,
                         IPRule.rule_type == "blacklist",
-                        IPRule.is_active == True,
+                        IPRule.is_active,
                     )
                     .filter(
                         (IPRule.expires_at.is_(None)) | (IPRule.expires_at > now_utc)
@@ -148,7 +148,7 @@ class IPAccessController:
                 now_utc = datetime.now(timezone.utc)
                 active_rules = (
                     db.query(IPRule)
-                    .filter(IPRule.is_active == True)
+                    .filter(IPRule.is_active)
                     .filter(
                         (IPRule.expires_at.is_(None)) | (IPRule.expires_at > now_utc)
                     )
@@ -249,7 +249,7 @@ class IPAccessController:
                     db.query(IPRule).filter(
                         IPRule.ip_or_cidr == ip_text,
                         IPRule.rule_type == "blacklist",
-                        IPRule.is_active == True,
+                        IPRule.is_active,
                     ).update({"is_active": False})
                     db.commit()
                 finally:

@@ -1692,7 +1692,7 @@ def create_ip_rule(
         .filter(
             IPRule.ip_or_cidr == ip_or_cidr,
             IPRule.rule_type == payload.rule_type,
-            IPRule.is_active == True,
+            IPRule.is_active,
         )
         .first()
     )
@@ -1781,7 +1781,7 @@ def update_ip_rule(
             .filter(
                 IPRule.ip_or_cidr == ip_or_cidr,
                 IPRule.rule_type == payload.rule_type,
-                IPRule.is_active == True,
+                IPRule.is_active,
                 IPRule.id != rule_id,
             )
             .first()
