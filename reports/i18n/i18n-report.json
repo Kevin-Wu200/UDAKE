@@ -1,12 +1,12 @@
 {
-  "generatedAt": "2026-05-12T02:59:39.714Z",
+  "generatedAt": "2026-06-02T08:08:52.528Z",
   "summary": {
     "baseKeyCount": 970,
-    "usedKeyCount": 809,
-    "unusedKeyCount": 437,
+    "usedKeyCount": 806,
+    "unusedKeyCount": 441,
     "baselineUnusedKeyCount": 130,
-    "hardcodedCount": 1852,
-    "baselineHardcodedCount": 72
+    "hardcodedCount": 1879,
+    "baselineHardcodedCount": 56
   },
   "coverage": [
     {
@@ -166,6 +166,8 @@
     "datacomparison.report.target",
     "dataimport.label.wkt",
     "dataimport.status.noWktInfo",
+    "deeplearning.titleCollapsed",
+    "deeplearning.titleExpanded",
     "description.accountInfo",
     "description.exportGeoJSON",
     "description.exportWizard",
@@ -388,6 +390,8 @@
     "export.report.parameter.config.value",
     "export.report.stats",
     "formvalidator.error.format",
+    "frontendintegration.titleCollapsed",
+    "frontendintegration.titleExpanded",
     "interpolation.failed",
     "interpolation.finished",
     "interpolation.loadingResult",
@@ -484,12 +488,12 @@
     "html": [
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 62,
+        "line": 65,
         "text": "新建项目"
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/index.html",
-        "line": 230,
+        "line": 233,
         "text": "，且"
       },
       {
@@ -9669,7 +9673,7 @@
       },
       {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/index.html",
-        "line": 298,
+        "line": 301,
         "text": "开发者信息"
       },
       {
@@ -9730,19 +9734,154 @@
     ],
     "js": [
       {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/DroneHUDOverlay.ts",
+        "line": 171,
+        "text": "'置信度: --'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/DroneViewSwitch.ts",
+        "line": 82,
+        "text": "'<span>🛩️ 无人机视角</span>'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/DroneViewSwitch.ts",
+        "line": 108,
+        "text": "'置信度: ${Math.round(this.config.confidence * 100)}% (阈值: ${Math.round(this.config.confidenceThreshold * 100)}%)'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/DroneViewSwitch.ts",
+        "line": 249,
+        "text": "'置信度: <span style='"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Kriging3DPanel.ts",
+        "line": 277,
+        "text": "'请先选择文件'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Kriging3DPanel.ts",
+        "line": 285,
+        "text": "'上传中...'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Kriging3DPanel.ts",
+        "line": 290,
+        "text": "'上传成功: ${data.point_count} 个3D点'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Kriging3DPanel.ts",
+        "line": 315,
+        "text": "'上传失败: ${err.message}'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Kriging3DPanel.ts",
+        "line": 343,
+        "text": "'启动中...'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Kriging3DPanel.ts",
+        "line": 354,
+        "text": "'任务已启动: ${this.taskId?.slice(0, 8)}...'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Kriging3DPanel.ts",
+        "line": 357,
+        "text": "'启动失败: ${err.message}'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Kriging3DPanel.ts",
+        "line": 380,
+        "text": "'3D插值完成'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Kriging3DPanel.ts",
+        "line": 384,
+        "text": "'失败: ${status.error || '"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Kriging3DPanel.ts",
+        "line": 386,
+        "text": "'计算中... ${(status.progress || 0).toFixed(1)}%'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/Kriging3DPanel.ts",
+        "line": 483,
+        "text": "'>${slice.axis.toUpperCase()}轴切片 @ ${slice.position.toFixed(2)}</p>'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/PointDetailedNavigation.ts",
+        "line": 450,
+        "text": "'精准导航'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRecommendationPanel.ts",
+        "line": 109,
+        "text": "'建议点数量'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRecommendationPanel.ts",
+        "line": 123,
+        "text": "'基于方差优先'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRecommendationPanel.ts",
+        "line": 124,
+        "text": "'基于空间覆盖'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRecommendationPanel.ts",
+        "line": 253,
+        "text": "'建议点：${this.recommendations.length}'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SamplingRecommendationPanel.ts",
+        "line": 706,
+        "text": "'视口内还有 ${hiddenCount} 个建议点未显示，请放大地图查看'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SiriAssistant.ts",
+        "line": 125,
+        "text": "'打开智能助手'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SiriAssistant.ts",
+        "line": 126,
+        "text": "'UDAKE 小U'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SiriAssistant.ts",
+        "line": 139,
+        "text": "'输入问题或指令'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SiriAssistant.ts",
+        "line": 144,
+        "text": "'发送'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SiriAssistant.ts",
+        "line": 150,
+        "text": "'语音输入'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SiriAssistant.ts",
+        "line": 156,
+        "text": "'关闭'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SiriAssistant.ts",
+        "line": 281,
+        "text": "'UDAKE 智能助手 · 基于 Qwen3:8b'"
+      },
+      {
+        "file": "/Users/wuchenkai/UDAKE/apps/frontend/js/components/SiriAssistant.ts",
+        "line": 548,
+        "text": "'>参考: ${sources}</span>'"
+      },
+      {
         "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/js/i18n.js",
-        "line": 692,
+        "line": 740,
         "text": "'中文'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/js/ticket-form.js",
-        "line": 218,
-        "text": "'<p>查询中...</p>'"
-      },
-      {
-        "file": "/Users/wuchenkai/UDAKE/apps/frontend/landing-page/js/ticket-form.js",
-        "line": 228,
-        "text": "'>未找到相关工单或信息不匹配</p>'"
       }
     ]
   }

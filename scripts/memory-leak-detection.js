@@ -111,7 +111,7 @@ async function run() {
       p95HeapMB: Number(percentile(heapSeries, 0.95).toFixed(2)),
       maxHeapMB: Number(Math.max(...heapSeries).toFixed(2)),
       projected24hMB: Number((last.heapUsedMB + growthPerHour * 24).toFixed(2)),
-      potentialLeak: growthPerHour > options.maxGrowthPerHourMB || Math.max(...heapSeries) > 200
+      potentialLeak: growthPerHour > options.maxGrowthPerHourMB || Math.max(...heapSeries) > options.maxProjected24hMB
     },
     samples
   };

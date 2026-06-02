@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-04-22T03:44:35.762Z",
-  "baseKeyCount": 492,
+  "generatedAt": "2026-06-02T08:08:52.582Z",
+  "baseKeyCount": 970,
   "results": [
     {
       "locale": "en-US",
-      "total": 492,
+      "total": 970,
       "missingCount": 0,
       "extraCount": 0,
       "missing": [],
@@ -12,7 +12,7 @@
     },
     {
       "locale": "zh-TW",
-      "total": 492,
+      "total": 970,
       "missingCount": 0,
       "extraCount": 0,
       "missing": [],
@@ -20,7 +20,7 @@
     },
     {
       "locale": "ja-JP",
-      "total": 492,
+      "total": 970,
       "missingCount": 0,
       "extraCount": 0,
       "missing": [],
@@ -28,7 +28,7 @@
     },
     {
       "locale": "ko-KR",
-      "total": 492,
+      "total": 970,
       "missingCount": 0,
       "extraCount": 0,
       "missing": [],

@@ -1,12 +1,12 @@
 # 前端国际化检查报告
 
-- 生成时间: 2026-05-12T02:59:39.714Z
+- 生成时间: 2026-06-02T08:08:52.528Z
 - 基准语言总键数: 970
-- 检测到使用键数: 809
-- 未使用键数: 437
+- 检测到使用键数: 806
+- 未使用键数: 441
 - 基线保留键数: 130
-- 可疑硬编码数: 1852
-- 基线忽略硬编码数: 72
+- 可疑硬编码数: 1879
+- 基线忽略硬编码数: 56
 
 ## 语言覆盖率
 
@@ -75,8 +75,8 @@
 
 ## 可疑硬编码（最多 50 条）
 
-- apps/frontend/index.html:62 -> 新建项目
-- apps/frontend/index.html:230 -> ，且
+- apps/frontend/index.html:65 -> 新建项目
+- apps/frontend/index.html:233 -> ，且
 - apps/frontend/landing-page/detail-interpolation.html:9 -> 跳转到空间插值模块详情页
 - apps/frontend/landing-page/detail-realtime.html:9 -> 跳转到实时插值模块详情页
 - apps/frontend/landing-page/detail-template.html:6 -> UDAKE - 详情页模板
