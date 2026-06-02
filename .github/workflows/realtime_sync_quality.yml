@@ -1,6 +1,7 @@
 name: Realtime Sync Quality
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'apps/frontend/js/services/LocationService.ts'

@@ -1,6 +1,7 @@
 name: Deep Learning Tests
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'deep_learning/**'

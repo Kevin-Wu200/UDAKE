@@ -1,6 +1,7 @@
 name: i18n TMS Check
 
 on:
+  workflow_dispatch:
   pull_request:
     paths:
       - 'apps/frontend/js/utils/I18n.ts'

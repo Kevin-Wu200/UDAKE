@@ -1,6 +1,7 @@
 name: TypeScript Quality
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'apps/frontend/**'

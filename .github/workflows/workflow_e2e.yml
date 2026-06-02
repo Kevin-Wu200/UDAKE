@@ -1,6 +1,7 @@
 name: Workflow E2E
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'apps/admin-frontend/**'

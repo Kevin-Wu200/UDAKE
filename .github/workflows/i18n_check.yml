@@ -1,6 +1,7 @@
 name: Frontend I18n Check
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - 'apps/frontend/**'
