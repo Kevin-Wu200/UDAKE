@@ -56,7 +56,7 @@ export class GeoSceneEngine extends BaseMapEngine {
 
         // 检测深色模式
         const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        const basemap = finalOptions.basemap || (isDark ? 'dark-gray-vector' : 'gray-vector');
+        const basemap = finalOptions.basemap || (isDark ? 'tianditu-vector' : 'tianditu-vector');
 
         // 创建地图
         this.map = new Map({
@@ -98,7 +98,7 @@ export class GeoSceneEngine extends BaseMapEngine {
         const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
         mediaQuery.addEventListener('change', (e: MediaQueryListEvent) => {
             if (this.map) {
-                this.map.basemap = e.matches ? 'dark-gray-vector' : 'gray-vector';
+                this.map.basemap = 'tianditu-vector';
             }
         });
 
