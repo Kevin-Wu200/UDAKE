@@ -161,19 +161,20 @@
     "dmg": {
       "contents": [
         {
-          "x": 130,
-          "y": 220
+          "x": 180,
+          "y": 220,
+          "type": "file"
         },
         {
-          "x": 410,
+          "x": 510,
           "y": 220,
           "type": "link",
           "path": "/Applications"
         }
       ],
       "window": {
-        "width": 540,
-        "height": 380
+        "width": 660,
+        "height": 440
       },
       "background": "build/dmg-background.png"
     },
