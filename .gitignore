@@ -77,4 +77,3 @@ apps/admin-frontend/dist
 android/app/build/outputs/
 apps/frontend/dist/
 dist/
-package-lock.json
