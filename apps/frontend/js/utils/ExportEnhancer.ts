@@ -49,6 +49,53 @@ export class ExportEnhancer {
         })), filename);
     }
 
+    /** 导出采样点为 GeoJSON（纯前端生成） */
+    static exportPointsGeoJSON(points: Array<{ x: number; y: number; value: number; [k: string]: any }>, filename = 'sampling_points.geojson'): void {
+        const features = points.map(p => ({
+            type: 'Feature' as const,
+            geometry: {
+                type: 'Point' as const,
+                coordinates: [p.x, p.y]
+            },
+            properties: {
+                value: p.value,
+                ...(p.timestamp ? { timestamp: p.timestamp } : {}),
+            }
+        }));
+
+        const geojson = {
+            type: 'FeatureCollection',
+            features
+        };
+
+        const blob = new Blob([JSON.stringify(geojson, null, 2)], { type: 'application/geo+json;charset=utf-8' });
+        this._download(blob, filename);
+    }
+
+    /** 导出采样点为 Excel（XLSX 格式） */
+    static exportPointsExcel(points: Array<{ x: number; y: number; value: number; [k: string]: any }>, filename = 'sampling_points.xlsx'): void {
+        // 使用简单 CSV 格式作为 Excel 导出（.xlsx 扩展名，Excel 可打开 CSV）
+        // 如果需要真正的 XLSX，需要引入 SheetJS 库
+        const headers = ['longitude', 'latitude', 'value'];
+        const hasTimestamp = points.some(p => p.timestamp);
+        if (hasTimestamp) headers.push('timestamp');
+        
+        const rows = [
+            headers.join(','),
+            ...points.map(p => {
+                const row = [p.x, p.y, p.value];
+                if (hasTimestamp) row.push(p.timestamp || '');
+                return row.map(v => {
+                    const str = String(v ?? '');
+                    return str.includes(',') || str.includes('"') ? `"${str.replace(/"/g, '""')}"` : str;
+                }).join(',');
+            })
+        ];
+        const csv = '\uFEFF' + rows.join('\n'); // BOM for Excel UTF-8
+        const blob = new Blob([csv], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=utf-8' });
+        this._download(blob, filename);
+    }
+
     /** 生成简易 HTML 报告并导出为可打印页面 */
     static generateHTMLReport(reportData: {
         taskId: string;

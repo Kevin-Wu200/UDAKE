@@ -8,7 +8,7 @@ from typing import Sequence, Union
 
 # revision identifiers, used by Alembic.
 revision: str = 'ad11761e2338'
-down_revision: Union[str, None] = ('20260416_0009', '20260507_0009')
+down_revision: Union[str, None] = ('20260415_0008', '20260507_0009')
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

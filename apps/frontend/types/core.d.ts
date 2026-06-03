@@ -142,6 +142,7 @@ export interface StartKrigingResponse {
 /** 预测/方差结果 */
 export interface ResultResponse {
     geotiff_url: string;
+    geojson_url?: string;
     geojson?: GeoJSONFeatureCollection;
     statistics?: Record<string, number>;
 }

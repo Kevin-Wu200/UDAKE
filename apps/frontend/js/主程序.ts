@@ -1580,6 +1580,8 @@ class App {
 
         if (this.layerManager) {
             await this.layerManager.addSamplingPoint(normalizedPoint);
+        } else {
+            console.warn('图层管理器未初始化，采样点将在项目加载后显示');
         }
 
         const components = this.componentInitializer.getComponentRegistry();
@@ -1587,6 +1589,12 @@ class App {
         components.parameterAdjustmentPanel.setSamplingContext(allPoints);
 
         this.validateGridResolution();
+
+        // 更新热力图数据源，确保新采样点立即显示
+        const mapEnhancer = this.componentInitializer?.getComponentRegistry()?.mapVisualEnhancer;
+        if (mapEnhancer) {
+            mapEnhancer.refreshData();
+        }
     }
 
     /**
@@ -1947,6 +1955,53 @@ class App {
                 this.layerManager.addRasterLayer('variance', varianceResult.geotiff_url);
             }
 
+            // 尝试获取插值网格数据并注入热力图控制器
+            try {
+                const interpolationResult = await this.apiService!.getInterpolationResult(this.currentTaskId!);
+                if (interpolationResult && interpolationResult.grid && interpolationResult.grid.length > 0) {
+                    const { grid, bounds, cellSize } = interpolationResult;
+                    const heatmapPoints: Array<{ lng: number; lat: number; value: number; sourceId: string; timestamp: number }> = [];
+                    const timestamp = Date.now();
+                    
+                    // 将网格数据转换为热力图数据点
+                    for (let row = 0; row < grid.length; row++) {
+                        for (let col = 0; col < grid[row].length; col++) {
+                            const value = grid[row][col];
+                            if (value === null || value === undefined || isNaN(value)) continue;
+                            const lng = bounds.minX + col * cellSize;
+                            const lat = bounds.minY + row * cellSize;
+                            heatmapPoints.push({
+                                lng,
+                                lat,
+                                value,
+                                sourceId: `interp-${row}-${col}`,
+                                timestamp
+                            });
+                        }
+                    }
+
+                    if (heatmapPoints.length > 0) {
+                        // 归一化值到 0-1 范围以便热力图渲染
+                        const values = heatmapPoints.map(p => p.value);
+                        const minVal = Math.min(...values);
+                        const maxVal = Math.max(...values);
+                        const span = maxVal - minVal || 1;
+                        for (const p of heatmapPoints) {
+                            p.value = (p.value - minVal) / span;
+                        }
+
+                        const mapEnhancer = this.componentInitializer?.getComponentRegistry()?.mapVisualEnhancer;
+                        if (mapEnhancer) {
+                            mapEnhancer.setExternalData(heatmapPoints);
+                            mapEnhancer.togglePanel(true);
+                        }
+                    }
+                }
+            } catch (gridError) {
+                // 网格数据获取失败不影响主流程
+                console.warn('无法获取插值网格数据用于热力图:', gridError);
+            }
+
             const exportPanel = document.getElementById('export-panel');
             if (exportPanel) {
                 exportPanel.style.display = 'block';
@@ -1986,10 +2041,32 @@ class App {
                 undoable: false
             });
         } catch (error) {
-            console.error(t('dialog.export.failed.title'), error);
+            console.warn(t('dialog.export.failed.title'), error);
             LoadingManager.hide();
-            const errorMessage = error instanceof Error ? error.message : t('error.commmon.unkown');
-            this.showExportStatus(t('dialog.export.failed.message', {errorMessage: errorMessage}), 'error');
+            
+            // 如果是 GeoJSON 格式，尝试从服务端获取结果数据并前端生成 GeoJSON
+            if (format === 'geojson' && this.currentTaskId) {
+                try {
+                    this.showExportStatus('正在从服务器获取数据生成 GeoJSON...', 'success');
+                    const result = dataType === 'prediction'
+                        ? await this.apiService!.getPredictionResult(this.currentTaskId)
+                        : await this.apiService!.getVarianceResult(this.currentTaskId);
+                    
+                    if (result.geojson_url) {
+                        // 尝试通过 geojson_url 下载
+                        await this.apiService!.downloadExportFile(this.currentTaskId, `${this.currentTaskId}_${dataType}.geojson`);
+                        this.showExportStatus(t('dialog.download.success', {filename: filename}), 'success');
+                    } else {
+                        throw new Error('无法获取 GeoJSON 数据');
+                    }
+                } catch (fallbackError) {
+                    const errorMessage = error instanceof Error ? error.message : t('error.common.unkown');
+                    this.showExportStatus(t('dialog.export.failed.message', {errorMessage: errorMessage}), 'error');
+                }
+            } else {
+                const errorMessage = error instanceof Error ? error.message : t('error.common.unkown');
+                this.showExportStatus(t('dialog.export.failed.message', {errorMessage: errorMessage}), 'error');
+            }
         }
     }
 
@@ -2010,25 +2087,61 @@ class App {
         bindButton('export-variance-shp', 'variance', 'shp');
         bindButton('export-variance-tif', 'variance', 'tif');
 
-        // 增强导出
+        // CSV 导出（采样点数据）
         this.eventBinder.bindBySelector('#export-csv', 'click', () => {
             const points = this.currentProject?.points || this.layerManager?.getSamplingPoints() || [];
             if (points.length === 0) {
-                this.showExportStatus(t('dialog.export.failed.noResult'), 'error');
+                this.showExportStatus('没有可导出的采样点数据', 'error');
                 return;
             }
             ExportEnhancer.exportPointsCSV(points);
+            this.showExportStatus(`成功导出 ${points.length} 个采样点为 CSV`, 'success');
             HistoryManager.record({
-                action: t('dialog.export.CSV.title'),
+                action: '导出 CSV',
                 type: 'export',
-                detail: t('dialog.export.pointsNum.detail', {pointNum: points.length}),
+                detail: `导出 ${points.length} 个采样点`,
                 undoable: false
             });
         });
 
+        // GeoJSON 采样点导出（纯前端生成）
+        this.eventBinder.bindBySelector('#export-geojson-sampling', 'click', () => {
+            const points = this.currentProject?.points || this.layerManager?.getSamplingPoints() || [];
+            if (points.length === 0) {
+                this.showExportStatus('没有可导出的采样点数据', 'error');
+                return;
+            }
+            ExportEnhancer.exportPointsGeoJSON(points);
+            this.showExportStatus(`成功导出 ${points.length} 个采样点为 GeoJSON`, 'success');
+            HistoryManager.record({
+                action: '导出 GeoJSON',
+                type: 'export',
+                detail: `导出 ${points.length} 个采样点`,
+                undoable: false
+            });
+        });
+
+        // Excel 导出（采样点数据）
+        this.eventBinder.bindBySelector('#export-excel', 'click', () => {
+            const points = this.currentProject?.points || this.layerManager?.getSamplingPoints() || [];
+            if (points.length === 0) {
+                this.showExportStatus('没有可导出的采样点数据', 'error');
+                return;
+            }
+            ExportEnhancer.exportPointsExcel(points);
+            this.showExportStatus(`成功导出 ${points.length} 个采样点为 Excel`, 'success');
+            HistoryManager.record({
+                action: '导出 Excel',
+                type: 'export',
+                detail: `导出 ${points.length} 个采样点`,
+                undoable: false
+            });
+        });
+
+        // HTML 报告导出
         this.eventBinder.bindBySelector('#export-report', 'click', () => {
             if (!this.currentTaskId) {
-                this.showExportStatus(t('error.export.task.noReport'), 'error');
+                this.showExportStatus('没有可导出报告的任务', 'error');
                 return;
             }
             const krigingMethodSelect = document.getElementById('kriging-method') as HTMLSelectElement;
@@ -2040,9 +2153,9 @@ class App {
                 gridResolution: parseInt(gridResolutionInput?.value || '10', 10)
             });
             HistoryManager.record({
-                action: t('dialog.export.report.title'),
+                action: '导出 HTML 报告',
                 type: 'export',
-                detail: t('dialog.export.report.detail', {currentTaskId: this.currentTaskId}),
+                detail: `导出报告 ${this.currentTaskId}`,
                 undoable: false
             });
         });

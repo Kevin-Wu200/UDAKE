@@ -157,6 +157,7 @@ export class Map25DHeatmapController {
 
     private screenPoints: ScreenPoint[] = [];
     private lastHoverId: string | null = null;
+    private externalDataPoints: HeatmapDataPoint[] | null = null;
 
     constructor(mapContainer: HTMLElement, provider: ContextProvider) {
         this.mapContainer = mapContainer;
@@ -193,6 +194,28 @@ export class Map25DHeatmapController {
     updateContext(provider: ContextProvider): void {
         this.provider = provider;
         this.dataSource = new LayerManagerHeatmapDataSource(provider.getSamplingPoints);
+    }
+
+    /**
+     * 刷新数据源，强制重新读取采样点数据
+     */
+    refreshData(): void {
+        this.dataSource = new LayerManagerHeatmapDataSource(this.provider.getSamplingPoints);
+    }
+
+    /**
+     * 设置外部数据（如插值结果网格），用于热力图显示
+     * @param points 热力图数据点数组，包含经纬度和值
+     */
+    setExternalData(points: HeatmapDataPoint[]): void {
+        this.externalDataPoints = points.length > 0 ? points : null;
+    }
+
+    /**
+     * 清除外部数据，恢复使用采样点数据
+     */
+    clearExternalData(): void {
+        this.externalDataPoints = null;
     }
 
     togglePanel(forceVisible?: boolean): void {
@@ -461,9 +484,17 @@ export class Map25DHeatmapController {
             return;
         }
 
-        const frame = this.dataSource.getFrame(this.heatmap.timeIndex).filter((point) => (
+        let frame = this.dataSource.getFrame(this.heatmap.timeIndex).filter((point) => (
             point.value >= this.heatmap.minFilter && point.value <= this.heatmap.maxFilter
         ));
+
+        // 合并外部数据（如插值结果网格点）
+        if (this.externalDataPoints && this.externalDataPoints.length > 0) {
+            const filteredExternal = this.externalDataPoints.filter((point) => (
+                point.value >= this.heatmap.minFilter && point.value <= this.heatmap.maxFilter
+            ));
+            frame = [...frame, ...filteredExternal];
+        }
 
         this.screenPoints = frame
             .map((point) => {

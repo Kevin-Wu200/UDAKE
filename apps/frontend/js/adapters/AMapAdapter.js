@@ -85,10 +85,121 @@ export class AMapAdapter extends MapAdapter {
     }
 
     /**
-     * 添加栅格图层（高德地图暂不支持，预留接口）
+     * 添加栅格图层
+     * 高德地图通过 ImageLayer 加载渲染后的 GeoTIFF 预览图
+     * 或使用 GeoJSON 点数据进行可视化
      */
-    async addRasterLayer(_type, _url) {
-        console.warn('高德地图暂不支持栅格图层');
+    async addRasterLayer(type, url) {
+        try {
+            // 构建 GeoTIFF 的完整 URL
+            const fullUrl = url.startsWith('http') ? url : `${window.location.origin}${url}`;
+            
+            // 尝试使用 ImageLayer 加载 GeoTIFF（需要服务端返回可渲染格式）
+            const imageLayer = new AMap.ImageLayer({
+                url: fullUrl,
+                bounds: this.map.getBounds(),
+                zooms: [3, 18],
+                opacity: 0.6
+            });
+
+            const layerKey = `raster_${type}`;
+            if (this.layers[layerKey]) {
+                this.map.remove(this.layers[layerKey]);
+            }
+
+            imageLayer.setMap(this.map);
+            this.layers[layerKey] = imageLayer;
+            console.log(`✅ 栅格图层(${type})已添加`);
+        } catch (error) {
+            console.warn(`栅格图层(${type})加载失败，尝试 GeoJSON 点渲染:`, error.message);
+            // 降级方案：尝试加载对应的 GeoJSON 文件进行点渲染
+            try {
+                const taskId = url.split('/').pop()?.split('_')[0];
+                if (taskId) {
+                    const geojsonUrl = url.replace(/\.tif$/, '.geojson');
+                    const fullGeojsonUrl = geojsonUrl.startsWith('http') ? geojsonUrl : `${window.location.origin}${geojsonUrl}`;
+                    const response = await fetch(fullGeojsonUrl, { mode: 'cors' });
+                    if (response.ok) {
+                        const geojson = await response.json();
+                        if (geojson.features) {
+                            this._renderGeoJSONPoints(geojson, type);
+                        }
+                    }
+                }
+            } catch (geojsonError) {
+                console.warn(`GeoJSON 降级渲染也失败:`, geojsonError.message);
+            }
+        }
+    }
+
+    /**
+     * 将 GeoJSON 点数据渲染为地图上的彩色点
+     */
+    _renderGeoJSONPoints(geojson, type) {
+        const layerKey = `geojson_${type}`;
+        if (this.layers[layerKey]) {
+            this.map.remove(this.layers[layerKey]);
+        }
+
+        // 计算值范围用于颜色映射
+        const values = geojson.features
+            .map(f => f.properties?.value ?? f.properties?.[type])
+            .filter(v => v !== null && v !== undefined && isFinite(v));
+        
+        const minVal = Math.min(...values);
+        const maxVal = Math.max(...values);
+        const span = maxVal - minVal || 1;
+
+        // 为每个点创建标记
+        const markers = geojson.features.map((feature, _index) => {
+            const coords = feature.geometry?.coordinates;
+            if (!coords || coords.length < 2) return null;
+
+            const value = feature.properties?.value ?? feature.properties?.[type] ?? 0;
+            const normalizedValue = (value - minVal) / span;
+            
+            // 颜色映射：蓝(低) -> 绿(中) -> 红(高)
+            const color = this._valueToColor(normalizedValue);
+
+            return new AMap.CircleMarker({
+                center: [coords[0], coords[1]],
+                radius: 4 + normalizedValue * 8,
+                fillColor: color,
+                fillOpacity: 0.6,
+                strokeColor: color,
+                strokeWeight: 1,
+                strokeOpacity: 0.3,
+                zIndex: Math.floor(normalizedValue * 100)
+            });
+        }).filter(Boolean);
+
+        if (markers.length > 0) {
+            // 使用 OverlayGroup 管理大量标记以提高性能
+            const group = new AMap.OverlayGroup(markers.slice(0, 5000)); // 限制最多 5000 个点
+            group.setMap(this.map);
+            this.layers[layerKey] = group;
+            console.log(`✅ GeoJSON 点渲染完成(${type}): ${Math.min(markers.length, 5000)} 个点`);
+        }
+    }
+
+    /**
+     * 根据值(0-1)返回颜色（蓝绿红渐变）
+     */
+    _valueToColor(normalizedValue) {
+        let r, g, b;
+        if (normalizedValue < 0.5) {
+            // 蓝色 -> 绿色
+            r = Math.floor(normalizedValue * 2 * 255);
+            g = Math.floor(100 + normalizedValue * 2 * 155);
+            b = Math.floor(255 - normalizedValue * 2 * 155);
+        } else {
+            // 绿色 -> 红色
+            const t = (normalizedValue - 0.5) * 2;
+            r = Math.floor(255);
+            g = Math.floor(255 - t * 255);
+            b = Math.floor(100 - t * 100);
+        }
+        return `rgb(${r},${g},${b})`;
     }
 
     /**
