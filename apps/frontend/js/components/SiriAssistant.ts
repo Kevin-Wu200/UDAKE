@@ -294,6 +294,12 @@ export class SiriAssistant {
         document.addEventListener('mousemove', (e) => this._onDragMove(e as MouseEvent));
         document.addEventListener('mouseup', (e) => this._onDragEnd(e as MouseEvent));
 
+        // 点击打开/关闭面板（非拖拽情况下）
+        this.ball.addEventListener('click', () => {
+            if (this.isDragging) return;
+            this.isPanelOpen ? this.closePanel() : this.openPanel();
+        });
+
         // 移动端拖拽
         this.ball.addEventListener('touchstart', (e) => this._onTouchStart(e as TouchEvent), { passive: false });
         document.addEventListener('touchmove', (e) => this._onTouchMove(e as TouchEvent), { passive: false });
