@@ -33,6 +33,7 @@ interface MarkerData {
     value: number;
     color: number[];
     size: number;
+    shape: string;
 }
 
 /** 多边形内部表示 */
@@ -165,7 +166,8 @@ export class CanvasMapAdapter extends MapAdapter {
                     lngLat: [lng, lat],
                     value,
                     color: [...this._markerColor],
-                    size: DEFAULT_MARKER_SIZE
+                    size: DEFAULT_MARKER_SIZE,
+                    shape: 'circle'
                 });
             }
         }
@@ -191,9 +193,12 @@ export class CanvasMapAdapter extends MapAdapter {
     async addRasterLayer(type: 'prediction' | 'variance', url: string): Promise<void> {
         const layerName = type;
 
-        // 移除旧图层
+        // 移除旧图层（包括 GeoJSON 降级图层）
         if (this._layers.has(layerName)) {
             this.removeLayer(layerName);
+        }
+        if (this._layers.has(`geojson_${layerName}`)) {
+            this.removeLayer(`geojson_${layerName}`);
         }
 
         const rasterData: RasterLayerData = {
@@ -213,10 +218,33 @@ export class CanvasMapAdapter extends MapAdapter {
         });
 
         // 异步加载图像
+        let rasterLoaded = false;
         try {
             await this._fetchRasterImage(layerName);
+            rasterLoaded = true;
         } catch (error) {
-            console.error(`❌ 加载栅格图层失败: ${layerName}`, error);
+            console.warn(`栅格图层(${layerName})加载失败，尝试 GeoJSON 点渲染降级:`, (error as Error).message);
+            this.removeLayer(layerName); // 移除失败的栅格图层占位
+        }
+
+        // 栅格加载失败时，尝试 GeoJSON 降级方案
+        if (!rasterLoaded) {
+            try {
+                const taskId = url.split('/').pop()?.split('.')[0]?.split('_')[0];
+                if (taskId) {
+                    const geojsonUrl = url.replace(/\.tif$/, '.geojson');
+                    const fullGeojsonUrl = geojsonUrl.startsWith('http') ? geojsonUrl : `${window.location.origin}${geojsonUrl}`;
+                    const response = await fetch(fullGeojsonUrl, { mode: 'cors' });
+                    if (response.ok) {
+                        const geojson = await response.json();
+                        if (geojson.features) {
+                            this._renderGeoJSONPoints(geojson, type);
+                        }
+                    }
+                }
+            } catch (geojsonError) {
+                console.warn(`GeoJSON 降级渲染也失败:`, (geojsonError as Error).message);
+            }
         }
 
         this._requestRender();
@@ -272,22 +300,109 @@ export class CanvasMapAdapter extends MapAdapter {
         }
     }
 
+    /**
+     * 将 GeoJSON 点数据渲染为彩色标记（栅格降级方案）
+     * 创建按值着色的点图层，与 AMapAdapter._renderGeoJSONPoints 保持一致的配色
+     */
+    private _renderGeoJSONPoints(geojson: GeoJSONFeatureCollection, type: 'prediction' | 'variance'): void {
+        const layerKey = `geojson_${type}`;
+
+        // 移除旧图层
+        if (this._layers.has(layerKey)) {
+            this.removeLayer(layerKey);
+        }
+
+        // 计算值范围用于颜色映射
+        const values: number[] = [];
+        for (const f of geojson.features) {
+            const v = f.properties?.value ?? f.properties?.[type];
+            if (v !== null && v !== undefined && isFinite(v)) {
+                values.push(v);
+            }
+        }
+        if (values.length === 0) return;
+
+        const minVal = Math.min(...values);
+        const maxVal = Math.max(...values);
+        const span = maxVal - minVal || 1;
+
+        const points: MarkerData[] = [];
+        const MAX_POINTS = 5000;
+
+        for (let i = 0; i < Math.min(geojson.features.length, MAX_POINTS); i++) {
+            const feature = geojson.features[i];
+            const coords = feature.geometry?.coordinates;
+            if (!coords || coords.length < 2) continue;
+
+            const value = feature.properties?.value ?? feature.properties?.[type] ?? 0;
+            const normalizedValue = (value - minVal) / span;
+            const [r, g, b, a] = this._valueToColor(normalizedValue);
+            const gkCoord = this.engine.projectionService.toGK(coords[0], coords[1]);
+
+            points.push({
+                gkCoord,
+                lngLat: [coords[0], coords[1]],
+                value,
+                color: [r, g, b, a],
+                size: 5 + normalizedValue * 10,
+                shape: 'circle'
+            });
+        }
+
+        this._layers.set(layerKey, {
+            name: layerKey,
+            type: 'points',
+            visible: true,
+            opacity: 0.8,
+            zIndex: 10,
+            data: points
+        });
+
+        console.log(`✅ GeoJSON 点渲染完成(${type}): ${points.length} 个点`);
+    }
+
+    /**
+     * 根据归一化值(0-1)返回 RGBA 颜色数组（蓝绿红渐变）
+     * 与 AMapAdapter._valueToColor 保持一致的配色方案
+     */
+    private _valueToColor(normalizedValue: number): [number, number, number, number] {
+        let r: number, g: number, b: number;
+        if (normalizedValue < 0.5) {
+            // 蓝色 -> 绿色
+            r = Math.floor(normalizedValue * 2 * 255);
+            g = Math.floor(100 + normalizedValue * 2 * 155);
+            b = Math.floor(255 - normalizedValue * 2 * 155);
+        } else {
+            // 绿色 -> 红色
+            const t = (normalizedValue - 0.5) * 2;
+            r = Math.min(255, Math.floor(100 + t * 155));
+            g = Math.floor(255 - t * 155);
+            b = Math.floor(100 - t * 100);
+        }
+        return [r, g, b, 0.8];
+    }
+
     async addMarker(pointData: SamplingPoint): Promise<void> {
-        // SamplingPoint 使用 x/y 表示经纬度
+        // 从 pointData.style 读取样式，否则使用默认值
+        const style = pointData.style;
+        const hexColor = style?.color || '#007AFF';
+        const shape = style?.shape || 'circle';
+        const rgba = this._hexToRgba(hexColor, 0.9);
+
         const gkCoord = this.engine.projectionService.toGK(pointData.x, pointData.y);
 
         const marker: MarkerData = {
             gkCoord,
             lngLat: [pointData.x, pointData.y],
             value: pointData.value,
-            color: [...this._markerColor],
-            size: DEFAULT_MARKER_SIZE
+            color: rgba,
+            size: DEFAULT_MARKER_SIZE,
+            shape: shape
         };
 
         this._markers.push(marker);
         this._samplingPoints.push(pointData);
 
-        // 添加到标记图层
         let markerLayer = this._layers.get('__markers__');
         if (!markerLayer) {
             this._layers.set('__markers__', {
@@ -303,6 +418,17 @@ export class CanvasMapAdapter extends MapAdapter {
         (markerLayer.data as MarkerData[]).push(marker);
 
         this._requestRender();
+    }
+
+    /**
+     * 将 hex 颜色字符串转换为 RGBA 数组
+     */
+    private _hexToRgba(hex: string, alpha: number): [number, number, number, number] {
+        const clean = hex.replace('#', '');
+        const r = parseInt(clean.substring(0, 2), 16);
+        const g = parseInt(clean.substring(2, 4), 16);
+        const b = parseInt(clean.substring(4, 6), 16);
+        return [r, g, b, alpha];
     }
 
     async addPolygon(coordinates: number[][][], options: PolygonStyleOptions = {}): Promise<any> {
@@ -597,7 +723,7 @@ export class CanvasMapAdapter extends MapAdapter {
     }
 
     /**
-     * 渲染采样点标记
+     * 渲染采样点标记（支持多种形状）
      */
     private _renderMarkers(
         ctx: CanvasRenderingContext2D,
@@ -621,27 +747,77 @@ export class CanvasMapAdapter extends MapAdapter {
 
             const [r, g, b, a] = marker.color;
             const size = Math.max(4, marker.size * Math.min(2, scale / 0.00005));
+            const shape = marker.shape || 'circle';
 
             // 绘制外圈光晕
             ctx.beginPath();
-            ctx.arc(px, py, size + 3, 0, Math.PI * 2);
+            this._drawShapePath(ctx, px, py, size + 3, shape);
             ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a * 0.3})`;
             ctx.fill();
 
-            // 绘制实心圆
+            // 绘制实心形状
             ctx.beginPath();
-            ctx.arc(px, py, size, 0, Math.PI * 2);
+            this._drawShapePath(ctx, px, py, size, shape);
             ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${a})`;
             ctx.fill();
 
             // 绘制白色边框
             ctx.beginPath();
-            ctx.arc(px, py, size, 0, Math.PI * 2);
+            this._drawShapePath(ctx, px, py, size, shape);
             ctx.strokeStyle = this.engine.isDarkMode()
                 ? 'rgba(30, 30, 46, 0.9)'
                 : 'rgba(255, 255, 255, 0.9)';
             ctx.lineWidth = 1.5;
             ctx.stroke();
+        }
+    }
+
+    /**
+     * 根据形状类型绘制路径
+     */
+    private _drawShapePath(ctx: CanvasRenderingContext2D, cx: number, cy: number, size: number, shape: string): void {
+        switch (shape) {
+            case 'square': {
+                const half = size * 0.7;
+                ctx.moveTo(cx - half, cy - half);
+                ctx.lineTo(cx + half, cy - half);
+                ctx.lineTo(cx + half, cy + half);
+                ctx.lineTo(cx - half, cy + half);
+                ctx.closePath();
+                break;
+            }
+            case 'triangle': {
+                ctx.moveTo(cx, cy - size);
+                ctx.lineTo(cx + size * 0.87, cy + size * 0.5);
+                ctx.lineTo(cx - size * 0.87, cy + size * 0.5);
+                ctx.closePath();
+                break;
+            }
+            case 'diamond': {
+                ctx.moveTo(cx, cy - size);
+                ctx.lineTo(cx + size * 0.7, cy);
+                ctx.lineTo(cx, cy + size);
+                ctx.lineTo(cx - size * 0.7, cy);
+                ctx.closePath();
+                break;
+            }
+            case 'star': {
+                const outerR = size;
+                const innerR = size * 0.4;
+                for (let i = 0; i < 5; i++) {
+                    const outerAngle = (i * 72 - 90) * Math.PI / 180;
+                    const innerAngle = ((i * 72 + 36) - 90) * Math.PI / 180;
+                    if (i === 0) ctx.moveTo(cx + outerR * Math.cos(outerAngle), cy + outerR * Math.sin(outerAngle));
+                    else ctx.lineTo(cx + outerR * Math.cos(outerAngle), cy + outerR * Math.sin(outerAngle));
+                    ctx.lineTo(cx + innerR * Math.cos(innerAngle), cy + innerR * Math.sin(innerAngle));
+                }
+                ctx.closePath();
+                break;
+            }
+            case 'circle':
+            default:
+                ctx.arc(cx, cy, size, 0, Math.PI * 2);
+                break;
         }
     }
 

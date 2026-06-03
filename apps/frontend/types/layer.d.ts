@@ -120,6 +120,7 @@ export interface ILayerManager {
     addRasterLayer(type: string, url: string): Promise<void>;
     toggleLayer(layerName: string, visible: boolean): void;
     setLayerOpacity(layerName: string, opacity: number): void;
+    setRasterOpacity(opacity: number): void;
     removeLayer(layerName: string): void;
     clearAllLayers(): void;
 
@@ -127,6 +128,7 @@ export interface ILayerManager {
     addSamplingPoint(pointData: SamplingPoint): Promise<void>;
     addMarker(pointData: SamplingPoint): Promise<void>;
     getSamplingPoints(): SamplingPoint[];
+    getCurrentMarkerStyle(): { color: string; shape: string };
 
     // 交互操作
     setupClickHandler(handler: (graphic: MapGraphic, mapPoint: MapPoint) => void): void;

@@ -136,6 +136,111 @@
     gap: 8px;
 }
 
+/* 栅格透明度和点位样式控制 */
+.layer-opacity-control {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-color, #e0e0e0);
+}
+
+.opacity-label {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 13px;
+    color: var(--text-secondary, #666);
+    margin-bottom: 6px;
+}
+
+.opacity-slider {
+    width: 100%;
+    height: 6px;
+    -webkit-appearance: none;
+    appearance: none;
+    background: linear-gradient(to right, var(--accent-color, #007AFF) 0%, var(--accent-color, #007AFF) 70%, var(--bg-tertiary, #e0e0e0) 70%, var(--bg-tertiary, #e0e0e0) 100%);
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+}
+
+.opacity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent-color, #007AFF);
+    cursor: pointer;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    transition: transform var(--transition-fast, 0.15s);
+}
+
+.opacity-slider::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+}
+
+.opacity-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: var(--accent-color, #007AFF);
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* 点位样式控制 */
+.marker-style-control {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.color-picker-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.color-picker {
+    width: 36px;
+    height: 36px;
+    border: 2px solid var(--border-color, #e0e0e0);
+    border-radius: 8px;
+    cursor: pointer;
+    padding: 2px;
+    background: none;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+    padding: 0;
+}
+
+.color-picker::-webkit-color-swatch {
+    border: none;
+    border-radius: 5px;
+}
+
+.color-hex-label {
+    font-size: 13px;
+    font-family: monospace;
+    color: var(--text-secondary, #666);
+}
+
+.marker-style-preview {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: var(--bg-secondary, #f5f5f7);
+}
+
+.preview-label {
+    font-size: 12px;
+    color: var(--text-tertiary, #999);
+}
+
 .checkbox-label {
     display: flex;
     align-items: center;

@@ -108,6 +108,37 @@
                     </div>
                 </div>
 
+                <div class="panel" id="marker-style-panel" data-collapsible="marker-style-panel">
+                    <h2 class="panel-title" data-i18n="marker.style">点位样式</h2>
+                    <div class="panel-content">
+                        <div class="marker-style-control">
+                            <div class="form-group">
+                                <label for="marker-color-picker">颜色</label>
+                                <div class="color-picker-row">
+                                    <input type="color" id="marker-color-picker" class="color-picker" value="#007AFF">
+                                    <span id="marker-color-hex" class="color-hex-label">#007AFF</span>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="marker-shape-select">形状</label>
+                                <select id="marker-shape-select" class="select">
+                                    <option value="circle" selected>⚫ 圆形</option>
+                                    <option value="square">◼ 方形</option>
+                                    <option value="triangle">▲ 三角形</option>
+                                    <option value="diamond">◆ 菱形</option>
+                                    <option value="star">★ 星形</option>
+                                </select>
+                            </div>
+                            <div class="marker-style-preview">
+                                <span class="preview-label">预览</span>
+                                <svg id="marker-preview-svg" width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+                                    <circle cx="16" cy="16" r="13" fill="#007AFF" stroke="#fff" stroke-width="2"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="panel" id="kriging-params-panel" data-collapsible="kriging-params-panel">
                     <h2 class="panel-title" data-i18n="kriging.title">插值参数</h2>
                     <div class="panel-content">
@@ -319,6 +350,14 @@
                                 <input type="checkbox" id="layer-variance">
                                 <span data-i18n="layer.variance">方差栅格</span>
                             </label>
+                        </div>
+                        <div class="layer-opacity-control">
+                            <label for="raster-opacity-slider" class="opacity-label">
+                                <span data-i18n="layer.opacity">栅格透明度</span>
+                                <span id="raster-opacity-value">70%</span>
+                            </label>
+                            <input type="range" id="raster-opacity-slider" class="opacity-slider"
+                                min="10" max="100" value="70" step="5">
                         </div>
                     </div>
                 </div>

@@ -17,6 +17,7 @@ export interface SamplingPoint {
     y: number;
     value: number;
     timestamp?: string;
+    style?: { color: string; shape: string };
 }
 
 /** 地理边界 */

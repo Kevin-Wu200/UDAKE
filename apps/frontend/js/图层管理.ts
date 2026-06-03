@@ -60,6 +60,10 @@ export class LayerManager implements ILayerManager {
         // 初始化加载指示器
         this._initLoadingIndicator();
 
+        // 初始化透明度滑条和点位样式
+        this._initOpacitySlider();
+        this._initMarkerStylePicker();
+
         this.setupClickHandler((graphic, mapPoint) => this.showInfoPanel(graphic, mapPoint));
         this._setupViewportListener();
     }
@@ -110,6 +114,106 @@ export class LayerManager implements ILayerManager {
             }
         `;
         document.head.appendChild(style);
+    }
+
+    /** 当前栅格透明度（0-1） */
+    private _rasterOpacity: number = 0.7;
+
+    /** 当前点位样式 */
+    private _currentMarkerStyle: { color: string; shape: string } = {
+        color: '#007AFF',
+        shape: 'circle'
+    };
+
+    /**
+     * 初始化栅格透明度滑条
+     */
+    private _initOpacitySlider(): void {
+        const slider = document.getElementById('raster-opacity-slider') as HTMLInputElement;
+        const valueLabel = document.getElementById('raster-opacity-value');
+        if (!slider) return;
+
+        slider.addEventListener('input', () => {
+            const opacity = parseInt(slider.value) / 100;
+            this._rasterOpacity = opacity;
+            if (valueLabel) {
+                valueLabel.textContent = `${slider.value}%`;
+            }
+            // 更新滑条背景渐变
+            slider.style.background = `linear-gradient(to right, var(--accent-color, #007AFF) 0%, var(--accent-color, #007AFF) ${slider.value}%, var(--bg-tertiary, #e0e0e0) ${slider.value}%, var(--bg-tertiary, #e0e0e0) 100%)`;
+            // 应用到所有栅格图层
+            this.adapter.setLayerOpacity('prediction', opacity);
+            this.adapter.setLayerOpacity('variance', opacity);
+        });
+    }
+
+    /**
+     * 设置栅格透明度（供外部直接调用）
+     */
+    setRasterOpacity(opacity: number): void {
+        this._rasterOpacity = Math.max(0.1, Math.min(1, opacity));
+        this.adapter.setLayerOpacity('prediction', this._rasterOpacity);
+        this.adapter.setLayerOpacity('variance', this._rasterOpacity);
+    }
+
+    /**
+     * 初始化点位样式选择器
+     */
+    private _initMarkerStylePicker(): void {
+        const colorPicker = document.getElementById('marker-color-picker') as HTMLInputElement;
+        const shapeSelect = document.getElementById('marker-shape-select') as HTMLSelectElement;
+        const colorHex = document.getElementById('marker-color-hex');
+        const previewSvg = document.getElementById('marker-preview-svg');
+
+        if (colorPicker) {
+            colorPicker.addEventListener('input', () => {
+                this._currentMarkerStyle.color = colorPicker.value;
+                if (colorHex) colorHex.textContent = colorPicker.value;
+                this._updateMarkerPreview(previewSvg, colorPicker.value, this._currentMarkerStyle.shape);
+            });
+        }
+
+        if (shapeSelect) {
+            shapeSelect.addEventListener('change', () => {
+                this._currentMarkerStyle.shape = shapeSelect.value;
+                this._updateMarkerPreview(previewSvg, this._currentMarkerStyle.color, shapeSelect.value);
+            });
+        }
+    }
+
+    /**
+     * 更新点位样式预览 SVG
+     */
+    private _updateMarkerPreview(svg: HTMLElement | null, color: string, shape: string): void {
+        if (!svg) return;
+        const size = 32;
+        const half = size / 2;
+        let shapeSvg = '';
+        switch (shape) {
+            case 'circle':
+                shapeSvg = `<circle cx="${half}" cy="${half}" r="13" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                break;
+            case 'square':
+                shapeSvg = `<rect x="4" y="4" width="24" height="24" rx="3" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                break;
+            case 'triangle':
+                shapeSvg = `<polygon points="16,3 29,29 3,29" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                break;
+            case 'diamond':
+                shapeSvg = `<polygon points="16,3 29,16 16,29 3,16" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                break;
+            case 'star':
+                shapeSvg = `<polygon points="16,3 20,12 30,13 23,20 25,30 16,24 7,30 9,20 2,13 12,12" fill="${color}" stroke="#fff" stroke-width="2"/>`;
+                break;
+        }
+        svg.innerHTML = shapeSvg;
+    }
+
+    /**
+     * 获取当前点位样式（供外部使用）
+     */
+    getCurrentMarkerStyle(): { color: string; shape: string } {
+        return { ...this._currentMarkerStyle };
     }
 
     /**
@@ -399,13 +503,16 @@ export class LayerManager implements ILayerManager {
      * 添加单个采样点（带性能优化）
      */
     async addSamplingPoint(pointData: SamplingPoint): Promise<void> {
+        // 注入当前点位样式
+        if (!pointData.style) {
+            pointData.style = { ...this._currentMarkerStyle };
+        }
+
         this.allMarkerData.push(pointData);
 
-        // 数量未超限直接添加
         if (this.allMarkerData.length <= this.MAX_VISIBLE_MARKERS) {
             await this.adapter.addMarker(pointData);
         } else {
-            // 超限后触发视口过滤
             this._refreshVisibleMarkers();
         }
     }

@@ -204,15 +204,62 @@ export class AMapAdapter extends MapAdapter {
 
     /**
      * 添加单个采样点
+     * 支持从 pointData.style 读取颜色和形状配置
      */
     async addMarker(pointData) {
+        const style = pointData.style;
+        const hexColor = style?.color || '#007AFF';
+        const shape = style?.shape || 'circle';
+
+        // 生成 SVG 标记内容
+        const svgContent = this._createMarkerSvg(hexColor, shape, 24);
+
         this.engine.addMarker([pointData.x, pointData.y], {
             title: `值: ${pointData.value}`,
-            data: pointData
+            data: pointData,
+            icon: null,
+            content: svgContent,
+            offset: new AMap.Pixel(-12, -12)
         });
 
         this.samplingPoints.push(pointData);
-        console.log('✅ 采样点已添加:', pointData);
+        console.log('✅ 采样点已添加:', pointData, '样式:', shape, hexColor);
+    }
+
+    /**
+     * 根据颜色和形状生成 SVG 字符串
+     */
+    _createMarkerSvg(hexColor, shape, size) {
+        const strokeColor = '#fff';
+        const strokeWidth = 1.5;
+        const half = size / 2;
+        let shapePath;
+
+        switch (shape) {
+            case 'circle':
+                shapePath = `<circle cx="${half}" cy="${half}" r="${half - 2}" fill="${hexColor}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>`;
+                break;
+            case 'square':
+                shapePath = `<rect x="2" y="2" width="${size - 4}" height="${size - 4}" rx="2" fill="${hexColor}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>`;
+                break;
+            case 'triangle':
+                shapePath = `<polygon points="${half},2 ${size - 2},${size - 2} 2,${size - 2}" fill="${hexColor}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>`;
+                break;
+            case 'diamond':
+                shapePath = `<polygon points="${half},2 ${size - 2},${half} ${half},${size - 2} 2,${half}" fill="${hexColor}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>`;
+                break;
+            case 'star':
+                shapePath = `<polygon points="${half},2 ${half + 5},${half - 4} ${size - 2},${half - 4} ${half + 7},${half + 3} ${half + 12},${size - 2} ${half},${half + 6} ${half - 12},${size - 2} ${half - 7},${half + 3} 2,${half - 4} ${half - 5},${half - 4}" fill="${hexColor}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>`;
+                break;
+            default:
+                shapePath = `<circle cx="${half}" cy="${half}" r="${half - 2}" fill="${hexColor}" stroke="${strokeColor}" stroke-width="${strokeWidth}"/>`;
+        }
+
+        return `<div style="width:${size}px;height:${size}px;pointer-events:none;">
+            <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
+                ${shapePath}
+            </svg>
+        </div>`;
     }
 
     /**

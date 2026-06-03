@@ -175,4 +175,35 @@
         background-color: rgba(28, 28, 30, 0.95) !important;
         color: #FFFFFF !important;
     }
+
+    /* 栅格透明度滑条 */
+    .opacity-slider {
+        background: linear-gradient(to right, #0A84FF 0%, #0A84FF 70%, #3a3a3c 70%, #3a3a3c 100%);
+    }
+
+    .opacity-slider::-webkit-slider-thumb {
+        background: #0A84FF;
+    }
+
+    .opacity-slider::-moz-range-thumb {
+        background: #0A84FF;
+    }
+
+    .layer-opacity-control {
+        border-top-color: #3a3a3c;
+    }
+
+    /* 点位样式控件 */
+    .color-picker {
+        border-color: #3a3a3c;
+        background: #2c2c2e;
+    }
+
+    .marker-style-preview {
+        background: #2c2c2e;
+    }
+
+    .color-hex-label {
+        color: #98989d;
+    }
 }

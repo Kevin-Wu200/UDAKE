@@ -278,13 +278,21 @@ export class GeoSceneAdapter extends MapAdapter {
 
     /**
      * 添加栅格图层
+     * 优先使用 ImageryLayer 加载栅格数据，失败时降级为 GeoJSON 点渲染
      */
     async addRasterLayer(type: 'prediction' | 'variance', url: string): Promise<void> {
         if (this.isMock) {
-            // Mock 模式下简化实现
             console.log(`Mock 模式：添加 ${type === 'prediction' ? '预测' : '方差'}栅格图层`);
-            // 在 Mock 模式下，我们只是记录日志，不实际添加图层
             return;
+        }
+
+        // 移除旧图层
+        if (this.layers[type]) {
+            this.map.remove(this.layers[type]);
+        }
+        // 移除旧的 GeoJSON 降级图层
+        if (this.layers[`geojson_${type}`]) {
+            this.map.remove(this.layers[`geojson_${type}`]);
         }
 
         try {
@@ -292,11 +300,6 @@ export class GeoSceneAdapter extends MapAdapter {
                 // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
                 import('@geoscene/core/layers/ImageryLayer').then((m: any) => m.default)
             ]);
-
-            // 移除旧图层
-            if (this.layers[type]) {
-                this.map.remove(this.layers[type]);
-            }
 
             const layer = new ImageryLayer({
                 url: url,
@@ -310,17 +313,144 @@ export class GeoSceneAdapter extends MapAdapter {
             await layer.when();
             console.log(`✅ ${type}栅格图层加载完成`);
         } catch (error) {
-            console.error(`❌ 加载${type}栅格失败:`, error);
-            throw error;
+            console.warn(`${type}栅格图层加载失败，尝试 GeoJSON 点渲染降级:`, (error as Error).message);
+            try {
+                const taskId = url.split('/').pop()?.split('.')[0]?.split('_')[0];
+                if (taskId) {
+                    const geojsonUrl = url.replace(/\.tif$/, '.geojson');
+                    const fullGeojsonUrl = geojsonUrl.startsWith('http') ? geojsonUrl : `${window.location.origin}${geojsonUrl}`;
+                    const response = await fetch(fullGeojsonUrl, { mode: 'cors' });
+                    if (response.ok) {
+                        const geojson = await response.json();
+                        if (geojson.features) {
+                            await this._renderGeoJSONPoints(geojson, type);
+                        }
+                    }
+                }
+            } catch (geojsonError) {
+                console.warn(`GeoJSON 降级渲染也失败:`, (geojsonError as Error).message);
+            }
         }
     }
 
     /**
+     * 将 GeoJSON 点数据渲染为彩色标记（栅格降级方案）
+     * 使用 SimpleMarkerSymbol + Graphic 在地图上绘制颜色分级标记
+     */
+    private async _renderGeoJSONPoints(geojson: GeoJSONFeatureCollection, type: 'prediction' | 'variance'): Promise<void> {
+        const layerKey = `geojson_${type}`;
+
+        // 计算值范围用于颜色映射
+        const values: number[] = [];
+        for (const f of geojson.features) {
+            const v = f.properties?.value ?? f.properties?.[type];
+            if (v !== null && v !== undefined && isFinite(v)) {
+                values.push(v);
+            }
+        }
+        if (values.length === 0) return;
+
+        const minVal = Math.min(...values);
+        const maxVal = Math.max(...values);
+        const span = maxVal - minVal || 1;
+
+        const [Graphic, Point, SimpleMarkerSymbol]: [any, any, any] = await Promise.all([
+            // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
+            import('@geoscene/core/Graphic').then((m: any) => m.default),
+            // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
+            import('@geoscene/core/geometry/Point').then((m: any) => m.default),
+            // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
+            import('@geoscene/core/symbols/SimpleMarkerSymbol').then((m: any) => m.default)
+        ]);
+
+        const graphics: any[] = [];
+        const MAX_POINTS = 5000;
+
+        for (let i = 0; i < Math.min(geojson.features.length, MAX_POINTS); i++) {
+            const feature = geojson.features[i];
+            const coords = feature.geometry?.coordinates;
+            if (!coords || coords.length < 2) continue;
+
+            const value = feature.properties?.value ?? feature.properties?.[type] ?? 0;
+            const normalizedValue = (value - minVal) / span;
+            const color = this._valueToColor(normalizedValue);
+
+            const point = new Point({
+                x: coords[0],
+                y: coords[1],
+                spatialReference: this.view.spatialReference
+            });
+
+            const symbol = new SimpleMarkerSymbol({
+                color: color,
+                size: 4 + normalizedValue * 8,
+                outline: {
+                    color: [255, 255, 255, 0.3],
+                    width: 0.5
+                }
+            });
+
+            const graphic = new Graphic({
+                geometry: point,
+                symbol: symbol,
+                attributes: {
+                    value: value,
+                    type: type
+                }
+            });
+
+            graphics.push(graphic);
+        }
+
+        // 使用 GraphicsLayer 管理大量标记
+        const [GraphicsLayer]: [any] = await Promise.all([
+            // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
+            import('@geoscene/core/layers/GraphicsLayer').then((m: any) => m.default)
+        ]);
+
+        // 替换旧图层
+        if (this.layers[layerKey]) {
+            this.map.remove(this.layers[layerKey]);
+        }
+
+        const graphicsLayer = new GraphicsLayer({
+            title: type === 'prediction' ? '预测值(GeoJSON降级)' : '方差值(GeoJSON降级)',
+            graphics: graphics
+        });
+
+        this.map.add(graphicsLayer);
+        this.layers[layerKey] = graphicsLayer;
+
+        console.log(`✅ GeoJSON 点渲染完成(${type}): ${graphics.length} 个点`);
+    }
+
+    /**
+     * 根据归一化值(0-1)返回 RGBA 颜色数组（蓝绿红渐变）
+     * 与 AMapAdapter._valueToColor 保持一致的配色方案
+     */
+    private _valueToColor(normalizedValue: number): [number, number, number, number] {
+        let r: number, g: number, b: number;
+        if (normalizedValue < 0.5) {
+            // 蓝色 -> 绿色
+            r = Math.floor(normalizedValue * 2 * 255);
+            g = Math.floor(100 + normalizedValue * 2 * 155);
+            b = Math.floor(255 - normalizedValue * 2 * 155);
+        } else {
+            // 绿色 -> 红色
+            const t = (normalizedValue - 0.5) * 2;
+            r = Math.min(255, Math.floor(100 + t * 155));
+            g = Math.floor(255 - t * 155);
+            b = Math.floor(100 - t * 100);
+        }
+        return [r, g, b, 0.7];
+    }
+
+    /**
      * 添加单个采样点
+     * 支持从 pointData.style 读取颜色和形状配置
      */
     async addMarker(pointData: SamplingPoint): Promise<void> {
         if (this.isMock) {
-            // Mock 模式下简化实现
             console.log(`Mock 模式：添加采样点 (${pointData.x}, ${pointData.y})`);
             this.samplingPoints.push(pointData);
             return;
@@ -335,7 +465,22 @@ export class GeoSceneAdapter extends MapAdapter {
             import('@geoscene/core/symbols/SimpleMarkerSymbol').then((m: any) => m.default)
         ]);
 
-        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        // 从 pointData.style 读取样式，否则使用默认值
+        const style = pointData.style;
+        const hexColor = style?.color || '#007AFF';
+        const shape = (style?.shape || 'circle') as string;
+
+        // 解析 hex 颜色为 RGBA 数组
+        const color = this._hexToRgba(hexColor, 0.8);
+
+        // 映射形状到 GeoScene SimpleMarkerSymbol style
+        const GEOSCENE_SHAPE_MAP: Record<string, string> = {
+            circle: 'circle',
+            square: 'square',
+            triangle: 'triangle',
+            diamond: 'diamond',
+            star: 'cross'  // GeoScene 无原生 star，用 cross 近似
+        };
 
         const point = new Point({
             x: pointData.x,
@@ -344,10 +489,11 @@ export class GeoSceneAdapter extends MapAdapter {
         });
 
         const symbol = new SimpleMarkerSymbol({
-            color: [0, 122, 255, 0.8],
-            size: 8,
+            color: color,
+            size: 10,
+            style: GEOSCENE_SHAPE_MAP[shape] || 'circle',
             outline: {
-                color: isDark ? [255, 255, 255] : [255, 255, 255],
+                color: [255, 255, 255, 1],
                 width: 2
             }
         });
@@ -371,7 +517,18 @@ export class GeoSceneAdapter extends MapAdapter {
             graphic.symbol = symbol;
         }, 50);
 
-        console.log('✅ 采样点已添加:', pointData);
+        console.log('✅ 采样点已添加:', pointData, '样式:', shape, hexColor);
+    }
+
+    /**
+     * 将 hex 颜色字符串转换为 RGBA 数组
+     */
+    private _hexToRgba(hex: string, alpha: number): [number, number, number, number] {
+        const clean = hex.replace('#', '');
+        const r = parseInt(clean.substring(0, 2), 16);
+        const g = parseInt(clean.substring(2, 4), 16);
+        const b = parseInt(clean.substring(4, 6), 16);
+        return [r, g, b, alpha];
     }
 
     /**

@@ -118,8 +118,23 @@ export class CoordinateInput {
 /** 采样模式 */
 export type SamplingMode = 'free' | 'region';
 
+/** 标记形状 */
+export type MarkerShape = 'circle' | 'square' | 'triangle' | 'diamond' | 'star';
+
+/** 标记样式 */
+export interface MarkerStyle {
+    color: string;   // hex 颜色值，如 '#007AFF'
+    shape: MarkerShape;
+}
+
+/** 默认标记样式 */
+export const DEFAULT_MARKER_STYLE: MarkerStyle = {
+    color: '#007AFF',
+    shape: 'circle'
+};
+
 /** 点添加回调 */
-export type PointAddedCallback = (pointData: SamplingPointValue) => Promise<void>;
+export type PointAddedCallback = (pointData: SamplingPointValue, markerStyle?: MarkerStyle) => Promise<void>;
 
 // ========== 自由采样类型 ==========
 
