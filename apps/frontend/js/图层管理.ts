@@ -170,6 +170,7 @@ export class LayerManager implements ILayerManager {
                 this._currentMarkerStyle.color = colorPicker.value;
                 if (colorHex) colorHex.textContent = colorPicker.value;
                 this._updateMarkerPreview(previewSvg, colorPicker.value, this._currentMarkerStyle.shape);
+                this._applyMarkerStyleToAll();
             });
         }
 
@@ -177,6 +178,7 @@ export class LayerManager implements ILayerManager {
             shapeSelect.addEventListener('change', () => {
                 this._currentMarkerStyle.shape = shapeSelect.value;
                 this._updateMarkerPreview(previewSvg, this._currentMarkerStyle.color, shapeSelect.value);
+                this._applyMarkerStyleToAll();
             });
         }
     }
@@ -207,6 +209,50 @@ export class LayerManager implements ILayerManager {
                 break;
         }
         svg.innerHTML = shapeSvg;
+    }
+
+    /**
+     * 将当前点位样式应用到所有已有采样点并刷新地图标记
+     */
+    private _applyMarkerStyleToAll(): void {
+        if (this.allMarkerData.length === 0) return;
+
+        // 更新所有采样点数据的样式
+        const newStyle = { ...this._currentMarkerStyle };
+        for (const pt of this.allMarkerData) {
+            pt.style = { ...newStyle };
+        }
+
+        // 清除视口缓存（样式已变，缓存失效）
+        this._viewportCache.bounds = null;
+        this._viewportCache.timestamp = 0;
+
+        // 回收当前所有可见标记
+        this._recycleAllVisible();
+
+        // 清理适配器中的采样点列表，避免重复计数
+        const adapterAny = this.adapter as any;
+        if (adapterAny.samplingPoints) {
+            adapterAny.samplingPoints.length = 0;
+        }
+
+        if (this.allMarkerData.length <= this.MAX_VISIBLE_MARKERS) {
+            // 标记数量少，全部重新绘制
+            for (const pt of this.allMarkerData) {
+                this.adapter.addMarker(pt);
+            }
+        } else {
+            // 标记数量多，仅绘制视口内的（最多 MAX_VISIBLE_MARKERS 个）
+            const bounds = this._getViewportBounds();
+            if (bounds) {
+                const inView = this.allMarkerData.filter(p => this._isInViewport(p, bounds!));
+                const toShow = inView.slice(0, this.MAX_VISIBLE_MARKERS);
+                for (const pt of toShow) {
+                    this.adapter.addMarker(pt);
+                }
+                this._updateClusterHint(inView.length - toShow.length);
+            }
+        }
     }
 
     /**

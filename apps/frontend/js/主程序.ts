@@ -1342,11 +1342,7 @@ class App {
                 break;
             }
             case 'export-geojson': {
-                const exportBtn = document.getElementById('export-prediction-geojson') as HTMLButtonElement | null;
-                const exportPanel = document.getElementById('export-panel');
-                if (exportBtn && exportPanel && exportPanel.style.display !== 'none') {
-                    exportBtn.click();
-                }
+                this.handleExport('prediction', 'geojson');
                 break;
             }
             case 'show-account-info':
@@ -2443,9 +2439,9 @@ class App {
                 return;
             }
 
-            const { AMapEngine } = await import('./map/core/AMapEngine.js');
-            if (engine instanceof AMapEngine) {
-                const success = engine.panToLocation();
+            // 使用鸭子类型检测 panToLocation 方法，统一支持所有引擎
+            if (typeof (engine as any).panToLocation === 'function') {
+                const success = (engine as any).panToLocation();
                 if (success) {
                     this.showStatus(t('dialog.resetMap.success'), 'success');
                 } else {

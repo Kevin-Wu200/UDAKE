@@ -203,6 +203,14 @@ export class GeoSceneAdapter extends MapAdapter {
             return;
         }
 
+        // 加载投影模块，确保不同空间参考间的自动投影可用
+        // 这是修复"坐标与地图位置不符"问题的关键：Graphic 使用 WGS84 (4326) 坐标，
+        // 而 MapView 使用 Web Mercator (3857)，必须加载投影模块才能正确转换
+        // @ts-ignore - GeoScene 模块通过 global.d.ts 声明
+        const projection: any = await import('@geoscene/core/geometry/projection');
+        await projection.load();
+        console.log('✅ 投影模块已加载');
+
         // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
         const GraphicsLayer: any = (await import('@geoscene/core/layers/GraphicsLayer')).default;
         this.graphicsLayer = new GraphicsLayer({
@@ -375,10 +383,11 @@ export class GeoSceneAdapter extends MapAdapter {
             const normalizedValue = (value - minVal) / span;
             const color = this._valueToColor(normalizedValue);
 
+            // GeoJSON 坐标使用 WGS84 (Wkid 4326)，显式设置空间参考
             const point = new Point({
                 x: coords[0],
                 y: coords[1],
-                spatialReference: this.view.spatialReference
+                spatialReference: { wkid: 4326 }
             });
 
             const symbol = new SimpleMarkerSymbol({
@@ -482,10 +491,13 @@ export class GeoSceneAdapter extends MapAdapter {
             star: 'cross'  // GeoScene 无原生 star，用 cross 近似
         };
 
+        // 使用 WGS84 (Wkid 4326) 空间参考创建几何点，因为 pointData.x/y 存储的是经纬度度数
+        // MapView 的 spatialReference 是 Web Mercator (3857)，
+        // 投影模块会在渲染时自动将 WGS84 坐标投影到视图的 Web Mercator 坐标系
         const point = new Point({
             x: pointData.x,
             y: pointData.y,
-            spatialReference: this.view.spatialReference
+            spatialReference: { wkid: 4326 }
         });
 
         const symbol = new SimpleMarkerSymbol({
@@ -550,9 +562,10 @@ export class GeoSceneAdapter extends MapAdapter {
             import('@geoscene/core/symbols/SimpleFillSymbol').then((m: any) => m.default)
         ]);
 
+        // 多边形坐标来自 GeoJSON，使用 WGS84 (Wkid 4326) 空间参考
         const polygon = new Polygon({
             rings: coordinates,
-            spatialReference: this.view.spatialReference
+            spatialReference: { wkid: 4326 }
         });
 
         const symbol = new SimpleFillSymbol({

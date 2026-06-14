@@ -20,6 +20,12 @@ export class GeoSceneEngine extends BaseMapEngine {
     /** 配置选项 */
     options: GeoSceneConfig;
 
+    /** 初始中心点（用于回到中心功能） */
+    private initialCenter: [number, number] = [116.39, 39.9];
+
+    /** 初始缩放级别（用于回到中心功能） */
+    private initialZoom: number = 5;
+
     constructor(options: GeoSceneConfig = {}) {
         super();
         this.supportsCustomReset = false;
@@ -104,6 +110,11 @@ export class GeoSceneEngine extends BaseMapEngine {
 
         await this.view!.when();
 
+        // 保存初始中心点和缩放级别（用于回到中心功能）
+        const initCenter = finalOptions.center || [116.39, 39.9];
+        this.initialCenter = initCenter as [number, number];
+        this.initialZoom = finalOptions.zoom || 5;
+
         console.log('✅ GeoScene 引擎初始化完成');
     }
 
@@ -143,6 +154,26 @@ export class GeoSceneEngine extends BaseMapEngine {
     }
 
     /**
+     * 回到初始中心点
+     * 将地图平滑移动到初始化时的中心点和缩放级别
+     * @returns 是否成功移动
+     */
+    panToLocation(): boolean {
+        if (!this.view) {
+            console.warn('⚠️ GeoScene 视图不存在，无法回到中心');
+            return false;
+        }
+
+        this.view.goTo({
+            center: this.initialCenter as any,
+            zoom: this.initialZoom
+        });
+
+        console.log('✅ GeoScene 地图已回到初始中心:', this.initialCenter);
+        return true;
+    }
+
+    /**
      * 适配到指定边界
      */
     async fitToBounds(bounds: Bounds): Promise<void> {
@@ -154,12 +185,14 @@ export class GeoSceneEngine extends BaseMapEngine {
         // @ts-ignore - ArcGIS 模块通过 global.d.ts 声明
         const Extent: any = (await import('@geoscene/core/geometry/Extent')).default;
 
+        // 边界值 (minLng/minLat/maxLng/maxLat) 是 WGS84 经纬度度数，
+        // 使用 Wkid 4326 而非 view.spatialReference (3857)，确保正确投影
         const extent = new Extent({
             xmin: minLng,
             ymin: minLat,
             xmax: maxLng,
             ymax: maxLat,
-            spatialReference: this.view.spatialReference
+            spatialReference: { wkid: 4326 }
         });
 
         await this.view.goTo({ target: extent });
