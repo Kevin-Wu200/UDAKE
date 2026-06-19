@@ -111,8 +111,8 @@ async def generate_recommendations(
             existing_values = None
             try:
                 task_info = task_manager.get_task_info(task_id)
-                if task_info and task_info.data_id:
-                    spatial_data = task_manager.get_spatial_data(task_info.data_id)
+                if task_info and task_info.get('data_id'):
+                    spatial_data = task_manager.get_spatial_data(task_info.get('data_id'))
                     if spatial_data:
                         existing_points = np.array([[p.x, p.y] for p in spatial_data.points])
                         existing_values = np.array([p.value for p in spatial_data.points])
@@ -138,7 +138,7 @@ async def generate_recommendations(
             for idx, rec in enumerate(improved_results["recommendations"]):
                 # 计算不确定性等级
                 variance_percentile = (np.percentile(variance, rec["variance"] * 100 / np.max(variance)))
-                uncertainty_level = int(np.ceil(variance_percentile * 5 / 100))
+                uncertainty_level = max(1, min(5, int(np.ceil(variance_percentile * 5 / 100))))
 
                 # 计算距离最近采样点的距离
                 if len(existing_points) > 0:
@@ -261,8 +261,8 @@ async def generate_recommendations(
         existing_points = None
         try:
             task_info = task_manager.get_task_info(task_id)
-            if task_info and task_info.data_id:
-                spatial_data = task_manager.get_spatial_data(task_info.data_id)
+            if task_info and task_info.get('data_id'):
+                spatial_data = task_manager.get_spatial_data(task_info.get('data_id'))
                 if spatial_data:
                     existing_points = np.array([[p.x, p.y] for p in spatial_data.points])
         except Exception as e:
@@ -291,9 +291,9 @@ async def generate_recommendations(
         # 为每个建议点添加详细标注
         recommendations = []
         for idx, rec in enumerate(base_recommendations["recommendations"]):
-            # 计算不确定性等级（1-5）
+            # 计算不确定性等级（1-5），并确保值在有效范围内
             variance_percentile = (np.percentile(variance, rec["variance"] * 100 / np.max(variance)))
-            uncertainty_level = int(np.ceil(variance_percentile * 5 / 100))
+            uncertainty_level = max(1, min(5, int(np.ceil(variance_percentile * 5 / 100))))
 
             # 计算距离最近采样点的距离
             if existing_points is not None and len(existing_points) > 0:

@@ -18,6 +18,7 @@ sys.path.insert(0, str(project_root))
 from ..constraints.boundary import BoundaryConstraint
 from ..constraints.budget import BudgetConstraint
 from ..constraints.distance import DistanceConstraint
+from ..constraints.time_window import TimeWindowConstraint
 from ..core.nsga2 import NSGA2Optimizer
 from ..objectives.accessibility import AccessibilityObjective
 from ..objectives.cost import CostObjective
@@ -115,6 +116,17 @@ async def create_optimization_task(request: OptimizationRequest):
 
         if 'budget' in request.constraints:
             constraints.append(BudgetConstraint(request.constraints['budget']))
+
+        if 'time_window' in request.constraints:
+            tw_config = request.constraints['time_window']
+            constraints.append(TimeWindowConstraint(
+                time_windows=tw_config.get('time_windows'),
+                max_total_time=tw_config.get('max_total_time', 480.0),
+                time_per_sample=tw_config.get('time_per_sample', 15.0),
+                travel_speed=tw_config.get('travel_speed', 30.0),
+                base_location=tw_config.get('base_location', (0, 0)),
+                start_time=tw_config.get('start_time', 0.0),
+            ))
 
         # 创建优化器
         optimizer = NSGA2Optimizer(  # noqa: F841
@@ -343,6 +355,14 @@ async def get_config():
                     'name': '预算约束',
                     'description': '限制采样总成本',
                     'type': 'numeric'
+                },
+                'time_window': {
+                    'name': '时间窗约束',
+                    'description': '限制各采样点的采集时间在指定时间窗内',
+                    'type': 'temporal',
+                    'default_max_total_time': 480,
+                    'default_time_per_sample': 15,
+                    'default_travel_speed': 30
                 }
             },
             'limits': {
@@ -495,7 +515,8 @@ async def get_optimization_status():
         available_constraints = [
             {"id": "boundary", "name": "边界约束", "description": "限制采样点在指定边界内"},
             {"id": "min_distance", "name": "最小间距约束", "description": "限制采样点最小间距"},
-            {"id": "budget", "name": "预算约束", "description": "限制采样总成本"}
+            {"id": "budget", "name": "预算约束", "description": "限制采样总成本"},
+            {"id": "time_window", "name": "时间窗约束", "description": "限制各采样点采集时间在指定时间窗内"}
         ]
 
         status_data = {

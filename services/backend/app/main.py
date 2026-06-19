@@ -64,6 +64,7 @@ from .api import (
     通用数据处理接口,
     配置接口,
     采样建议接口,
+    采样优化接口,
     采样点影响评估接口,
     项目管理接口,
     风险报告接口,
@@ -281,6 +282,7 @@ app.include_router(任务状态接口.router, prefix="/api", tags=["任务状态
 app.include_router(报告生成接口.router, prefix="/api", tags=["报告生成"])
 app.include_router(模型推荐接口.router, prefix="/api", tags=["模型推荐"])
 app.include_router(采样建议接口.router, prefix="/api", tags=["采样建议"])
+app.include_router(采样优化接口.router, prefix="/api", tags=["采样优化"])
 app.include_router(采样点影响评估接口.router, prefix="/api/sampling-impact", tags=["采样点影响评估"])
 app.include_router(行业配置接口.router, prefix="/api", tags=["行业配置"])
 app.include_router(进度详情接口.router, prefix="/api", tags=["进度详情"])

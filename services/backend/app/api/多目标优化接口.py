@@ -18,6 +18,7 @@ from multi_objective_optimization import (
     CostObjective,
     DistanceConstraint,
     NSGA2Optimizer,
+    TimeWindowConstraint,
     VarianceObjective,
 )
 from multi_objective_optimization.utils.metrics import calculate_performance_metrics
@@ -279,6 +280,20 @@ def run_optimization(
         budget_constraint = BudgetConstraint(budget, base_location=(0, 0))
         constraint_list.append(budget_constraint)
 
+    if "time_window" in constraints:
+        tw_config = constraints["time_window"]
+        time_window_constraint = TimeWindowConstraint(
+            time_windows=tw_config.get("time_windows"),
+            max_total_time=tw_config.get("max_total_time", 480.0),
+            time_per_sample=tw_config.get("time_per_sample", 15.0),
+            travel_speed=tw_config.get("travel_speed", 30.0),
+            base_location=tw_config.get("base_location", (0, 0)),
+            x_coords=x_coords,
+            y_coords=y_coords,
+            start_time=tw_config.get("start_time", 0.0),
+        )
+        constraint_list.append(time_window_constraint)
+
     # 创建优化器
     n_candidates = len(x_coords) * len(y_coords)
 
@@ -501,6 +516,14 @@ async def get_optimization_config():
                     "description": "限制采样点最小间距",
                     "type": "numeric",
                     "default_value": 50
+                },
+                "time_window": {
+                    "name": "时间窗约束",
+                    "description": "限制各采样点的采集时间在指定时间窗内",
+                    "type": "temporal",
+                    "default_max_total_time": 480,
+                    "default_time_per_sample": 15,
+                    "default_travel_speed": 30
                 },
                 "budget": {
                     "name": "预算约束",

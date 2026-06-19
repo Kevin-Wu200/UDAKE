@@ -10,6 +10,7 @@ from .constraints.base import BaseConstraint
 from .constraints.boundary import BoundaryConstraint
 from .constraints.budget import BudgetConstraint
 from .constraints.distance import DistanceConstraint
+from .constraints.time_window import TimeWindowConstraint
 from .core.nsga2 import NSGA2Optimizer
 from .core.optimizer import BaseOptimizer
 from .core.population import Individual, Population
@@ -34,6 +35,7 @@ __all__ = [
     'BoundaryConstraint',
     'DistanceConstraint',
     'BudgetConstraint',
+    'TimeWindowConstraint',
     'STSamplingPoint',
     'STObjectiveFunctions',
     'STConstraintConfig',

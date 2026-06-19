@@ -97,3 +97,5 @@ class FusionTask(BaseModel):
     error: Optional[str] = None
     created_at: str
     completed_at: Optional[str] = None
+    optimization_results: Optional[Dict[str, Any]] = None
+    comparison_results: Optional[Dict[str, Any]] = None
