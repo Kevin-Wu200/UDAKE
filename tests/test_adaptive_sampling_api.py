@@ -4,44 +4,12 @@
 """
 import sys
 import os
-import json
 
 # 确保项目路径正确
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'services', 'backend'))
 
-from fastapi.testclient import TestClient
 
-# 模拟必要的模块以避免完整依赖
-import importlib
-
-
-def run_api_tests():
-    """通过直接调用模块函数测试 API 功能"""
-
-    # 模拟 settings.RESULTS_DIR
-    import pathlib
-    import tempfile
-    from unittest.mock import patch, MagicMock
-
-    tmpdir = tempfile.mkdtemp()
-
-    with patch('app.api.采样优化接口.settings') as mock_settings:
-        mock_settings.RESULTS_DIR = pathlib.Path(tmpdir)
-
-        # 导入模块
-        from app.api.采样优化接口 import (
-            adaptive_sessions,
-            start_adaptive_sampling,
-            adaptive_sampling_iterate,
-            stop_adaptive_sampling,
-            get_adaptive_sampling_status,
-        )
-
-        # 确保会话存储清空
-        adaptive_sessions.clear()
-
-
-async def test_start_adaptive_sampling():
+async def _start_adaptive_sampling_test():
     """测试启动自适应采样"""
     from app.api.采样优化接口 import adaptive_sessions, start_adaptive_sampling
 
@@ -73,7 +41,7 @@ async def test_start_adaptive_sampling():
     return session_id
 
 
-async def test_adaptive_iterate(session_id):
+async def _adaptive_iterate_test(session_id):
     """测试自适应采样迭代"""
     from app.api.采样优化接口 import adaptive_sessions, adaptive_sampling_iterate
 
@@ -88,7 +56,7 @@ async def test_adaptive_iterate(session_id):
     result = await adaptive_sampling_iterate(session_id=session_id)
     assert result["success"] is True
     assert result["data"]["iteration"] == 2
-    print(f"✓ 第2次迭代成功")
+    print("✓ 第2次迭代成功")
 
     # 检查会话状态
     session = adaptive_sessions[session_id]
@@ -97,7 +65,7 @@ async def test_adaptive_iterate(session_id):
     print(f"✓ 会话状态正确: {session['status']}, 迭代次数: {len(session['iterations'])}")
 
 
-async def test_get_adaptive_status(session_id):
+async def _get_adaptive_status_test(session_id):
     """测试获取自适应采样状态"""
     from app.api.采样优化接口 import get_adaptive_sampling_status
 
@@ -116,7 +84,7 @@ async def test_get_adaptive_status(session_id):
     print(f"✓ 获取所有会话列表成功, 共 {result['data']['total']} 个会话")
 
 
-async def test_stop_adaptive_sampling(session_id):
+async def _stop_adaptive_sampling_test(session_id):
     """测试停止自适应采样"""
     from app.api.采样优化接口 import adaptive_sessions, stop_adaptive_sampling
 
@@ -127,10 +95,10 @@ async def test_stop_adaptive_sampling(session_id):
     session = adaptive_sessions[session_id]
     assert session["status"] == "stopped"
     assert session["completed_at"] is not None
-    print(f"✓ 停止自适应采样成功")
+    print("✓ 停止自适应采样成功")
 
 
-async def test_stop_already_stopped(session_id):
+async def _stop_already_stopped_test(session_id):
     """测试重复停止已停止的会话"""
     from app.api.采样优化接口 import stop_adaptive_sampling
 
@@ -142,7 +110,7 @@ async def test_stop_already_stopped(session_id):
         print(f"✓ 重复停止正确拒绝: {e.detail}")
 
 
-async def test_iterate_after_stop(session_id):
+async def _iterate_after_stop_test(session_id):
     """测试已停止会话无法继续迭代"""
     from app.api.采样优化接口 import adaptive_sampling_iterate
 
@@ -154,7 +122,7 @@ async def test_iterate_after_stop(session_id):
         print(f"✓ 已停止会话无法继续迭代: {e.detail}")
 
 
-async def test_session_not_found():
+async def _session_not_found_test():
     """测试访问不存在的会话"""
     from app.api.采样优化接口 import (
         adaptive_sampling_iterate,
@@ -170,7 +138,7 @@ async def test_session_not_found():
         print("✗ 应抛出404")
     except Exception as e:
         assert "不存在" in str(e.detail)
-        print(f"✓ 不存在的会话迭代正确返回404")
+        print("✓ 不存在的会话迭代正确返回404")
 
     # 停止
     try:
@@ -178,7 +146,7 @@ async def test_session_not_found():
         print("✗ 应抛出404")
     except Exception as e:
         assert "不存在" in str(e.detail)
-        print(f"✓ 不存在的会话停止正确返回404")
+        print("✓ 不存在的会话停止正确返回404")
 
     # 状态查询
     try:
@@ -186,10 +154,10 @@ async def test_session_not_found():
         print("✗ 应抛出404")
     except Exception as e:
         assert "不存在" in str(e.detail)
-        print(f"✓ 不存在的会话状态查询正确返回404")
+        print("✓ 不存在的会话状态查询正确返回404")
 
 
-async def test_max_iterations():
+async def _max_iterations_test():
     """测试达到最大迭代次数自动停止"""
     from app.api.采样优化接口 import adaptive_sessions, start_adaptive_sampling, adaptive_sampling_iterate
 
@@ -216,7 +184,7 @@ async def test_max_iterations():
     # 第3次迭代应该提示已完成
     result = await adaptive_sampling_iterate(session_id=sid)
     if result["data"]["status"] == "completed":
-        print(f"✓ 超过最大迭代次数正确返回完成状态")
+        print("✓ 超过最大迭代次数正确返回完成状态")
 
 
 async def run_all():
@@ -225,24 +193,24 @@ async def run_all():
     print("=" * 60)
 
     # 测试启动
-    session_id = await test_start_adaptive_sampling()
+    session_id = await _start_adaptive_sampling_test()
 
     # 测试状态查询（含列表）
-    await test_get_adaptive_status(session_id)
+    await _get_adaptive_status_test(session_id)
 
     # 测试迭代
-    await test_adaptive_iterate(session_id)
+    await _adaptive_iterate_test(session_id)
 
     # 测试停止
-    await test_stop_adaptive_sampling(session_id)
+    await _stop_adaptive_sampling_test(session_id)
 
     # 测试边界情况
-    await test_stop_already_stopped(session_id)
-    await test_iterate_after_stop(session_id)
-    await test_session_not_found()
+    await _stop_already_stopped_test(session_id)
+    await _iterate_after_stop_test(session_id)
+    await _session_not_found_test()
 
     # 测试最大迭代次数
-    await test_max_iterations()
+    await _max_iterations_test()
 
     print("\n🎉 所有自适应采样 API 测试通过!")
 
